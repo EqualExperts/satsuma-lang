@@ -344,7 +344,7 @@ export function buildIndex(parsedFiles: (ParsedFile | FileData)[]): ExtractedWor
           resolvedMapping = `<anon>@${filePath}:${parentRow}`;
         }
       }
-      allArrowRecords.push({ ...ar, mapping: resolvedMapping, file: filePath } as ArrowRecord);
+      allArrowRecords.push({ ...ar, mapping: resolvedMapping, file: filePath });
     }
     if (fileData.nlRefData) {
       for (const nr of fileData.nlRefData) {
@@ -352,7 +352,7 @@ export function buildIndex(parsedFiles: (ParsedFile | FileData)[]): ExtractedWor
         const mapping = nr.mapping?.startsWith("<anon>@:")
           ? nr.mapping.replace("<anon>@:", `<anon>@${filePath}:`)
           : nr.mapping;
-        allNLRefData.push({ ...nr, mapping, file: filePath } as NLRefData);
+        allNLRefData.push({ ...nr, mapping, file: filePath });
       }
     }
     if (fileData.notes) {

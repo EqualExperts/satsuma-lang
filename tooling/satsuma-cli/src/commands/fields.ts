@@ -184,7 +184,7 @@ function filterUnmappedFields(fields: FieldWithTags[], mapped: Set<string>, pref
       // 'mapped' only means it was registered as a prefix of a child arrow
       // (via addPathAndPrefixes), not that the record itself was directly targeted.
       // A record is excluded only when all its children are covered.
-      const unmappedChildren = filterUnmappedFields(f.children as FieldWithTags[], mapped, path);
+      const unmappedChildren = filterUnmappedFields(f.children, mapped, path);
       if (unmappedChildren.length > 0) {
         result.push({ ...f, children: unmappedChildren });
       }
@@ -216,7 +216,7 @@ function enrichFieldMeta(_schemaName: string, fields: FieldWithTags[], _parsedFi
         }
         if (tags.length > 0) field.tags = tags;
       }
-      if (field.children) enrich(field.children as FieldWithTags[]);
+      if (field.children) enrich(field.children);
     }
   }
   enrich(fields);

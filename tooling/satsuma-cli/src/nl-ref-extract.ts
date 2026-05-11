@@ -49,7 +49,7 @@ function makeLookup(index: ExtractedWorkspace): DefinitionLookup {
     getFragment: (key) => index.fragments?.get(key) ?? null,
     hasTransform: (key) => (index.transforms?.has(key) ?? false),
     getMapping: (key) => index.mappings.get(key) ?? null,
-    iterateSchemas: () => index.schemas.entries() as unknown as Iterable<[string, { fields: import("@satsuma/core").FieldDecl[]; hasSpreads: boolean; namespace?: string | null; spreads?: string[] }]>,
+    iterateSchemas: () => index.schemas.entries(),
     expandSpreads: (entity, ns) => expandEntityFields(entity, ns, index),
   };
 }
