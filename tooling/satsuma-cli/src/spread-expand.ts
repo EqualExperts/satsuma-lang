@@ -46,9 +46,9 @@ export function expandSpreads(
   fieldPaths: Set<string>,
   diagnostics: SpreadDiagnostic[] = [],
 ): boolean {
-  const resolveRef = makeIndexRefResolver(currentNs, index.fragments as unknown as Map<string, unknown>);
-  const lookupFragment = (key: string) => index.fragments.get(key) as SpreadEntity | undefined;
-  const lookupSchema = (key: string) => index.schemas.get(key) as SpreadEntity | undefined;
+  const resolveRef = makeIndexRefResolver(currentNs, index.fragments);
+  const lookupFragment = (key: string) => index.fragments.get(key);
+  const lookupSchema = (key: string) => index.schemas.get(key);
   return _expandSpreads(schemaKeys, currentNs, resolveRef, lookupFragment, fieldPaths, diagnostics, lookupSchema);
 }
 
@@ -61,8 +61,8 @@ export function expandEntityFields(
   currentNs: string | null,
   index: ExtractedWorkspace,
 ): ExpandedField[] {
-  const resolveRef = makeIndexRefResolver(currentNs, index.fragments as unknown as Map<string, unknown>);
-  const lookupFragment = (key: string) => index.fragments.get(key) as SpreadEntity | undefined;
+  const resolveRef = makeIndexRefResolver(currentNs, index.fragments);
+  const lookupFragment = (key: string) => index.fragments.get(key);
   return _expandEntityFields(entity, currentNs, resolveRef, lookupFragment);
 }
 
@@ -75,7 +75,7 @@ export function expandNestedSpreads(
   currentNs: string | null,
   index: ExtractedWorkspace,
 ): void {
-  const resolveRef = makeIndexRefResolver(currentNs, index.fragments as unknown as Map<string, unknown>);
-  const lookupFragment = (key: string) => index.fragments.get(key) as SpreadEntity | undefined;
+  const resolveRef = makeIndexRefResolver(currentNs, index.fragments);
+  const lookupFragment = (key: string) => index.fragments.get(key);
   _expandNestedSpreads(fields, currentNs, resolveRef, lookupFragment);
 }

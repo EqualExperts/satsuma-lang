@@ -26,8 +26,8 @@ export function parseFile(filePath: string): ParsedFile {
   const parser = getParser();
   const tree = parser.parse(src);
   if (!tree) throw new Error(`parse returned null for ${filePath}`);
-  const errorCount = countErrors(tree.rootNode as unknown as SyntaxNode);
-  return { filePath, src, tree: tree as unknown as Tree, errorCount };
+  const errorCount = countErrors(tree.rootNode);
+  return { filePath, src, tree, errorCount };
 }
 
 /**
@@ -37,8 +37,8 @@ export function parseSource(src: string): { src: string; tree: Tree; errorCount:
   const parser = getParser();
   const tree = parser.parse(src);
   if (!tree) throw new Error("parse returned null");
-  const errorCount = countErrors(tree.rootNode as unknown as SyntaxNode);
-  return { src, tree: tree as unknown as Tree, errorCount };
+  const errorCount = countErrors(tree.rootNode);
+  return { src, tree, errorCount };
 }
 
 /**
