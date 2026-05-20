@@ -35,6 +35,11 @@ This directory documents conventions for representing esoteric and non-standard 
 | MARC21 | [`marc21/`](marc21/) | Tag/indicator/subfield model, cataloguing semantics |
 | iCalendar | [`icalendar/`](icalendar/) | Line folding, recurrence rules, timezone handling |
 
+### Modern Data Formats
+| Format | Directory | What it Stresses |
+|--------|-----------|-----------------|
+| Apache Avro | [`avro/`](avro/) | Union nullability, logical types, schema evolution, Schema Registry coupling |
+
 ## General Principles
 
 These conventions apply across all formats:
@@ -67,5 +72,6 @@ The `examples/` directory at the repo root contains full working Satsuma files f
 |--------|---------------|---------|-----------------|
 | EDI (EDIFACT / ODETTE / TRADACOMS) | [`edi/`](edi/) | `examples/edi-to-json/pipeline.stm` | Qualifier filters, implied decimals, positional correlation with `each` |
 | JSON / JSON API | [`json/`](json/) | `examples/json-api-to-parquet/pipeline.stm` | Deep nesting, array iteration, relative paths, JSON blob preservation |
+| Apache Avro | [`avro/`](avro/) | `examples/cobol-to-avro/pipeline.stm` (Avro as target) | Union nullability, logical types, schema evolution, Schema Registry coupling |
 
 The remaining conventions in this directory focus on formats that are **not** yet covered by canonical examples and where Satsuma's mixed-model approach provides the most value.
