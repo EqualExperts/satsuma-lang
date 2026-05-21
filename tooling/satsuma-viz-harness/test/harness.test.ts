@@ -64,6 +64,8 @@ let reportsUri: string;
 let sapUri: string;
 /** Filter / flatten / governance fixture — multi-source joins, flatten, notes. */
 let ffgUri: string;
+/** buy-to-om-order contract fixture — used for compact card expansion tests. */
+let buyToOmUri: string;
 
 /**
  * Resolve fixture URIs before tests run.  The harness API serves the full list;
@@ -81,7 +83,9 @@ test.beforeAll(async ({ request }) => {
   const sap = find("sap-po-to-mfcs/pipeline.stm");
   const ffg = find("filter-flatten-governance/filter-flatten-governance.stm");
 
-  if (!sfdc || !metrics || !nsPlatform || !reports || !sap || !ffg) {
+  const buyToOm = find("contracts/buy-to-om-order.stm");
+
+  if (!sfdc || !metrics || !nsPlatform || !reports || !sap || !ffg || !buyToOm) {
     throw new Error("Required fixtures not found in /api/fixtures");
   }
 
@@ -91,6 +95,7 @@ test.beforeAll(async ({ request }) => {
   reportsUri = reports.uri;
   sapUri = sap.uri;
   ffgUri = ffg.uri;
+  buyToOmUri = buyToOm.uri;
 });
 
 /**
@@ -1243,3 +1248,87 @@ test.describe("Geometry sanity — overview layout invariants", () => {
 // single-file vs lineage card-visibility behaviour is tightened, add a
 // describe block here that asserts a specific imported card is hidden in
 // single-file mode and visible in lineage mode.
+
+test.describe("Compact card expansion in overview", () => {
+  // Uses buy-to-om-order.stm: two compact schema cards (buy_order, om_order)
+  // with enough fields to make expansion meaningful.
+
+  test.beforeEach(async ({ page }) => {
+    await page.goto("/");
+    await page.locator(".toggle-btn[data-mode='single']").click();
+    await loadFixture(page, buyToOmUri);
+  });
+
+  test("compact schema card shows no fields initially", async ({ page }) => {
+    // Compact cards in overview mode display only the schema name and a field
+    // count.  The fields list must be absent until the user clicks the header.
+    const card = page.locator("[data-testid^='overview-schema-card-buy-order']");
+    await expect(card).toBeVisible();
+
+    // The fields section is rendered only when _compactExpanded is true.
+    // In the initial state the card renders no field-row elements.
+    const fields = card.locator("[data-testid$='-field-id']");
+    await expect(fields).toHaveCount(0);
+  });
+
+  test("clicking a compact card header expands fields", async ({ page }) => {
+    // A single click on the compact card header must toggle _compactExpanded
+    // and render the fields list below the header.
+    const card = page.locator("[data-testid^='overview-schema-card-buy-order']");
+    await card.locator(".header").click();
+
+    // At least one field row must now appear inside the card.
+    const fields = card.locator("[data-testid$='-field-id']");
+    await expect(fields.first()).toBeVisible({ timeout: 5_000 });
+  });
+
+  test("clicking the compact card header a second time collapses the fields", async ({ page }) => {
+    // Two clicks must return the card to its compact (fields-hidden) state.
+    const card = page.locator("[data-testid^='overview-schema-card-buy-order']");
+    const header = card.locator(".header");
+
+    await header.click();
+    // Fields visible after first click.
+    await expect(card.locator("[data-testid$='-field-id']").first()).toBeVisible({ timeout: 5_000 });
+
+    await header.click();
+    // Fields gone after second click.
+    await expect(card.locator("[data-testid$='-field-id']")).toHaveCount(0);
+  });
+
+  test("expanding a compact card grows the overview canvas height", async ({ page }) => {
+    // When fields expand, _onCompactToggled re-measures the positioned cards
+    // and updates _overviewCanvasHeight.  The canvas element's inline height
+    // style must be larger after expansion than before.
+    const canvas = page.locator(".canvas");
+    const heightBefore = await canvas.evaluate((el) => el.getBoundingClientRect().height);
+
+    const card = page.locator("[data-testid^='overview-schema-card-buy-order']");
+    await card.locator(".header").click();
+    await expect(card.locator("[data-testid$='-field-id']").first()).toBeVisible({ timeout: 5_000 });
+
+    // Wait for the canvas resize to propagate (triggered via updateComplete in _onCompactToggled).
+    await page.waitForTimeout(200);
+    const heightAfter = await canvas.evaluate((el) => el.getBoundingClientRect().height);
+
+    expect(heightAfter).toBeGreaterThan(heightBefore);
+  });
+
+  test("expanding a compact card still fires a navigate event", async ({ page }) => {
+    // Clicking a compact card header both expands the fields and dispatches
+    // SzNavigateEvent so hosts like VS Code can jump to the schema source.
+    await page.evaluate(() => window.__satsumaHarness.clearEvents());
+
+    const card = page.locator("[data-testid^='overview-schema-card-buy-order']");
+    await card.locator(".header").click();
+
+    await expect.poll(async () => recordedEvents(page, "navigate")).toContainEqual(
+      expect.objectContaining({
+        detail: expect.objectContaining({
+          uri: expect.stringContaining("buy-to-om-order.stm"),
+          line: expect.any(Number),
+        }),
+      }),
+    );
+  });
+});
