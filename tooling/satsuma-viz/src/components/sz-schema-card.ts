@@ -453,6 +453,10 @@ export class SzSchemaCard extends LitElement {
   @state()
   private _collapsed = false;
 
+  /** Whether a compact card has been expanded by the user to reveal its fields. */
+  @state()
+  private _compactExpanded = false;
+
   @state()
   private _notesExpanded = true;
 
@@ -680,9 +684,10 @@ export class SzSchemaCard extends LitElement {
     return html`
       <div>
         ${this._renderNamespacePill()}
-        <div class="header ${isReport ? "report" : ""}" @click=${() => this._navigate(s.location)}>
+        <div class="header ${isReport ? "report" : ""}" @click=${this._onCompactHeaderClick}>
           ${this._headerIcon(isReport)}
           <span class="header-name">${displayName}</span>
+          <span class="header-toggle" ?data-collapsed=${!this._compactExpanded}>&#9660;</span>
           <span class="header-count">${totalFields} fields</span>
         </div>
         ${metaPills.length > 0
@@ -692,8 +697,23 @@ export class SzSchemaCard extends LitElement {
               )}
             </div>`
           : ""}
+        ${this._compactExpanded
+          ? html`<div class="fields">
+              ${s.fields.map((f) => this._renderField(f, 0))}
+            </div>`
+          : ""}
       </div>
     `;
+  }
+
+  private _onCompactHeaderClick() {
+    this._compactExpanded = !this._compactExpanded;
+    this.style.overflow = this._compactExpanded ? "visible" : "";
+    // Notify the parent viz so it can grow the canvas to fit the expanded fields.
+    this.dispatchEvent(new Event("sz-compact-toggled", { bubbles: true, composed: true }));
+    if (this.schema) {
+      this._navigate(this.schema.location);
+    }
   }
 
   private _onHeaderClick() {

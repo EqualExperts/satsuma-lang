@@ -708,6 +708,10 @@ export class SatsumaViz extends LitElement {
   @state()
   private _overviewLayout: OverviewLayoutResult | null = null;
 
+  /** Canvas height for overview mode — starts at layout height but grows when compact cards expand. */
+  @state()
+  private _overviewCanvasHeight = 0;
+
   @state()
   private _selectedMapping: MappingBlock | null = null;
 
@@ -875,6 +879,7 @@ export class SatsumaViz extends LitElement {
       ]);
       this._layout = detail;
       this._overviewLayout = overview;
+      this._overviewCanvasHeight = overview.height;
     } catch {
       this._layoutError = true;
     }
@@ -1149,6 +1154,21 @@ export class SatsumaViz extends LitElement {
     this._panY = 0;
   }
 
+  /** Grow the overview canvas height to fit any compact cards that have been expanded. */
+  private _onCompactToggled() {
+    // Wait for Lit to re-render the expanded fields before measuring.
+    void this.updateComplete.then(() => {
+      const canvas = this.renderRoot?.querySelector?.(".canvas") as HTMLElement | null;
+      if (!canvas || !this._overviewLayout) return;
+      const cards = Array.from(canvas.querySelectorAll(".positioned-card")) as HTMLElement[];
+      let maxBottom = this._overviewLayout.height;
+      for (const card of cards) {
+        maxBottom = Math.max(maxBottom, card.offsetTop + card.offsetHeight);
+      }
+      this._overviewCanvasHeight = maxBottom;
+    });
+  }
+
   private _fit() {
     const viewport = this.renderRoot?.querySelector?.(".viewport") as HTMLElement | null;
     const canvas = this.renderRoot?.querySelector?.(".canvas") as HTMLElement | null;
@@ -1330,7 +1350,8 @@ export class SatsumaViz extends LitElement {
   /** Render the overview: compact schema cards + thick overview edges. */
   private _renderOverview(overview: OverviewLayoutResult, namespaces: NamespaceGroup[]) {
     return html`
-      <div class="canvas" style="width: ${overview.width + 48}px; height: ${overview.height + 48}px; padding: 24px;">
+      <div class="canvas" style="width: ${overview.width + 48}px; height: ${this._overviewCanvasHeight + 48}px; padding: 24px;"
+        @sz-compact-toggled=${this._onCompactToggled}>
         <!-- Overview SVG edge layer (filtered to visible nodes) -->
         <sz-overview-edge-layer
           style="left: 24px; top: 0; z-index: 30;"

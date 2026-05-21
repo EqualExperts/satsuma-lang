@@ -126,6 +126,17 @@ The suite should include the following groups.
 - Clicking an arrow row records a navigation event for that arrow's source location.
 - Clicking export records an `export` event and verifies the SVG payload is non-empty, if export remains supported in the harness.
 
+#### Compact card expansion (overview)
+
+Compact schema cards in overview mode are click-to-expand: clicking the card header reveals the schema's fields inline without leaving the overview. This makes the harness useful for presenting schema structure to colleagues — previously clicking a compact card did nothing visible in the harness (though it still dispatches `SzNavigateEvent` for VS Code).
+
+- A compact card shows no field rows on initial load.
+- Clicking the header expands the fields list; clicking again collapses it.
+- Expanding a compact card grows the canvas height so fields are never clipped by the viewport boundary. The canvas height is re-measured from actual positioned-card DOM bounds after each toggle.
+- Expanding a compact card still dispatches a `navigate` event so VS Code integration continues to work.
+
+Implementation: `_compactExpanded` state in `sz-schema-card`; `_overviewCanvasHeight` reactive state in `satsuma-viz` updated on `sz-compact-toggled` event via DOM measurement in `_onCompactToggled()`.
+
 #### Filters and lineage mode
 
 - Namespace filter narrows `ns-platform` to one namespace and hides cards from the others.
@@ -212,6 +223,7 @@ Update the harness docs so contributors know:
     - `npm --prefix tooling/satsuma-viz-backend run test`
     - `npm --prefix tooling/satsuma-viz-harness run build`
     - Playwright via the existing sentinel watcher workflow
+11. Compact card expansion in overview mode is covered by Playwright tests: initial collapsed state, expand on click, collapse on second click, canvas height grows after expansion, `navigate` event fires on expand.
 
 ---
 
