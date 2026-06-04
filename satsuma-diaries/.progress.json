@@ -1,6 +1,6 @@
 {
-  "last_covered_date": "2026-04-07",
-  "last_entry_file": "satsuma-diaries/2026/04/2026-04-07.md",
-  "rolled_up_days": ["2026-04-03", "2026-04-04", "2026-04-05", "2026-04-06"],
-  "note": "Last entry refreshed: 2026-04-07. Covers four rolled-up quiet days, 53 local commits, late-day merged PR context through #228, and tk ticket context. Next run will cover from 2026-04-08."
+  "last_covered_date": "2026-06-04",
+  "last_entry_file": "satsuma-diaries/2026/06/2026-06-04.md",
+  "rolled_up_days": [],
+  "note": "Last entry written: 2026-06-04 (v0.8.0 release day, EE org migration via Feature 31). Skipped diary coverage for 2026-04-08 through 2026-06-03 — those days were absorbed into the release-day narrative as a brief 'two quiet months' preamble rather than written up as standalone or rollup entries. Next run will cover from 2026-06-05."
 }
