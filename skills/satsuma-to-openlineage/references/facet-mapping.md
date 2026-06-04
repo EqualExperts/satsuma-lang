@@ -11,7 +11,7 @@ These are defined by the OpenLineage spec and understood by all backends.
 ```json
 {
   "schema": {
-    "_producer": "https://github.com/thorbenlouw/satsuma-lang",
+    "_producer": "https://github.com/EqualExperts/satsuma-lang",
     "_schemaURL": "https://openlineage.io/spec/facets/1-2-0/SchemaDatasetFacet.json#/$defs/SchemaDatasetFacet",
     "fields": [
       {
@@ -57,7 +57,7 @@ Mark these with `"description": "(inferred from Satsuma metadata)"`.
 ```json
 {
   "columnLineage": {
-    "_producer": "https://github.com/thorbenlouw/satsuma-lang",
+    "_producer": "https://github.com/EqualExperts/satsuma-lang",
     "_schemaURL": "https://openlineage.io/spec/facets/1-1-0/ColumnLineageDatasetFacet.json#/$defs/ColumnLineageDatasetFacet",
     "fields": {
       "<target_field>": {
@@ -98,7 +98,7 @@ Satsuma paths like `customer.email -> customer_email` should be flattened:
 ```json
 {
   "documentation": {
-    "_producer": "https://github.com/thorbenlouw/satsuma-lang",
+    "_producer": "https://github.com/EqualExperts/satsuma-lang",
     "_schemaURL": "https://openlineage.io/spec/facets/1-1-0/DocumentationDatasetFacet.json#/$defs/DocumentationDatasetFacet",
     "description": "Customer master — CRM system of record",
     "contentType": "text/markdown"
@@ -115,7 +115,7 @@ For multi-line notes (triple-quoted), concatenate and set `contentType` to
 ```json
 {
   "ownership": {
-    "_producer": "https://github.com/thorbenlouw/satsuma-lang",
+    "_producer": "https://github.com/EqualExperts/satsuma-lang",
     "_schemaURL": "https://openlineage.io/spec/facets/1-0-1/OwnershipDatasetFacet.json#/$defs/OwnershipDatasetFacet",
     "owners": [
       { "name": "data-platform-team", "type": "TEAM" },
@@ -132,7 +132,7 @@ For multi-line notes (triple-quoted), concatenate and set `contentType` to
 ```json
 {
   "jobType": {
-    "_producer": "https://github.com/thorbenlouw/satsuma-lang",
+    "_producer": "https://github.com/EqualExperts/satsuma-lang",
     "_schemaURL": "https://openlineage.io/spec/facets/2-0-3/JobTypeJobFacet.json#/$defs/JobTypeJobFacet",
     "processingType": "BATCH",
     "integration": "SATSUMA",
@@ -159,8 +159,8 @@ Carries PII, classification, retention, compliance, and masking metadata.
 ```json
 {
   "satsuma_governance": {
-    "_producer": "https://github.com/thorbenlouw/satsuma-lang",
-    "_schemaURL": "https://github.com/thorbenlouw/satsuma-lang/blob/main/openlineage/SatsumaGovernanceDatasetFacet.json",
+    "_producer": "https://github.com/EqualExperts/satsuma-lang",
+    "_schemaURL": "https://github.com/EqualExperts/satsuma-lang/blob/main/openlineage/SatsumaGovernanceDatasetFacet.json",
     "classification": "RESTRICTED",
     "retention": "7y",
     "compliance": ["GDPR", "SOX"],
