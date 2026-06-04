@@ -634,6 +634,14 @@ jobs:
         with:
           fetch-depth: 0
 
+      # gitleaks-action v3 requires an org-tier licence
+      # (https://gitleaks.io/products) for org-owned repositories. Until the
+      # EqualExperts org has obtained a key and stored it as the
+      # GITLEAKS_LICENSE secret, this step skips itself rather than failing
+      # the build. The step re-enables automatically once the secret is set
+      # — no further code change required.
       - uses: gitleaks/gitleaks-action@v3
+        if: ${{ env.GITLEAKS_LICENSE != '' }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}
