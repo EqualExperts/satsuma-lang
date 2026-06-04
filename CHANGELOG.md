@@ -1,6 +1,11 @@
 # Changelog
 
-## Unreleased
+## v0.8.0 — 2026-06-04
+
+Mostly an additive release: five new agent skills, a viz UX improvement for
+compact mapping cards, a fix to natural-language `@ref` parsing, broader
+test coverage across the toolchain, and the project's move under Equal
+Experts stewardship. No language or grammar changes.
 
 ### Project ownership and brand alignment (Feature 31)
 
@@ -28,6 +33,119 @@
   describing each file. The published site footer carries the tagline "An
   Equal Experts open-source project" and the top navigation gains an EE
   brand-mark link pointing at `https://www.equalexperts.com/`.
+
+### Agent Skills
+
+- **Five new skills shipped under `skills/`**, all following the
+  [agentskills.io](https://agentskills.io) standard and runnable from any
+  agent runtime that supports skills (Claude Code, Claude Desktop, etc.):
+  - **`satsuma-explainer`** — plain-English walkthroughs of `.stm` files
+    plus risk assessments, PII audits, coverage checks, and impact analysis
+    for non-technical stakeholders.
+  - **`satsuma-from-dbt`** — reverse-engineer Satsuma mapping specs from an
+    existing dbt project so teams can adopt Satsuma without starting over.
+  - **`satsuma-to-dbt`** — scaffold an idiomatic dbt project (staging /
+    marts, Kimball stars, Data Vault 2.0, exposures) from `.stm` specs.
+  - **`satsuma-sample-data`** — generate realistic CSV/JSON fixtures from a
+    schema, respecting types, enums, PII patterns, and referential
+    integrity across tables.
+  - **`satsuma-to-openlineage`** — emit OpenLineage 2-0-2 RunEvents with
+    column-level lineage for Marquez, DataHub, Atlan, and OpenMetadata.
+- **Skills now assume a globally-installed `satsuma` CLI** rather than
+  invoking via `npx`. Install the CLI tarball once with `npm install -g`
+  and all skills resolve it from PATH.
+- **Copilot + Excel reverse-engineering tutorial** added under
+  `docs/tutorials/` walking through using GitHub Copilot to convert legacy
+  Excel mapping spreadsheets into Satsuma.
+
+### VS Code Visualization
+
+- **Compact overview cards expand on click.** In overview mode, compact
+  schema cards now expand inline to reveal their fields without leaving the
+  workspace view. The canvas grows to accommodate the expanded card so it
+  is never clipped.
+- **Renderer test hooks** added to the viz component for mapping-detail and
+  field-coverage modes, enabling deterministic browser-based test coverage
+  through the new viz harness (Feature 30).
+
+### CLI / LSP / Core
+
+- **Unified validation pipeline.** Core, CLI, and LSP now share a single
+  semantic-validation interface, eliminating drift between the three
+  consumers' diagnostics.
+- **`loadWorkspace` API** introduced and adopted across CLI commands; the
+  earlier `WorkspaceIndex` type was renamed to `ExtractedWorkspace` for
+  consistency. Internal-only — no CLI surface change.
+- **`process.exit` centralised** in a single command runner so individual
+  command modules no longer call it directly.
+- **CLI duplicated consumer utilities consolidated** with their core
+  counterparts (`satsuma-core` is now the canonical home for shared NL-ref,
+  classification, metadata-extraction, and CST text helpers).
+
+### Bug fixes
+
+- **`@ref` regex anchoring + multiline position helper** — `@ref` tokens
+  inside multi-line natural-language strings are now resolved at the
+  correct source position. Previously, refs after a line break could be
+  attributed to the wrong line, producing misleading lineage. Reported and
+  fixed in `sl-dkr6`.
+- **`metrics-platform` example validates with zero warnings** (`sl-wzpe`)
+  and namespaces example regression fixed.
+- **CLI `arrows` command** no longer destructures an unused `parsedFiles`
+  value.
+- **Site release-asset download URLs** corrected on the cli / vscode /
+  learn pages.
+- **VS Code extension build adapted for `vscode-languageclient` v10** —
+  resolves a peer-dependency mismatch in the extension build.
+
+### Schema format conventions
+
+- **Apache Avro** added to the schema-format convention guides under
+  `docs/conventions-for-schema-formats/avro/`, with mappings between Avro
+  records, fields, logical types, unions, and Satsuma schemas.
+
+### Test coverage and tooling
+
+- **Viz harness (Feature 30) test suite expanded** from baseline coverage
+  to comprehensive: canonical mapping-detail content, field-coverage and
+  hover highlighting, toolbar namespace + file filter behaviour, geometry
+  sanity helpers, overview edge anchoring across all fixture families, and
+  a real arrow-row click test. A screenshot review workflow is also
+  available for human-in-the-loop visual verification.
+- **Grammar recovery corpus expanded** with additional malformed-input
+  cases.
+- **LSP / CLI custom-request, completion, and recovery test coverage
+  grown** (`sl-63ix`).
+- **Per-module coverage gates** raised across `satsuma-core`, `satsuma-viz`,
+  `satsuma-viz-model`, `satsuma-viz-backend`, `satsuma-lsp`, and
+  `satsuma-cli`. CI matrices the coverage jobs so per-module results are
+  reported separately.
+
+### Documentation
+
+- **Tooling architecture documentation consolidated** under
+  `docs/developer/ARCHITECTURE.md`, with a refreshed contributor guide.
+- **Tutorials refreshed**: the BA, data-engineer, and integration-engineer
+  tutorials now drop DMD acronym usage in favour of generic terminology,
+  defer common-syntax pitfalls to `satsuma agent-reference`, and include a
+  concrete prompt for the customise-workspace step.
+- **Viz harness `README`** added covering the sentinel watcher, fixtures,
+  and screenshot workflow (`sl-gfo4`).
+
+### Dependencies
+
+- TypeScript 5.9 → 6.0; typescript-eslint 8.58 → 8.60; ESLint 10.1 → 10.4.
+- `vscode-languageclient` 9 → 10; `@types/vscode` refreshed for the new
+  runtime; dev type versions aligned to runtime targets.
+- `commander`, `tsx`, `tree-sitter-cli`, `liquidjs`, `markdownlint-cli2`,
+  and several GitHub Action versions bumped via Dependabot.
+
+### CI
+
+- **gitleaks secret-scanning step now gates on the `GITLEAKS_LICENSE`
+  secret being present** — the step skips itself for org-owned repos that
+  do not yet have an org-tier licence, and re-enables automatically when
+  the secret is set. Tracked as `tk 3eb-4vjj`.
 
 ## v0.7.0 — 2026-04-02
 
