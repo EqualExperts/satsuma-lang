@@ -1,5 +1,34 @@
 # Changelog
 
+## Unreleased
+
+### Project ownership and brand alignment (Feature 31)
+
+- **Repository migrated to the `EqualExperts` GitHub organisation.** All
+  references to `github.com/thorbenlouw/satsuma-lang` in the README, security
+  report, citation file, VS Code extension manifest, and the published site
+  now point at `github.com/EqualExperts/satsuma-lang`. GitHub redirects keep
+  the old URLs working for now, but downstream tooling that captured the old
+  URL string should be updated.
+- **OpenLineage `_producer` URL changes (downstream-visible).** The
+  `satsuma-to-openlineage` skill emits the producer URL into every event it
+  generates. The documented producer URL changes from
+  `https://github.com/thorbenlouw/satsuma-lang` to
+  `https://github.com/EqualExperts/satsuma-lang`. The producer URL is treated
+  as movable rather than as a long-lived stable identifier — downstream
+  lineage consumers that key on the producer-URL string will see the new
+  value once they regenerate events with this version of the skill. If you
+  need a stable correlation across the change, key on dataset namespace +
+  name (which are unaffected) and treat the producer URL as informational.
+- **Equal Experts named as the maintainer.** The README now leads with
+  stacked Satsuma + Equal Experts branding and closes with a "Maintained by
+  Equal Experts" section. `CITATION.cff` adds Equal Experts as an entity
+  author alongside the original creator.
+- **EE brand assets live under `assets/ee-brand/`** with a short README
+  describing each file. The published site footer carries the tagline "An
+  Equal Experts open-source project" and the top navigation gains an EE
+  brand-mark link pointing at `https://www.equalexperts.com/`.
+
 ## v0.7.0 — 2026-04-02
 
 ### Language Simplification (Feature 28)

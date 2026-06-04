@@ -6,7 +6,7 @@ Full language support for the Satsuma data mapping language: syntax highlighting
 
 ### From GitHub Release (recommended)
 
-Download `vscode-satsuma.vsix` from the [latest release](https://github.com/thorbenlouw/satsuma-lang/releases/tag/latest) and install:
+Download `vscode-satsuma.vsix` from the [latest release](https://github.com/EqualExperts/satsuma-lang/releases/tag/latest) and install:
 
 ```bash
 code --install-extension vscode-satsuma.vsix
@@ -33,7 +33,7 @@ code --install-extension vscode-satsuma.vsix
 
 - **VS Code** 1.85+
 - **Node.js** 20+ (for building from source)
-- **`satsuma` CLI** on PATH (for validation diagnostics, commands, and webviews). Install from the [latest release](https://github.com/thorbenlouw/satsuma-lang/releases/tag/latest).
+- **`satsuma` CLI** on PATH (for validation diagnostics, commands, and webviews). Install from the [latest release](https://github.com/EqualExperts/satsuma-lang/releases/tag/latest).
 
 ## Features
 

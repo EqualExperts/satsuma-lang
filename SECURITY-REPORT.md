@@ -470,5 +470,5 @@ That said, we take security seriously and are committed to:
 - Being transparent about known limitations and trade-offs
 
 If you find a security issue, please report it via
-[GitHub Issues](https://github.com/thorbenlouw/satsuma-lang/issues) or contact
+[GitHub Issues](https://github.com/EqualExperts/satsuma-lang/issues) or contact
 the maintainer directly.

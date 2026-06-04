@@ -103,7 +103,7 @@ Field-level arrows become column lineage entries on the **output** dataset:
 ```json
 {
   "columnLineage": {
-    "_producer": "https://github.com/thorbenlouw/satsuma-lang",
+    "_producer": "https://github.com/EqualExperts/satsuma-lang",
     "_schemaURL": "https://openlineage.io/spec/facets/1-1-0/ColumnLineageDatasetFacet.json#/$defs/ColumnLineageDatasetFacet",
     "fields": {
       "customer_id": {
@@ -180,8 +180,8 @@ as custom facets with the `satsuma_` prefix:
 ```json
 {
   "satsuma_governance": {
-    "_producer": "https://github.com/thorbenlouw/satsuma-lang",
-    "_schemaURL": "https://github.com/thorbenlouw/satsuma-lang/blob/main/openlineage/SatsumaGovernanceDatasetFacet.json",
+    "_producer": "https://github.com/EqualExperts/satsuma-lang",
+    "_schemaURL": "https://github.com/EqualExperts/satsuma-lang/blob/main/openlineage/SatsumaGovernanceDatasetFacet.json",
     "piiFields": ["email", "phone", "tax_id"],
     "classification": "RESTRICTED",
     "retention": "7y",
@@ -201,8 +201,8 @@ as custom facets with the `satsuma_` prefix:
 ```json
 {
   "satsuma_modelling": {
-    "_producer": "https://github.com/thorbenlouw/satsuma-lang",
-    "_schemaURL": "https://github.com/thorbenlouw/satsuma-lang/blob/main/openlineage/SatsumaModellingDatasetFacet.json",
+    "_producer": "https://github.com/EqualExperts/satsuma-lang",
+    "_schemaURL": "https://github.com/EqualExperts/satsuma-lang/blob/main/openlineage/SatsumaModellingDatasetFacet.json",
     "entityType": "dimension",
     "scdType": 2,
     "naturalKey": "customer_id",
@@ -239,8 +239,8 @@ For Data Vault entities, use equivalent structure with `hub`, `satellite`, `link
 ```json
 {
   "satsuma_mergeStrategy": {
-    "_producer": "https://github.com/thorbenlouw/satsuma-lang",
-    "_schemaURL": "https://github.com/thorbenlouw/satsuma-lang/blob/main/openlineage/SatsumaMergeStrategyJobFacet.json",
+    "_producer": "https://github.com/EqualExperts/satsuma-lang",
+    "_schemaURL": "https://github.com/EqualExperts/satsuma-lang/blob/main/openlineage/SatsumaMergeStrategyJobFacet.json",
     "strategy": "upsert",
     "matchOn": ["customer_id"],
     "onMatch": "update",

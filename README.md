@@ -1,10 +1,18 @@
 ![Satsuma logo](assets/512x_satsuma_logo.png)
 
+<p>
+  <a href="https://www.equalexperts.com/" target="_blank" rel="noopener">
+    <img src="assets/ee-brand/ee-logo-colour.png" alt="Equal Experts" height="28">
+  </a>
+  <br>
+  <em><a href="https://www.equalexperts.com/" target="_blank" rel="noopener">An Equal Experts open-source project</a></em>
+</p>
+
 # Satsuma
 
-[![CI](https://github.com/thorbenlouw/satsuma-lang/actions/workflows/ci.yml/badge.svg?branch=main&event=push)](https://github.com/thorbenlouw/satsuma-lang/actions/workflows/ci.yml?query=branch%3Amain+event%3Apush)
-[![Release](https://github.com/thorbenlouw/satsuma-lang/actions/workflows/release.yml/badge.svg?branch=main)](https://github.com/thorbenlouw/satsuma-lang/actions/workflows/release.yml)
-[![Security](https://github.com/thorbenlouw/satsuma-lang/actions/workflows/security.yml/badge.svg?branch=main&event=push)](https://github.com/thorbenlouw/satsuma-lang/actions/workflows/security.yml?query=branch%3Amain+event%3Apush)
+[![CI](https://github.com/EqualExperts/satsuma-lang/actions/workflows/ci.yml/badge.svg?branch=main&event=push)](https://github.com/EqualExperts/satsuma-lang/actions/workflows/ci.yml?query=branch%3Amain+event%3Apush)
+[![Release](https://github.com/EqualExperts/satsuma-lang/actions/workflows/release.yml/badge.svg?branch=main)](https://github.com/EqualExperts/satsuma-lang/actions/workflows/release.yml)
+[![Security](https://github.com/EqualExperts/satsuma-lang/actions/workflows/security.yml/badge.svg?branch=main&event=push)](https://github.com/EqualExperts/satsuma-lang/actions/workflows/security.yml?query=branch%3Amain+event%3Apush)
 
 Satsuma is a domain-specific language for source-to-target data mapping.
 
@@ -156,7 +164,7 @@ A universal pre-built package is published on every merge to `main`. It uses
 WASM internally, so the same package works on macOS, Linux, and Windows:
 
 ```bash
-npm install -g https://github.com/thorbenlouw/satsuma-lang/releases/download/latest/satsuma-cli.tgz
+npm install -g https://github.com/EqualExperts/satsuma-lang/releases/download/latest/satsuma-cli.tgz
 ```
 
 This gives you the `satsuma` command on your PATH. Run `satsuma --help` to see
@@ -429,7 +437,7 @@ See [SATSUMA-CLI.md](SATSUMA-CLI.md) for the full command reference.
 
 We haven't published the extension to the official VS Code Marketplace yet.
 A pre-built `.vsix` is published on every merge to `main`. Download it from the
-[latest release](https://github.com/thorbenlouw/satsuma-lang/releases/tag/latest)
+[latest release](https://github.com/EqualExperts/satsuma-lang/releases/tag/latest)
 and install:
 
 - In VS Code, open the Command Palette (`Cmd+Shift+P`) and choose
@@ -527,10 +535,16 @@ passing security checks.
 For a full threat model, dependency audit, and enterprise adoption guidance, see
 the **[Security Report](SECURITY-REPORT.md)**.
 
-## Author
+## Maintained by Equal Experts
 
-Satsuma was created by [Thorben Louw](https://github.com/thorbenlouw) at
-[Equal Experts](https://www.equalexperts.com/).
+Satsuma is **An Equal Experts open-source project** — maintained by
+[Equal Experts](https://www.equalexperts.com/), the software consultancy that
+helps clients build the things they need to run their business.
+
+The project was created by Thorben Louw and is now under EE stewardship. EE
+engineers use Satsuma across client engagements in data engineering and
+integration work, and we contribute the language and its tooling back to the
+community under the MIT licence so other teams can use it too.
 
 ## License
 

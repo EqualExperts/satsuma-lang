@@ -9,7 +9,7 @@ mapping produces one COMPLETE event.
 {
   "eventTime": "2025-01-01T00:00:00.000Z",
   "eventType": "COMPLETE",
-  "producer": "https://github.com/thorbenlouw/satsuma-lang",
+  "producer": "https://github.com/EqualExperts/satsuma-lang",
   "schemaURL": "https://openlineage.io/spec/2-0-2/OpenLineage.json#/$defs/RunEvent",
   "run": {
     "runId": "<deterministic-uuid-v5>",
@@ -20,12 +20,12 @@ mapping produces one COMPLETE event.
     "name": "<mapping-name>",
     "facets": {
       "documentation": {
-        "_producer": "https://github.com/thorbenlouw/satsuma-lang",
+        "_producer": "https://github.com/EqualExperts/satsuma-lang",
         "_schemaURL": "https://openlineage.io/spec/facets/1-1-0/DocumentationJobFacet.json#/$defs/DocumentationJobFacet",
         "description": "<mapping note text>"
       },
       "jobType": {
-        "_producer": "https://github.com/thorbenlouw/satsuma-lang",
+        "_producer": "https://github.com/EqualExperts/satsuma-lang",
         "_schemaURL": "https://openlineage.io/spec/facets/2-0-3/JobTypeJobFacet.json#/$defs/JobTypeJobFacet",
         "processingType": "BATCH",
         "integration": "SATSUMA",
@@ -74,7 +74,7 @@ mapping produces one COMPLETE event.
 |---|---|---|
 | `eventTime` | ISO 8601 timestamp | Use current time when generating, or a fixed timestamp for reproducibility |
 | `eventType` | `"COMPLETE"` | Always COMPLETE for design-time lineage |
-| `producer` | `"https://github.com/thorbenlouw/satsuma-lang"` | Fixed |
+| `producer` | `"https://github.com/EqualExperts/satsuma-lang"` | Fixed |
 | `schemaURL` | `"https://openlineage.io/spec/2-0-2/OpenLineage.json#/$defs/RunEvent"` | Current spec version |
 
 ### Run

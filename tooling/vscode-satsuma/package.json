@@ -8,7 +8,7 @@
   "icon": "icon.png",
   "repository": {
     "type": "git",
-    "url": "https://github.com/thorbenlouw/satsuma-lang"
+    "url": "https://github.com/EqualExperts/satsuma-lang"
   },
   "engines": {
     "vscode": "^1.91.0"

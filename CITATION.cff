@@ -6,9 +6,11 @@ authors:
   - family-names: Louw
     given-names: Thorben
     affiliation: Equal Experts
+  - name: Equal Experts
+    website: "https://www.equalexperts.com/"
 license: MIT
-repository-code: "https://github.com/thorbenlouw/satsuma-lang"
-url: "https://github.com/thorbenlouw/satsuma-lang"
+repository-code: "https://github.com/EqualExperts/satsuma-lang"
+url: "https://github.com/EqualExperts/satsuma-lang"
 abstract: >-
   Satsuma is a domain-specific language for source-to-target data mapping,
   designed to replace ad hoc spreadsheets and verbose structured specs
