@@ -10,6 +10,15 @@
   --sz-card-shadow: 0 2px 8px rgba(45, 42, 38, 0.06);
   --sz-namespace-bg: #FFF3E8;
   --sz-namespace-border: #F5E6D3;
+  --sz-row-hover-bg: rgba(45, 42, 38, 0.03);
+  --sz-row-active-bg: rgba(45, 42, 38, 0.06);
+  --sz-accent-wash: rgba(242, 145, 61, 0.12);
+  --sz-green-wash: rgba(90, 158, 111, 0.12);
+  --sz-warning-border-soft: rgba(196, 93, 34, 0.2);
+  --sz-warning-border-strong: rgba(196, 93, 34, 0.3);
+  --sz-question-border-soft: rgba(124, 107, 174, 0.2);
+  --sz-question-border-strong: rgba(124, 107, 174, 0.3);
+  --sz-card-border-strong: rgba(45, 42, 38, 0.15);
 
   /* --- Accents --- */
   --sz-orange: #F2913D;
@@ -17,10 +26,17 @@
   --sz-green: #5A9E6F;
   --sz-violet: #8E5BB0;
   --sz-warning: #C45D22;
+  --sz-report: #4A90B8;
+  --sz-edge-default: #4A4744;
+  --sz-edge-bare-stroke: #6B6560;
+  --sz-at-ref: #4A8A5B;
 
   /* --- Text --- */
   --sz-text: #2D2A26;
   --sz-text-muted: #6B6560;
+  --sz-text-on-accent: #FFFFFF;
+  --sz-icon-overlay-soft: rgba(255, 255, 255, 0.6);
+  --sz-icon-divider: rgba(0, 0, 0, 0.2);
 
   /* --- Badges --- */
   --sz-badge-bg: #FFF3E8;
@@ -33,6 +49,15 @@
   /* --- Arrows --- */
   --sz-arrow-stroke: #D97726;
   --sz-arrow-nl-stroke: #5A9E6F;
+  --sz-gear-bg: #FFFFFF;
+  --sz-overview-mapping-bg: linear-gradient(135deg, rgba(16, 80, 104, 0.98), rgba(10, 53, 76, 0.98));
+  --sz-overview-mapping-gloss: linear-gradient(45deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0));
+  --sz-overview-mapping-border: rgba(8, 36, 52, 0.35);
+  --sz-overview-mapping-shadow: 0 8px 20px rgba(10, 53, 76, 0.18);
+  --sz-edge-highlight-glow: rgba(217, 119, 38, 0.4);
+  --sz-namespace-pill-bg: #DCECF6;
+  --sz-namespace-pill-text: #0A354C;
+  --sz-namespace-pill-chip-bg: rgba(255, 255, 255, 0.88);
   --sz-arrow-width: 2px;
 
   /* --- Typography --- */
@@ -60,15 +85,31 @@
   --sz-card-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
   --sz-namespace-bg: #2D2520;
   --sz-namespace-border: #3D3530;
+  --sz-row-hover-bg: rgba(255, 255, 255, 0.04);
+  --sz-row-active-bg: rgba(255, 255, 255, 0.08);
+  --sz-accent-wash: rgba(242, 168, 96, 0.16);
+  --sz-green-wash: rgba(109, 191, 130, 0.16);
+  --sz-warning-border-soft: rgba(224, 112, 64, 0.28);
+  --sz-warning-border-strong: rgba(224, 112, 64, 0.4);
+  --sz-question-border-soft: rgba(160, 140, 200, 0.24);
+  --sz-question-border-strong: rgba(160, 140, 200, 0.36);
+  --sz-card-border-strong: rgba(255, 255, 255, 0.15);
 
   --sz-orange: #F2A860;
   --sz-orange-dark: #E89040;
   --sz-green: #6DBF82;
   --sz-violet: #A878C8;
   --sz-warning: #E07040;
+  --sz-report: #6FB3D9;
+  --sz-edge-default: #9D9D9D;
+  --sz-edge-bare-stroke: #9D9D9D;
+  --sz-at-ref: #82C995;
 
   --sz-text: #D4D4D4;
   --sz-text-muted: #9D9D9D;
+  --sz-text-on-accent: #FFFFFF;
+  --sz-icon-overlay-soft: rgba(255, 255, 255, 0.72);
+  --sz-icon-divider: rgba(255, 255, 255, 0.35);
 
   --sz-badge-bg: #3D3020;
   --sz-badge-text: #E89040;
@@ -79,4 +120,13 @@
 
   --sz-arrow-stroke: #E89040;
   --sz-arrow-nl-stroke: #6DBF82;
+  --sz-gear-bg: #252526;
+  --sz-overview-mapping-bg: linear-gradient(135deg, rgba(14, 62, 84, 0.98), rgba(8, 39, 58, 0.98));
+  --sz-overview-mapping-gloss: linear-gradient(45deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0));
+  --sz-overview-mapping-border: rgba(255, 255, 255, 0.12);
+  --sz-overview-mapping-shadow: 0 8px 20px rgba(0, 0, 0, 0.35);
+  --sz-edge-highlight-glow: rgba(242, 168, 96, 0.36);
+  --sz-namespace-pill-bg: #27465A;
+  --sz-namespace-pill-text: #CFE7F5;
+  --sz-namespace-pill-chip-bg: rgba(255, 255, 255, 0.22);
 }

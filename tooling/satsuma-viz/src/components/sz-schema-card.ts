@@ -39,12 +39,12 @@ export class SzSchemaCard extends LitElement {
       box-sizing: border-box;
       min-width: var(--sz-card-min-width, 240px);
       max-width: var(--sz-card-max-width, 380px);
-      border-radius: var(--sz-card-radius, 8px);
-      background: var(--sz-card-bg, #fff);
-      border: 1px solid var(--sz-card-border, rgba(45, 42, 38, 0.08));
-      box-shadow: var(--sz-card-shadow, 0 2px 8px rgba(45, 42, 38, 0.06));
+      border-radius: var(--sz-card-radius);
+      background: var(--sz-card-bg);
+      border: 1px solid var(--sz-card-border);
+      box-shadow: var(--sz-card-shadow);
       overflow: hidden;
-      font-family: var(--sz-font-sans, system-ui);
+      font-family: var(--sz-font-sans);
     }
 
     :host([content-width]) {
@@ -57,14 +57,14 @@ export class SzSchemaCard extends LitElement {
       align-items: center;
       gap: 8px;
       padding: 10px 12px;
-      background: var(--sz-orange, #F2913D);
-      color: #fff;
+      background: var(--sz-orange);
+      color: var(--sz-text-on-accent);
       cursor: pointer;
       user-select: none;
     }
 
     .header.report {
-      background: var(--sz-report, #4A90B8);
+      background: var(--sz-report);
     }
 
     .header-icon {
@@ -77,8 +77,8 @@ export class SzSchemaCard extends LitElement {
       font-size: 14px;
       font-weight: 600;
       flex: 1;
-      overflow: var(--sz-header-name-overflow, hidden);
-      text-overflow: var(--sz-header-name-overflow-mode, ellipsis);
+      overflow: var(--sz-header-name-overflow);
+      text-overflow: var(--sz-header-name-overflow-mode);
       white-space: nowrap;
     }
 
@@ -101,9 +101,9 @@ export class SzSchemaCard extends LitElement {
     .label {
       padding: 4px 12px 6px;
       font-size: 12px;
-      color: var(--sz-text-muted, #6B6560);
+      color: var(--sz-text-muted);
       font-style: italic;
-      border-bottom: 1px solid var(--sz-card-border, rgba(45, 42, 38, 0.08));
+      border-bottom: 1px solid var(--sz-card-border);
       max-width: 400px;
       word-break: break-word;
     }
@@ -117,45 +117,45 @@ export class SzSchemaCard extends LitElement {
       align-items: center;
       gap: 6px;
       padding: 3px 12px;
-      height: var(--sz-field-height, 28px);
+      height: var(--sz-field-height);
       cursor: pointer;
     }
 
     .field-row:hover {
-      background: rgba(45, 42, 38, 0.03);
+      background: var(--sz-row-hover-bg);
     }
 
     .port {
-      width: var(--sz-port-size, 8px);
-      height: var(--sz-port-size, 8px);
+      width: var(--sz-port-size);
+      height: var(--sz-port-size);
       border-radius: 50%;
       flex-shrink: 0;
     }
 
     .port.mapped {
-      background: var(--sz-orange-dark, #D97726);
+      background: var(--sz-orange-dark);
     }
 
     .port.unmapped {
-      border: 1.5px solid var(--sz-text-muted, #6B6560);
+      border: 1.5px solid var(--sz-text-muted);
       background: transparent;
     }
 
     .field-name {
-      font-family: var(--sz-font-mono, monospace);
+      font-family: var(--sz-font-mono);
       font-size: 12px;
       font-weight: 500;
-      color: var(--sz-text, #2D2A26);
-      flex: var(--sz-field-name-flex, 1);
-      overflow: var(--sz-field-name-overflow, hidden);
-      text-overflow: var(--sz-field-name-overflow-mode, ellipsis);
+      color: var(--sz-text);
+      flex: var(--sz-field-name-flex);
+      overflow: var(--sz-field-name-overflow);
+      text-overflow: var(--sz-field-name-overflow-mode);
       white-space: nowrap;
     }
 
     .field-type {
-      font-family: var(--sz-font-mono, monospace);
+      font-family: var(--sz-font-mono);
       font-size: 11px;
-      color: var(--sz-text-muted, #6B6560);
+      color: var(--sz-text-muted);
       flex-shrink: 0;
     }
 
@@ -166,19 +166,19 @@ export class SzSchemaCard extends LitElement {
     }
 
     .badge {
-      font-family: var(--sz-font-sans, system-ui);
+      font-family: var(--sz-font-sans);
       font-size: 10px;
       font-weight: 500;
       padding: 1px 5px;
-      border-radius: var(--sz-badge-radius, 4px);
-      background: var(--sz-badge-bg, #FFF3E8);
-      color: var(--sz-badge-text, #D97726);
+      border-radius: var(--sz-badge-radius);
+      background: var(--sz-badge-bg);
+      color: var(--sz-badge-text);
       line-height: 1.4;
     }
 
     .badge.pii {
-      background: var(--sz-warning-bg, #FEF3CD);
-      color: var(--sz-warning-icon, #C45D22);
+      background: var(--sz-warning-bg);
+      color: var(--sz-warning-icon);
     }
 
     .comment-badge {
@@ -195,13 +195,13 @@ export class SzSchemaCard extends LitElement {
     }
 
     .comment-badge.warning {
-      background: var(--sz-warning-bg, #FEF3CD);
-      color: var(--sz-warning-icon, #C45D22);
+      background: var(--sz-warning-bg);
+      color: var(--sz-warning-icon);
     }
 
     .comment-badge.question {
-      background: var(--sz-question-bg, #E8F0FE);
-      color: var(--sz-question-icon, #7C6BAE);
+      background: var(--sz-question-bg);
+      color: var(--sz-question-icon);
     }
 
     .nested {
@@ -226,23 +226,23 @@ export class SzSchemaCard extends LitElement {
       flex-wrap: wrap;
       gap: 4px;
       padding: 4px 12px 6px;
-      border-bottom: 1px solid var(--sz-card-border, rgba(45, 42, 38, 0.08));
+      border-bottom: 1px solid var(--sz-card-border);
     }
 
     .meta-pill {
-      font-family: var(--sz-font-sans, system-ui);
+      font-family: var(--sz-font-sans);
       font-size: 10px;
       font-weight: 500;
       padding: 1px 6px;
-      border-radius: var(--sz-badge-radius, 4px);
-      background: var(--sz-namespace-bg, #FFF3E8);
-      color: var(--sz-text-muted, #6B6560);
+      border-radius: var(--sz-badge-radius);
+      background: var(--sz-namespace-bg);
+      color: var(--sz-text-muted);
       line-height: 1.4;
       white-space: nowrap;
     }
 
     .meta-pill .meta-key {
-      color: var(--sz-orange-dark, #D97726);
+      color: var(--sz-orange-dark);
     }
 
     .spread-indicator {
@@ -251,8 +251,8 @@ export class SzSchemaCard extends LitElement {
       gap: 4px;
       padding: 3px 12px;
       font-size: 11px;
-      color: var(--sz-green, #5A9E6F);
-      border-top: 1px dotted var(--sz-green, #5A9E6F);
+      color: var(--sz-green);
+      border-top: 1px dotted var(--sz-green);
     }
 
     .spread-indicator .spread-icon {
@@ -260,7 +260,7 @@ export class SzSchemaCard extends LitElement {
     }
 
     .notes-section {
-      border-top: 1px dashed var(--sz-card-border, rgba(45, 42, 38, 0.08));
+      border-top: 1px dashed var(--sz-card-border);
       padding: 6px 12px;
     }
 
@@ -270,13 +270,13 @@ export class SzSchemaCard extends LitElement {
       gap: 6px;
       cursor: pointer;
       font-size: 12px;
-      color: var(--sz-text-muted, #6B6560);
+      color: var(--sz-text-muted);
       user-select: none;
       padding: 2px 0;
     }
 
     .notes-toggle:hover {
-      color: var(--sz-text, #2D2A26);
+      color: var(--sz-text);
     }
 
     .notes-toggle .arrow {
@@ -289,9 +289,9 @@ export class SzSchemaCard extends LitElement {
     }
 
     .note-content {
-      font-family: var(--sz-font-sans, system-ui);
+      font-family: var(--sz-font-sans);
       font-size: 12px;
-      color: var(--sz-text, #2D2A26);
+      color: var(--sz-text);
       line-height: 1.5;
       padding: 4px 0 2px 22px;
       word-break: break-word;
@@ -325,9 +325,9 @@ export class SzSchemaCard extends LitElement {
     }
 
     .note-content code {
-      font-family: var(--sz-font-mono, monospace);
+      font-family: var(--sz-font-mono);
       font-size: 11px;
-      background: rgba(45, 42, 38, 0.06);
+      background: var(--sz-row-active-bg);
       padding: 1px 4px;
       border-radius: 3px;
     }
@@ -349,7 +349,7 @@ export class SzSchemaCard extends LitElement {
       border: none;
       border-radius: 3px;
       background: transparent;
-      color: var(--sz-text-muted, #6B6560);
+      color: var(--sz-text-muted);
       cursor: pointer;
       flex-shrink: 0;
       padding: 0;
@@ -362,8 +362,8 @@ export class SzSchemaCard extends LitElement {
     }
 
     .lineage-btn:hover {
-      background: rgba(242, 145, 61, 0.12);
-      color: var(--sz-orange-dark, #D97726);
+      background: var(--sz-accent-wash);
+      color: var(--sz-orange-dark);
     }
 
     /* Cross-highlighting */
@@ -377,11 +377,11 @@ export class SzSchemaCard extends LitElement {
     }
 
     :host([has-highlight]) .field-row.hl.hl-source {
-      background: rgba(242, 145, 61, 0.12);
+      background: var(--sz-accent-wash);
     }
 
     :host([has-highlight]) .field-row.hl.hl-target {
-      background: rgba(90, 158, 111, 0.12);
+      background: var(--sz-green-wash);
     }
 
     :host([has-highlight]) .field-row.hl .field-name {
@@ -395,13 +395,13 @@ export class SzSchemaCard extends LitElement {
 
     /* Shaded note row displayed beneath a field that has notes. */
     .field-note {
-      font-family: var(--sz-font-sans, system-ui);
+      font-family: var(--sz-font-sans);
       font-size: 11px;
       font-style: italic;
-      color: var(--sz-text-muted, #6B6560);
+      color: var(--sz-text-muted);
       line-height: 1.4;
       padding: 2px 12px 4px 38px;
-      background: rgba(45, 42, 38, 0.03);
+      background: var(--sz-row-hover-bg);
       max-width: 400px;
       word-break: break-word;
     }
@@ -481,20 +481,20 @@ export class SzSchemaCard extends LitElement {
       // (sl-3c2w) so Playwright can assert qualified namespace rendering
       // without text matching against a positioned <span>.
       return html`<div
-          style="padding: 8px 12px 0; background: var(--sz-orange, #F2913D);"
+          style="padding: 8px 12px 0; background: var(--sz-orange);"
           data-testid=${`${this.testIdPrefix}-namespace-pill`}
         >
           <span
             data-testid=${`${this.testIdPrefix}-namespace-label`}
-            style="display:inline-block;font-size:10px;font-weight:700;padding:1px 8px;border-radius:999px;background:rgba(255,255,255,0.88);color:var(--sz-orange-dark, #D97726);"
+            style="display:inline-block;font-size:10px;font-weight:700;padding:1px 8px;border-radius:999px;background:var(--sz-namespace-pill-chip-bg);color:var(--sz-orange-dark);"
           >${this.namespaceLabel}</span>
         </div>`;
     }
     if (this.compact) {
       const bg = this.schema && this._isReport(this.schema)
-        ? "var(--sz-report, #4A90B8)"
-        : "var(--sz-orange, #F2913D)";
-      return html`<div style="height:24px;background:${bg};border-radius:var(--sz-card-radius, 8px) var(--sz-card-radius, 8px) 0 0;"></div>`;
+        ? "var(--sz-report)"
+        : "var(--sz-orange)";
+      return html`<div style="height:24px;background:${bg};border-radius:var(--sz-card-radius) var(--sz-card-radius) 0 0;"></div>`;
     }
     return html``;
   }
@@ -504,15 +504,15 @@ export class SzSchemaCard extends LitElement {
       // Chart/report icon
       return html`<svg class="header-icon" viewBox="0 0 16 16" fill="currentColor">
         <rect x="1" y="2" width="14" height="12" rx="2" opacity="0.9"/>
-        <rect x="4" y="8" width="2" height="4" rx="0.5" fill="rgba(255,255,255,0.6)"/>
-        <rect x="7" y="5" width="2" height="7" rx="0.5" fill="rgba(255,255,255,0.6)"/>
-        <rect x="10" y="7" width="2" height="5" rx="0.5" fill="rgba(255,255,255,0.6)"/>
+        <rect x="4" y="8" width="2" height="4" rx="0.5" fill="var(--sz-icon-overlay-soft)"/>
+        <rect x="7" y="5" width="2" height="7" rx="0.5" fill="var(--sz-icon-overlay-soft)"/>
+        <rect x="10" y="7" width="2" height="5" rx="0.5" fill="var(--sz-icon-overlay-soft)"/>
       </svg>`;
     }
     // Table/schema icon
     return html`<svg class="header-icon" viewBox="0 0 16 16" fill="currentColor">
       <rect x="1" y="2" width="14" height="12" rx="2" opacity="0.9"/>
-      <line x1="1" y1="6" x2="15" y2="6" stroke="rgba(0,0,0,0.2)" stroke-width="1"/>
+      <line x1="1" y1="6" x2="15" y2="6" stroke="var(--sz-icon-divider)" stroke-width="1"/>
     </svg>`;
   }
 

@@ -42,7 +42,7 @@ export class SzOverviewEdgeLayer extends LitElement {
     .overview-path {
       fill: none;
       stroke-width: 3;
-      stroke: var(--sz-edge-default, #4A4744);
+      stroke: var(--sz-edge-default);
       pointer-events: stroke;
       transition: stroke-width 0.15s ease, stroke 0.15s ease, opacity 0.15s ease, filter 0.15s ease;
       opacity: 0.55;
@@ -54,10 +54,10 @@ export class SzOverviewEdgeLayer extends LitElement {
     }
 
     .overview-path.highlighted {
-      stroke: var(--sz-edge-nl, #5A9E6F);
+      stroke: var(--sz-arrow-nl-stroke);
       stroke-width: 4;
       opacity: 1;
-      filter: drop-shadow(0 0 4px rgba(217, 119, 38, 0.4));
+      filter: drop-shadow(0 0 4px var(--sz-edge-highlight-glow));
     }
 
     .overview-path.highlighted:hover {
@@ -71,13 +71,13 @@ export class SzOverviewEdgeLayer extends LitElement {
 
     .anchor-dot {
       pointer-events: none;
-      fill: var(--sz-edge-default, #4A4744);
+      fill: var(--sz-edge-default);
       opacity: 0.55;
       transition: fill 0.15s ease, opacity 0.15s ease;
     }
 
     .anchor-dot.highlighted {
-      fill: var(--sz-edge-nl, #5A9E6F);
+      fill: var(--sz-arrow-nl-stroke);
       opacity: 1;
     }
 
@@ -89,9 +89,9 @@ export class SzOverviewEdgeLayer extends LitElement {
     .tooltip {
       position: absolute;
       pointer-events: none;
-      background: var(--sz-card-bg, #fff);
-      border: 1px solid var(--sz-card-border, rgba(45, 42, 38, 0.08));
-      box-shadow: var(--sz-card-shadow, 0 2px 8px rgba(45, 42, 38, 0.06));
+      background: var(--sz-card-bg);
+      border: 1px solid var(--sz-card-border);
+      box-shadow: var(--sz-card-shadow);
       border-radius: 6px;
       padding: 8px 10px;
       font-size: 11px;
@@ -101,17 +101,17 @@ export class SzOverviewEdgeLayer extends LitElement {
 
     .tooltip-name {
       font-weight: 600;
-      color: var(--sz-text, #2D2A26);
+      color: var(--sz-text);
       margin-bottom: 2px;
     }
 
     .tooltip-detail {
-      color: var(--sz-text-muted, #6B6560);
+      color: var(--sz-text-muted);
     }
 
     .tooltip-count {
-      font-family: var(--sz-font-mono, monospace);
-      color: var(--sz-orange-dark, #D97726);
+      font-family: var(--sz-font-mono);
+      color: var(--sz-orange-dark);
     }
   `;
 
