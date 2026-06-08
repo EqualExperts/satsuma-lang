@@ -51,7 +51,7 @@ export class SzMappingDetail extends LitElement {
   static override styles = css`
     :host {
       display: block;
-      font-family: var(--sz-font-sans, system-ui);
+      font-family: var(--sz-font-sans);
     }
 
     .layout {
@@ -83,17 +83,17 @@ export class SzMappingDetail extends LitElement {
       font-weight: 600;
       text-transform: uppercase;
       letter-spacing: 0.05em;
-      color: var(--sz-text-muted, #6B6560);
+      color: var(--sz-text-muted);
       padding: 0 4px 4px;
-      border-bottom: 1px solid var(--sz-card-border, rgba(45, 42, 38, 0.08));
+      border-bottom: 1px solid var(--sz-card-border);
     }
 
     /* Mapping header */
     .mapping-header {
-      background: var(--sz-card-bg, #fff);
-      border: 1px solid var(--sz-card-border, rgba(45, 42, 38, 0.08));
-      border-radius: var(--sz-card-radius, 8px);
-      box-shadow: var(--sz-card-shadow, 0 2px 8px rgba(45, 42, 38, 0.06));
+      background: var(--sz-card-bg);
+      border: 1px solid var(--sz-card-border);
+      border-radius: var(--sz-card-radius);
+      box-shadow: var(--sz-card-shadow);
       overflow: hidden;
       width: max-content;
       min-width: 100%;
@@ -104,8 +104,8 @@ export class SzMappingDetail extends LitElement {
       align-items: center;
       gap: 8px;
       padding: 10px 12px;
-      background: var(--sz-orange, #F2913D);
-      color: #fff;
+      background: var(--sz-orange);
+      color: var(--sz-text-on-accent);
       font-size: 14px;
       font-weight: 600;
       cursor: pointer;
@@ -120,7 +120,7 @@ export class SzMappingDetail extends LitElement {
       flex-direction: column;
       gap: 6px;
       padding: 8px 12px;
-      border-bottom: 1px solid var(--sz-card-border, rgba(45, 42, 38, 0.08));
+      border-bottom: 1px solid var(--sz-card-border);
     }
 
     .mapping-meta-row {
@@ -134,13 +134,13 @@ export class SzMappingDetail extends LitElement {
       font-size: 11px;
       padding: 2px 8px;
       border-radius: 4px;
-      background: var(--sz-badge-bg, #FFF3E8);
-      color: var(--sz-text-muted, #6B6560);
+      background: var(--sz-badge-bg);
+      color: var(--sz-text-muted);
       max-width: 100%;
     }
 
     .meta-tag .label {
-      color: var(--sz-orange-dark, #D97726);
+      color: var(--sz-orange-dark);
       font-weight: 500;
     }
 
@@ -163,15 +163,15 @@ export class SzMappingDetail extends LitElement {
       font-weight: 600;
       text-transform: uppercase;
       letter-spacing: 0.05em;
-      color: var(--sz-text-muted, #6B6560);
+      color: var(--sz-text-muted);
       text-align: left;
       padding: 6px 12px;
-      border-bottom: 2px solid var(--sz-card-border, rgba(45, 42, 38, 0.08));
+      border-bottom: 2px solid var(--sz-card-border);
     }
 
     .arrow-table td {
       padding: 5px 12px;
-      border-bottom: 1px solid var(--sz-card-border, rgba(45, 42, 38, 0.08));
+      border-bottom: 1px solid var(--sz-card-border);
       font-size: 12px;
       vertical-align: top;
     }
@@ -182,7 +182,7 @@ export class SzMappingDetail extends LitElement {
     }
 
     .arrow-table tr:hover {
-      background: rgba(45, 42, 38, 0.03);
+      background: var(--sz-row-hover-bg);
     }
 
     /* Cross-highlighting on arrow rows */
@@ -192,7 +192,7 @@ export class SzMappingDetail extends LitElement {
 
     :host([has-highlight]) .arrow-table tr.arrow-row.hl {
       opacity: 1;
-      background: rgba(242, 145, 61, 0.08);
+      background: var(--sz-accent-wash);
     }
 
     :host([has-highlight]) .arrow-table tr.arrow-row.hl .field-ref {
@@ -203,7 +203,7 @@ export class SzMappingDetail extends LitElement {
       font-family: var(--sz-font-mono, monospace);
       font-size: 12px;
       font-weight: 500;
-      color: var(--sz-text, #2D2A26);
+      color: var(--sz-text);
       white-space: normal;
       word-break: break-word;
       overflow-wrap: anywhere;
@@ -232,7 +232,7 @@ export class SzMappingDetail extends LitElement {
       display: inline-block;
       font-style: italic;
       font-size: 11px;
-      color: var(--sz-green, #5A9E6F);
+      color: var(--sz-green);
       max-width: 400px;
       white-space: normal;
       word-break: break-word;
@@ -242,18 +242,18 @@ export class SzMappingDetail extends LitElement {
 
     .transform-bare {
       font-size: 11px;
-      color: var(--sz-text-muted, #6B6560);
+      color: var(--sz-text-muted);
     }
 
     /* @ref highlights inside NL transform text */
     .at-ref {
       font-weight: 600;
       font-style: normal;
-      color: var(--sz-at-ref, #4A8A5B);
+      color: var(--sz-at-ref);
     }
 
     .arrow-icon {
-      color: var(--sz-text-muted, #6B6560);
+      color: var(--sz-text-muted);
       font-size: 11px;
     }
 
@@ -263,13 +263,13 @@ export class SzMappingDetail extends LitElement {
     }
 
     .arrow-note {
-      font-family: var(--sz-font-sans, system-ui);
+      font-family: var(--sz-font-sans);
       font-size: 11px;
       font-style: italic;
-      color: var(--sz-text-muted, #6B6560);
+      color: var(--sz-text-muted);
       line-height: 1.4;
       padding: 2px 8px;
-      background: rgba(45, 42, 38, 0.03);
+      background: var(--sz-row-hover-bg);
       border-radius: 3px;
       max-width: 400px;
       word-break: break-word;
@@ -287,24 +287,24 @@ export class SzMappingDetail extends LitElement {
       padding: 6px 12px;
       font-size: 11px;
       font-weight: 600;
-      color: var(--sz-text-muted, #6B6560);
-      background: var(--sz-namespace-bg, #FFF3E8);
-      border-top: 1px dashed var(--sz-card-border, rgba(45, 42, 38, 0.08));
+      color: var(--sz-text-muted);
+      background: var(--sz-namespace-bg);
+      border-top: 1px dashed var(--sz-card-border);
     }
 
     .scope-label .scope-tag {
-      font-family: var(--sz-font-mono, monospace);
+      font-family: var(--sz-font-mono);
       font-size: 10px;
       padding: 1px 6px;
       border-radius: 3px;
-      background: var(--sz-orange-dark, #D97726);
-      color: #fff;
+      background: var(--sz-orange-dark);
+      color: var(--sz-text-on-accent);
     }
 
     .scope-fields {
-      font-family: var(--sz-font-mono, monospace);
+      font-family: var(--sz-font-mono);
       font-size: 11px;
-      color: var(--sz-text, #2D2A26);
+      color: var(--sz-text);
     }
   `;
 
@@ -570,11 +570,11 @@ export class SzMappingDetail extends LitElement {
     return html`
       <div class="mapping-header" data-testid=${`${this.testIdPrefix}-header`}>
         ${this.namespaceLabel
-          ? html`<div style="padding: 8px 12px 0; background: var(--sz-orange, #F2913D);">
+          ? html`<div style="padding: 8px 12px 0; background: var(--sz-orange);">
               <span
                 class="meta-tag"
                 data-testid=${`${this.testIdPrefix}-namespace-label`}
-                style="display:inline-block;font-size:10px;font-weight:700;padding:1px 8px;border-radius:999px;background:rgba(255,255,255,0.88);color:var(--sz-orange-dark, #D97726);"
+                style="display:inline-block;font-size:10px;font-weight:700;padding:1px 8px;border-radius:999px;background:var(--sz-namespace-pill-chip-bg);color:var(--sz-orange-dark);"
               >${this.namespaceLabel}</span>
             </div>`
           : nothing}

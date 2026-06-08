@@ -18,12 +18,12 @@ export class SzMetricCard extends LitElement {
       box-sizing: border-box;
       min-width: var(--sz-card-min-width, 240px);
       max-width: var(--sz-card-max-width, 380px);
-      border-radius: var(--sz-card-radius, 8px);
-      background: var(--sz-card-bg, #fff);
-      border: 1px solid var(--sz-card-border, rgba(45, 42, 38, 0.08));
-      box-shadow: var(--sz-card-shadow, 0 2px 8px rgba(45, 42, 38, 0.06));
+      border-radius: var(--sz-card-radius);
+      background: var(--sz-card-bg);
+      border: 1px solid var(--sz-card-border);
+      box-shadow: var(--sz-card-shadow);
       overflow: hidden;
-      font-family: var(--sz-font-sans, system-ui);
+      font-family: var(--sz-font-sans);
     }
 
     .header {
@@ -31,8 +31,8 @@ export class SzMetricCard extends LitElement {
       align-items: center;
       gap: 8px;
       padding: 10px 12px;
-      background: var(--sz-violet, #8E5BB0);
-      color: #fff;
+      background: var(--sz-violet);
+      color: var(--sz-text-on-accent);
       cursor: pointer;
       user-select: none;
     }
@@ -64,8 +64,8 @@ export class SzMetricCard extends LitElement {
     .meta {
       padding: 4px 12px 6px;
       font-size: 11px;
-      color: var(--sz-text-muted, #6B6560);
-      border-bottom: 1px solid var(--sz-card-border, rgba(45, 42, 38, 0.08));
+      color: var(--sz-text-muted);
+      border-bottom: 1px solid var(--sz-card-border);
       line-height: 1.5;
     }
 
@@ -87,12 +87,12 @@ export class SzMetricCard extends LitElement {
       align-items: center;
       gap: 6px;
       padding: 3px 12px;
-      height: var(--sz-field-height, 28px);
+      height: var(--sz-field-height);
       cursor: pointer;
     }
 
     .field-row:hover {
-      background: rgba(45, 42, 38, 0.03);
+      background: var(--sz-row-hover-bg);
     }
 
     .measure-icon {
@@ -100,22 +100,22 @@ export class SzMetricCard extends LitElement {
       text-align: center;
       font-size: 13px;
       font-weight: 600;
-      color: var(--sz-violet, #8E5BB0);
+      color: var(--sz-violet);
       flex-shrink: 0;
     }
 
     .field-name {
-      font-family: var(--sz-font-mono, monospace);
+      font-family: var(--sz-font-mono);
       font-size: 12px;
       font-weight: 500;
-      color: var(--sz-text, #2D2A26);
+      color: var(--sz-text);
       flex: 1;
     }
 
     .field-type {
-      font-family: var(--sz-font-mono, monospace);
+      font-family: var(--sz-font-mono);
       font-size: 11px;
-      color: var(--sz-text-muted, #6B6560);
+      color: var(--sz-text-muted);
       flex-shrink: 0;
     }
 
@@ -126,7 +126,7 @@ export class SzMetricCard extends LitElement {
     }
 
     .notes-section {
-      border-top: 1px dashed var(--sz-card-border, rgba(45, 42, 38, 0.08));
+      border-top: 1px dashed var(--sz-card-border);
       padding: 6px 12px;
     }
 
@@ -136,13 +136,13 @@ export class SzMetricCard extends LitElement {
       gap: 6px;
       cursor: pointer;
       font-size: 12px;
-      color: var(--sz-text-muted, #6B6560);
+      color: var(--sz-text-muted);
       user-select: none;
       padding: 2px 0;
     }
 
     .notes-toggle:hover {
-      color: var(--sz-text, #2D2A26);
+      color: var(--sz-text);
     }
 
     .notes-toggle .arrow {
@@ -155,9 +155,9 @@ export class SzMetricCard extends LitElement {
     }
 
     .note-content {
-      font-family: var(--sz-font-sans, system-ui);
+      font-family: var(--sz-font-sans);
       font-size: 12px;
-      color: var(--sz-text, #2D2A26);
+      color: var(--sz-text);
       line-height: 1.5;
       padding: 4px 0 2px 22px;
       white-space: pre-wrap;
@@ -182,11 +182,11 @@ export class SzMetricCard extends LitElement {
 
   private _renderNamespacePill() {
     if (this.namespaceLabel) {
-      return html`<div style="padding: 8px 12px 0; background: var(--sz-violet, #8E5BB0);">
-          <span style="display:inline-block;font-size:10px;font-weight:700;padding:1px 8px;border-radius:999px;background:rgba(255,255,255,0.88);color:var(--sz-orange-dark, #D97726);">${this.namespaceLabel}</span>
+      return html`<div style="padding: 8px 12px 0; background: var(--sz-violet);">
+          <span style="display:inline-block;font-size:10px;font-weight:700;padding:1px 8px;border-radius:999px;background:var(--sz-namespace-pill-chip-bg);color:var(--sz-orange-dark);">${this.namespaceLabel}</span>
         </div>`;
     }
-    if (this.compact) return html`<div style="height:24px;background:var(--sz-violet, #8E5BB0);border-radius:var(--sz-card-radius, 8px) var(--sz-card-radius, 8px) 0 0;"></div>`;
+    if (this.compact) return html`<div style="height:24px;background:var(--sz-violet);border-radius:var(--sz-card-radius) var(--sz-card-radius) 0 0;"></div>`;
     return html``;
   }
 

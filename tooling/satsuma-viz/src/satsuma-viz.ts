@@ -165,13 +165,11 @@ export class SatsumaViz extends LitElement {
       box-sizing: border-box;
       min-height: 44px;
       padding: 0 40px 0 12px;
-      border-radius: var(--sz-card-radius, 8px);
-      background:
-        linear-gradient(135deg, rgba(16, 80, 104, 0.98), rgba(10, 53, 76, 0.98)),
-        linear-gradient(45deg, rgba(255,255,255,0.06), rgba(255,255,255,0));
-      border: 1px solid rgba(8, 36, 52, 0.35);
-      color: #fff;
-      box-shadow: 0 8px 20px rgba(10, 53, 76, 0.18);
+      border-radius: var(--sz-card-radius);
+      background: var(--sz-overview-mapping-bg), var(--sz-overview-mapping-gloss);
+      border: 1px solid var(--sz-overview-mapping-border);
+      color: var(--sz-text-on-accent);
+      box-shadow: var(--sz-overview-mapping-shadow);
       font-size: 13px;
       font-weight: 600;
       white-space: nowrap;
@@ -249,10 +247,10 @@ export class SatsumaViz extends LitElement {
 
     .file-notes {
       margin: 16px 24px 0;
-      border-radius: var(--sz-card-radius, 8px);
-      background: var(--sz-card-bg, #fff);
-      border: 1px solid var(--sz-card-border, rgba(45, 42, 38, 0.08));
-      box-shadow: var(--sz-card-shadow, 0 2px 8px rgba(45, 42, 38, 0.06));
+      border-radius: var(--sz-card-radius);
+      background: var(--sz-card-bg);
+      border: 1px solid var(--sz-card-border);
+      box-shadow: var(--sz-card-shadow);
       overflow: hidden;
     }
 
@@ -265,11 +263,11 @@ export class SatsumaViz extends LitElement {
       user-select: none;
       font-size: 13px;
       font-weight: 600;
-      color: var(--sz-text, #2D2A26);
+      color: var(--sz-text);
     }
 
     .file-notes-toggle:hover {
-      background: rgba(45, 42, 38, 0.03);
+      background: var(--sz-row-hover-bg);
     }
 
     .file-notes-toggle .arrow {
@@ -285,10 +283,10 @@ export class SatsumaViz extends LitElement {
       padding: 8px 12px 8px 34px;
       font-size: 12px;
       line-height: 1.5;
-      color: var(--sz-text, #2D2A26);
+      color: var(--sz-text);
       white-space: pre-wrap;
       word-break: break-word;
-      border-top: 1px solid var(--sz-card-border, rgba(45, 42, 38, 0.08));
+      border-top: 1px solid var(--sz-card-border);
     }
 
     /* Toolbar */
@@ -297,9 +295,9 @@ export class SatsumaViz extends LitElement {
       align-items: center;
       gap: 2px;
       padding: 6px 12px;
-      background: var(--sz-card-bg, #fff);
-      border-bottom: 1px solid var(--sz-card-border, rgba(45, 42, 38, 0.08));
-      font-family: var(--sz-font-sans, system-ui);
+      background: var(--sz-card-bg);
+      border-bottom: 1px solid var(--sz-card-border);
+      font-family: var(--sz-font-sans);
       font-size: 12px;
       position: sticky;
       top: 0;
@@ -309,7 +307,7 @@ export class SatsumaViz extends LitElement {
     .toolbar-title {
       font-weight: 600;
       font-size: 13px;
-      color: var(--sz-text, #2D2A26);
+      color: var(--sz-text);
       margin-right: 12px;
       padding: 4px 0;
     }
@@ -317,7 +315,7 @@ export class SatsumaViz extends LitElement {
     .toolbar-sep {
       width: 1px;
       height: 20px;
-      background: var(--sz-card-border, rgba(45, 42, 38, 0.08));
+      background: var(--sz-card-border);
       margin: 0 6px;
     }
 
@@ -329,7 +327,7 @@ export class SatsumaViz extends LitElement {
       border: 1px solid transparent;
       border-radius: 4px;
       background: transparent;
-      color: var(--sz-text-muted, #6B6560);
+      color: var(--sz-text-muted);
       cursor: pointer;
       font-size: 12px;
       font-family: inherit;
@@ -338,14 +336,14 @@ export class SatsumaViz extends LitElement {
     }
 
     .toolbar-btn:hover {
-      background: rgba(45, 42, 38, 0.05);
-      color: var(--sz-text, #2D2A26);
+      background: var(--sz-row-active-bg);
+      color: var(--sz-text);
     }
 
     .toolbar-btn[data-active] {
-      background: var(--sz-badge-bg, #FFF3E8);
-      color: var(--sz-orange-dark, #D97726);
-      border-color: var(--sz-orange-dark, #D97726);
+      background: var(--sz-badge-bg);
+      color: var(--sz-orange-dark);
+      border-color: var(--sz-orange-dark);
     }
 
     .toolbar-spacer {
@@ -354,10 +352,10 @@ export class SatsumaViz extends LitElement {
 
     .toolbar-select {
       padding: 4px 8px;
-      border: 1px solid var(--sz-card-border, rgba(45, 42, 38, 0.08));
+      border: 1px solid var(--sz-card-border);
       border-radius: 4px;
-      background: var(--sz-card-bg, #fff);
-      color: var(--sz-text, #2D2A26);
+      background: var(--sz-card-bg);
+      color: var(--sz-text);
       font-size: 12px;
       font-family: inherit;
       cursor: pointer;
@@ -411,9 +409,9 @@ export class SatsumaViz extends LitElement {
       bottom: 12px;
       right: 12px;
       font-size: 11px;
-      color: var(--sz-text-muted, #6B6560);
-      background: var(--sz-card-bg, #fff);
-      border: 1px solid var(--sz-card-border, rgba(45, 42, 38, 0.08));
+      color: var(--sz-text-muted);
+      background: var(--sz-card-bg);
+      border: 1px solid var(--sz-card-border);
       padding: 2px 8px;
       border-radius: 4px;
       pointer-events: none;
@@ -432,10 +430,10 @@ export class SatsumaViz extends LitElement {
       align-items: center;
       gap: 4px;
       padding: 4px 12px;
-      background: var(--sz-namespace-bg, #FFF3E8);
-      border-bottom: 1px solid var(--sz-card-border, rgba(45, 42, 38, 0.08));
+      background: var(--sz-namespace-bg);
+      border-bottom: 1px solid var(--sz-card-border);
       font-size: 11px;
-      color: var(--sz-text-muted, #6B6560);
+      color: var(--sz-text-muted);
       overflow-x: auto;
     }
 
@@ -447,40 +445,40 @@ export class SatsumaViz extends LitElement {
       border-radius: 4px;
       cursor: pointer;
       white-space: nowrap;
-      background: var(--sz-card-bg, #fff);
-      border: 1px solid var(--sz-card-border, rgba(45, 42, 38, 0.08));
+      background: var(--sz-card-bg);
+      border: 1px solid var(--sz-card-border);
     }
 
     .breadcrumb-item:hover {
-      border-color: var(--sz-orange-dark, #D97726);
-      color: var(--sz-orange-dark, #D97726);
+      border-color: var(--sz-orange-dark);
+      color: var(--sz-orange-dark);
     }
 
     .breadcrumb-item.primary {
       font-weight: 600;
-      color: var(--sz-text, #2D2A26);
+      color: var(--sz-text);
     }
 
     .breadcrumb-sep {
-      color: var(--sz-text-muted, #6B6560);
+      color: var(--sz-text-muted);
       font-size: 10px;
     }
 
     .breadcrumb-collapse {
       margin-left: auto;
       padding: 2px 8px;
-      border: 1px solid var(--sz-card-border, rgba(45, 42, 38, 0.08));
+      border: 1px solid var(--sz-card-border);
       border-radius: 4px;
       background: transparent;
-      color: var(--sz-text-muted, #6B6560);
+      color: var(--sz-text-muted);
       cursor: pointer;
       font-size: 11px;
       font-family: inherit;
     }
 
     .breadcrumb-collapse:hover {
-      background: rgba(45, 42, 38, 0.05);
-      color: var(--sz-text, #2D2A26);
+      background: var(--sz-row-active-bg);
+      color: var(--sz-text);
     }
 
     /* Slide-in animation for expanded cards */
@@ -514,8 +512,8 @@ export class SatsumaViz extends LitElement {
     .notes-pane {
       width: 280px;
       flex-shrink: 0;
-      border-left: 1px solid var(--sz-card-border, rgba(45, 42, 38, 0.08));
-      background: var(--sz-bg, #FFFAF5);
+      border-left: 1px solid var(--sz-card-border);
+      background: var(--sz-bg);
       overflow-y: auto;
       padding: 12px;
       display: flex;
@@ -526,18 +524,18 @@ export class SatsumaViz extends LitElement {
     .notes-pane-header {
       font-size: 12px;
       font-weight: 600;
-      color: var(--sz-text-muted, #6B6560);
+      color: var(--sz-text-muted);
       text-transform: uppercase;
       letter-spacing: 0.05em;
       padding-bottom: 4px;
-      border-bottom: 1px solid var(--sz-card-border, rgba(45, 42, 38, 0.08));
+      border-bottom: 1px solid var(--sz-card-border);
     }
 
     .notes-pane-section {
       font-size: 10px;
       font-weight: 600;
       text-transform: uppercase;
-      color: var(--sz-text-muted, #6B6560);
+      color: var(--sz-text-muted);
       margin-top: 6px;
     }
 
@@ -554,15 +552,15 @@ export class SatsumaViz extends LitElement {
     }
 
     .comment-card.warning {
-      background: var(--sz-warning-bg, #FEF3CD);
-      border: 1px solid rgba(196, 93, 34, 0.2);
-      color: var(--sz-warning-icon, #C45D22);
+      background: var(--sz-warning-bg);
+      border: 1px solid var(--sz-warning-border-soft);
+      color: var(--sz-warning-icon);
     }
 
     .comment-card.question {
-      background: var(--sz-question-bg, #E8F0FE);
-      border: 1px solid rgba(124, 107, 174, 0.2);
-      color: var(--sz-question-icon, #7C6BAE);
+      background: var(--sz-question-bg);
+      border: 1px solid var(--sz-question-border-soft);
+      color: var(--sz-question-icon);
     }
 
     .comment-card-source {
@@ -576,9 +574,9 @@ export class SatsumaViz extends LitElement {
       padding: 8px 10px;
       font-size: 12px;
       line-height: 1.5;
-      background: var(--sz-card-bg, #fff);
-      border: 1px solid var(--sz-card-border, rgba(45, 42, 38, 0.08));
-      color: var(--sz-text, #2D2A26);
+      background: var(--sz-card-bg);
+      border: 1px solid var(--sz-card-border);
+      color: var(--sz-text);
       white-space: pre-wrap;
       word-break: break-word;
     }
@@ -602,15 +600,15 @@ export class SatsumaViz extends LitElement {
     }
 
     .block-comment-badge.warning {
-      background: var(--sz-warning-bg, #FEF3CD);
-      color: var(--sz-warning-icon, #C45D22);
-      border: 1px solid rgba(196, 93, 34, 0.3);
+      background: var(--sz-warning-bg);
+      color: var(--sz-warning-icon);
+      border: 1px solid var(--sz-warning-border-strong);
     }
 
     .block-comment-badge.question {
-      background: var(--sz-question-bg, #E8F0FE);
-      color: var(--sz-question-icon, #7C6BAE);
-      border: 1px solid rgba(124, 107, 174, 0.3);
+      background: var(--sz-question-bg);
+      color: var(--sz-question-icon);
+      border: 1px solid var(--sz-question-border-strong);
     }
 
     .block-comment-badge:hover {
@@ -621,13 +619,13 @@ export class SatsumaViz extends LitElement {
     /* Source block join/filter labels */
     .source-block-label {
       position: absolute;
-      background: var(--sz-badge-bg, #FFF3E8);
-      border: 1px dashed var(--sz-orange-dark, #D97726);
+      background: var(--sz-badge-bg);
+      border: 1px dashed var(--sz-orange-dark);
       border-radius: 4px;
       padding: 3px 8px;
       font-size: 10px;
-      font-family: var(--sz-font-mono, monospace);
-      color: var(--sz-orange-dark, #D97726);
+      font-family: var(--sz-font-mono);
+      color: var(--sz-orange-dark);
       white-space: nowrap;
       z-index: 40;
     }
@@ -639,10 +637,10 @@ export class SatsumaViz extends LitElement {
       right: 12px;
       width: 160px;
       height: 100px;
-      background: var(--sz-card-bg, #fff);
-      border: 1px solid var(--sz-card-border, rgba(45, 42, 38, 0.08));
+      background: var(--sz-card-bg);
+      border: 1px solid var(--sz-card-border);
       border-radius: 4px;
-      box-shadow: var(--sz-card-shadow, 0 2px 8px rgba(45, 42, 38, 0.06));
+      box-shadow: var(--sz-card-shadow);
       overflow: hidden;
       cursor: pointer;
       z-index: 80;
@@ -650,21 +648,21 @@ export class SatsumaViz extends LitElement {
 
     .minimap-viewport {
       position: absolute;
-      border: 1.5px solid var(--sz-orange, #F2913D);
-      background: rgba(242, 145, 61, 0.08);
+      border: 1.5px solid var(--sz-orange);
+      background: var(--sz-accent-wash);
       border-radius: 1px;
       pointer-events: none;
     }
 
     .source-block-filter {
       position: absolute;
-      background: var(--sz-question-bg, #E8F0FE);
-      border: 1px solid rgba(124, 107, 174, 0.2);
+      background: var(--sz-question-bg);
+      border: 1px solid var(--sz-question-border-soft);
       border-radius: 4px;
       padding: 2px 6px;
       font-size: 10px;
-      font-family: var(--sz-font-mono, monospace);
-      color: var(--sz-question-icon, #7C6BAE);
+      font-family: var(--sz-font-mono);
+      color: var(--sz-question-icon);
       white-space: nowrap;
       z-index: 40;
     }
@@ -1226,24 +1224,24 @@ export class SatsumaViz extends LitElement {
 <svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">
   <style>
     .edge-path { fill: none; stroke-width: 1.5; }
-    .edge-path.nl { stroke: #5A9E6F; stroke-dasharray: 6 3; }
-    .edge-path.bare { stroke: #6B6560; stroke-width: 1; }
-    .scope-label { font-family: monospace; font-size: 9px; font-weight: 600; fill: #6B6560; text-anchor: middle; }
-    .gear-circle { fill: #fff; stroke: #6B6560; stroke-width: 1; }
-    .gear-icon { fill: #6B6560; font-size: 10px; text-anchor: middle; dominant-baseline: central; }
-    rect.card { fill: #fff; stroke: rgba(45,42,38,0.08); rx: 8; }
+    .edge-path.nl { stroke: var(--sz-arrow-nl-stroke); stroke-dasharray: 6 3; }
+    .edge-path.bare { stroke: var(--sz-edge-bare-stroke); stroke-width: 1; }
+    .scope-label { font-family: monospace; font-size: 9px; font-weight: 600; fill: var(--sz-edge-bare-stroke); text-anchor: middle; }
+    .gear-circle { fill: var(--sz-gear-bg); stroke: var(--sz-edge-bare-stroke); stroke-width: 1; }
+    .gear-icon { fill: var(--sz-edge-bare-stroke); font-size: 10px; text-anchor: middle; dominant-baseline: central; }
+    rect.card { fill: var(--sz-card-bg); stroke: var(--sz-card-border); rx: 8; }
     rect.header { rx: 8; }
-    text.card-name { font-family: system-ui; font-size: 14px; font-weight: 600; fill: #fff; }
-    text.field-name { font-family: monospace; font-size: 12px; fill: #2D2A26; }
-    text.field-type { font-family: monospace; font-size: 11px; fill: #6B6560; }
+    text.card-name { font-family: system-ui; font-size: 14px; font-weight: 600; fill: var(--sz-text-on-accent); }
+    text.field-name { font-family: monospace; font-size: 12px; fill: var(--sz-text); }
+    text.field-type { font-family: monospace; font-size: 11px; fill: var(--sz-text-muted); }
   </style>
-  <rect width="${w}" height="${h}" fill="#FFFAF5"/>
+  <rect width="${w}" height="${h}" fill="var(--sz-bg)"/>
   ${edgeSvgContent}
   ${[...this._layout.nodes.values()].map((n) => `
   <g transform="translate(${n.x},${n.y})">
-    <rect class="card" width="${n.width}" height="${n.height}" fill="#fff" stroke="rgba(45,42,38,0.08)" rx="8"/>
-    <rect class="header" width="${n.width}" height="40" fill="#F2913D" rx="8"/>
-    <rect x="0" y="32" width="${n.width}" height="8" fill="#F2913D"/>
+    <rect class="card" width="${n.width}" height="${n.height}" fill="var(--sz-card-bg)" stroke="var(--sz-card-border)" rx="8"/>
+    <rect class="header" width="${n.width}" height="40" fill="var(--sz-orange)" rx="8"/>
+    <rect x="0" y="32" width="${n.width}" height="8" fill="var(--sz-orange)"/>
     <text class="card-name" x="12" y="26">${n.id}</text>
   </g>`).join("")}
 </svg>`;
@@ -1425,7 +1423,7 @@ export class SatsumaViz extends LitElement {
                   <div class="overview-mapping-card" data-testid=${`overview-mapping-card-${sanitizeTestIdSegment(m.id)}`} style="${!ns.name ? "padding-top:24px;" : ""}" title=${m.id}>
                     <div style="display:flex;flex-direction:column;align-items:flex-start;gap:4px;min-width:0;">
                       ${ns.name
-                        ? html`<span style="display:inline-block;font-size:10px;font-weight:700;padding:1px 6px;border-radius:999px;background:#DCECF6;color:#0A354C;">${ns.name}</span>`
+                        ? html`<span style="display:inline-block;font-size:10px;font-weight:700;padding:1px 6px;border-radius:999px;background:var(--sz-namespace-pill-bg);color:var(--sz-namespace-pill-text);">${ns.name}</span>`
                         : ""}
                       <div style="display:flex;align-items:center;gap:8px;min-width:0;">
                         <svg class="overview-mapping-icon" viewBox="0 0 16 16" fill="currentColor">
@@ -1717,7 +1715,7 @@ export class SatsumaViz extends LitElement {
               <rect
                 x=${n.x * scale} y=${n.y * scale}
                 width=${n.width * scale} height=${n.height * scale}
-                fill="var(--sz-card-border, rgba(45,42,38,0.15))"
+                fill="var(--sz-card-border-strong)"
                 rx="1"
               />
             `

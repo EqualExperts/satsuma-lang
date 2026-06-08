@@ -45,12 +45,12 @@ export class SzEdgeLayer extends LitElement {
     }
 
     .edge-path.nl {
-      stroke: var(--sz-edge-nl, #5A9E6F);
+      stroke: var(--sz-arrow-nl-stroke);
       stroke-dasharray: 6 3;
     }
 
     .edge-path.bare {
-      stroke: var(--sz-text-muted, #6B6560);
+      stroke: var(--sz-text-muted);
       stroke-width: 1;
     }
 
@@ -60,34 +60,34 @@ export class SzEdgeLayer extends LitElement {
     }
 
     .gear-circle {
-      fill: var(--sz-card-bg, #fff);
-      stroke: var(--sz-text-muted, #6B6560);
+      fill: var(--sz-card-bg);
+      stroke: var(--sz-text-muted);
       stroke-width: 1;
     }
 
     .gear-icon {
-      fill: var(--sz-text-muted, #6B6560);
+      fill: var(--sz-text-muted);
       font-size: 10px;
       text-anchor: middle;
       dominant-baseline: central;
     }
 
     .gear-group:hover .gear-circle {
-      stroke: var(--sz-orange, #F2913D);
-      fill: var(--sz-badge-bg, #FFF3E8);
+      stroke: var(--sz-orange);
+      fill: var(--sz-badge-bg);
     }
 
     .gear-group:hover .gear-icon {
-      fill: var(--sz-orange, #F2913D);
+      fill: var(--sz-orange);
     }
 
     .transform-card {
       position: absolute;
       pointer-events: all;
-      background: var(--sz-card-bg, #fff);
-      border: 1px solid var(--sz-card-border, rgba(45, 42, 38, 0.08));
-      box-shadow: var(--sz-card-shadow, 0 2px 8px rgba(45, 42, 38, 0.06));
-      border-radius: var(--sz-card-radius, 8px);
+      background: var(--sz-card-bg);
+      border: 1px solid var(--sz-card-border);
+      box-shadow: var(--sz-card-shadow);
+      border-radius: var(--sz-card-radius);
       padding: 8px 12px;
       font-size: 11px;
       max-width: 280px;
@@ -95,18 +95,18 @@ export class SzEdgeLayer extends LitElement {
     }
 
     .transform-card .label {
-      font-family: var(--sz-font-sans, system-ui);
+      font-family: var(--sz-font-sans);
       font-size: 10px;
       font-weight: 600;
       text-transform: uppercase;
-      color: var(--sz-text-muted, #6B6560);
+      color: var(--sz-text-muted);
       margin-bottom: 4px;
       letter-spacing: 0.04em;
     }
 
     .transform-card .step-text {
-      font-family: var(--sz-font-mono, monospace);
-      color: var(--sz-text, #2D2A26);
+      font-family: var(--sz-font-mono);
+      color: var(--sz-text);
       white-space: pre-wrap;
       word-break: break-word;
     }
@@ -114,7 +114,7 @@ export class SzEdgeLayer extends LitElement {
     /* @ref highlights inside NL transform steps */
     .transform-card .at-ref {
       font-weight: 600;
-      color: var(--sz-at-ref, #4A8A5B);
+      color: var(--sz-at-ref);
     }
 
     .transform-card .step {
@@ -125,24 +125,24 @@ export class SzEdgeLayer extends LitElement {
     }
 
     .transform-card .step-sep {
-      color: var(--sz-text-muted, #6B6560);
+      color: var(--sz-text-muted);
     }
 
     .scope-label {
-      font-family: var(--sz-font-mono, monospace);
+      font-family: var(--sz-font-mono);
       font-size: 9px;
       font-weight: 600;
-      fill: var(--sz-text-muted, #6B6560);
+      fill: var(--sz-text-muted);
       text-anchor: middle;
       pointer-events: none;
     }
 
     .scope-label.each {
-      fill: var(--sz-orange-dark, #D97726);
+      fill: var(--sz-orange-dark);
     }
 
     .scope-label.flatten {
-      fill: var(--sz-green, #5A9E6F);
+      fill: var(--sz-green);
     }
 
     /* Dimmed edges when highlighting a field */
