@@ -36,10 +36,11 @@ async function vizWidth(page: Page): Promise<number> {
   return box.width;
 }
 
-// The source column is 448px and the collapsed rail 26px (index.html :root
-// variables), so a genuine reflow reclaims ~422px. Asserting against a
-// conservative lower bound keeps the test robust to minor style tweaks while
-// still failing hard if the pane merely overlays the viz (delta ≈ 0).
+// The source column is half the window (640px at Playwright's default 1280px
+// viewport) and the collapsed rail 26px (index.html :root variables), so a
+// genuine reflow reclaims ~614px. Asserting against a conservative lower bound
+// keeps the test robust to minor style tweaks while still failing hard if the
+// pane merely overlays the viz (delta ≈ 0).
 const MIN_RECLAIMED_WIDTH = 300;
 
 test.describe("Collapsible source pane", () => {
