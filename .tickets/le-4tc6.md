@@ -1,6 +1,6 @@
 ---
 id: le-4tc6
-status: open
+status: closed
 deps: []
 links: []
 created: 2026-06-09T23:24:47Z
@@ -17,3 +17,10 @@ The source pane is a fixed 448px column; on wide screens the editor is cramped. 
 
 Expanded source pane occupies half the window width; collapse/expand and persistence behaviour unchanged and tests pass.
 
+
+## Notes
+
+**2026-06-10T00:50:00+01:00**
+
+Cause: The source pane was a fixed 448px column, cramping the editor on wide screens.
+Fix: --source-width is now 50%, so the expanded pane takes half the window; collapse-rail behaviour and persistence unchanged (commit 287fcbd)
