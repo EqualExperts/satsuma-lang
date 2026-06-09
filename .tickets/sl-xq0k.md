@@ -1,6 +1,6 @@
 ---
 id: sl-xq0k
-status: in_progress
+status: closed
 deps: [sl-1qte, sl-nopd, sl-kd45, sl-ncu9]
 links: []
 created: 2026-06-09T21:15:33Z
@@ -21,3 +21,10 @@ Run via the existing sentinel-watcher workflow (.run-tests / .playwright-results
 
 a static-build Playwright project loads the published bundle under a non-root base path and renders a seeded example; harness tests cover live re-render, horizontal-scroll alignment, Open, Save, collapse reflow, seeding + edited-example-survives-reload, and in-browser cross-file lineage; a network-isolation test asserts no request carries source content during edit/Open/Save.
 
+
+## Notes
+
+**2026-06-10T01:15:00+01:00**
+
+Cause: Feature work — the suite only exercised the Node dev server at the site root; nothing validated the published static bundle under the GitHub Pages base path, and the privacy promise was prose rather than a tested property.
+Fix: playground-static Playwright project + scripts/serve-playground.mjs serve the bundle at /satsuma-lang/playground/ and assert base-path-contained requests, seeded rendering, and zero network requests across edit/Open/Save; library.test.ts covers first-visit seeding and edited-example-survives-reload. Remaining checklist items were landed with their feature tickets (commit f0c3f33)
