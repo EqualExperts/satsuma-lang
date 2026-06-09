@@ -38,8 +38,11 @@ export default defineConfig({
       use: { ...devices["Desktop Firefox"] },
       // Semantic pass/fail suite only — *.test.ts. Screenshot review specs
       // live in *.spec.ts and run under the dedicated screenshots project so
-      // a contributor can choose to run only one or the other.
+      // a contributor can choose to run only one or the other. The static
+      // playground suite runs against the OTHER server (port 3334), so it is
+      // excluded here and owned by the playground-static project below.
       testMatch: /.*\.test\.ts$/,
+      testIgnore: /playground-static/,
     },
     {
       // Screenshot review project — emits the named PNG artifacts plus
@@ -50,12 +53,36 @@ export default defineConfig({
       use: { ...devices["Desktop Firefox"] },
       testMatch: /.*\.spec\.ts$/,
     },
+    {
+      // Static playground smoke + privacy project (sl-xq0k): runs against the
+      // published server-free bundle served by a dumb file server under the
+      // GitHub Pages base path (/satsuma-lang/playground/), proving the bundle
+      // itself — not the dev server — loads, seeds, renders, and never lets a
+      // request carry source content.
+      name: "playground-static",
+      use: {
+        ...devices["Desktop Firefox"],
+        baseURL: "http://localhost:3334/satsuma-lang/playground/",
+      },
+      testMatch: /playground-static\.test\.ts$/,
+    },
   ],
-  /* Start the harness server before tests, shut it down after */
-  webServer: {
-    command: "node dist/server.js",
-    url: "http://localhost:3333",
-    reuseExistingServer: false,
-    timeout: 15_000,
-  },
+  /* Start both servers before tests, shut them down after: the Node harness
+   * server (firefox + screenshots projects) and the static playground file
+   * server (playground-static project). The latter re-assembles the bundle
+   * from the current dist/ first — a fast copy, not a rebuild. */
+  webServer: [
+    {
+      command: "node dist/server.js",
+      url: "http://localhost:3333",
+      reuseExistingServer: false,
+      timeout: 15_000,
+    },
+    {
+      command: "node scripts/build-playground.mjs && node scripts/serve-playground.mjs",
+      url: "http://localhost:3334/satsuma-lang/playground/index.html",
+      reuseExistingServer: false,
+      timeout: 15_000,
+    },
+  ],
 });
