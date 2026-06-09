@@ -3,39 +3,31 @@
  *
  * Owns two responsibilities:
  *   1. Static file serving — ships the browser client (index.html, app.js,
- *      satsuma-viz.js) that renders fixtures in a real browser.
- *   2. Fixture API — parses every .stm file found under the repo's examples/
- *      directory at startup, indexes them in a shared workspace index, and
- *      serves VizModel JSON via a simple REST-like API.
+ *      satsuma-viz.js) and the WASM parser artifacts the client loads.
+ *   2. Fixture API — discovers the .stm files under the repo's examples/
+ *      directory and serves their list and source text.
  *
- * The server is intentionally minimal: no Express, no bundler middleware,
- * no hot-reload.  It is a deterministic, fixture-driven harness designed for
- * Playwright automation, not a general-purpose dev server.
+ * The server no longer builds VizModels. Since feature 33 the browser client
+ * builds models itself via @satsuma/viz-backend (the /api/model endpoint and
+ * its server-side index were retired — see sl-j8n5); the server's only job now
+ * is to hand the client fixture sources and the WASM files. It stays a
+ * deterministic, fixture-driven harness for Playwright automation, not a
+ * general-purpose dev server.
  *
  * API routes:
  *   GET /              → redirect to /index.html
  *   GET /index.html    → harness shell page
  *   GET /app.js        → browser-side harness bundle
  *   GET /satsuma-viz.js → satsuma-viz web component bundle
+ *   GET /tree-sitter-satsuma.wasm, /tree-sitter.wasm → in-browser parser WASM
  *   GET /api/fixtures  → JSON array of { name, path, uri } objects
  *   GET /api/source?uri=<encoded> → { source: string, uri: string }
- *   GET /api/model?uri=<encoded>&lineage=<0|1> → VizModel JSON
  */
 
 import * as http from "http";
 import * as fs from "fs";
 import * as path from "path";
 import { pathToFileURL } from "url";
-import { initParser, getParser } from "@satsuma/core";
-import {
-  createWorkspaceIndex,
-  indexFile,
-  buildVizModel,
-  mergeVizModels,
-  getImportReachableUris,
-  createScopedIndex,
-} from "@satsuma/viz-backend";
-import type { WorkspaceIndex } from "@satsuma/viz-backend";
 
 // ---------- Configuration ----------
 
@@ -113,28 +105,6 @@ function discoverFixtures(dir: string): Fixture[] {
   return fixtures;
 }
 
-/**
- * Parse all discovered fixture files and build a shared workspace index.
- * Files that fail to read are skipped with a console warning.
- */
-function indexFixtures(fixtures: Fixture[], wsIndex: WorkspaceIndex): void {
-  const parser = getParser();
-  for (const fixture of fixtures) {
-    let source: string;
-    try {
-      source = fs.readFileSync(fixture.path, "utf-8");
-    } catch (err) {
-      console.warn(`[harness] skipping unreadable fixture: ${fixture.path}`, err);
-      continue;
-    }
-    const tree = parser.parse(source);
-    // web-tree-sitter's parse() returns Tree | null; null is only possible
-    // when parsing is halted via a callback, which we never do here.
-    if (!tree) continue;
-    indexFile(wsIndex, fixture.uri, tree);
-  }
-}
-
 // ---------- HTTP request handling ----------
 
 /**
@@ -172,11 +142,10 @@ function serveStaticFile(res: http.ServerResponse, filePath: string): boolean {
 
 /**
  * Build and return the request handler for the HTTP server.
- * Captures the fixture registry and workspace index in its closure.
+ * Captures the fixture registry in its closure.
  */
 function makeHandler(
   fixtures: Fixture[],
-  wsIndex: WorkspaceIndex,
   fixturesByUri: Map<string, Fixture>,
 ): http.RequestListener {
   return (req, res) => {
@@ -245,53 +214,10 @@ function makeHandler(
       return;
     }
 
-    if (rawPath === "/api/model") {
-      const uri = query.get("uri");
-      if (!uri) { sendError(res, 400, "Missing ?uri="); return; }
-      const fixture = fixturesByUri.get(uri);
-      if (!fixture) { sendError(res, 404, `Unknown fixture URI: ${uri}`); return; }
-
-      const wantLineage = query.get("lineage") === "1";
-      const parser = getParser();
-
-      let source: string;
-      try {
-        source = fs.readFileSync(fixture.path, "utf-8");
-      } catch {
-        sendError(res, 500, "Failed to read fixture file");
-        return;
-      }
-
-      const tree = parser.parse(source);
-      if (!tree) { sendError(res, 500, "Parser returned null"); return; }
-
-      if (wantLineage) {
-        // Full transitive lineage: collect VizModels for all import-reachable files
-        // and merge them, so the viz shows the complete cross-file data flow.
-        const reachable = getImportReachableUris(uri, wsIndex);
-        const models = [];
-        for (const reachableUri of reachable) {
-          const rf = fixturesByUri.get(reachableUri);
-          if (!rf) continue;
-          let rfSource: string;
-          try { rfSource = fs.readFileSync(rf.path, "utf-8"); }
-          catch { continue; }
-          const rfTree = parser.parse(rfSource);
-          if (!rfTree) continue;
-          const scopedIndex = createScopedIndex(wsIndex, reachable);
-          models.push(buildVizModel(reachableUri, rfTree, scopedIndex));
-        }
-        const merged = mergeVizModels(uri, models);
-        sendJson(res, 200, merged);
-      } else {
-        // Single-file model using an import-scoped index (matching LSP behaviour).
-        const reachable = getImportReachableUris(uri, wsIndex);
-        const scopedIndex = createScopedIndex(wsIndex, reachable);
-        const model = buildVizModel(uri, tree, scopedIndex);
-        sendJson(res, 200, model);
-      }
-      return;
-    }
+    // Note: there is no /api/model route. Model-building moved to the browser
+    // client in feature 33 (sl-dn29); the server-side endpoint and its workspace
+    // index were retired (sl-j8n5). The client builds VizModels from the source
+    // text it fetches via /api/source.
 
     sendError(res, 404, `Unknown route: ${rawPath}`);
   };
@@ -300,14 +226,9 @@ function makeHandler(
 // ---------- Main ----------
 
 async function main(): Promise<void> {
-  // Initialise the WASM parser.  Both WASM files live next to server.js after
-  // the build:wasm step copies them from the tree-sitter and web-tree-sitter
-  // packages.  locateFile tells web-tree-sitter where its own runtime WASM is,
-  // since esbuild moves the file out of the default module-relative location.
-  await initParser(WASM_SATSUMA, { locateFile: () => WASM_RUNTIME });
-
-  const wsIndex = createWorkspaceIndex();
-
+  // The server no longer parses or builds models — the client does that with its
+  // own in-browser WASM parser (feature 33). The server just discovers fixtures
+  // and serves their sources and the WASM files the client loads.
   if (!fs.existsSync(EXAMPLES_DIR)) {
     console.error(`[harness] examples directory not found: ${EXAMPLES_DIR}`);
     process.exit(1);
@@ -316,12 +237,9 @@ async function main(): Promise<void> {
   const fixtures = discoverFixtures(EXAMPLES_DIR);
   console.log(`[harness] discovered ${fixtures.length} fixture(s) in ${EXAMPLES_DIR}`);
 
-  indexFixtures(fixtures, wsIndex);
-  console.log(`[harness] indexed all fixtures`);
-
   const fixturesByUri = new Map(fixtures.map((f) => [f.uri, f]));
 
-  const server = http.createServer(makeHandler(fixtures, wsIndex, fixturesByUri));
+  const server = http.createServer(makeHandler(fixtures, fixturesByUri));
   server.listen(PORT, () => {
     console.log(`[harness] ready at http://localhost:${PORT}`);
   });
