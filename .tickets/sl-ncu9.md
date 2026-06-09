@@ -1,6 +1,6 @@
 ---
 id: sl-ncu9
-status: open
+status: in_progress
 deps: [sl-dn29, sl-kd45]
 links: []
 created: 2026-06-09T21:15:33Z

@@ -13,6 +13,7 @@
     "build:viz": "cp ../satsuma-viz/dist/satsuma-viz.js dist/client/satsuma-viz.js",
     "build:examples": "node scripts/generate-examples-manifest.mjs",
     "build": "mkdir -p dist/client && npm run build:server && npm run build:client && npm run build:wasm && npm run build:viz && npm run build:examples",
+    "build:playground": "npm run build && node scripts/build-playground.mjs",
     "dev": "npm run build && node dist/server.js",
     "test": "playwright test",
     "test:unit": "node --test scripts/*.test.mjs test/unit/*.test.mjs",
