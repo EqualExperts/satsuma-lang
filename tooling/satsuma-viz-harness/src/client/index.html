@@ -30,6 +30,14 @@
       --color-accent: #5b7fde;
       --color-accent-hover: #7094e8;
       --color-selected: #1d2d54;
+      /*
+       * Editor text-selection highlight (le-9zil).  MUST stay translucent: the
+       * overlay editor's textarea text is transparent (the coloured tokens live
+       * on the layer beneath), so an opaque selection background would cover
+       * them and read as a solid block.  Translucent accent at ~30% keeps the
+       * syntax colours visible through the selection.
+       */
+      --editor-selection: rgba(91, 127, 222, 0.30);
       --color-ready-bg: #0d2b1a;
       --color-ready-text: #3fb950;
       --color-ready-border: #2ea043;
@@ -64,6 +72,8 @@
       --color-accent: #D97726;
       --color-accent-hover: #C45D22;
       --color-selected: #FFE0C7;
+      /* Translucent selection for the light theme — see the dark declaration. */
+      --editor-selection: rgba(217, 119, 38, 0.25);
       --color-ready-bg: #E6F4EA;
       --color-ready-text: #2E7D46;
       --color-ready-border: #5A9E6F;
@@ -225,7 +235,16 @@
       caret-color: var(--color-text);
       white-space: pre; overflow-wrap: normal; word-break: normal;
     }
-    #source-input::selection { background: var(--color-selected); }
+    /*
+     * Selection must be translucent and must NOT repaint the glyphs: the
+     * characters the user sees belong to the highlight layer below, so the
+     * selected text stays transparent and only a see-through tint is drawn
+     * over it (le-9zil — an opaque selection reads as a solid block).
+     */
+    #source-input::selection {
+      background: var(--editor-selection);
+      color: transparent;
+    }
 
     /*
      * Parse-status indicator (feature 33 §2).  Shown when the live buffer fails

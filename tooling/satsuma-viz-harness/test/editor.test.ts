@@ -121,6 +121,29 @@ test.describe("Live editor — editing and highlighting", () => {
     if (!after) throw new Error("comment token not rendered after scroll");
     expect(after.x).toBeCloseTo(before.x - SCROLL_BY, 0);
   });
+
+  test("text selection stays translucent so the coloured tokens remain visible", async ({
+    page,
+  }) => {
+    // The textarea's glyphs are transparent — the characters the user sees are
+    // on the highlight layer BELOW. An opaque ::selection background therefore
+    // covers them and reads as a solid block (le-9zil). Pin the two properties
+    // that prevent that: a selection background with alpha < 1, and selected
+    // text that stays transparent rather than being repainted by the browser.
+    const selection = await page.locator("#source-input").evaluate((el) => {
+      const style = getComputedStyle(el, "::selection");
+      return { background: style.backgroundColor, color: style.color };
+    });
+
+    const alphaOf = (cssColor: string): number => {
+      // rgb(…) means alpha 1; rgba(…) carries it as the fourth component.
+      const match = /rgba\([^)]*,\s*([\d.]+)\)/.exec(cssColor);
+      return match ? Number(match[1]) : 1;
+    };
+    expect(alphaOf(selection.background)).toBeLessThan(1);
+    expect(alphaOf(selection.background)).toBeGreaterThan(0);
+    expect(alphaOf(selection.color)).toBe(0);
+  });
 });
 
 test.describe("Live editor — debounced re-render and resilience", () => {
