@@ -1,6 +1,9 @@
 # Feature 32 — Viz Light Mode & VS Code Theme Integration
 
-> **Status: DRAFT (2026-06-05) — awaiting review**
+> **Status: IMPLEMENTED (2026-06-09).** All phases delivered (epic `sl-wyr1`).
+> Remaining manual step: VS Code Extension-Host GUI verification of live theme
+> switching (light / dark / live-switch / HighContrastLight), which cannot run
+> in the agent sandbox.
 
 ## Goal
 
