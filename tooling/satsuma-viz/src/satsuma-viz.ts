@@ -11,8 +11,11 @@ import { buildMappedFieldsIndex, buildMappingCoveredFields } from "./field-cover
 export { VizModel } from "./model.js";
 export type { NamespaceGroup } from "./model.js";
 
+import type { SzCompactToggledDetail } from "./components/sz-schema-card.js";
+
 // Re-export components so they register when the bundle loads
 export { SzSchemaCard } from "./components/sz-schema-card.js";
+export type { SzCompactToggledDetail } from "./components/sz-schema-card.js";
 export { SzMetricCard } from "./components/sz-metric-card.js";
 export { SzFragmentCard } from "./components/sz-fragment-card.js";
 export { SzEdgeLayer } from "./edges/sz-edge-layer.js";
@@ -716,9 +719,17 @@ export class SatsumaViz extends LitElement {
   @state()
   private _overviewLayout: OverviewLayoutResult | null = null;
 
-  /** Canvas height for overview mode — starts at layout height but grows when compact cards expand. */
+  /**
+   * Compact overview cards the user has expanded to show fields, by schema
+   * qualifiedId. Drives BOTH each card's `compactExpanded` property and the
+   * overview layout's per-node size (computeOverviewLayout expandedSchemaIds),
+   * which is what makes expansion re-flow neighbours instead of overlapping
+   * them. Survives model rebuilds deliberately: a live-editor keystroke
+   * replaces the model, and the user's expanded cards should stay expanded;
+   * ids that no longer exist are simply ignored by the layout.
+   */
   @state()
-  private _overviewCanvasHeight = 0;
+  private _compactExpandedIds: ReadonlySet<string> = new Set();
 
   @state()
   private _selectedMapping: MappingBlock | null = null;
@@ -909,11 +920,10 @@ export class SatsumaViz extends LitElement {
     try {
       const [detail, overview] = await Promise.all([
         computeLayout(mergedModel),
-        computeOverviewLayout(mergedModel),
+        computeOverviewLayout(mergedModel, { expandedSchemaIds: this._compactExpandedIds }),
       ]);
       this._layout = detail;
       this._overviewLayout = overview;
-      this._overviewCanvasHeight = overview.height;
     } catch {
       this._layoutError = true;
     }
@@ -1188,19 +1198,24 @@ export class SatsumaViz extends LitElement {
     this._panY = 0;
   }
 
-  /** Grow the overview canvas height to fit any compact cards that have been expanded. */
-  private _onCompactToggled() {
-    // Wait for Lit to re-render the expanded fields before measuring.
-    void this.updateComplete.then(() => {
-      const canvas = this.renderRoot?.querySelector?.(".canvas") as HTMLElement | null;
-      if (!canvas || !this._overviewLayout) return;
-      const cards = Array.from(canvas.querySelectorAll(".positioned-card")) as HTMLElement[];
-      let maxBottom = this._overviewLayout.height;
-      for (const card of cards) {
-        maxBottom = Math.max(maxBottom, card.offsetTop + card.offsetHeight);
-      }
-      this._overviewCanvasHeight = maxBottom;
-    });
+  /**
+   * A compact card requested an expand/collapse of its field list. The card's
+   * size changes, so the overview layout is recomputed with the new node
+   * geometry — neighbours move aside and edges re-route rather than the
+   * expanded card painting over them, and the canvas height follows the
+   * layout symmetrically (it shrinks back on collapse).
+   */
+  private _onCompactToggled(e: Event) {
+    const detail = (e as CustomEvent<SzCompactToggledDetail>).detail;
+    if (!detail?.schemaId) return;
+    const next = new Set(this._compactExpandedIds);
+    if (detail.expanded) {
+      next.add(detail.schemaId);
+    } else {
+      next.delete(detail.schemaId);
+    }
+    this._compactExpandedIds = next;
+    void this._runLayout();
   }
 
   private _fit() {
@@ -1384,7 +1399,7 @@ export class SatsumaViz extends LitElement {
   /** Render the overview: compact schema cards + thick overview edges. */
   private _renderOverview(overview: OverviewLayoutResult, namespaces: NamespaceGroup[]) {
     return html`
-      <div class="canvas" style="width: ${overview.width + 48}px; height: ${this._overviewCanvasHeight + 48}px; padding: 24px;"
+      <div class="canvas" style="width: ${overview.width + 48}px; height: ${overview.height + 48}px; padding: 24px;"
         @sz-compact-toggled=${this._onCompactToggled}>
         <!-- Overview SVG edge layer (filtered to visible nodes) -->
         <sz-overview-edge-layer
@@ -1410,6 +1425,7 @@ export class SatsumaViz extends LitElement {
                     .testIdPrefix=${`overview-schema-card-${sanitizeTestIdSegment(s.qualifiedId)}`}
                     .schema=${s}
                     .namespaceLabel=${ns.name}
+                    .compactExpanded=${this._compactExpandedIds.has(s.qualifiedId)}
                     compact
                   ></sz-schema-card>
                 </div>

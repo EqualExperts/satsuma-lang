@@ -6,6 +6,19 @@ import { SzNavigateEvent, SzFieldHoverEvent, SzFieldLineageEvent } from "../sats
 import { renderMarkdown } from "../markdown.js";
 import { isCoveredFieldPath } from "@satsuma/core/coverage-paths";
 
+/**
+ * Detail of the `sz-compact-toggled` CustomEvent a compact card dispatches
+ * when its header is clicked. The card does NOT change its own state — the
+ * parent visualization owns `compactExpanded` (it must re-run the overview
+ * layout at the card's new size) and flips the property in response.
+ */
+export interface SzCompactToggledDetail {
+  /** qualifiedId of the schema whose card was clicked (id if unqualified). */
+  schemaId: string;
+  /** The state the user asked for: true = expand fields, false = collapse. */
+  expanded: boolean;
+}
+
 function sanitizeTestIdSegment(value: string): string {
   const lowered = value.toLowerCase();
   let result = "";
@@ -50,6 +63,15 @@ export class SzSchemaCard extends LitElement {
     :host([content-width]) {
       width: max-content;
       max-width: none;
+    }
+
+    /*
+     * While a compact card is expanded, the overview layout sizes its node
+     * from a height ESTIMATE (field-note lines are not estimated), so let any
+     * small overshoot paint past the host instead of being clipped.
+     */
+    :host([compact-expanded]) {
+      overflow: visible;
     }
 
     .header {
@@ -450,12 +472,18 @@ export class SzSchemaCard extends LitElement {
   @property({ type: String })
   highlightColor: "source" | "target" | "" = "";
 
+  /**
+   * Whether this compact card is expanded to reveal its field list. OWNED BY
+   * THE PARENT visualization: the parent must know the expanded set to size
+   * this card's node in the overview layout, so a header click only *requests*
+   * the toggle (see sz-compact-toggled) and the parent flips this property.
+   * Reflected so the stylesheet can lift the host's overflow while expanded.
+   */
+  @property({ type: Boolean, attribute: "compact-expanded", reflect: true })
+  compactExpanded = false;
+
   @state()
   private _collapsed = false;
-
-  /** Whether a compact card has been expanded by the user to reveal its fields. */
-  @state()
-  private _compactExpanded = false;
 
   @state()
   private _notesExpanded = true;
@@ -687,7 +715,7 @@ export class SzSchemaCard extends LitElement {
         <div class="header ${isReport ? "report" : ""}" @click=${this._onCompactHeaderClick}>
           ${this._headerIcon(isReport)}
           <span class="header-name">${displayName}</span>
-          <span class="header-toggle" ?data-collapsed=${!this._compactExpanded}>&#9660;</span>
+          <span class="header-toggle" ?data-collapsed=${!this.compactExpanded}>&#9660;</span>
           <span class="header-count">${totalFields} fields</span>
         </div>
         ${metaPills.length > 0
@@ -697,7 +725,7 @@ export class SzSchemaCard extends LitElement {
               )}
             </div>`
           : ""}
-        ${this._compactExpanded
+        ${this.compactExpanded
           ? html`<div class="fields">
               ${s.fields.map((f) => this._renderField(f, 0))}
             </div>`
@@ -707,10 +735,19 @@ export class SzSchemaCard extends LitElement {
   }
 
   private _onCompactHeaderClick() {
-    this._compactExpanded = !this._compactExpanded;
-    this.style.overflow = this._compactExpanded ? "visible" : "";
-    // Notify the parent viz so it can grow the canvas to fit the expanded fields.
-    this.dispatchEvent(new Event("sz-compact-toggled", { bubbles: true, composed: true }));
+    // Request the toggle rather than flipping local state: the parent owns
+    // compactExpanded because it must re-run the overview layout with this
+    // card's new size (expansion re-flows neighbours; it never overlays them).
+    this.dispatchEvent(
+      new CustomEvent<SzCompactToggledDetail>("sz-compact-toggled", {
+        detail: {
+          schemaId: this.schema?.qualifiedId ?? this.schema?.id ?? "",
+          expanded: !this.compactExpanded,
+        },
+        bubbles: true,
+        composed: true,
+      }),
+    );
     if (this.schema) {
       this._navigate(this.schema.location);
     }
