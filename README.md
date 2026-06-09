@@ -14,6 +14,8 @@
 [![Release](https://github.com/EqualExperts/satsuma-lang/actions/workflows/release.yml/badge.svg?branch=main)](https://github.com/EqualExperts/satsuma-lang/actions/workflows/release.yml)
 [![Security](https://github.com/EqualExperts/satsuma-lang/actions/workflows/security.yml/badge.svg?branch=main&event=push)](https://github.com/EqualExperts/satsuma-lang/actions/workflows/security.yml?query=branch%3Amain+event%3Apush)
 
+📖 **[Website, documentation &amp; examples → equalexperts.github.io/satsuma-lang](https://equalexperts.github.io/satsuma-lang/)**
+
 Satsuma is a domain-specific language for source-to-target data mapping.
 
 It is designed to replace ad hoc spreadsheets, wiki tables, and overly verbose
