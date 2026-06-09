@@ -1,6 +1,30 @@
 const { describe, it } = require("node:test");
 const assert = require("node:assert/strict");
-const { runValidate } = require("../dist/validate-diagnostics");
+const { fileURLToPath, pathToFileURL } = require("node:url");
+const { runValidate, pathToFileUri } = require("../dist/validate-diagnostics");
+
+describe("pathToFileUri", () => {
+  // The Windows symptom (a `C:\…` path becoming a malformed `file://C:\…`
+  // URI that never matches the open document, so diagnostics silently fail
+  // to attach) cannot be reproduced on the POSIX CI host, because
+  // pathToFileURL is platform-bound. These cases pin the platform-independent
+  // invariant that prevents it: a canonical file:// URL that round-trips. (gh-265)
+
+  it("produces a canonical file:// URL, not a hand-built string", () => {
+    // Locks the implementation to Node's pathToFileURL. The previous
+    // `"file://" + encodeURI(path)` is what mishandled Windows drive paths.
+    assert.equal(pathToFileUri("/proj/x.stm"), pathToFileURL("/proj/x.stm").toString());
+  });
+
+  it("round-trips a path containing URL-significant characters", () => {
+    // `?` is the POSIX proxy for the Windows drive-colon breakage: encodeURI
+    // left it raw, so the old code yielded `file:///a?b.stm` where `?b.stm`
+    // parses as a query string and fileURLToPath loses it. pathToFileURL
+    // encodes it, so the URI round-trips to the exact input.
+    const p = "/proj/weird?name #1/x.stm";
+    assert.equal(fileURLToPath(pathToFileUri(p)), p);
+  });
+});
 
 describe("runValidate", () => {
   it("returns empty map when CLI produces no output", async () => {
