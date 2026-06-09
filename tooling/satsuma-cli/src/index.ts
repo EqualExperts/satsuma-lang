@@ -13,6 +13,7 @@ import { readFileSync } from "fs";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
 import { initParser } from "./parser.js";
+import { commandModuleSpecifier } from "./command-loader.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -72,7 +73,9 @@ const commands = [
 ];
 
 for (const cmd of commands) {
-  const mod = await import(join(__dirname, cmd)) as { register: (program: Command) => void };
+  // Import via a file:// URL, not a raw path: Node's ESM loader rejects bare
+  // absolute paths like "C:\…\summary.js" on Windows (gh-265). See command-loader.
+  const mod = await import(commandModuleSpecifier(__dirname, cmd)) as { register: (program: Command) => void };
   mod.register(program);
 }
 
