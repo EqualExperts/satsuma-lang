@@ -1,6 +1,6 @@
 ---
 id: sl-xq0k
-status: open
+status: in_progress
 deps: [sl-1qte, sl-nopd, sl-kd45, sl-ncu9]
 links: []
 created: 2026-06-09T21:15:33Z
