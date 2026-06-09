@@ -5,7 +5,7 @@ import {
   Position,
 } from "vscode-languageserver";
 import { execFile } from "node:child_process";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 /** Shape of a single entry from `satsuma validate --json`. */
 interface ValidateEntry {
@@ -100,7 +100,18 @@ export async function runValidate(
   });
 }
 
-function pathToFileUri(fsPath: string): string {
-  // Use a simple conversion — the file paths from validate are absolute
-  return "file://" + encodeURI(fsPath).replace(/#/g, "%23");
+/**
+ * Convert an absolute filesystem path (as emitted by `satsuma validate --json`)
+ * into a `file://` URI that matches the editor's document URIs.
+ *
+ * Exported for direct testing of the URI invariant. We delegate to Node's
+ * `pathToFileURL` rather than hand-building the URL: on Windows a path like
+ * `C:\proj\x.stm` must become `file:///c:/proj/x.stm`, but string concatenation
+ * (`"file://" + path`) leaves the drive colon and backslashes raw, producing a
+ * malformed URI that never matches the open document — so diagnostics silently
+ * fail to attach. `pathToFileURL` also percent-encodes URL-significant
+ * characters (spaces, `?`, `#`) that naive encoding mishandles. (gh-265)
+ */
+export function pathToFileUri(fsPath: string): string {
+  return pathToFileURL(fsPath).toString();
 }
