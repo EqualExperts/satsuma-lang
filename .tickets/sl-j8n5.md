@@ -17,3 +17,12 @@ Assert the browser model pipeline and the existing server /api/model produce the
 
 a parity test asserts client-built and server-built VizModels match for canonical single-file and cross-file-lineage fixtures; once green and authoritative, /api/model is removed or explicitly scoped to test-only with a note; the file:/// URI standardisation keeps URIs identical across runtimes so the comparison is apples-to-apples.
 
+
+## Notes
+
+**2026-06-09T22:09:42Z**
+
+**2026-06-09T22:09:42Z**
+
+Cause: model-building moved to the browser in sl-dn29; needed a regression guard that the extraction preserved output, and the server /api/model endpoint became dead code (no client/test consumer).
+Fix: added model-parity.test.js deep-equating buildModelFromSources to a frozen transcription of the original server algorithm (single + lineage), then removed /api/model plus the server-side workspace index, indexFixtures, and parser init (commit e6afb1b).
