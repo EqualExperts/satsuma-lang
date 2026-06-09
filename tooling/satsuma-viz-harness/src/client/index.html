@@ -147,12 +147,60 @@
       border-right: 1px solid var(--color-border);
       position: relative; /* needed for dropdown overlay */
     }
-    #source-code {
-      flex: 1; overflow: auto; padding: 10px;
-      background: var(--color-bg); color: var(--color-text);
-      font-size: 10px; line-height: 1.6; white-space: pre; tab-size: 2;
+    /*
+     * Overlay editor (feature 33 §2).  Two layers fill #source-editor exactly:
+     * a coloured <pre> (#source-highlight) and a transparent <textarea>
+     * (#source-input) on top.  Both carry .code-layer so they share identical
+     * box geometry — font, line-height, padding, white-space — which is what
+     * keeps the colours pixel-aligned under the caret at any scroll offset.
+     */
+    #source-editor {
+      flex: 1; position: relative; overflow: hidden;
+      background: var(--color-bg);
     }
-    #source-code.empty { color: var(--color-text-muted); font-style: italic; white-space: normal; }
+    .code-layer {
+      position: absolute; inset: 0; margin: 0; padding: 10px;
+      font-family: var(--font-mono); font-size: 10px; line-height: 1.6;
+      tab-size: 2; white-space: pre; border: 0;
+    }
+    /* Coloured layer: shows tokens, ignores all interaction. */
+    #source-highlight {
+      overflow: hidden; pointer-events: none; z-index: 0;
+      color: var(--color-text);
+    }
+    /*
+     * Editable layer: transparent text over the colours, a visible caret, and
+     * the single scroll region.  white-space:pre (+ wrap="off" on the element)
+     * keeps wide lines on one line so they scroll horizontally rather than wrap.
+     */
+    #source-input {
+      overflow: auto; resize: none; z-index: 1; outline: none;
+      background: transparent; color: transparent;
+      caret-color: var(--color-text);
+      white-space: pre; overflow-wrap: normal; word-break: normal;
+    }
+    #source-input::selection { background: var(--color-selected); }
+
+    /*
+     * Parse-status indicator (feature 33 §2).  Shown when the live buffer fails
+     * to produce a model and the previous good visualization is being retained,
+     * so the canvas is never blanked mid-edit.  Dismissable; re-appears on the
+     * next stale edit.
+     */
+    #parse-status {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 2px 6px 2px 8px; border-radius: 10px;
+      font-size: 9px; white-space: nowrap;
+      background: var(--color-surface-2);
+      color: var(--tok-comment-warn);
+      border: 1px solid var(--color-border);
+    }
+    #parse-status.hidden { display: none; }
+    #parse-status-dismiss {
+      background: none; border: 0; cursor: pointer; padding: 0 2px;
+      color: inherit; font-size: 12px; line-height: 1; font-family: inherit;
+    }
+    #parse-status-dismiss:hover { color: var(--color-text); }
 
     /* ── Fixture picker button + dropdown ────────────────────────────────── */
     #fixture-picker { position: relative; flex: 1; min-width: 0; }
@@ -269,9 +317,15 @@
             <div id="fixture-list"></div>
           </div>
         </div>
+        <span class="toolbar-spacer"></span>
+        <!-- Shown by app.ts only while a mid-edit buffer keeps the last good viz -->
+        <span id="parse-status" class="hidden" role="status">
+          <span id="parse-status-text">&#9888; unparsed edits</span>
+          <button id="parse-status-dismiss" title="Dismiss" aria-label="Dismiss">&times;</button>
+        </span>
       </div>
-      <!-- innerHTML is set by app.ts with syntax-highlighted HTML -->
-      <pre id="source-code" class="empty">Select a fixture to view its source.</pre>
+      <!-- Overlay editor: app.ts mounts #source-highlight + #source-input here -->
+      <div id="source-editor"></div>
     </section>
 
     <!-- Viz panel: zoom hint + PNG export in toolbar, viz component below -->
