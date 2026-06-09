@@ -1332,3 +1332,171 @@ test.describe("Compact card expansion in overview", () => {
     );
   });
 });
+
+// ---------------------------------------------------------------------------
+// Theme switching (Feature 32)
+//
+// Proves the light/dark theme contract end-to-end in a real browser: the
+// `?theme=` URL parameter deterministically selects the palette, the
+// prefers-color-scheme fallback works, the header toggle restyles both chrome
+// and component while recording an automation event, and representative
+// tokenized elements (not just --sz-bg) change colour between themes.
+// ---------------------------------------------------------------------------
+
+/** Computed background-color of the <satsuma-viz> host (drives off --sz-bg). */
+async function vizHostBackground(page: Page): Promise<string> {
+  return page
+    .locator("satsuma-viz")
+    .evaluate((el) => getComputedStyle(el).backgroundColor);
+}
+
+/** Read a computed style property of the first element matching a selector. */
+async function computedStyle(
+  page: Page,
+  selector: string,
+  property: string,
+): Promise<string> {
+  return page
+    .locator(selector)
+    .first()
+    .evaluate(
+      (el, prop) => getComputedStyle(el).getPropertyValue(prop),
+      property,
+    );
+}
+
+test.describe("Theme switching — URL parameter", () => {
+  test("?theme=light renders the light component palette", async ({ page }) => {
+    // The light --sz-bg token is #FFFAF5 → rgb(255, 250, 245). Asserting the
+    // host's computed background proves the component received theme="light"
+    // and the tokens.css :host defaults (light) are in effect.
+    await page.goto("/?theme=light");
+    await loadFixture(page, sfdcUri);
+
+    await expect(page.locator("satsuma-viz")).toHaveAttribute("theme", "light");
+    expect(await vizHostBackground(page)).toBe("rgb(255, 250, 245)");
+    expect(await page.evaluate(() => window.__satsumaHarness.theme)).toBe("light");
+  });
+
+  test("?theme=dark renders the dark component palette", async ({ page }) => {
+    // The dark --sz-bg token is #1E1E1E → rgb(30, 30, 30). This is the
+    // :host([theme="dark"]) override engaging via the reflected attribute.
+    await page.goto("/?theme=dark");
+    await loadFixture(page, sfdcUri);
+
+    await expect(page.locator("satsuma-viz")).toHaveAttribute("theme", "dark");
+    expect(await vizHostBackground(page)).toBe("rgb(30, 30, 30)");
+    expect(await page.evaluate(() => window.__satsumaHarness.theme)).toBe("dark");
+  });
+});
+
+test.describe("Theme switching — prefers-color-scheme fallback", () => {
+  // With no ?theme= parameter the harness falls back to the emulated
+  // colorScheme. Playwright drives the media query via test.use({ colorScheme }).
+  test.describe("emulated light scheme", () => {
+    test.use({ colorScheme: "light" });
+    test("adopts light when the OS prefers light and no parameter is set", async ({
+      page,
+    }) => {
+      await page.goto("/");
+      await loadFixture(page, sfdcUri);
+      expect(await page.evaluate(() => window.__satsumaHarness.theme)).toBe("light");
+      await expect(page.locator("satsuma-viz")).toHaveAttribute("theme", "light");
+    });
+  });
+
+  test.describe("emulated dark scheme", () => {
+    test.use({ colorScheme: "dark" });
+    test("adopts dark when the OS prefers dark and no parameter is set", async ({
+      page,
+    }) => {
+      await page.goto("/");
+      await loadFixture(page, sfdcUri);
+      expect(await page.evaluate(() => window.__satsumaHarness.theme)).toBe("dark");
+      await expect(page.locator("satsuma-viz")).toHaveAttribute("theme", "dark");
+    });
+  });
+});
+
+test.describe("Theme switching — header toggle", () => {
+  test("toggling to light restyles chrome + component and records a theme-change event", async ({
+    page,
+  }) => {
+    // Start in dark, toggle to light. The toggle must flip the component's
+    // theme attribute, the chrome's body[data-theme] (which restyles the
+    // chrome background via CSS variables), AND append a theme-change event so
+    // automation can observe the switch.
+    await page.goto("/?theme=dark");
+    await loadFixture(page, sfdcUri);
+    await page.evaluate(() => window.__satsumaHarness.clearEvents());
+
+    // Dark chrome background before the switch (#0f1117 → rgb(15, 17, 23)).
+    const bodyBgBefore = await page
+      .locator("body")
+      .evaluate((el) => getComputedStyle(el).backgroundColor);
+    expect(bodyBgBefore).toBe("rgb(15, 17, 23)");
+
+    await page.locator("#theme-toggle .toggle-btn[data-theme='light']").click();
+
+    // Component attribute and chrome data-theme both flip to light.
+    await expect(page.locator("satsuma-viz")).toHaveAttribute("theme", "light");
+    await expect(page.locator("body")).toHaveAttribute("data-theme", "light");
+
+    // Chrome background restyled to the light cream (#FFFAF5 → rgb(255,250,245)).
+    const bodyBgAfter = await page
+      .locator("body")
+      .evaluate((el) => getComputedStyle(el).backgroundColor);
+    expect(bodyBgAfter).toBe("rgb(255, 250, 245)");
+
+    // The switch is observable in the automation event log.
+    await expect.poll(async () => recordedEvents(page, "theme-change")).toContainEqual(
+      expect.objectContaining({ detail: { theme: "light" } }),
+    );
+  });
+});
+
+test.describe("Theme switching — representative audit tokens", () => {
+  test("report header and overview edge stroke change colour between themes", async ({
+    page,
+  }) => {
+    // --sz-bg flipping is necessary but not sufficient: the audit promoted many
+    // other tokens. This asserts two representative ones — the report-card
+    // header (--sz-report) and the overview edge stroke (--sz-edge-default) —
+    // resolve to different computed colours in light vs dark, proving the full
+    // token set switches, not just the page background.
+    // Overview schema cards render compact, so the report header carries no
+    // -header testid — locate it by its `.header.report` class inside the
+    // card's shadow DOM (Playwright pierces open shadow roots for CSS
+    // descendant combinators, as the existing `.header` click tests rely on).
+    const reportHeader =
+      "[data-testid='overview-schema-card-weekly-sales-dashboard'] .header.report";
+    const overviewEdge = "sz-overview-edge-layer path.overview-path";
+
+    await page.goto("/?theme=light");
+    await page.locator(".toggle-btn[data-mode='single']").click();
+    await loadFixture(page, reportsUri);
+    const reportHeaderLight = await computedStyle(page, reportHeader, "background-color");
+    const edgeStrokeLight = await computedStyle(page, overviewEdge, "stroke");
+
+    // --sz-report light is #4A90B8 → rgb(74, 144, 184): the exact promoted token.
+    expect(reportHeaderLight).toBe("rgb(74, 144, 184)");
+    // Edge stroke resolves to a real colour (its exact token depends on whether
+    // the first edge is a bare/map or NL edge — both differ between themes).
+    expect(edgeStrokeLight).toMatch(/^rgb\(/);
+
+    await page.goto("/?theme=dark");
+    await page.locator(".toggle-btn[data-mode='single']").click();
+    await loadFixture(page, reportsUri);
+    const reportHeaderDark = await computedStyle(page, reportHeader, "background-color");
+    const edgeStrokeDark = await computedStyle(page, overviewEdge, "stroke");
+
+    // --sz-report dark is #6FB3D9 → rgb(111, 179, 217).
+    expect(reportHeaderDark).toBe("rgb(111, 179, 217)");
+    expect(edgeStrokeDark).toMatch(/^rgb\(/);
+
+    // The audit tokens switch with the theme — neither element keeps its
+    // light-mode colour in dark mode.
+    expect(reportHeaderDark).not.toBe(reportHeaderLight);
+    expect(edgeStrokeDark).not.toBe(edgeStrokeLight);
+  });
+});

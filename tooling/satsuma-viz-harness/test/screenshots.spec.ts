@@ -51,6 +51,8 @@ interface ManifestEntry {
   fixture: string;
   /** View mode the harness was in when the shot was taken. */
   viewMode: "single" | "lineage";
+  /** Theme the shot was captured in — both are captured for palette sign-off. */
+  theme: "light" | "dark";
   /** Free-form description of the UI state captured (overview, detail, filter, …). */
   uiState: string;
   /** Viewport the shot was rendered at. */
@@ -60,6 +62,9 @@ interface ManifestEntry {
   /** Playwright test step name (used to correlate shots back to this file). */
   step: string;
 }
+
+/** Both themes are captured for every named shot (Feature 32 palette sign-off). */
+const THEMES = ["light", "dark"] as const;
 
 // In-memory manifest accumulated across all steps in this file. Written to
 // disk in afterAll so a partial run still leaves whatever it managed to
@@ -145,6 +150,7 @@ async function capture(
     file: string;
     fixture: string;
     viewMode: "single" | "lineage";
+    theme: "light" | "dark";
     uiState: string;
     step: string;
   },
@@ -155,6 +161,7 @@ async function capture(
     file: args.file,
     fixture: args.fixture,
     viewMode: args.viewMode,
+    theme: args.theme,
     uiState: args.uiState,
     viewport: REVIEW_VIEWPORT,
     timestamp: new Date().toISOString(),
@@ -168,156 +175,172 @@ async function capture(
 // Tests are kept independent so a single failure does not block the rest of
 // the gallery from being captured.
 
-test.describe("Screenshot review artifacts", () => {
-  test.use({ viewport: REVIEW_VIEWPORT });
+// Every named shot is captured once per theme. The ?theme= URL parameter
+// deterministically selects the palette (see app.ts resolveInitialTheme), and
+// the file name + manifest entry carry the theme so a reviewer can line up the
+// light and dark versions of each shot side by side.
+for (const theme of THEMES) {
+  test.describe(`Screenshot review artifacts (${theme})`, () => {
+    test.use({ viewport: REVIEW_VIEWPORT });
 
-  test("sfdc-overview-single", async ({ page }) => {
-    await page.goto("/");
-    await setSingleFileMode(page);
-    await loadFixture(page, sfdcUri);
-    await capture(page, {
-      file: "sfdc-overview-single.png",
-      fixture: "sfdc-to-snowflake/pipeline.stm",
-      viewMode: "single",
-      uiState: "overview",
-      step: "sfdc-overview-single",
+    test(`sfdc-overview-single-${theme}`, async ({ page }) => {
+      await page.goto(`/?theme=${theme}`);
+      await setSingleFileMode(page);
+      await loadFixture(page, sfdcUri);
+      await capture(page, {
+        file: `sfdc-overview-single-${theme}.png`,
+        fixture: "sfdc-to-snowflake/pipeline.stm",
+        viewMode: "single",
+        theme,
+        uiState: "overview",
+        step: `sfdc-overview-single-${theme}`,
+      });
+    });
+
+    test(`sfdc-detail-opportunity-ingestion-${theme}`, async ({ page }) => {
+      await page.goto(`/?theme=${theme}`);
+      await setSingleFileMode(page);
+      await loadFixture(page, sfdcUri);
+      await openMapping(page, "opportunity-ingestion");
+      await capture(page, {
+        file: `sfdc-detail-opportunity-ingestion-${theme}.png`,
+        fixture: "sfdc-to-snowflake/pipeline.stm",
+        viewMode: "single",
+        theme,
+        uiState: "detail:opportunity-ingestion",
+        step: `sfdc-detail-opportunity-ingestion-${theme}`,
+      });
+    });
+
+    test(`namespaces-overview-lineage-${theme}`, async ({ page }) => {
+      await page.goto(`/?theme=${theme}`);
+      // Default mode is lineage; ns-platform shows all namespaces in lineage mode.
+      await loadFixture(page, nsPlatformUri);
+      await capture(page, {
+        file: `namespaces-overview-lineage-${theme}.png`,
+        fixture: "namespaces/ns-platform.stm",
+        viewMode: "lineage",
+        theme,
+        uiState: "overview:all-namespaces",
+        step: `namespaces-overview-lineage-${theme}`,
+      });
+    });
+
+    test(`namespaces-detail-namespaced-mapping-${theme}`, async ({ page }) => {
+      await page.goto(`/?theme=${theme}`);
+      await loadFixture(page, nsPlatformUri);
+      await openMapping(page, "load-hub-contact");
+      await capture(page, {
+        file: `namespaces-detail-namespaced-mapping-${theme}.png`,
+        fixture: "namespaces/ns-platform.stm",
+        viewMode: "lineage",
+        theme,
+        uiState: "detail:vault::load-hub-contact",
+        step: `namespaces-detail-namespaced-mapping-${theme}`,
+      });
+    });
+
+    test(`metrics-overview-lineage-all-files-${theme}`, async ({ page }) => {
+      await page.goto(`/?theme=${theme}`);
+      await loadFixture(page, metricsUri);
+      await capture(page, {
+        file: `metrics-overview-lineage-all-files-${theme}.png`,
+        fixture: "metrics-platform/metrics.stm",
+        viewMode: "lineage",
+        theme,
+        uiState: "overview:file-filter=all",
+        step: `metrics-overview-lineage-all-files-${theme}`,
+      });
+    });
+
+    test(`metrics-overview-file-filter-sources-${theme}`, async ({ page }) => {
+      await page.goto(`/?theme=${theme}`);
+      await loadFixture(page, metricsUri);
+
+      // Drive the file filter to the metric_sources.stm option, mirroring the
+      // approach used in the toolbar file-filter test in harness.test.ts.
+      const fileFilter = page.locator("[data-testid='toolbar-file-filter']");
+      const options = await fileFilter
+        .locator("option")
+        .evaluateAll((opts) =>
+          (opts as HTMLOptionElement[]).map((o) => ({
+            value: o.value,
+            label: o.textContent,
+          })),
+        );
+      const sourcesOption = options.find((o) => o.label?.includes("metric_sources.stm"));
+      if (!sourcesOption) {
+        throw new Error(`metric_sources.stm option not found; got ${JSON.stringify(options)}`);
+      }
+      await fileFilter.selectOption(sourcesOption.value);
+      await waitForReady(page);
+
+      await capture(page, {
+        file: `metrics-overview-file-filter-sources-${theme}.png`,
+        fixture: "metrics-platform/metrics.stm",
+        viewMode: "lineage",
+        theme,
+        uiState: "overview:file-filter=metric_sources.stm",
+        step: `metrics-overview-file-filter-sources-${theme}`,
+      });
+    });
+
+    test(`reports-overview-${theme}`, async ({ page }) => {
+      await page.goto(`/?theme=${theme}`);
+      await setSingleFileMode(page);
+      await loadFixture(page, reportsUri);
+      await capture(page, {
+        file: `reports-overview-${theme}.png`,
+        fixture: "reports-and-models/pipeline.stm",
+        viewMode: "single",
+        theme,
+        uiState: "overview",
+        step: `reports-overview-${theme}`,
+      });
+    });
+
+    test(`filter-flatten-detail-completed-orders-${theme}`, async ({ page }) => {
+      await page.goto(`/?theme=${theme}`);
+      await setSingleFileMode(page);
+      await loadFixture(page, ffgUri);
+      await openMapping(page, "completed-orders");
+      await capture(page, {
+        file: `filter-flatten-detail-completed-orders-${theme}.png`,
+        fixture: "filter-flatten-governance/filter-flatten-governance.stm",
+        viewMode: "single",
+        theme,
+        uiState: "detail:completed-orders",
+        step: `filter-flatten-detail-completed-orders-${theme}`,
+      });
+    });
+
+    test(`filter-flatten-detail-order-line-facts-${theme}`, async ({ page }) => {
+      await page.goto(`/?theme=${theme}`);
+      await setSingleFileMode(page);
+      await loadFixture(page, ffgUri);
+      await openMapping(page, "order-line-facts");
+      await capture(page, {
+        file: `filter-flatten-detail-order-line-facts-${theme}.png`,
+        fixture: "filter-flatten-governance/filter-flatten-governance.stm",
+        viewMode: "single",
+        theme,
+        uiState: "detail:order-line-facts",
+        step: `filter-flatten-detail-order-line-facts-${theme}`,
+      });
+    });
+
+    test(`sap-po-layout-stability-${theme}`, async ({ page }) => {
+      await page.goto(`/?theme=${theme}`);
+      await setSingleFileMode(page);
+      await loadFixture(page, sapUri);
+      await capture(page, {
+        file: `sap-po-layout-stability-${theme}.png`,
+        fixture: "sap-po-to-mfcs/pipeline.stm",
+        viewMode: "single",
+        theme,
+        uiState: "overview",
+        step: `sap-po-layout-stability-${theme}`,
+      });
     });
   });
-
-  test("sfdc-detail-opportunity-ingestion", async ({ page }) => {
-    await page.goto("/");
-    await setSingleFileMode(page);
-    await loadFixture(page, sfdcUri);
-    await openMapping(page, "opportunity-ingestion");
-    await capture(page, {
-      file: "sfdc-detail-opportunity-ingestion.png",
-      fixture: "sfdc-to-snowflake/pipeline.stm",
-      viewMode: "single",
-      uiState: "detail:opportunity-ingestion",
-      step: "sfdc-detail-opportunity-ingestion",
-    });
-  });
-
-  test("namespaces-overview-lineage", async ({ page }) => {
-    await page.goto("/");
-    // Default mode is lineage; ns-platform shows all namespaces in lineage mode.
-    await loadFixture(page, nsPlatformUri);
-    await capture(page, {
-      file: "namespaces-overview-lineage.png",
-      fixture: "namespaces/ns-platform.stm",
-      viewMode: "lineage",
-      uiState: "overview:all-namespaces",
-      step: "namespaces-overview-lineage",
-    });
-  });
-
-  test("namespaces-detail-namespaced-mapping", async ({ page }) => {
-    await page.goto("/");
-    await loadFixture(page, nsPlatformUri);
-    await openMapping(page, "load-hub-contact");
-    await capture(page, {
-      file: "namespaces-detail-namespaced-mapping.png",
-      fixture: "namespaces/ns-platform.stm",
-      viewMode: "lineage",
-      uiState: "detail:vault::load-hub-contact",
-      step: "namespaces-detail-namespaced-mapping",
-    });
-  });
-
-  test("metrics-overview-lineage-all-files", async ({ page }) => {
-    await page.goto("/");
-    await loadFixture(page, metricsUri);
-    await capture(page, {
-      file: "metrics-overview-lineage-all-files.png",
-      fixture: "metrics-platform/metrics.stm",
-      viewMode: "lineage",
-      uiState: "overview:file-filter=all",
-      step: "metrics-overview-lineage-all-files",
-    });
-  });
-
-  test("metrics-overview-file-filter-sources", async ({ page }) => {
-    await page.goto("/");
-    await loadFixture(page, metricsUri);
-
-    // Drive the file filter to the metric_sources.stm option, mirroring the
-    // approach used in the toolbar file-filter test in harness.test.ts.
-    const fileFilter = page.locator("[data-testid='toolbar-file-filter']");
-    const options = await fileFilter
-      .locator("option")
-      .evaluateAll((opts) =>
-        (opts as HTMLOptionElement[]).map((o) => ({
-          value: o.value,
-          label: o.textContent,
-        })),
-      );
-    const sourcesOption = options.find((o) => o.label?.includes("metric_sources.stm"));
-    if (!sourcesOption) {
-      throw new Error(`metric_sources.stm option not found; got ${JSON.stringify(options)}`);
-    }
-    await fileFilter.selectOption(sourcesOption.value);
-    await waitForReady(page);
-
-    await capture(page, {
-      file: "metrics-overview-file-filter-sources.png",
-      fixture: "metrics-platform/metrics.stm",
-      viewMode: "lineage",
-      uiState: "overview:file-filter=metric_sources.stm",
-      step: "metrics-overview-file-filter-sources",
-    });
-  });
-
-  test("reports-overview", async ({ page }) => {
-    await page.goto("/");
-    await setSingleFileMode(page);
-    await loadFixture(page, reportsUri);
-    await capture(page, {
-      file: "reports-overview.png",
-      fixture: "reports-and-models/pipeline.stm",
-      viewMode: "single",
-      uiState: "overview",
-      step: "reports-overview",
-    });
-  });
-
-  test("filter-flatten-detail-completed-orders", async ({ page }) => {
-    await page.goto("/");
-    await setSingleFileMode(page);
-    await loadFixture(page, ffgUri);
-    await openMapping(page, "completed-orders");
-    await capture(page, {
-      file: "filter-flatten-detail-completed-orders.png",
-      fixture: "filter-flatten-governance/filter-flatten-governance.stm",
-      viewMode: "single",
-      uiState: "detail:completed-orders",
-      step: "filter-flatten-detail-completed-orders",
-    });
-  });
-
-  test("filter-flatten-detail-order-line-facts", async ({ page }) => {
-    await page.goto("/");
-    await setSingleFileMode(page);
-    await loadFixture(page, ffgUri);
-    await openMapping(page, "order-line-facts");
-    await capture(page, {
-      file: "filter-flatten-detail-order-line-facts.png",
-      fixture: "filter-flatten-governance/filter-flatten-governance.stm",
-      viewMode: "single",
-      uiState: "detail:order-line-facts",
-      step: "filter-flatten-detail-order-line-facts",
-    });
-  });
-
-  test("sap-po-layout-stability", async ({ page }) => {
-    await page.goto("/");
-    await setSingleFileMode(page);
-    await loadFixture(page, sapUri);
-    await capture(page, {
-      file: "sap-po-layout-stability.png",
-      fixture: "sap-po-to-mfcs/pipeline.stm",
-      viewMode: "single",
-      uiState: "overview",
-      step: "sap-po-layout-stability",
-    });
-  });
-});
+}
