@@ -8,13 +8,19 @@
  * Entity extraction (fields, types) delegates to @satsuma/core functions.
  * Cross-file reference indexing lives here rather than in @satsuma/core because
  * it depends on workspace context that multiple higher-level consumers share.
+ *
+ * Runtime portability: this module has **zero Node built-in imports** (no
+ * `path`/`url`/`fs`). Import-path resolution and the LSP import-suggestion both
+ * operate purely on `file://` URI strings via the WHATWG `URL` constructor,
+ * which exists identically in Node and the browser. That is what lets the same
+ * index power the CLI/LSP/server (file-based) and the in-browser playground
+ * (localStorage-backed virtual `file:///` URIs) from one code path. See the
+ * "Import resolution" section below and ADR-on-isomorphic-resolver (feature 33).
  */
 
 import {
   Range,
 } from "vscode-languageserver";
-import { fileURLToPath, pathToFileURL } from "url";
-import { resolve, dirname, relative } from "path";
 import type { SyntaxNode, Tree } from "./parser-utils";
 import { nodeRange, child, children, labelText, walkDescendants } from "./parser-utils";
 import {
@@ -165,36 +171,85 @@ export function createScopedIndex(
   return scoped;
 }
 
+// ---------- Import resolution (isomorphic: Node and browser) ----------
+//
+// Import paths are resolved against the importing file's URI using the WHATWG
+// `URL` constructor. `new URL(pathText, importerUri)` reproduces the previous
+// `fileURLToPath → dirname → resolve → pathToFileURL` round-trip byte-for-byte
+// for `file://` URIs (relative, `./`, `../`, absolute, and bare-name cases),
+// while working natively in the browser where Node's `path`/`url` do not exist.
+// The browser playground indexes documents under virtual `file:///` URIs so
+// `index.indexedFiles.has(resolved)` matches across runtimes (feature 33 §1a).
+
 /**
  * Build the suggested import statement for a name defined in `defUri`,
- * as seen from `currentUri`.
+ * as seen from `currentUri`. Used by the LSP "add missing import" quick-fix.
+ *
+ * Computes the relative path between the two `file://` URIs with a pure
+ * pathname diff (no Node `path.relative`), keeping this module browser-safe.
+ * Falls back to a placeholder path when either URI is unparseable.
  */
 export function buildImportSuggestion(
   currentUri: string,
   name: string,
   defUri: string,
 ): string {
-  try {
-    const currentPath = fileURLToPath(currentUri);
-    const defPath = fileURLToPath(defUri);
-    const rel = relative(dirname(currentPath), defPath);
-    const relPath = rel.startsWith(".") ? rel : `./${rel}`;
-    return `import { ${name} } from "${relPath}"`;
-  } catch {
-    return `import { ${name} } from "..."`;
-  }
+  const rel = relativeUriPath(currentUri, defUri);
+  if (rel === null) return `import { ${name} } from "..."`;
+  // Import paths must be explicitly relative; bare paths read as bare-name imports.
+  const relPath = rel.startsWith(".") ? rel : `./${rel}`;
+  return `import { ${name} } from "${relPath}"`;
 }
 
 /** Resolve an import path relative to the importing file URI. Returns null on failure. */
 function resolveImportUri(importerUri: string, pathText: string): string | null {
   try {
-    const importerPath = fileURLToPath(importerUri);
-    const importerDir = dirname(importerPath);
-    const resolved = resolve(importerDir, pathText);
-    return pathToFileURL(resolved).toString();
+    return new URL(pathText, importerUri).toString();
   } catch {
     return null;
   }
+}
+
+/**
+ * Relative path from the directory of `fromUri` to `toUri`, both `file://`
+ * URIs — a pure replacement for `path.relative(dirname(from), to)`.
+ *
+ * Operates on the decoded URI pathnames (so percent-encoded characters become
+ * real path characters, matching `fileURLToPath`'s output) and follows POSIX
+ * `path.relative` semantics: walk up out of the source directory with `..`
+ * segments, then descend into the target. Returns null if either URI cannot be
+ * parsed. Browser-safe — no Node `path`/`url`.
+ */
+function relativeUriPath(fromUri: string, toUri: string): string | null {
+  let from: URL;
+  let to: URL;
+  try {
+    from = new URL(fromUri);
+    to = new URL(toUri);
+  } catch {
+    return null;
+  }
+
+  // Decode to real path text and split into non-empty segments. Dropping the
+  // last segment of `from` yields its containing directory (dirname).
+  const fromSegments = decodeURIComponent(from.pathname).split("/").filter(Boolean);
+  fromSegments.pop();
+  const toSegments = decodeURIComponent(to.pathname).split("/").filter(Boolean);
+
+  // Skip the shared leading segments, then go up for what remains of the source
+  // directory and down into what remains of the target.
+  let shared = 0;
+  while (
+    shared < fromSegments.length &&
+    shared < toSegments.length &&
+    fromSegments[shared] === toSegments[shared]
+  ) {
+    shared++;
+  }
+
+  const up = fromSegments.slice(shared).map(() => "..");
+  const down = toSegments.slice(shared);
+  return [...up, ...down].join("/");
 }
 
 /** Index (or re-index) a single file. Replaces any existing entries for the URI. */
@@ -917,3 +972,16 @@ function addReference(
   existing.push(entry);
   index.references.set(name, existing);
 }
+
+// ---------- Test-only exports ----------
+//
+// `resolveImportUri` is private (consumers reach it through
+// getImportReachableUris), but the resolver parity test needs to compare it
+// directly against the old Node `path`-based output. Exposed here rather than
+// widening the public API, matching the `_testInternals` convention in
+// viz-model.ts. Named distinctly from viz-model's `_testInternals` so the
+// package barrel's `export *` stays unambiguous.
+export const _resolverTestInternals = {
+  resolveImportUri,
+  relativeUriPath,
+};
