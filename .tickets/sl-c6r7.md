@@ -1,6 +1,6 @@
 ---
 id: sl-c6r7
-status: open
+status: closed
 deps: [sl-wpa8]
 links: []
 created: 2026-06-09T21:14:51Z
