@@ -203,6 +203,20 @@ function makeHandler(
       return;
     }
 
+    // WASM artifacts for the in-browser parser. The client builds the VizModel
+    // itself now (feature 33), so it fetches both the grammar and the
+    // web-tree-sitter runtime WASM at startup. They live next to server.js after
+    // build:wasm; serve them at the site root so document.baseURI-relative URLs
+    // resolve here and in the static playground build alike.
+    if (rawPath === "/tree-sitter-satsuma.wasm") {
+      if (!serveStaticFile(res, WASM_SATSUMA)) sendError(res, 404, "Not found");
+      return;
+    }
+    if (rawPath === "/tree-sitter.wasm") {
+      if (!serveStaticFile(res, WASM_RUNTIME)) sendError(res, 404, "Not found");
+      return;
+    }
+
     // Source maps for app.js (useful during local debugging)
     if (rawPath === "/app.js.map") {
       const served = serveStaticFile(res, path.join(CLIENT_DIR, "app.js.map"));

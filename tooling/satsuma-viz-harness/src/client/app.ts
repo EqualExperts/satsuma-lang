@@ -27,6 +27,9 @@
  * event log so Playwright can assert the switch was observed.
  */
 
+import { ensureParserReady, buildModel } from "./model-pipeline";
+import type { SourceDocument } from "./model-pipeline";
+
 // ---------- Types ----------
 
 interface Fixture {
@@ -107,6 +110,20 @@ const harness: SatsumaHarness = {
 };
 
 window.__satsumaHarness = harness;
+
+// ---------- Document set (client-side model source) ----------
+//
+// The client builds the VizModel itself now (feature 33) instead of fetching
+// /api/model: it holds every fixture's source text in memory and feeds the
+// whole set to buildModel so cross-file `import`s resolve in-browser. This map
+// is the single source of truth for both highlighting and model-building, and
+// is the seam the localStorage document library (sl-kd45) later plugs into.
+const documentSources = new Map<string, string>();
+
+/** Snapshot the document set in the { uri, source } shape buildModel expects. */
+function currentDocuments(): SourceDocument[] {
+  return [...documentSources.entries()].map(([uri, source]) => ({ uri, source }));
+}
 
 // ---------- DOM references ----------
 
@@ -453,38 +470,43 @@ function ensureVizElement(): HTMLElement {
 // ---------- Fixture loading ----------
 
 /**
- * Fetch and render the source and VizModel for the given fixture URI.
- * Uses the current viewMode to decide whether to request a single-file or
- * full-lineage model from the server.
+ * Render the source and a client-built VizModel for the given document URI.
+ *
+ * The source comes from the in-memory document set and the model is built
+ * in-browser via buildModel — no /api/model call. The current viewMode decides
+ * single-file vs full cross-file lineage; lineage resolves against every
+ * document in the set.
  */
-async function loadFixture(uri: string): Promise<void> {
+function loadFixture(uri: string): void {
   harness.fixture = uri;
   harness.ready = false;
   updateReadyBadge("loading");
 
-  // Fetch source text and model in parallel to keep the UI responsive.
-  const lineageParam = harness.viewMode === "lineage" ? "1" : "0";
-  const [sourceRes, modelRes] = await Promise.all([
-    fetch(`/api/source?uri=${encodeURIComponent(uri)}`),
-    fetch(`/api/model?uri=${encodeURIComponent(uri)}&lineage=${lineageParam}`),
-  ]);
-
-  if (!sourceRes.ok || !modelRes.ok) {
+  const source = documentSources.get(uri);
+  if (source === undefined) {
     sourceCodeEl.textContent = "Failed to load fixture.";
     sourceCodeEl.className = "empty";
     updateReadyBadge("empty");
     return;
   }
 
-  const { source } = (await sourceRes.json()) as { source: string };
-  const model = await modelRes.json();
-
   // Safe: highlightSatsuma HTML-escapes all user content via esc() before
   // constructing the markup — no raw source text reaches the DOM.
   sourceCodeEl.innerHTML = highlightSatsuma(source); // nosemgrep: javascript.browser.security.insecure-document-method.insecure-document-method
   sourceCodeEl.className = "";
 
-  // Pass the model to the viz component.
+  renderModel(uri);
+}
+
+/**
+ * Build the VizModel for `entryUri` from the current document set and hand it to
+ * the viz component. Synchronous — the WASM parser must already be initialised
+ * (ensureParserReady is awaited once at startup). Model-building errors are kept
+ * non-fatal so a mid-edit buffer never blanks the canvas.
+ */
+function renderModel(entryUri: string): void {
+  const lineage = harness.viewMode === "lineage";
+  const model = buildModel(entryUri, currentDocuments(), { lineage });
   const viz = ensureVizElement();
   (viz as unknown as { model: unknown }).model = model;
 }
@@ -632,12 +654,28 @@ async function init(): Promise<void> {
   const autoMode = params.get("mode");
   if (autoMode === "lineage" || autoMode === "single") harness.viewMode = autoMode;
 
+  // Initialise the in-browser WASM parser before any model is built.
+  await ensureParserReady();
+
   const res = await fetch("/api/fixtures");
   if (!res.ok) {
     fixtureListEl.textContent = "Failed to load fixtures.";
     return;
   }
   const fixtures = (await res.json()) as Fixture[];
+
+  // Pull every fixture's source into the in-memory document set so the client
+  // can build single-file and cross-file-lineage models without a model API.
+  await Promise.all(
+    fixtures.map(async (f) => {
+      const sourceRes = await fetch(`/api/source?uri=${encodeURIComponent(f.uri)}`);
+      if (sourceRes.ok) {
+        const { source } = (await sourceRes.json()) as { source: string };
+        documentSources.set(f.uri, source);
+      }
+    }),
+  );
+
   renderFixtureList(fixtures);
 
   // If a fixture was specified via URL param, select it; otherwise select the first.

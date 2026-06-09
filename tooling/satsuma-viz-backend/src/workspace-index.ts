@@ -18,9 +18,12 @@
  * "Import resolution" section below and ADR-on-isomorphic-resolver (feature 33).
  */
 
+// Range is a runtime value (Range.create) from vscode-languageserver-types, the
+// zero-dependency types package — not the top-level vscode-languageserver, which
+// would drag Node-only JSON-RPC server code into the browser bundle (feature 33).
 import {
   Range,
-} from "vscode-languageserver";
+} from "vscode-languageserver-types";
 import type { SyntaxNode, Tree } from "./parser-utils";
 import { nodeRange, child, children, labelText, walkDescendants } from "./parser-utils";
 import {
