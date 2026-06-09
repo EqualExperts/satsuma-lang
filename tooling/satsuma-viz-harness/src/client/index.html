@@ -132,14 +132,15 @@
       background: var(--color-surface-2);
       color: var(--color-text);
     }
-    /* The collapse handle sits in the source toolbar next to the picker. */
-    #editor-collapse-btn {
+    /* Small source-toolbar action buttons: Open…, Save, and the collapse handle. */
+    .toolbar-action {
       flex-shrink: 0; padding: 3px 6px; border-radius: 4px;
       border: 1px solid var(--color-border); background: transparent;
       color: var(--color-text-muted); cursor: pointer;
       font-size: 10px; font-family: inherit; line-height: 1;
+      white-space: nowrap;
     }
-    #editor-collapse-btn:hover { background: var(--color-surface-2); color: var(--color-text); }
+    .toolbar-action:hover { background: var(--color-surface-2); color: var(--color-text); }
 
     /* ── Header ──────────────────────────────────────────────────────────── */
     #header {
@@ -418,6 +419,9 @@
             <span id="fixture-picker-name">no fixture selected</span>
             <span class="picker-chevron">&#9660;</span>
           </button>
+          <!-- Hidden file input backing the Open… action; the file is read
+               in-browser via File.text() and NEVER uploaded (feature 33 §3) -->
+          <input type="file" id="file-open-input" accept=".stm,.txt" hidden />
           <div id="fixture-picker-dropdown" class="hidden">
             <!-- app.ts renders the library here: Examples + Your documents -->
             <div id="fixture-list"></div>
@@ -427,13 +431,15 @@
             </div>
           </div>
         </div>
+        <button id="file-open-btn" class="toolbar-action" title="Open a local .stm file &mdash; read in your browser, never uploaded">Open&hellip;</button>
+        <button id="file-save-btn" class="toolbar-action" title="Download the current buffer as a .stm file &mdash; nothing leaves your browser">Save</button>
         <span class="toolbar-spacer"></span>
         <!-- Shown by app.ts only while a mid-edit buffer keeps the last good viz -->
         <span id="parse-status" class="hidden" role="status">
           <span id="parse-status-text">&#9888; unparsed edits</span>
           <button id="parse-status-dismiss" title="Dismiss" aria-label="Dismiss">&times;</button>
         </span>
-        <button id="editor-collapse-btn" title="Collapse the source pane" aria-label="Collapse the source pane">&#9664;</button>
+        <button id="editor-collapse-btn" class="toolbar-action" title="Collapse the source pane" aria-label="Collapse the source pane">&#9664;</button>
       </div>
       <!-- Overlay editor: app.ts mounts #source-highlight + #source-input here -->
       <div id="source-editor"></div>
