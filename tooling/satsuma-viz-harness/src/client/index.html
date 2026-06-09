@@ -7,10 +7,18 @@
   <style>
     /* ── Reset and base ──────────────────────────────────────────────────── */
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    /*
+     * Chrome theming.  The harness chrome (header, panels, source view) has its
+     * OWN palette, independent of the satsuma-viz component tokens.  Dark is the
+     * default (declared on :root); the light variant lives under
+     * body[data-theme="light"].  app.ts sets data-theme on <body> AND the
+     * `theme` attribute on <satsuma-viz>, so chrome and component always agree.
+     */
     :root {
       --header-height: 44px;
       --source-width: 448px;
       --font-mono: "JetBrains Mono", "Fira Code", ui-monospace, monospace;
+      /* Dark chrome (default). */
       --color-bg: #0f1117;
       --color-surface: #1a1d27;
       --color-surface-2: #22273a;
@@ -20,6 +28,56 @@
       --color-accent: #5b7fde;
       --color-accent-hover: #7094e8;
       --color-selected: #1d2d54;
+      --color-ready-bg: #0d2b1a;
+      --color-ready-text: #3fb950;
+      --color-ready-border: #2ea043;
+      /* Syntax token colours (dark — aligned with Tokyo Night). */
+      --tok-comment: #4a5274;
+      --tok-comment-warn: #e0af68;
+      --tok-comment-q: #9d86e9;
+      --tok-string: #9ece6a;
+      --tok-kw: #7aa2f7;
+      --tok-type: #73daca;
+      --tok-pipeline: #e0af68;
+      --tok-boolean: #ff9e64;
+      --tok-number: #ff9e64;
+      --tok-arrow: #89ddff;
+      --tok-backtick: #73daca;
+      --tok-ref: #bb9af7;
+    }
+
+    /*
+     * Light chrome variant.  Warm cream/orange to co-brand with the satsuma-viz
+     * light palette (Feature 31 identity).  The syntax token colours are
+     * re-tuned for legibility on the cream background — the dark Tokyo Night set
+     * (e.g. #9ece6a strings, #7aa2f7 keywords) is too low-contrast on #FFFAF5.
+     */
+    body[data-theme="light"] {
+      --color-bg: #FFFAF5;
+      --color-surface: #FFF3E8;
+      --color-surface-2: #F5E6D3;
+      --color-border: #E5D5C3;
+      --color-text: #2D2A26;
+      --color-text-muted: #8A7E72;
+      --color-accent: #D97726;
+      --color-accent-hover: #C45D22;
+      --color-selected: #FFE0C7;
+      --color-ready-bg: #E6F4EA;
+      --color-ready-text: #2E7D46;
+      --color-ready-border: #5A9E6F;
+      /* Syntax token colours (light) — darker, saturated for contrast on cream. */
+      --tok-comment: #8A8077;
+      --tok-comment-warn: #B5740A;
+      --tok-comment-q: #7C5CBF;
+      --tok-string: #3F7A4F;
+      --tok-kw: #2D6BB8;
+      --tok-type: #0E7C7B;
+      --tok-pipeline: #B5740A;
+      --tok-boolean: #C25A1C;
+      --tok-number: #C25A1C;
+      --tok-arrow: #1A7FA8;
+      --tok-backtick: #0E7C7B;
+      --tok-ref: #8E5BB0;
     }
     html, body {
       height: 100%; overflow: hidden;
@@ -63,7 +121,7 @@
       background: var(--color-surface-2); color: var(--color-text-muted); border: 1px solid var(--color-border);
       white-space: nowrap;
     }
-    #harness-ready-badge.ready { background: #0d2b1a; color: #3fb950; border-color: #2ea043; }
+    #harness-ready-badge.ready { background: var(--color-ready-bg); color: var(--color-ready-text); border-color: var(--color-ready-border); }
 
     /* ── Panel shared ────────────────────────────────────────────────────── */
     .panel-toolbar {
@@ -162,23 +220,24 @@
       height: 100%; color: var(--color-text-muted); font-style: italic; font-size: 12px;
     }
 
-    /* ── Syntax highlighting token colours (dark theme) ─────────────────── */
-    /* Colours are aligned with Tokyo Night for readability on dark backgrounds. */
-    .tok-comment      { color: #4a5274; font-style: italic; }
-    .tok-comment-warn { color: #e0af68; font-style: italic; } /* //! warning */
-    .tok-comment-q    { color: #9d86e9; font-style: italic; } /* //? question */
-    .tok-string       { color: #9ece6a; }
-    .tok-string-triple { color: #9ece6a; }
-    .tok-kw           { color: #7aa2f7; font-weight: 600; }   /* block + import keywords */
-    .tok-type         { color: #73daca; }                      /* STRING, INT, UUID… */
-    .tok-pipeline     { color: #e0af68; }                      /* trim, lowercase… */
-    .tok-boolean      { color: #ff9e64; }                      /* true, false, null */
-    .tok-number       { color: #ff9e64; }
-    .tok-arrow        { color: #89ddff; }                      /* -> */
-    .tok-spread       { color: #89ddff; }                      /* ... */
-    .tok-pipe         { color: #89ddff; }                      /* | */
-    .tok-backtick     { color: #73daca; }                      /* `identifier` */
-    .tok-ref          { color: #bb9af7; }                      /* @ref in NL strings */
+    /* ── Syntax highlighting token colours ──────────────────────────────── */
+    /* Colours resolve from CSS variables so both the dark (:root) and light
+     * (body[data-theme="light"]) syntax palettes are defined in one place. */
+    .tok-comment      { color: var(--tok-comment); font-style: italic; }
+    .tok-comment-warn { color: var(--tok-comment-warn); font-style: italic; } /* //! warning */
+    .tok-comment-q    { color: var(--tok-comment-q); font-style: italic; } /* //? question */
+    .tok-string       { color: var(--tok-string); }
+    .tok-string-triple { color: var(--tok-string); }
+    .tok-kw           { color: var(--tok-kw); font-weight: 600; }   /* block + import keywords */
+    .tok-type         { color: var(--tok-type); }                    /* STRING, INT, UUID… */
+    .tok-pipeline     { color: var(--tok-pipeline); }                /* trim, lowercase… */
+    .tok-boolean      { color: var(--tok-boolean); }                 /* true, false, null */
+    .tok-number       { color: var(--tok-number); }
+    .tok-arrow        { color: var(--tok-arrow); }                   /* -> */
+    .tok-spread       { color: var(--tok-arrow); }                   /* ... */
+    .tok-pipe         { color: var(--tok-arrow); }                   /* | */
+    .tok-backtick     { color: var(--tok-backtick); }                /* `identifier` */
+    .tok-ref          { color: var(--tok-ref); }                     /* @ref in NL strings */
   </style>
 </head>
 <body>
@@ -188,6 +247,10 @@
       <div class="toggle-group" id="view-mode-toggle">
         <button class="toggle-btn active" data-mode="lineage" title="Full transitive import lineage">lineage</button>
         <button class="toggle-btn"        data-mode="single"  title="Single file only">single</button>
+      </div>
+      <div class="toggle-group" id="theme-toggle">
+        <button class="toggle-btn" data-theme="light" title="Light theme">light</button>
+        <button class="toggle-btn" data-theme="dark"  title="Dark theme">dark</button>
       </div>
       <span id="harness-ready-badge">idle</span>
     </header>

@@ -187,7 +187,11 @@ function makeHandler(
     // ── Static routes ──────────────────────────────────────────────────────
 
     if (rawPath === "/" || rawPath === "") {
-      res.writeHead(302, { Location: "/index.html" });
+      // Preserve the query string across the redirect so client-side URL
+      // parameters (?theme=, ?fixture=, ?mode=) survive a hit to the bare root.
+      // Dropping it here previously made ?theme= a silent no-op.
+      const suffix = rawQuery ? `?${rawQuery}` : "";
+      res.writeHead(302, { Location: `/index.html${suffix}` });
       res.end();
       return;
     }
