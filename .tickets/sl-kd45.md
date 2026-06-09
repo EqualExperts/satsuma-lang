@@ -21,3 +21,10 @@ Library = workspace: the WorkspaceIndex (resolver + file:/// URIs) is built from
 
 first load seeds the bundled examples into the localStorage library and the picker lists them; opening one loads it into the editor; an example that imports another library document renders cross-file lineage edges with no network model call; a returning visit does not re-seed over a user-edited document and the edit survives reload; active buffer + collapsed/expanded state restore on reload; global Reset restores the corpus and per-document Restore original re-copies one example; no server-side storage exists.
 
+
+## Notes
+
+**2026-06-09T22:59:13Z**
+
+Cause: Feature 33 needed a client-only persistence layer: the playground had no document storage, the picker was server-backed, and imports outside the served fixture set could not be explained to the user.
+Fix: Added a storage-injectable localStorage DocumentLibrary (seed/re-seed/restore/reset/user-docs/starter/quota-guard) that doubles as the in-browser workspace, rewired the client picker+session to it under virtual file:///examples/ URIs, and extended viz-backend with unresolved-import diagnostics surfaced as an on-page note. (commit 92f2592)
