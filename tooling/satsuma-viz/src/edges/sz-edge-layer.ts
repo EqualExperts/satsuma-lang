@@ -6,19 +6,23 @@
  * gear icons at the midpoint for transform detail.
  */
 
-import { LitElement, html, svg, css, unsafeCSS, type SVGTemplateResult } from "lit";
+import { LitElement, html, svg, css, type SVGTemplateResult } from "lit";
 import { unsafeHTML } from "lit/directives/unsafe-html.js";
 import { customElement, property, state } from "lit/decorators.js";
 import type { LayoutEdge } from "../layout/elk-layout.js";
 import { highlightAtRefs } from "../markdown.js";
-import tokens from "../tokens.css";
 import { SzNavigateEvent } from "../satsuma-viz.js";
 
 @customElement("sz-edge-layer")
 export class SzEdgeLayer extends LitElement {
   static override styles = css`
-    ${unsafeCSS(tokens)}
-
+    /*
+     * Do NOT inject tokens.css here. The colour tokens are inherited from the
+     * <satsuma-viz> host, whose theme attribute selects the palette. Defining
+     * tokens.css locally would pin the light :host defaults onto this
+     * edge-layer host (which never carries theme="dark"), freezing edges in
+     * light mode in both themes.
+     */
     :host {
       display: block;
       position: absolute;

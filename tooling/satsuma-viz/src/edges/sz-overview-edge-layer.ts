@@ -6,11 +6,10 @@
  * SzOpenMappingEvent. Hover shows a tooltip with mapping summary.
  */
 
-import { LitElement, html, svg, css, unsafeCSS, type SVGTemplateResult } from "lit";
+import { LitElement, html, svg, css, type SVGTemplateResult } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import type { OverviewEdge } from "../layout/elk-layout.js";
 import type { MappingBlock } from "../model.js";
-import tokens from "../tokens.css";
 
 /** Event dispatched when a user clicks an overview edge to open a mapping detail. */
 export class SzOpenMappingEvent extends Event {
@@ -24,8 +23,13 @@ export class SzOpenMappingEvent extends Event {
 @customElement("sz-overview-edge-layer")
 export class SzOverviewEdgeLayer extends LitElement {
   static override styles = css`
-    ${unsafeCSS(tokens)}
-
+    /*
+     * Do NOT inject tokens.css here. The colour tokens (--sz-edge-default,
+     * --sz-arrow-nl-stroke, …) are inherited from the <satsuma-viz> host, whose
+     * theme attribute selects the palette. Defining tokens.css locally would
+     * pin the light :host defaults onto this edge-layer host (which never
+     * carries theme="dark"), freezing edges in light mode in both themes.
+     */
     :host {
       display: block;
       position: absolute;
