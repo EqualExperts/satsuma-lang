@@ -5,6 +5,7 @@ import { FieldLineagePanel } from "../field-lineage/panel";
 import {
   loadExpandedModels,
   loadFullLineageModel,
+  vizThemeForKind,
 } from "./integration";
 
 export class VizPanel {
@@ -82,6 +83,17 @@ export class VizPanel {
     );
     this.disposables.push(editorWatcher);
 
+    // Live theme switching: when the user changes their VS Code colour theme
+    // while the panel is open, push the new renderer theme to the webview so it
+    // restyles without a reload. Decoupled from data loads — see _setTheme.
+    const themeWatcher = vscode.window.onDidChangeActiveColorTheme((theme) => {
+      this.panel.webview.postMessage({
+        type: "setTheme",
+        theme: vizThemeForKind(theme.kind),
+      });
+    });
+    this.disposables.push(themeWatcher);
+
     // Clean up on dispose
     this.panel.onDidDispose(() => this.dispose(), null, this.disposables);
 
@@ -127,7 +139,7 @@ export class VizPanel {
       this.panel.webview.postMessage({
         type: "vizModel",
         payload: modelEnvelope.payload,
-        isDark: modelEnvelope.isDark,
+        theme: modelEnvelope.theme,
       });
     } catch (err) {
       this.panel.webview.postMessage({
@@ -207,7 +219,7 @@ export class VizPanel {
         type: "expandedModels",
         schemaId: expandedEnvelope.schemaId,
         models: expandedEnvelope.models,
-        isDark: expandedEnvelope.isDark,
+        theme: expandedEnvelope.theme,
       });
     } catch (err) {
       this.panel.webview.postMessage({

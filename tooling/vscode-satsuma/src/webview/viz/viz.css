@@ -28,20 +28,11 @@ satsuma-viz {
   font-size: 14px;
 }
 
-/* Dark theme override — applied via body.dark class */
-body.dark satsuma-viz {
-  --sz-bg: #1e1e1e;
-  --sz-text: #d4d4d4;
-  --sz-text-muted: #858585;
-  --sz-card-bg: #252526;
-  --sz-card-border: rgba(255, 255, 255, 0.1);
-  --sz-card-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
-  --sz-namespace-bg: rgba(242, 145, 61, 0.08);
-  --sz-namespace-border: rgba(242, 145, 61, 0.2);
-  --sz-badge-bg: rgba(242, 145, 61, 0.15);
-  --sz-badge-text: #f2a968;
-  --sz-warning-bg: rgba(254, 243, 205, 0.12);
-  --sz-warning-icon: #e6a34e;
-  --sz-question-bg: rgba(124, 107, 174, 0.12);
-  --sz-question-icon: #a593cf;
-}
+/*
+ * Theme tokens are NOT declared here. Both palettes live exclusively in
+ * tooling/satsuma-viz/src/tokens.css and are selected via the component's
+ * reflected `theme` attribute (set in viz.ts). The former `body.dark
+ * satsuma-viz` override block was removed as part of Feature 32 because its
+ * values had drifted from the canonical tokens.css dark palette; the canonical
+ * values now win in every consumer.
+ */
