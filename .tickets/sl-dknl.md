@@ -82,3 +82,9 @@ Today a single click on the compact header both toggles fields and dispatches `n
 - The `canvas height grows` Playwright test no longer uses `page.waitForTimeout`; it polls on the canvas bounding rect.
 - Tests (`npm --prefix tooling/satsuma-viz run test`, viz-harness Playwright via the sentinel workflow) pass locally.
 
+
+## Notes
+
+**2026-06-09T21:15:24Z**
+
+Pre-existing bug found during Feature 32: commit ff366cf added the compact-card-expansion Playwright tests referencing fixture contracts/buy-to-om-order.stm but never committed the fixture. Since harness.test.ts resolves all fixtures in a shared beforeAll, the missing file made the ENTIRE firefox harness suite (40 tests) throw and not-run on main. Fixed by authoring the intended canonical example examples/contracts/buy-to-om-order.stm (buy_order → om_order, validates clean). All 40 firefox tests now execute and pass.
