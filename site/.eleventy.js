@@ -6,6 +6,9 @@ module.exports = function(eleventyConfig) {
   // setup/deploy script) live in satsuma-diaries/content/ and are served via
   // passthrough copy.
   eleventyConfig.ignores.add("satsuma-diaries/**");
+  // The playground is a pre-built static app (its index.html is NOT a
+  // template); the deploy workflow copies the bundle in before this build.
+  eleventyConfig.ignores.add("playground/**");
 
   // Passthrough copy for static assets (paths relative to input dir)
   eleventyConfig.addPassthroughCopy("css");
@@ -13,6 +16,8 @@ module.exports = function(eleventyConfig) {
   eleventyConfig.addPassthroughCopy("img");
   // Diary content JSON files are generated at deploy/setup time and served as-is
   eleventyConfig.addPassthroughCopy("satsuma-diaries");
+  // The live-editor playground bundle, copied in at deploy time — served as-is
+  eleventyConfig.addPassthroughCopy("playground");
 
   // Group diary entries (sorted newest-first) by calendar month.
   // Returns [{label: "March 2026", entries: [...]}, ...] so the template

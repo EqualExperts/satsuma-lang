@@ -15,6 +15,7 @@ tooling/satsuma-cli/src/**/*.js
 tooling/satsuma-cli/src/**/*.d.ts
 site/_site/
 site/satsuma-diaries/
+site/playground/
 .worktrees/
 .claude/*.local.md
 .claude/*.local.json

@@ -51,6 +51,25 @@ jobs:
           cp -rf satsuma-diaries/. site/satsuma-diaries/
           python3 scripts/generate-diary-manifest.py
 
+      # ── "Try it Live!" playground (feature 33) ──────────────────────────
+      # The playground is a server-free static bundle built from the viz
+      # harness. It is copied into site/playground/ BEFORE the Eleventy
+      # build, which passes it through as-is (see site/.eleventy.js), so it
+      # publishes at <pages-url>/playground/. Every asset in the bundle is
+      # page-relative, so the non-root base path needs no extra config.
+      - name: Install tooling packages (playground build)
+        run: npm run ci:all
+
+      - name: Build tree-sitter WASM (the playground's in-browser parser)
+        working-directory: tooling/tree-sitter-satsuma
+        run: node_modules/.bin/tree-sitter build --wasm . -o tree-sitter-satsuma.wasm
+
+      - name: Build the playground bundle and copy it into the site
+        run: |
+          npm --prefix tooling/satsuma-viz-harness run build:playground
+          mkdir -p site/playground
+          cp -rf tooling/satsuma-viz-harness/dist/playground/. site/playground/
+
       - name: Install site dependencies
         run: cd site && npm ci
 
