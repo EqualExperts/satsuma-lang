@@ -1,0 +1,82 @@
+// Satsuma v2 — Procurement Buy Order → Order-Management Order
+//
+// A deliberately small two-schema contract: a procurement-side purchase order
+// (`buy_order`) mapped onto an order-management order (`om_order`). It exists as
+// a compact, self-contained fixture for the viz harness compact-card-expansion
+// tests (two schemas, one mapping, enough fields per card that expanding a
+// compact overview card visibly grows the canvas).
+
+note {
+  """
+  # Buy Order → OM Order
+
+  Maps a procurement `buy_order` raised in the purchasing system onto the
+  canonical `om_order` consumed by the order-management platform.
+
+  ## Notes
+  - Monetary totals are consolidated: `gross_total` is the net plus tax.
+  - Order `status` is normalised onto the OM lifecycle `state`.
+  """
+}
+
+// --- Source: procurement purchase order ---
+schema buy_order (note "Purchase order raised in the procurement system") {
+  id           ID            (pk)
+  supplier_ref STRING(40)    (required)
+  order_date   DATE
+  currency     STRING(3)     (default GBP)
+  net_amount   DECIMAL(12,2)
+  tax_amount   DECIMAL(12,2)
+  status       PICKLIST      (enum {draft, submitted, approved, cancelled})
+  buyer_email  STRING(120)
+}
+
+// --- Target: order-management order ---
+schema om_order (note "Canonical order consumed by the OM platform") {
+  order_key     VARCHAR(36)   (pk)
+  vendor_id     VARCHAR(40)   (indexed)
+  placed_on     DATE
+  gross_total   NUMBER(12,2)  (note "Net amount plus tax")
+  currency_code VARCHAR(3)    (default GBP)
+  state         VARCHAR(20)   (enum {open, fulfilled, void})
+  contact_email VARCHAR(120)
+  imported_at   TIMESTAMP_NTZ
+}
+
+// --- Mapping ---
+mapping `buy to om order` {
+  source { `buy_order` }
+  target { `om_order` }
+
+  // --- Identifiers ---
+  id -> order_key
+  supplier_ref -> vendor_id
+
+  // --- Dates ---
+  order_date -> placed_on
+
+  // --- Money ---
+  net_amount -> gross_total {
+    "Add @net_amount and @tax_amount"
+    | round 2
+  }
+  currency -> currency_code
+
+  // --- Lifecycle normalization ---
+  status -> state {
+    map {
+      draft: "open"
+      submitted: "open"
+      approved: "fulfilled"
+      cancelled: "void"
+      _: "open"
+    }
+  }
+
+  // --- Contact + metadata ---
+  buyer_email -> contact_email { lowercase }
+
+  -> imported_at {
+    "Set to the ingestion time in UTC."
+  }
+}
