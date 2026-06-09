@@ -1,6 +1,6 @@
 ---
 id: sl-kd45
-status: open
+status: in_progress
 deps: [sl-dn29, sl-p1r9, sl-c6r7]
 links: []
 created: 2026-06-09T21:14:51Z

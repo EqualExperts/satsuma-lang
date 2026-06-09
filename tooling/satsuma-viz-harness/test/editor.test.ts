@@ -15,32 +15,14 @@
  */
 
 import { test, expect, type Page } from "@playwright/test";
-
-interface SatsumaHarness {
-  fixture: string | null;
-  viewMode: "lineage" | "single";
-  parseStatus: "ok" | "stale";
-  ready: boolean;
-}
-
-declare global {
-  interface Window {
-    __satsumaHarness: SatsumaHarness;
-  }
-}
+// The typed window.__satsumaHarness global is declared once in harness-env.ts
+// from the app's exported interface.
+import { libraryUri } from "./harness-env";
 
 // ---------- Helpers ----------
 
-/** The sfdc-to-snowflake fixture URI — a self-contained single-file pipeline. */
-let sfdcUri: string;
-
-test.beforeAll(async ({ request }) => {
-  const res = await request.get("/api/fixtures");
-  const fixtures = (await res.json()) as Array<{ name: string; uri: string }>;
-  const sfdc = fixtures.find((f) => f.name === "sfdc-to-snowflake/pipeline.stm");
-  if (!sfdc) throw new Error("sfdc-to-snowflake fixture not found in /api/fixtures");
-  sfdcUri = sfdc.uri;
-});
+/** The sfdc-to-snowflake document URI — a self-contained single-file pipeline. */
+const sfdcUri = libraryUri("sfdc-to-snowflake/pipeline.stm");
 
 /**
  * Open the harness in single-file mode and load the sfdc fixture into the editor.

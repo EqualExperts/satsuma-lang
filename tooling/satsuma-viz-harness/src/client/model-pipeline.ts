@@ -14,14 +14,15 @@
  */
 
 import { initParser } from "@satsuma/core";
-import { buildModelFromSources } from "@satsuma/viz-backend";
+import { buildModelResultFromSources } from "@satsuma/viz-backend";
 import type {
   SourceDocument,
   BuildModelOptions,
+  BuildModelResult,
   VizModel,
 } from "@satsuma/viz-backend";
 
-export type { SourceDocument, BuildModelOptions, VizModel };
+export type { SourceDocument, BuildModelOptions, BuildModelResult, VizModel };
 
 // The two WASM artifacts the parser needs. Both are served alongside the page:
 // the harness server serves them at the site root, and the static playground
@@ -63,7 +64,10 @@ export function ensureParserReady(): Promise<void> {
 }
 
 /**
- * Build a VizModel for `entryUri` from in-memory `documents`. A thin, synchronous
+ * Build a VizModel for `entryUri` from in-memory `documents`, returning the
+ * model plus the import paths that failed to resolve against the document set
+ * (the playground shows those as a visible note — a buffer importing a path
+ * outside the library renders without it, never silently). A thin, synchronous
  * pass-through to the core pipeline — the parser must already be initialised
  * (call `ensureParserReady()` once at startup). Kept as the playground's single
  * model entry point so the rest of the client never imports viz-backend directly.
@@ -72,6 +76,6 @@ export function buildModel(
   entryUri: string,
   documents: SourceDocument[],
   options?: BuildModelOptions,
-): VizModel {
-  return buildModelFromSources(entryUri, documents, options);
+): BuildModelResult {
+  return buildModelResultFromSources(entryUri, documents, options);
 }

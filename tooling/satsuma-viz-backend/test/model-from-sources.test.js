@@ -12,7 +12,10 @@
 const { describe, it, before } = require("node:test");
 const assert = require("node:assert/strict");
 const { initTestParser } = require("./helper");
-const { buildModelFromSources } = require("../dist/model-from-sources");
+const {
+  buildModelFromSources,
+  buildModelResultFromSources,
+} = require("../dist/model-from-sources");
 
 before(async () => {
   await initTestParser();
@@ -115,6 +118,98 @@ describe("buildModelFromSources — cross-file lineage from in-memory documents"
     assert.ok(
       lineageUris.has(importeeUri),
       "lineage model includes a schema sourced from the imported document",
+    );
+  });
+});
+
+describe("buildModelResultFromSources — unresolved-import diagnostics", () => {
+  const base = "file:///library/";
+
+  // The playground's "import outside the library" case: the buffer imports a
+  // path with no matching document, so the result must both still build a model
+  // from what IS available and name the missing path so the UI can say why.
+  it("reports the authored path of an import that resolves to no document", () => {
+    const uri = `${base}buffer.stm`;
+    const { model, unresolvedImports } = buildModelResultFromSources(uri, [
+      {
+        uri,
+        source: [
+          'import { customers } from "./not-in-library.stm"',
+          "schema users { id INT }",
+        ].join("\n"),
+      },
+    ]);
+    assert.deepEqual(unresolvedImports, ["./not-in-library.stm"]);
+    assert.equal(schemaIds(model).includes("users"), true, "local content still renders");
+  });
+
+  // Mixed graph: one import resolves (and must not be reported), one does not.
+  // Pins that resolution failures are per-import, not per-file.
+  it("reports only the failing import when siblings resolve", () => {
+    const entryUri = `${base}pipeline.stm`;
+    const { unresolvedImports } = buildModelResultFromSources(
+      entryUri,
+      [
+        {
+          uri: entryUri,
+          source: [
+            'import { customers } from "./customers.stm"',
+            'import { orders } from "./missing.stm"',
+            "schema users { id INT }",
+          ].join("\n"),
+        },
+        { uri: `${base}customers.stm`, source: "schema customers { id INT }" },
+      ],
+      { lineage: true },
+    );
+    assert.deepEqual(unresolvedImports, ["./missing.stm"]);
+  });
+
+  // A fully-resolved graph must report nothing — the note in the playground UI
+  // is gated on this being empty.
+  it("reports no unresolved imports when the whole graph is in the document set", () => {
+    const entryUri = `${base}pipeline.stm`;
+    const { unresolvedImports } = buildModelResultFromSources(entryUri, [
+      {
+        uri: entryUri,
+        source: 'import { customers } from "./customers.stm"\nschema users { id INT }',
+      },
+      { uri: `${base}customers.stm`, source: "schema customers { id INT }" },
+    ]);
+    assert.deepEqual(unresolvedImports, []);
+  });
+
+  // Unresolved imports of *transitively imported* documents are reported too:
+  // the walk covers the entry's whole reachable graph, not just the entry file.
+  it("reports unresolved imports declared in transitively imported documents", () => {
+    const entryUri = `${base}pipeline.stm`;
+    const { unresolvedImports } = buildModelResultFromSources(
+      entryUri,
+      [
+        {
+          uri: entryUri,
+          source: 'import { customers } from "./customers.stm"\nschema users { id INT }',
+        },
+        {
+          uri: `${base}customers.stm`,
+          source: 'import { raw } from "./raw.stm"\nschema customers { id INT }',
+        },
+      ],
+      { lineage: true },
+    );
+    assert.deepEqual(unresolvedImports, ["./raw.stm"]);
+  });
+
+  // The convenience wrapper must stay byte-identical to the result form's
+  // model — consumers picking either entry point see the same VizModel.
+  it("buildModelFromSources returns the same model as the result form", () => {
+    const uri = `${base}buffer.stm`;
+    const documents = [
+      { uri, source: "schema users { id INT }\nschema customers { id INT }" },
+    ];
+    assert.deepEqual(
+      buildModelFromSources(uri, documents),
+      buildModelResultFromSources(uri, documents).model,
     );
   });
 });

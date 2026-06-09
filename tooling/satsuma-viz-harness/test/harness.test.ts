@@ -21,82 +21,34 @@
  */
 
 import { test, expect, type Page } from "@playwright/test";
-
-// ---------- Global type declarations ----------
-
-// window.__satsumaHarness is set by src/client/app.ts and used by all tests
-// to assert on recorded interaction events without VS Code APIs.
-interface HarnessEvent {
-  type: string;
-  detail: unknown;
-  timestamp: number;
-}
-
-interface SatsumaHarness {
-  fixture: string | null;
-  viewMode: "lineage" | "single";
-  events: HarnessEvent[];
-  ready: boolean;
-  clearEvents(): void;
-}
-
-declare global {
-  interface Window {
-    __satsumaHarness: SatsumaHarness;
-  }
-}
+// window.__satsumaHarness is set by src/client/app.ts and used by all tests to
+// assert on recorded interaction events without VS Code APIs. The typed global
+// is declared once in harness-env.ts from the app's exported interface.
+import { libraryUri, type HarnessEvent } from "./harness-env";
 
 // ---------- Helpers ----------
 
-/** The URI query-parameter value for the sfdc-to-snowflake pipeline fixture. */
-let sfdcUri: string;
+// Document URIs are the deterministic virtual library form (sl-kd45), so no
+// /api/fixtures round-trip is needed to resolve them.
+
+/** The URI query-parameter value for the sfdc-to-snowflake pipeline document. */
+const sfdcUri = libraryUri("sfdc-to-snowflake/pipeline.stm");
 /**
- * The URI for the metrics-platform entry point fixture.
- * This file imports from ./metric_sources.stm (which exists in examples/metrics-platform/),
+ * The URI for the metrics-platform entry point document.
+ * This file imports from ./metric_sources.stm (also seeded into the library),
  * so lineage mode will produce schemas from both files — more than any single file alone.
  */
-let metricsUri: string;
+const metricsUri = libraryUri("metrics-platform/metrics.stm");
 /** Multi-namespace platform entry point — qualified IDs and namespace pills. */
-let nsPlatformUri: string;
+const nsPlatformUri = libraryUri("namespaces/ns-platform.stm");
 /** Reports + models fixture — report card metadata coverage. */
-let reportsUri: string;
+const reportsUri = libraryUri("reports-and-models/pipeline.stm");
 /** Larger fixture used in geometry/layout-stability tests. */
-let sapUri: string;
+const sapUri = libraryUri("sap-po-to-mfcs/pipeline.stm");
 /** Filter / flatten / governance fixture — multi-source joins, flatten, notes. */
-let ffgUri: string;
+const ffgUri = libraryUri("filter-flatten-governance/filter-flatten-governance.stm");
 /** buy-to-om-order contract fixture — used for compact card expansion tests. */
-let buyToOmUri: string;
-
-/**
- * Resolve fixture URIs before tests run.  The harness API serves the full list;
- * we pick the specific fixtures by display name.
- */
-test.beforeAll(async ({ request }) => {
-  const res = await request.get("/api/fixtures");
-  const fixtures = await res.json() as Array<{ name: string; uri: string }>;
-
-  const find = (name: string) => fixtures.find((f) => f.name === name);
-  const sfdc = find("sfdc-to-snowflake/pipeline.stm");
-  const metrics = find("metrics-platform/metrics.stm");
-  const nsPlatform = find("namespaces/ns-platform.stm");
-  const reports = find("reports-and-models/pipeline.stm");
-  const sap = find("sap-po-to-mfcs/pipeline.stm");
-  const ffg = find("filter-flatten-governance/filter-flatten-governance.stm");
-
-  const buyToOm = find("contracts/buy-to-om-order.stm");
-
-  if (!sfdc || !metrics || !nsPlatform || !reports || !sap || !ffg || !buyToOm) {
-    throw new Error("Required fixtures not found in /api/fixtures");
-  }
-
-  sfdcUri = sfdc.uri;
-  metricsUri = metrics.uri;
-  nsPlatformUri = nsPlatform.uri;
-  reportsUri = reports.uri;
-  sapUri = sap.uri;
-  ffgUri = ffg.uri;
-  buyToOmUri = buyToOm.uri;
-});
+const buyToOmUri = libraryUri("contracts/buy-to-om-order.stm");
 
 /**
  * Open a specific named mapping by clicking its overview mapping card.
@@ -1039,6 +991,9 @@ function assertBoxesDoNotOverlap(boxes: CardBox[], tolerance = 1): void {
     for (let j = i + 1; j < boxes.length; j++) {
       const a = boxes[i];
       const b = boxes[j];
+      // Indices are loop-bounded, so this never skips; the guard only
+      // narrows the noUncheckedIndexedAccess types without an assertion.
+      if (!a || !b) continue;
       const overlapX =
         Math.min(a.x + a.width, b.x + b.width) - Math.max(a.x, b.x);
       const overlapY =

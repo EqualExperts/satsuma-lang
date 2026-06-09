@@ -24,6 +24,7 @@ import {
   createWorkspaceIndex,
   indexFile,
   getImportReachableUris,
+  getUnresolvedImportPaths,
   createScopedIndex,
 } from "./workspace-index";
 import { buildVizModel, mergeVizModels } from "./viz-model";
@@ -59,7 +60,25 @@ function emptyModel(uri: string): VizModel {
 }
 
 /**
- * Build a VizModel for `entryUri` from a set of in-memory `documents`.
+ * A built model plus the diagnostics a live-editing consumer needs to explain
+ * what the model does NOT contain.
+ */
+export interface BuildModelResult {
+  /** The assembled model — identical to `buildModelFromSources` output. */
+  model: VizModel;
+  /**
+   * Import path texts (as authored) in the entry's import graph that did not
+   * resolve to any provided document. Non-empty means the model was built
+   * without those files — the playground surfaces this as a visible note
+   * (feature 33: a buffer importing a path outside the library renders without
+   * it, never silently).
+   */
+  unresolvedImports: string[];
+}
+
+/**
+ * Build a VizModel for `entryUri` from a set of in-memory `documents`, also
+ * reporting which import paths failed to resolve against the document set.
  *
  * Parses and indexes every document, then assembles the entry's model. In
  * lineage mode the import-reachable documents are merged; otherwise the entry
@@ -69,14 +88,14 @@ function emptyModel(uri: string): VizModel {
  * caller (the live editor keeps its last good visualization on top of this).
  *
  * Invariant: the model produced here is identical to the one the Node server's
- * `/api/model` handler produces for the same documents, because both paths run
+ * `/api/model` handler produced for the same documents, because both paths run
  * this function.
  */
-export function buildModelFromSources(
+export function buildModelResultFromSources(
   entryUri: string,
   documents: SourceDocument[],
   options: BuildModelOptions = {},
-): VizModel {
+): BuildModelResult {
   const parser = getParser();
   const index = createWorkspaceIndex();
 
@@ -93,14 +112,15 @@ export function buildModelFromSources(
   }
 
   const entryTree = treesByUri.get(entryUri);
-  if (!entryTree) return emptyModel(entryUri);
+  if (!entryTree) return { model: emptyModel(entryUri), unresolvedImports: [] };
 
   // Scope resolution to the entry's import graph, matching the server and LSP.
   const reachable = getImportReachableUris(entryUri, index);
   const scopedIndex = createScopedIndex(index, reachable);
+  const unresolvedImports = getUnresolvedImportPaths(entryUri, index);
 
   if (!options.lineage) {
-    return buildVizModel(entryUri, entryTree, scopedIndex);
+    return { model: buildVizModel(entryUri, entryTree, scopedIndex), unresolvedImports };
   }
 
   // Lineage: assemble a model per reachable document, then merge into one
@@ -111,5 +131,18 @@ export function buildModelFromSources(
     if (!tree) continue;
     models.push(buildVizModel(reachableUri, tree, scopedIndex));
   }
-  return mergeVizModels(entryUri, models);
+  return { model: mergeVizModels(entryUri, models), unresolvedImports };
+}
+
+/**
+ * Build a VizModel for `entryUri` from in-memory `documents`. Convenience form
+ * of `buildModelResultFromSources` for consumers that do not need the
+ * unresolved-import diagnostics (e.g. parity tests, batch tooling).
+ */
+export function buildModelFromSources(
+  entryUri: string,
+  documents: SourceDocument[],
+  options: BuildModelOptions = {},
+): VizModel {
+  return buildModelResultFromSources(entryUri, documents, options).model;
 }
