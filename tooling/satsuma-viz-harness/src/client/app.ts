@@ -15,6 +15,7 @@
  *   viewMode           — "lineage" | "single"
  *   theme              — "light" | "dark", the active chrome + component theme
  *   parseStatus        — "ok" | "stale"; see ParseStatus
+ *   editorCollapsed    — true while the source pane is collapsed to its rail
  *   unresolvedImports  — import paths in the active buffer's graph that resolve
  *                        to no library document (rendered as a visible note)
  *   events             — array of recorded interaction events
@@ -99,6 +100,8 @@ export interface SatsumaHarness {
   theme: HarnessTheme;
   /** Relationship between the displayed viz and the live buffer; see ParseStatus. */
   parseStatus: ParseStatus;
+  /** True while the source pane is collapsed to its re-expand rail (sl-1qte). */
+  editorCollapsed: boolean;
   /**
    * Import paths in the active buffer's graph that resolve to no library
    * document. Non-empty means the model on screen was built without those
@@ -123,6 +126,7 @@ const harness: SatsumaHarness = {
   viewMode: "lineage",
   theme: "dark",
   parseStatus: "ok",
+  editorCollapsed: false,
   unresolvedImports: [],
   events: [],
   ready: false,
@@ -157,6 +161,7 @@ function getRequired(id: string): HTMLElement {
   return el;
 }
 
+const layoutEl          = getRequired("layout");
 const fixtureListEl     = getRequired("fixture-list");
 const fixturePickerBtn  = getRequired("fixture-picker-btn");
 const fixturePickerName = getRequired("fixture-picker-name");
@@ -169,6 +174,8 @@ const parseStatusDismiss = getRequired("parse-status-dismiss");
 const unresolvedNoteEl  = getRequired("unresolved-imports");
 const storageWarningEl  = getRequired("storage-warning");
 const storageWarningDismiss = getRequired("storage-warning-dismiss");
+const editorCollapseBtn = getRequired("editor-collapse-btn");
+const editorExpandRail  = getRequired("editor-expand-rail");
 const vizContainer      = getRequired("viz-container");
 const readyBadge        = getRequired("harness-ready-badge");
 const viewModeToggle    = getRequired("view-mode-toggle");
@@ -779,6 +786,33 @@ themeToggle.addEventListener("click", (e) => {
 // Resolve and apply the theme synchronously at module load so the chrome paints
 // in the correct palette before the fixture list and viz mount.
 applyTheme(resolveInitialTheme(), false);
+
+// ---------- Collapsible source pane (sl-1qte) ----------
+
+/**
+ * Collapse the source pane to its re-expand rail, or expand it back. The grid
+ * column narrows (see #layout.editor-collapsed in index.html), so the viz panel
+ * genuinely receives the reclaimed width — the <satsuma-viz> host is container-
+ * sized and re-renders via its own ResizeObserver; nothing is overlaid. The
+ * state persists in localStorage so a reload restores the chosen layout.
+ *
+ * @param record  When true, append an `editor-collapse` automation event so
+ *                Playwright can assert the toggle was observed. The initial
+ *                restore at module load passes false so the log starts clean.
+ */
+function setEditorCollapsed(collapsed: boolean, record: boolean): void {
+  harness.editorCollapsed = collapsed;
+  layoutEl.classList.toggle("editor-collapsed", collapsed);
+  library.setEditorCollapsed(collapsed);
+  if (record) recordEvent("editor-collapse", { collapsed });
+}
+
+editorCollapseBtn.addEventListener("click", () => setEditorCollapsed(true, true));
+editorExpandRail.addEventListener("click", () => setEditorCollapsed(false, true));
+
+// Restore the persisted collapsed/expanded state synchronously at module load —
+// like the theme, the pane geometry should be right from the first paint.
+if (library.editorCollapsed) setEditorCollapsed(true, false);
 
 // ---------- Startup ----------
 

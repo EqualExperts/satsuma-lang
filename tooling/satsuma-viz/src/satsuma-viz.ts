@@ -785,9 +785,25 @@ export class SatsumaViz extends LitElement {
   private _panStartY = 0;
   private _panStartPanX = 0;
   private _panStartPanY = 0;
-  private readonly _handleWindowResize = () => {
+  /*
+   * Container-resize handling (feature 33, sl-1qte).
+   *
+   * The elk layout is content-driven — node positions do not depend on the
+   * viewport size — so a host resize never needs a re-layout.  What a resize
+   * DOES invalidate is everything rendered from a live viewport measurement:
+   * the minimap's viewport rectangle and the Fit math both read
+   * `.viewport` clientWidth/Height.  A plain re-render refreshes those.
+   *
+   * A host ResizeObserver (not a window listener) is used so the component
+   * reacts when its *container* changes size with the window unchanged —
+   * e.g. the playground collapsing its editor pane to hand this component the
+   * reclaimed width.  Falls back to a window listener in environments without
+   * ResizeObserver (the Node test shim).
+   */
+  private readonly _handleHostResize = () => {
     this.requestUpdate();
   };
+  private _resizeObserver: ResizeObserver | null = null;
   private _lastReadySignature: string | null = null;
 
   override connectedCallback() {
@@ -795,7 +811,12 @@ export class SatsumaViz extends LitElement {
     if (!this.hasAttribute("data-testid")) {
       this.setAttribute("data-testid", "viz-root");
     }
-    window.addEventListener("resize", this._handleWindowResize);
+    if (typeof ResizeObserver !== "undefined") {
+      this._resizeObserver = new ResizeObserver(this._handleHostResize);
+      this._resizeObserver.observe(this);
+    } else {
+      window.addEventListener("resize", this._handleHostResize);
+    }
     this.addEventListener("field-hover", ((e: SzFieldHoverEvent) => {
       this._hoveredSchema = e.schemaId;
       this._hoveredField = e.fieldName;
@@ -808,7 +829,12 @@ export class SatsumaViz extends LitElement {
   }
 
   override disconnectedCallback() {
-    window.removeEventListener("resize", this._handleWindowResize);
+    if (this._resizeObserver) {
+      this._resizeObserver.disconnect();
+      this._resizeObserver = null;
+    } else {
+      window.removeEventListener("resize", this._handleHostResize);
+    }
     super.disconnectedCallback();
   }
 

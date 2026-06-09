@@ -1,6 +1,6 @@
 ---
 id: sl-1qte
-status: open
+status: in_progress
 deps: [sl-p1r9]
 links: []
 created: 2026-06-09T21:14:51Z
