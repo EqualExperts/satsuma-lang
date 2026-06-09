@@ -103,7 +103,7 @@ PRD reference:
 - Design / Harness light mode
 - Phase 4
 
-### 6. Playwright theme coverage and both-theme gallery
+### 6. Playwright theme coverage and both-theme gallery — ✅ done (`sl-7b29`)
 
 Add the theme test group to `harness.test.ts` and capture every named
 gallery shot in both themes with a `theme` manifest field.
