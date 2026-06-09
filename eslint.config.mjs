@@ -41,7 +41,9 @@ export default [
     },
   },
   {
-    files: ["**/*.js"],
+    // .js and .mjs Node scripts (e.g. the harness build scripts). .mjs is used
+    // for ESM build scripts inside CommonJS packages, so it shares this config.
+    files: ["**/*.js", "**/*.mjs"],
     ignores: ["tooling/tree-sitter-satsuma/grammar.js", "site/**/*.js"],
     languageOptions: {
       ecmaVersion: "latest",
