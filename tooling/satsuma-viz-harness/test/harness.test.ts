@@ -1251,22 +1251,65 @@ test.describe("Compact card expansion in overview", () => {
     await expect(card.locator("[data-testid$='-field-id']")).toHaveCount(0);
   });
 
-  test("expanding a compact card grows the overview canvas height", async ({ page }) => {
-    // When fields expand, _onCompactToggled re-measures the positioned cards
-    // and updates _overviewCanvasHeight.  The canvas element's inline height
-    // style must be larger after expansion than before.
+  test("expanding grows the canvas and collapsing shrinks it back (symmetric re-layout)", async ({
+    page,
+  }) => {
+    // Expansion re-runs the overview layout with the card's field-list height,
+    // so the canvas (sized from the layout) must grow; collapsing re-runs it
+    // again at compact height, so the canvas must shrink back — the height is
+    // derived from the layout each way, never ratcheted up by measurement.
     const canvas = page.locator(".canvas");
     const heightBefore = await canvas.evaluate((el) => el.getBoundingClientRect().height);
 
     const card = page.locator("[data-testid^='overview-schema-card-buy-order']");
     await card.locator(".header").click();
     await expect(card.locator("[data-testid$='-field-id']").first()).toBeVisible({ timeout: 5_000 });
+    await expect
+      .poll(async () => canvas.evaluate((el) => el.getBoundingClientRect().height))
+      .toBeGreaterThan(heightBefore);
 
-    // Wait for the canvas resize to propagate (triggered via updateComplete in _onCompactToggled).
-    await page.waitForTimeout(200);
-    const heightAfter = await canvas.evaluate((el) => el.getBoundingClientRect().height);
+    await card.locator(".header").click();
+    await expect(card.locator("[data-testid$='-field-id']")).toHaveCount(0);
+    await expect
+      .poll(async () => canvas.evaluate((el) => el.getBoundingClientRect().height))
+      .toBe(heightBefore);
+  });
 
-    expect(heightAfter).toBeGreaterThan(heightBefore);
+  test("expanding a compact card re-lays-out the graph so no cards overlap", async ({ page }) => {
+    // The core property of layout-driven expansion (le-a1vp): the expanded
+    // card's height is part of the elk layout, so neighbouring cards move
+    // aside and edges re-route — the card must never paint over/under other
+    // cards the way the old grow-the-canvas-only behaviour allowed. The ffg
+    // fixture stacks two source schemas in one layer (multi-source join), so
+    // expanding the many-field order_events card directly above
+    // customer_profiles is exactly the geometry that used to overlap.
+    await loadFixture(page, ffgUri);
+    const card = page.locator("[data-testid^='overview-schema-card-order-events']");
+    await card.locator(".header").click();
+    await expect(card.locator("[data-testid$='-field-event-id']").first()).toBeVisible({
+      timeout: 5_000,
+    });
+
+    // Measure the <sz-schema-card> HOSTS only: the expanded card's field rows
+    // carry the same testid prefix, and rows inside the card trivially
+    // intersect it — only card-vs-card overlap is the regression under test.
+    const boxes = await page
+      .locator("sz-schema-card[data-testid^='overview-schema-card-']")
+      .evaluateAll((els) =>
+        (els as HTMLElement[]).map((el) => {
+          const r = el.getBoundingClientRect();
+          return {
+            testId: el.getAttribute("data-testid") ?? "",
+            x: r.x,
+            y: r.y,
+            width: r.width,
+            height: r.height,
+          };
+        }),
+      );
+    expect(boxes.length).toBeGreaterThan(2);
+    assertBoxesAreSane(boxes);
+    assertBoxesDoNotOverlap(boxes);
   });
 
   test("expanding a compact card still fires a navigate event", async ({ page }) => {

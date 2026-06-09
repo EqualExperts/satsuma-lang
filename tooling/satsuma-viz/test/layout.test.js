@@ -469,6 +469,52 @@ describe("computeOverviewLayout", () => {
     assert.ok(result.edges.some((e) => e.sourceNode === "mapping:_:m1" && e.targetNode === "tgt"));
   });
 
+  it("sizes an expanded compact card at field-list height so neighbours re-flow without overlap", async () => {
+    // le-a1vp: a card the user expanded must occupy its true height IN THE
+    // LAYOUT — the old behaviour kept the compact node size and let the
+    // expanded fields paint over the cards below. Two source schemas share a
+    // layer (stacked vertically), so expanding s1 must both grow its node and
+    // push s2 aside; no pair of nodes may overlap afterwards.
+    const model = {
+      uri: "file:///test.stm",
+      fileNotes: [],
+      namespaces: [{
+        name: null,
+        schemas: [
+          schema("s1", [field("a"), field("b"), field("c"), field("d")]),
+          schema("s2"),
+          schema("tgt"),
+        ],
+        mappings: [mapping("m1", ["s1", "s2"], "tgt", [arrow("a", "id")])],
+        metrics: [],
+        fragments: [],
+      }],
+    };
+
+    const compact = await computeOverviewLayout(model);
+    const expanded = await computeOverviewLayout(model, { expandedSchemaIds: new Set(["s1"]) });
+
+    const s1Compact = compact.nodes.find((n) => n.id === "s1");
+    const s1Expanded = expanded.nodes.find((n) => n.id === "s1");
+    assert.ok(
+      s1Expanded.height > s1Compact.height,
+      "the expanded card must be taller than its compact node in the layout",
+    );
+
+    for (let i = 0; i < expanded.nodes.length; i++) {
+      for (let j = i + 1; j < expanded.nodes.length; j++) {
+        const a = expanded.nodes[i];
+        const b = expanded.nodes[j];
+        const overlapX = Math.min(a.x + a.width, b.x + b.width) - Math.max(a.x, b.x);
+        const overlapY = Math.min(a.y + a.height, b.y + b.height) - Math.max(a.y, b.y);
+        assert.ok(
+          !(overlapX > 0 && overlapY > 0),
+          `nodes ${a.id} and ${b.id} overlap in the expanded layout`,
+        );
+      }
+    }
+  });
+
   it("keeps overview namespaced nodes in the flat output", async () => {
     const model = {
       uri: "file:///test.stm",

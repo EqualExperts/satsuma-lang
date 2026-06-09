@@ -136,6 +136,22 @@ function compactHeight(
   return preambleHeight(schema, hasNamespace) + FIELDS_PADDING_BOTTOM;
 }
 
+/**
+ * Compact card height once the user has expanded its field list in the
+ * overview (sz-schema-card's compact-expanded state): the preamble plus every
+ * field row, nested fields included. Field-level note lines are not estimated;
+ * the card keeps `overflow: visible` while expanded so a small undershoot
+ * paints past the node bounds instead of clipping.
+ */
+function compactExpandedHeight(schema: SchemaCard, hasNamespace = false): number {
+  return (
+    preambleHeight(schema, hasNamespace) +
+    FIELDS_PADDING_TOP +
+    countFields(schema.fields) * FIELD_HEIGHT +
+    FIELDS_PADDING_BOTTOM
+  );
+}
+
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
 }
@@ -180,6 +196,19 @@ function estimateCompactSchemaWidth(schema: SchemaCard): number {
 function estimateCompactTextCardWidth(id: string): number {
   const headerWidth = OVERVIEW_HEADER_BASE_WIDTH + estimateTextWidth(id, OVERVIEW_TITLE_CHAR_WIDTH);
   return clamp(Math.ceil(headerWidth), CARD_MIN_WIDTH, CARD_MAX_WIDTH);
+}
+
+/**
+ * Compact card width when its field list is expanded: the wider of the compact
+ * header and the widest field row, so long field names don't spill out of the
+ * laid-out node sideways.
+ */
+function compactExpandedWidth(schema: SchemaCard): number {
+  return clamp(
+    Math.max(estimateCompactSchemaWidth(schema), Math.ceil(measureFieldWidth(schema.fields))),
+    CARD_MIN_WIDTH,
+    CARD_MAX_WIDTH,
+  );
 }
 
 function estimateLines(text: string, charsPerLine: number): number {
@@ -703,11 +732,25 @@ function extractLayout(
   };
 }
 
+/** Options for computeOverviewLayout. */
+export interface OverviewLayoutOptions {
+  /**
+   * qualifiedIds of schemas whose compact cards the user has expanded to show
+   * their field lists. Expanded cards are sized at their full field-list
+   * dimensions in the layout, so neighbouring nodes move aside and edges
+   * re-route around the new geometry instead of the card painting over them.
+   */
+  expandedSchemaIds?: ReadonlySet<string>;
+}
+
 /**
  * Compute a schema-level overview layout (no field ports).
  * Creates compact nodes and one edge per MappingBlock.
  */
-export async function computeOverviewLayout(model: VizModel): Promise<OverviewLayoutResult> {
+export async function computeOverviewLayout(
+  model: VizModel,
+  options?: OverviewLayoutOptions,
+): Promise<OverviewLayoutResult> {
   const children: ElkNode[] = [];
   const edges: ElkEdge[] = [];
   const overviewNodeKinds = new Map<string, LayoutNode["kind"]>();
@@ -728,10 +771,11 @@ export async function computeOverviewLayout(model: VizModel): Promise<OverviewLa
       nodeIds.add(s.qualifiedId);
       overviewNodeKinds.set(s.qualifiedId, "schema");
       if (ns.name) overviewNodeHasNamespace.add(s.qualifiedId);
+      const expanded = options?.expandedSchemaIds?.has(s.qualifiedId) ?? false;
       nsNodes.push({
         id: s.qualifiedId,
-        width: estimateCompactSchemaWidth(s),
-        height: compactHeight(s, !!ns.name),
+        width: expanded ? compactExpandedWidth(s) : estimateCompactSchemaWidth(s),
+        height: expanded ? compactExpandedHeight(s, !!ns.name) : compactHeight(s, !!ns.name),
         layoutOptions: {
           "elk.layered.layerConstraint": "NONE",
         },
