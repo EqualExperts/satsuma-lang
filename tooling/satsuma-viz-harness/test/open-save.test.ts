@@ -91,6 +91,20 @@ test.describe("Open a local file (client-only)", () => {
   });
 });
 
+test.describe("On-page privacy statement", () => {
+  test("the page visibly states that editing is local-only and never uploaded", async ({
+    page,
+  }) => {
+    // Feature 33 AC 11: the privacy promise must be stated ON the page, not
+    // buried in docs — a visitor deciding whether to paste proprietary mapping
+    // source needs to see it without interacting with anything.
+    await page.goto("/");
+    const note = page.locator("#privacy-note");
+    await expect(note).toBeVisible();
+    await expect(note).toContainText(/never uploaded/i);
+  });
+});
+
 test.describe("Save to local (client-only download)", () => {
   test("downloads the live buffer named after a built-in's basename", async ({ page }) => {
     await openWithFixture(page);

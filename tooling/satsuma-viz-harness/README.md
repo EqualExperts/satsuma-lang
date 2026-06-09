@@ -22,6 +22,7 @@ that suite.
 | `test/screenshots.spec.ts` | **Screenshot review workflow.** Drives each fixture into a documented UI state and emits a named PNG plus a manifest entry. NOT a golden-baseline suite. |
 | `playwright.config.ts` | Two Playwright projects — `firefox` (semantic suite) and `screenshots` (review artifacts). |
 | `watch-and-test.sh` | Sentinel-file watcher that lets agents trigger Playwright runs without spawning a browser themselves. |
+| `scripts/build-playground.mjs` | Assembles the server-free **"Try it Live!"** bundle (`npm run build:playground` → `dist/playground/`): page, client + viz bundles, both WASM files, and the examples manifest — every asset page-relative so it deploys under a non-root base path (GitHub Pages). |
 
 ---
 

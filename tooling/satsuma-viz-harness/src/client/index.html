@@ -180,6 +180,12 @@
       white-space: nowrap;
     }
     #harness-ready-badge.ready { background: var(--color-ready-bg); color: var(--color-ready-text); border-color: var(--color-ready-border); }
+    /* The always-visible privacy statement (feature 33 AC 11). */
+    #privacy-note {
+      font-size: 10px; padding: 2px 7px; border-radius: 10px;
+      background: var(--color-surface-2); color: var(--color-text-muted);
+      border: 1px solid var(--color-border); white-space: nowrap;
+    }
 
     /* ── Panel shared ────────────────────────────────────────────────────── */
     .panel-toolbar {
@@ -424,6 +430,11 @@
         <button class="toggle-btn" data-theme="dark"  title="Dark theme">dark</button>
       </div>
       <span id="harness-ready-badge">idle</span>
+      <!-- The playground's privacy promise, always visible (feature 33 AC 11):
+           parsing, rendering, and persistence are entirely client-side. -->
+      <span id="privacy-note"
+        title="Everything you type or open stays in this browser (localStorage). No source is ever uploaded to a server.">
+        &#128274; local-only &mdash; your source is never uploaded</span>
       <!-- Shown by app.ts when a localStorage write fails (quota / privacy mode) -->
       <span id="storage-warning" class="hidden" role="status">
         <span>&#9888; storage unavailable &mdash; edits will not survive a reload</span>
@@ -482,9 +493,12 @@
     </section>
   </div>
 
-  <!-- satsuma-viz web component: loaded as a module to register the custom element -->
-  <script type="module" src="/satsuma-viz.js"></script>
+  <!-- satsuma-viz web component: loaded as a module to register the custom element.
+       Both scripts are referenced PAGE-RELATIVE (./…, like every other asset) so
+       the same page works on the dev server and in the static playground bundle
+       under a non-root base path such as GitHub Pages (sl-ncu9). -->
+  <script type="module" src="./satsuma-viz.js"></script>
   <!-- harness application logic -->
-  <script type="module" src="/app.js"></script>
+  <script type="module" src="./app.js"></script>
 </body>
 </html>
