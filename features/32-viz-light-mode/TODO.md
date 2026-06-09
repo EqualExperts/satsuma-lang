@@ -1,6 +1,6 @@
 # Feature 32 — Viz Light Mode: Task Breakdown
 
-Epic: _(tk epic to be created on PRD approval)_
+Epic: `sl-wyr1`
 
 Tasks map 1:1 to PRD phases plus an audit task. tk ticket IDs are added next
 to each task title when the tickets are created.
@@ -58,7 +58,7 @@ PRD reference:
 - Phase 1
 - Test plan (1, 2)
 
-### 3. Theme contract on `<satsuma-viz>`
+### 3. Theme contract on `<satsuma-viz>` — ✅ done (`sl-o05i`)
 
 Implement Phase 2: reflected `theme` property, default `"light"`.
 

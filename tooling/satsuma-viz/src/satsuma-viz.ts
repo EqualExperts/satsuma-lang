@@ -691,6 +691,16 @@ export class SatsumaViz extends LitElement {
   @property({ type: Object })
   model: VizModel | null = null;
 
+  /**
+   * Visual theme. Reflected to the `theme` attribute so the
+   * `:host([theme="dark"])` overrides in tokens.css apply — this is the *only*
+   * switching mechanism for the palette. Consumers (VS Code webview, harness)
+   * detect which theme to use and assign it; the component owns rendering.
+   * Default `"light"`, matching the warm cream/orange `:host` token defaults.
+   */
+  @property({ reflect: true })
+  theme: "light" | "dark" = "light";
+
   @property({ type: Boolean, attribute: "test-mode", reflect: true })
   testMode = false;
 
