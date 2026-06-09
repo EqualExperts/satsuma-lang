@@ -16,6 +16,8 @@
 
 📖 **[Website, documentation &amp; examples → equalexperts.github.io/satsuma-lang](https://equalexperts.github.io/satsuma-lang/)**
 
+⚡ **[Try it Live! — edit Satsuma in your browser and watch the visualization update](https://equalexperts.github.io/satsuma-lang/playground/)** (everything runs client-side; your source is never uploaded)
+
 Satsuma is a domain-specific language for source-to-target data mapping.
 
 It is designed to replace ad hoc spreadsheets, wiki tables, and overly verbose

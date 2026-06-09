@@ -29,6 +29,7 @@ export default [
       "**/*.min.js",
       "site/js/tailwind.js",
       "site/_site/**",
+      "site/playground/**",
     ],
   },
   js.configs.recommended,
