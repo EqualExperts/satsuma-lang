@@ -2,7 +2,7 @@ const { describe, it } = require("node:test");
 const assert = require("node:assert/strict");
 
 const {
-  isDarkTheme,
+  vizThemeForKind,
   loadFullLineageModel,
   loadExpandedModels,
   buildFieldLineagePath,
@@ -15,15 +15,27 @@ const ColorThemeKind = {
   HighContrastLight: 4,
 };
 
-describe("isDarkTheme", () => {
-  it("treats dark and high-contrast themes as dark renderer themes", () => {
-    assert.equal(isDarkTheme(ColorThemeKind.Dark), true);
-    assert.equal(isDarkTheme(ColorThemeKind.HighContrast), true);
+describe("vizThemeForKind", () => {
+  it("maps Light and HighContrastLight to the light renderer theme", () => {
+    // Both light-family kinds must resolve to the warm cream/orange light
+    // palette. HighContrastLight is the case that used to fall through to light
+    // only because the old boolean check didn't match it — the mapping is now
+    // intentional and documented.
+    assert.equal(vizThemeForKind(ColorThemeKind.Light), "light");
+    assert.equal(vizThemeForKind(ColorThemeKind.HighContrastLight), "light");
   });
 
-  it("keeps light themes out of dark renderer mode", () => {
-    assert.equal(isDarkTheme(ColorThemeKind.Light), false);
-    assert.equal(isDarkTheme(ColorThemeKind.HighContrastLight), false);
+  it("maps Dark and HighContrast to the dark renderer theme", () => {
+    // Both dark-family kinds fold into the dark palette until a dedicated
+    // high-contrast palette exists (feature non-goal).
+    assert.equal(vizThemeForKind(ColorThemeKind.Dark), "dark");
+    assert.equal(vizThemeForKind(ColorThemeKind.HighContrast), "dark");
+  });
+
+  it("defaults unknown kinds to dark", () => {
+    // A future or unrecognized ColorThemeKind must not crash the webview; it
+    // falls back to dark, matching the historical default.
+    assert.equal(vizThemeForKind(99), "dark");
   });
 });
 
@@ -51,7 +63,7 @@ describe("loadFullLineageModel", () => {
     ]);
     assert.deepEqual(envelope, {
       payload: { uri: "file:///platform.stm", namespaces: [] },
-      isDark: true,
+      theme: "dark",
     });
   });
 
@@ -115,7 +127,7 @@ describe("loadExpandedModels", () => {
     assert.deepEqual(envelope, {
       schemaId: "customers",
       models: [{ uri: "file:///crm.stm" }],
-      isDark: false,
+      theme: "light",
     });
   });
 
@@ -137,7 +149,7 @@ describe("loadExpandedModels", () => {
     assert.deepEqual(envelope, {
       schemaId: "customers",
       models: [],
-      isDark: true,
+      theme: "dark",
     });
   });
 });

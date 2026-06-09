@@ -61,16 +61,18 @@ window.addEventListener("message", (event) => {
   const msg = event.data;
 
   if (msg.type === "vizModel") {
-    // Apply theme
-    if (msg.isDark) {
-      document.body.classList.add("dark");
-    } else {
-      document.body.classList.remove("dark");
-    }
+    // The component owns theming: assign its `theme` attribute and let the
+    // tokens.css `:host([theme="dark"])` overrides do the switching. The
+    // envelope carries the theme so the initial load needs no second message.
+    if (msg.theme) vizEl.theme = msg.theme;
 
     // Set model on the component
     vizEl.model = msg.payload;
+  } else if (msg.type === "setTheme") {
+    // Live theme switch pushed by the host when the editor theme changes.
+    if (msg.theme) vizEl.theme = msg.theme;
   } else if (msg.type === "expandedModels") {
+    if (msg.theme) vizEl.theme = msg.theme;
     vizEl.addExpandedModels(msg.schemaId, msg.models);
   } else if (msg.type === "error") {
     root.textContent = "";

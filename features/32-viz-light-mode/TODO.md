@@ -70,7 +70,7 @@ PRD reference:
 - Design / Theme contract
 - Phase 2; Test plan (3)
 
-### 4. VS Code theme integration with live switching
+### 4. VS Code theme integration with live switching — ✅ done (`sl-go45`)
 
 Implement Phase 3: `VizTheme` + `vizThemeForKind`, `theme` in envelopes,
 `onDidChangeActiveColorTheme` → `setTheme` message, webview assigns
