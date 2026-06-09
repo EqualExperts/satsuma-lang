@@ -1,6 +1,6 @@
 ---
 id: sl-wpa8
-status: open
+status: closed
 deps: []
 links: []
 created: 2026-06-09T21:13:59Z
@@ -21,3 +21,12 @@ new URL(...) verified equivalent to the path-based resolver across relative, ./,
 
 resolveImportUri uses new URL(...) with no path/url import; buildImportSuggestion reimplemented as pure pathname diff; workspace-index.ts has zero Node (path/url/fs) imports; parity tests assert the new resolver matches the old path-based output for file:// URIs (relative, ./, ../, absolute, bare name); a browser-virtual-URI test resolves an import cross-file; existing viz-backend + LSP + CLI tests still pass unchanged.
 
+
+## Notes
+
+**2026-06-09T21:35:51Z**
+
+**2026-06-09T21:35:51Z**
+
+Cause: workspace-index.ts resolved import paths via Node path/url (fileURLToPath→resolve→pathToFileURL), which cannot bundle for --platform=browser and blocked in-browser cross-file lineage.
+Fix: replaced resolveImportUri with new URL(pathText, importerUri) and reimplemented buildImportSuggestion's path.relative as a pure pathname diff (relativeUriPath); module now has zero Node imports. Parity tests assert byte-for-byte equivalence with the legacy resolver for file:// URIs (commit b60dbef).
