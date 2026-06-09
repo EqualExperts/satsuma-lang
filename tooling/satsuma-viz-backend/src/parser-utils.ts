@@ -6,10 +6,15 @@
  * It does not own parser lifecycle or editor protocol wiring.
  */
 
+// Range/Position are runtime values (Range.create / Position.create) imported
+// from vscode-languageserver-types — the zero-dependency types package — rather
+// than the top-level vscode-languageserver, whose JSON-RPC server pulls in
+// Node-only modules. This keeps the package bundleable for --platform=browser
+// (feature 33: the playground runs this code in the browser).
 import {
   Position,
   Range,
-} from "vscode-languageserver";
+} from "vscode-languageserver-types";
 import {
   child,
   children,

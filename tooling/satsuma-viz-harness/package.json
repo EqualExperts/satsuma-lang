@@ -8,7 +8,7 @@
   "scripts": {
     "prebuild": "npm --prefix ../satsuma-core run build && npm --prefix ../satsuma-viz-backend run build && npm --prefix ../satsuma-viz run build",
     "build:server": "esbuild src/server.ts --bundle --platform=node --target=node20 --outfile=dist/server.js --sourcemap --banner:js='var __import_meta_url = require(\"url\").pathToFileURL(__filename).href;' --define:import.meta.url=__import_meta_url",
-    "build:client": "esbuild src/client/app.ts --bundle --format=esm --target=es2022 --outfile=dist/client/app.js --sourcemap && cp src/client/index.html dist/client/index.html",
+    "build:client": "esbuild src/client/app.ts --bundle --format=esm --target=es2022 --platform=browser --external:fs/promises --external:module --outfile=dist/client/app.js --sourcemap && cp src/client/index.html dist/client/index.html",
     "build:wasm": "cp ../tree-sitter-satsuma/tree-sitter-satsuma.wasm dist/tree-sitter-satsuma.wasm && cp node_modules/web-tree-sitter/web-tree-sitter.wasm dist/tree-sitter.wasm",
     "build:viz": "cp ../satsuma-viz/dist/satsuma-viz.js dist/client/satsuma-viz.js",
     "build": "mkdir -p dist/client && npm run build:server && npm run build:client && npm run build:wasm && npm run build:viz",
