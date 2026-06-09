@@ -1,3 +1,4 @@
+import "./dom-shim.js";
 import { describe, it } from "node:test";
 import * as assert from "node:assert/strict";
 import fs from "node:fs";
@@ -72,6 +73,36 @@ describe("theme token parity", () => {
       missing,
       [],
       `Missing dark token overrides: ${missing.join(", ")}`,
+    );
+  });
+});
+
+describe("satsuma-viz theme property", () => {
+  it("defaults to the light theme", async () => {
+    // The warm cream/orange :host token defaults ARE the light palette, so the
+    // component must default to "light" — a consumer that never sets a theme
+    // (e.g. a bare embed) still renders a coherent, fully-styled light viz.
+    const mod = await import("../dist/satsuma-viz.js");
+    const el = new mod.SatsumaViz();
+    assert.equal(el.theme, "light");
+  });
+
+  it("reflects theme to the `theme` attribute so :host([theme=\"dark\"]) engages", async () => {
+    // Reflection is the ONLY palette-switching mechanism: assigning theme must
+    // write the `theme` attribute on the host so the tokens.css
+    // `:host([theme="dark"])` override block applies. If reflect were dropped,
+    // dark mode would silently keep the light palette.
+    const mod = await import("../dist/satsuma-viz.js");
+    const options = mod.SatsumaViz.elementProperties.get("theme");
+    assert.ok(options, "theme must be a declared reactive property");
+    assert.equal(options.reflect, true, "theme must reflect to an attribute");
+    // Lit derives the attribute name from the property name (lowercased) unless
+    // overridden; the dark selector keys off exactly `theme`, so the derived
+    // attribute must not be disabled or renamed.
+    assert.notEqual(options.attribute, false);
+    assert.ok(
+      options.attribute === undefined || options.attribute === "theme",
+      `theme must reflect to the "theme" attribute, got ${String(options.attribute)}`,
     );
   });
 });
