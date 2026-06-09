@@ -31,7 +31,9 @@
  *                              otherwise prefers-color-scheme decides, then dark
  *
  * Theme changes (via the header toggle) append a `theme-change` event to the
- * event log so Playwright can assert the switch was observed.
+ * event log so Playwright can assert the switch was observed. The collapse
+ * toggle, Open…, and Save actions likewise append `editor-collapse`,
+ * `file-open`, and `file-save` events.
  */
 
 import { ensureParserReady, buildModel } from "./model-pipeline";
@@ -174,6 +176,9 @@ const parseStatusDismiss = getRequired("parse-status-dismiss");
 const unresolvedNoteEl  = getRequired("unresolved-imports");
 const storageWarningEl  = getRequired("storage-warning");
 const storageWarningDismiss = getRequired("storage-warning-dismiss");
+const fileOpenBtn       = getRequired("file-open-btn");
+const fileOpenInput     = getRequired("file-open-input") as HTMLInputElement;
+const fileSaveBtn       = getRequired("file-save-btn");
 const editorCollapseBtn = getRequired("editor-collapse-btn");
 const editorExpandRail  = getRequired("editor-expand-rail");
 const vizContainer      = getRequired("viz-container");
@@ -786,6 +791,68 @@ themeToggle.addEventListener("click", (e) => {
 // Resolve and apply the theme synchronously at module load so the chrome paints
 // in the correct palette before the fixture list and viz mount.
 applyTheme(resolveInitialTheme(), false);
+
+// ---------- Open / Save local files (sl-nopd) ----------
+//
+// Both actions are entirely client-side — the privacy contract of the
+// playground (feature 33 §3–4). Open reads the chosen file into memory with
+// File.text() and adds it to the document library as a user document; Save
+// serialises the live buffer into a Blob and downloads it via a temporary
+// anchor. No request carries source content in either direction.
+
+// Save fallback when no document is loaded (e.g. an empty library).
+const FALLBACK_SAVE_FILENAME = "untitled.stm";
+
+/**
+ * Derive the Save download's default filename from the active document label
+ * (PRD §4): the opened file's name, or the basename of a built-in example's
+ * path (slashes are not valid in a download name), or untitled.stm. A label
+ * without a recognised source extension gains `.stm` so the saved file
+ * round-trips through Open's `.stm,.txt` accept filter.
+ */
+function defaultSaveFilename(): string {
+  const doc = harness.fixture ? library.get(harness.fixture) : undefined;
+  if (!doc) return FALLBACK_SAVE_FILENAME;
+  const basename = doc.name.split("/").pop() ?? "";
+  if (basename === "") return FALLBACK_SAVE_FILENAME;
+  return /\.(stm|txt)$/.test(basename) ? basename : `${basename}.stm`;
+}
+
+// Open…: the visible button proxies to the hidden file input.
+fileOpenBtn.addEventListener("click", () => fileOpenInput.click());
+
+// A chosen file becomes a user document in the library (distinct from the
+// built-in examples), is selected — which replaces the editor buffer, sets the
+// document label to the filename, and re-renders the viz — and is recorded as
+// a `file-open` automation event.
+fileOpenInput.addEventListener("change", async () => {
+  const file = fileOpenInput.files?.[0];
+  if (!file) return;
+  const text = await file.text();
+  const doc = library.addUserDocument(file.name, text);
+  renderLibraryList();
+  selectDocument(doc.uri);
+  recordEvent("file-open", { name: doc.name, uri: doc.uri });
+  // Clear the input so choosing the same file again still fires `change`.
+  fileOpenInput.value = "";
+});
+
+// Save: download the LIVE buffer (editor.getValue(), not the possibly
+// debounce-stale library entry) as a Blob via a temporary anchor.
+fileSaveBtn.addEventListener("click", () => {
+  const filename = defaultSaveFilename();
+  const blob = new Blob([editor.getValue()], { type: "text/plain" });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename;
+  // Some browsers only honour programmatic anchor clicks from the document.
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(url);
+  recordEvent("file-save", { filename });
+});
 
 // ---------- Collapsible source pane (sl-1qte) ----------
 
