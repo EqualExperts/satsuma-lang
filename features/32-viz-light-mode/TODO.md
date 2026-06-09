@@ -87,7 +87,7 @@ PRD reference:
 - Design / VS Code theme mapping, Live theme switching
 - Phase 3; Test plan (4)
 
-### 5. Harness light mode
+### 5. Harness light mode — ✅ done (`sl-wxac`)
 
 Implement Phase 4 chrome work: theme resolution (URL param →
 `prefers-color-scheme` → dark), header toggle, light chrome variant

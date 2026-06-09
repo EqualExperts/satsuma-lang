@@ -12,6 +12,7 @@
  * Automation contract (exposed on window.__satsumaHarness):
  *   fixture     — currently loaded fixture URI, or null
  *   viewMode    — "lineage" | "single"
+ *   theme       — "light" | "dark", the active chrome + component theme
  *   events      — array of recorded interaction events
  *   ready       — true once the viz has reached the "ready" state
  *   clearEvents — helper to reset the event log between assertions
@@ -19,6 +20,11 @@
  * URL parameters for headless use (e.g. Playwright tests):
  *   ?fixture=<encoded-uri>   — auto-selects a fixture on load
  *   ?mode=lineage|single     — overrides the default view mode
+ *   ?theme=light|dark        — forces the theme (deterministic for Playwright);
+ *                              otherwise prefers-color-scheme decides, then dark
+ *
+ * Theme changes (via the header toggle) append a `theme-change` event to the
+ * event log so Playwright can assert the switch was observed.
  */
 
 // ---------- Types ----------
@@ -70,9 +76,14 @@ interface HarnessEvent {
  * The automation API exposed on window.__satsumaHarness.
  * All Playwright tests assert against this object rather than VS Code APIs.
  */
+/** The two renderer themes the harness and component support. */
+type HarnessTheme = "light" | "dark";
+
 export interface SatsumaHarness {
   fixture: string | null;
   viewMode: "lineage" | "single";
+  /** Active theme applied to both the chrome (body[data-theme]) and the viz component. */
+  theme: HarnessTheme;
   events: HarnessEvent[];
   ready: boolean;
   clearEvents(): void;
@@ -89,6 +100,7 @@ declare global {
 const harness: SatsumaHarness = {
   fixture: null,
   viewMode: "lineage",
+  theme: "dark",
   events: [],
   ready: false,
   clearEvents() { this.events = []; },
@@ -117,6 +129,7 @@ const sourceCodeEl      = getRequired("source-code");
 const vizContainer      = getRequired("viz-container");
 const readyBadge        = getRequired("harness-ready-badge");
 const viewModeToggle    = getRequired("view-mode-toggle");
+const themeToggle       = getRequired("theme-toggle");
 
 // ---------- Syntax highlighting ----------
 
@@ -390,6 +403,9 @@ function ensureVizElement(): HTMLElement {
   // under automation.  The satsuma-viz component uses this to skip CSS transitions
   // and emit layout-complete signals synchronously.
   el.setAttribute("test-mode", "");
+  // Mount with the currently-resolved theme so the component palette matches the
+  // chrome from the first paint (the component defaults to light otherwise).
+  el.setAttribute("theme", harness.theme);
 
   // Monitor ready-state changes via MutationObserver so Playwright can wait
   // for `data-ready-state="ready"` on the root element.
@@ -553,6 +569,52 @@ viewModeToggle.addEventListener("click", (e) => {
   const mode = btn.dataset["mode"] as "lineage" | "single" | undefined;
   if (mode && mode !== harness.viewMode) setViewMode(mode);
 });
+
+// ---------- Theme management ----------
+
+/**
+ * Resolve the initial theme deterministically.
+ * Order (per Feature 32): `?theme=` URL parameter → `prefers-color-scheme`
+ * media query → dark (the historical harness default).  The URL parameter
+ * makes Playwright runs deterministic regardless of the runner's OS setting.
+ */
+function resolveInitialTheme(): HarnessTheme {
+  const param = new URLSearchParams(window.location.search).get("theme");
+  if (param === "light" || param === "dark") return param;
+  if (window.matchMedia?.("(prefers-color-scheme: light)").matches) return "light";
+  return "dark";
+}
+
+/**
+ * Apply a theme to both the chrome and the viz component so they never diverge.
+ * Sets `data-theme` on <body> (drives the chrome CSS variable overrides) and the
+ * `theme` attribute on <satsuma-viz> (drives the component's tokens.css palette),
+ * and updates the toggle's active button.
+ *
+ * @param record  When true, append a `theme-change` automation event. The
+ *                initial resolution passes false so the log starts clean; user
+ *                toggles pass true so Playwright can assert the switch occurred.
+ */
+function applyTheme(theme: HarnessTheme, record: boolean): void {
+  harness.theme = theme;
+  document.body.dataset["theme"] = theme;
+  if (vizEl) vizEl.setAttribute("theme", theme);
+  for (const btn of themeToggle.querySelectorAll<HTMLButtonElement>(".toggle-btn")) {
+    btn.classList.toggle("active", btn.dataset["theme"] === theme);
+  }
+  if (record) recordEvent("theme-change", { theme });
+}
+
+themeToggle.addEventListener("click", (e) => {
+  const btn = (e.target as HTMLElement).closest<HTMLButtonElement>(".toggle-btn");
+  if (!btn) return;
+  const theme = btn.dataset["theme"] as HarnessTheme | undefined;
+  if (theme && theme !== harness.theme) applyTheme(theme, true);
+});
+
+// Resolve and apply the theme synchronously at module load so the chrome paints
+// in the correct palette before the fixture list and viz mount.
+applyTheme(resolveInitialTheme(), false);
 
 // ---------- Startup ----------
 

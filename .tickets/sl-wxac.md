@@ -1,6 +1,6 @@
 ---
 id: sl-wxac
-status: open
+status: closed
 deps: []
 links: []
 created: 2026-06-09T20:43:00Z
@@ -15,3 +15,9 @@ parent: sl-wyr1
 
 ?theme=light|dark deterministic; prefers-color-scheme fallback; header toggle restyles chrome+component; light .tok-* colours; __satsumaHarness.theme + theme-change events
 
+
+## Notes
+
+**2026-06-09T21:15:49Z**
+
+Harness light mode: chrome colours + .tok-* syntax colours moved to CSS variables with a light variant under body[data-theme=light]; added a Light/Dark header toggle; theme resolution ?theme= → prefers-color-scheme → dark; __satsumaHarness.theme + theme-change events. Also fixed a latent server bug: the GET / → /index.html redirect dropped the query string, making ?theme= (and ?fixture=/?mode=) silent no-ops — now preserved. Verified via Playwright (all theme tests pass).
