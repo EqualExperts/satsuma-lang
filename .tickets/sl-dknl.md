@@ -1,6 +1,6 @@
 ---
 id: sl-dknl
-status: open
+status: closed
 deps: []
 links: []
 created: 2026-06-04T09:51:36Z
@@ -88,3 +88,8 @@ Today a single click on the compact header both toggles fields and dispatches `n
 **2026-06-09T21:15:24Z**
 
 Pre-existing bug found during Feature 32: commit ff366cf added the compact-card-expansion Playwright tests referencing fixture contracts/buy-to-om-order.stm but never committed the fixture. Since harness.test.ts resolves all fixtures in a shared beforeAll, the missing file made the ENTIRE firefox harness suite (40 tests) throw and not-run on main. Fixed by authoring the intended canonical example examples/contracts/buy-to-om-order.stm (buy_order → om_order, validates clean). All 40 firefox tests now execute and pass.
+
+**2026-06-10T01:15:00+01:00**
+
+Cause: Review follow-ups from the compact-card-expansion feature (ff366cf): imperative style mutation, full-DOM measurement sweep, ratcheting canvas height, unverified re-layout interaction, and a fixed-wait test.
+Fix: All acceptance criteria were delivered by le-a1vp (commit e06975f), which made expansion layout-driven: reflected compact-expanded attribute + :host CSS replaces style.overflow; sz-compact-toggled is a CustomEvent { schemaId, expanded } with no DOM sweep; canvas height is layout-derived and symmetric; expanded state persists across re-layouts with geometry covered by node + Playwright tests; waitForTimeout replaced with expect.poll. Item 6 (separate chevron/title click semantics) was explicitly optional and remains a product decision.
