@@ -81,28 +81,15 @@ test.afterAll(() => {
 
 // ---------- Helpers (mirrors harness.test.ts) ----------
 
-let sfdcUri: string;
-let nsPlatformUri: string;
-let metricsUri: string;
-let reportsUri: string;
-let ffgUri: string;
-let sapUri: string;
+import { libraryUri } from "./harness-env";
 
-test.beforeAll(async ({ request }) => {
-  const res = await request.get("/api/fixtures");
-  const fixtures = (await res.json()) as Array<{ name: string; uri: string }>;
-  const find = (name: string) => {
-    const f = fixtures.find((entry) => entry.name === name);
-    if (!f) throw new Error(`Required fixture not found: ${name}`);
-    return f;
-  };
-  sfdcUri = find("sfdc-to-snowflake/pipeline.stm").uri;
-  nsPlatformUri = find("namespaces/ns-platform.stm").uri;
-  metricsUri = find("metrics-platform/metrics.stm").uri;
-  reportsUri = find("reports-and-models/pipeline.stm").uri;
-  ffgUri = find("filter-flatten-governance/filter-flatten-governance.stm").uri;
-  sapUri = find("sap-po-to-mfcs/pipeline.stm").uri;
-});
+// Deterministic virtual library URIs (sl-kd45) — no /api/fixtures round-trip.
+const sfdcUri = libraryUri("sfdc-to-snowflake/pipeline.stm");
+const nsPlatformUri = libraryUri("namespaces/ns-platform.stm");
+const metricsUri = libraryUri("metrics-platform/metrics.stm");
+const reportsUri = libraryUri("reports-and-models/pipeline.stm");
+const ffgUri = libraryUri("filter-flatten-governance/filter-flatten-governance.stm");
+const sapUri = libraryUri("sap-po-to-mfcs/pipeline.stm");
 
 async function loadFixture(page: Page, fixtureUri: string): Promise<void> {
   await page.locator("#fixture-picker-btn").click();

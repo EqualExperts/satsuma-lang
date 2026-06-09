@@ -1,0 +1,21 @@
+{
+  // Typecheck-only project for the Playwright suites. The package tsconfig
+  // covers src/ for the build; this one gives the test files (and editors)
+  // Node + DOM types and pulls in src/client/app.ts transitively via the
+  // harness-env type import. Playwright transpiles tests itself — nothing is
+  // emitted from here.
+  "compilerOptions": {
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "target": "es2022",
+    "lib": ["es2022", "dom", "dom.iterable"],
+    "types": ["node"],
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noEmit": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true
+  },
+  "include": ["./**/*.ts"]
+}

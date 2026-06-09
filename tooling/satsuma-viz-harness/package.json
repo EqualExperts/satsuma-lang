@@ -15,7 +15,7 @@
     "build": "mkdir -p dist/client && npm run build:server && npm run build:client && npm run build:wasm && npm run build:viz && npm run build:examples",
     "dev": "npm run build && node dist/server.js",
     "test": "playwright test",
-    "test:unit": "node --test scripts/*.test.mjs",
+    "test:unit": "node --test scripts/*.test.mjs test/unit/*.test.mjs",
     "screenshots": "playwright test --project=screenshots",
     "pretest": "npm run build"
   },

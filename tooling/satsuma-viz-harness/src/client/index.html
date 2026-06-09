@@ -202,6 +202,42 @@
     }
     #parse-status-dismiss:hover { color: var(--color-text); }
 
+    /*
+     * Unresolved-import note (feature 33 §5).  Shown when the active buffer
+     * imports a path that is not in the document library: the model renders
+     * without those files, and this note names them so missing lineage edges
+     * are explained rather than silent.
+     */
+    #unresolved-imports {
+      display: inline-block; padding: 2px 8px; border-radius: 10px;
+      font-size: 9px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      max-width: 40%;
+      background: var(--color-surface-2);
+      color: var(--tok-comment-warn);
+      border: 1px solid var(--color-border);
+    }
+    #unresolved-imports.hidden { display: none; }
+
+    /*
+     * Storage warning (sl-kd45 quota guard).  Shown when a localStorage write
+     * fails (quota / privacy mode): the playground keeps working from memory,
+     * but edits will not survive a reload.  Non-blocking and dismissable.
+     */
+    #storage-warning {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 2px 6px 2px 8px; border-radius: 10px;
+      font-size: 9px; white-space: nowrap;
+      background: var(--color-surface-2);
+      color: var(--tok-comment-warn);
+      border: 1px solid var(--color-border);
+    }
+    #storage-warning.hidden { display: none; }
+    #storage-warning-dismiss {
+      background: none; border: 0; cursor: pointer; padding: 0 2px;
+      color: inherit; font-size: 12px; line-height: 1; font-family: inherit;
+    }
+    #storage-warning-dismiss:hover { color: var(--color-text); }
+
     /* ── Fixture picker button + dropdown ────────────────────────────────── */
     #fixture-picker { position: relative; flex: 1; min-width: 0; }
     #fixture-picker-btn {
@@ -229,12 +265,15 @@
       overflow-y: auto;
     }
     #fixture-picker-dropdown.hidden { display: none; }
-    #fixture-list-header {
+    /* Section headings rendered by app.ts: "Examples" / "Your documents". */
+    .fixture-section-header {
       padding: 5px 10px 3px; font-size: 9px; font-weight: 600;
       color: var(--color-text-muted); letter-spacing: 0.05em; text-transform: uppercase;
     }
+    /* One library document: the select button plus an optional restore action. */
+    .fixture-row { display: flex; align-items: stretch; }
     .fixture-item {
-      display: block; width: 100%; text-align: left; padding: 4px 10px;
+      display: block; flex: 1; min-width: 0; text-align: left; padding: 4px 10px;
       background: none; border: none; color: var(--color-text-muted); cursor: pointer;
       font-size: 10px; font-family: inherit; line-height: 1.4;
       word-break: break-all; white-space: pre-wrap;
@@ -242,6 +281,23 @@
     }
     .fixture-item:hover { background: var(--color-surface-2); color: var(--color-text); }
     .fixture-item.selected { background: var(--color-selected); color: var(--color-accent); border-left-color: var(--color-accent); }
+    /* Per-document "Restore original" — rendered only for edited built-ins. */
+    .fixture-restore {
+      flex-shrink: 0; padding: 0 8px; background: none; border: none;
+      color: var(--color-text-muted); cursor: pointer; font-size: 11px; font-family: inherit;
+    }
+    .fixture-restore:hover { background: var(--color-surface-2); color: var(--color-accent); }
+    /* Footer actions: + New document, Reset library. */
+    .dropdown-footer {
+      display: flex; gap: 6px; padding: 6px 10px;
+      border-top: 1px solid var(--color-border);
+    }
+    .dropdown-footer button {
+      padding: 3px 8px; border-radius: 4px; border: 1px solid var(--color-border);
+      background: transparent; color: var(--color-text-muted); cursor: pointer;
+      font-size: 10px; font-family: inherit;
+    }
+    .dropdown-footer button:hover { background: var(--color-surface-2); color: var(--color-text); }
 
     /* ── Viz panel ─────────────────────────────────────────────────────────── */
     #viz-panel {
@@ -301,6 +357,11 @@
         <button class="toggle-btn" data-theme="dark"  title="Dark theme">dark</button>
       </div>
       <span id="harness-ready-badge">idle</span>
+      <!-- Shown by app.ts when a localStorage write fails (quota / privacy mode) -->
+      <span id="storage-warning" class="hidden" role="status">
+        <span>&#9888; storage unavailable &mdash; edits will not survive a reload</span>
+        <button id="storage-warning-dismiss" title="Dismiss" aria-label="Dismiss">&times;</button>
+      </span>
     </header>
 
     <!-- Source panel: compact file picker toolbar + highlighted source view -->
@@ -313,8 +374,12 @@
             <span class="picker-chevron">&#9660;</span>
           </button>
           <div id="fixture-picker-dropdown" class="hidden">
-            <div id="fixture-list-header">Fixtures</div>
+            <!-- app.ts renders the library here: Examples + Your documents -->
             <div id="fixture-list"></div>
+            <div class="dropdown-footer">
+              <button id="library-new-btn" title="Create a new document in the library">+ New</button>
+              <button id="library-reset-btn" title="Restore the bundled examples, discarding all edits and your own documents">Reset library&hellip;</button>
+            </div>
           </div>
         </div>
         <span class="toolbar-spacer"></span>
@@ -332,6 +397,8 @@
     <section id="viz-panel">
       <div class="panel-toolbar">
         <span class="panel-label">Visualization</span>
+        <!-- Shown by app.ts when the buffer imports paths not in the library -->
+        <span id="unresolved-imports" class="hidden" role="status"></span>
         <span class="zoom-hint">Ctrl+scroll to zoom &middot; drag to pan &middot; use Fit button inside</span>
       </div>
       <div id="viz-container">

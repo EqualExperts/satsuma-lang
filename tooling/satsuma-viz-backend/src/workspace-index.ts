@@ -109,6 +109,44 @@ export function createWorkspaceIndex(): WorkspaceIndex {
 }
 
 /**
+ * Walk the import graph from `entryUri`, classifying every import declaration
+ * encountered: imports that resolve to an indexed file extend the walk; imports
+ * that do not (unparseable path, or the resolved URI is not indexed) are
+ * collected as unresolved. Single source of truth for both
+ * `getImportReachableUris` and `getUnresolvedImportPaths`, so "what is
+ * reachable" and "what failed to resolve" can never disagree.
+ */
+function walkImportGraph(
+  entryUri: string,
+  index: WorkspaceIndex,
+): { reachable: Set<string>; unresolved: string[] } {
+  const reachable = new Set<string>();
+  const unresolved: string[] = [];
+  const queue = [entryUri];
+
+  while (queue.length > 0) {
+    const uri = queue.pop()!;
+    if (reachable.has(uri)) continue;
+    reachable.add(uri);
+
+    const imports = index.imports.get(uri);
+    if (!imports) continue;
+
+    for (const imp of imports) {
+      if (!imp.pathText) continue;
+      const resolved = resolveImportUri(uri, imp.pathText);
+      if (resolved && index.indexedFiles.has(resolved)) {
+        if (!reachable.has(resolved)) queue.push(resolved);
+      } else {
+        unresolved.push(imp.pathText);
+      }
+    }
+  }
+
+  return { reachable, unresolved };
+}
+
+/**
  * Return the set of file URIs transitively reachable from `entryUri` via
  * import declarations indexed in `index`. Always includes `entryUri` itself.
  *
@@ -119,27 +157,22 @@ export function getImportReachableUris(
   entryUri: string,
   index: WorkspaceIndex,
 ): Set<string> {
-  const visited = new Set<string>();
-  const queue = [entryUri];
+  return walkImportGraph(entryUri, index).reachable;
+}
 
-  while (queue.length > 0) {
-    const uri = queue.pop()!;
-    if (visited.has(uri)) continue;
-    visited.add(uri);
-
-    const imports = index.imports.get(uri);
-    if (!imports) continue;
-
-    for (const imp of imports) {
-      if (!imp.pathText) continue;
-      const resolved = resolveImportUri(uri, imp.pathText);
-      if (resolved && index.indexedFiles.has(resolved) && !visited.has(resolved)) {
-        queue.push(resolved);
-      }
-    }
-  }
-
-  return visited;
+/**
+ * Return the import path texts (as authored, e.g. "./other.stm") in the import
+ * graph of `entryUri` that do not resolve to an indexed file. Used by the
+ * browser playground to tell the user why a buffer renders without some of its
+ * imports (the imported document is not in the library), and usable by any
+ * consumer that needs missing-import diagnostics. Order follows the graph walk;
+ * duplicates are preserved (one entry per failing import declaration).
+ */
+export function getUnresolvedImportPaths(
+  entryUri: string,
+  index: WorkspaceIndex,
+): string[] {
+  return walkImportGraph(entryUri, index).unresolved;
 }
 
 /**
