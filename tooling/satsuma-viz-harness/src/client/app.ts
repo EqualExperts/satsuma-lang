@@ -28,7 +28,9 @@
  */
 
 import { ensureParserReady, buildModel } from "./model-pipeline";
-import type { SourceDocument } from "./model-pipeline";
+import type { SourceDocument, VizModel } from "./model-pipeline";
+import { highlightSatsuma } from "./highlight";
+import { SatsumaEditor } from "./editor";
 
 // ---------- Types ----------
 
@@ -82,11 +84,21 @@ interface HarnessEvent {
 /** The two renderer themes the harness and component support. */
 type HarnessTheme = "light" | "dark";
 
+/**
+ * Whether the visualization on screen reflects the current editor buffer.
+ *   "ok"    — the viz was built from the current buffer.
+ *   "stale" — the current buffer failed to produce a model, so a previously
+ *             good visualization is being retained (the canvas is never blanked).
+ */
+type ParseStatus = "ok" | "stale";
+
 export interface SatsumaHarness {
   fixture: string | null;
   viewMode: "lineage" | "single";
   /** Active theme applied to both the chrome (body[data-theme]) and the viz component. */
   theme: HarnessTheme;
+  /** Relationship between the displayed viz and the live buffer; see ParseStatus. */
+  parseStatus: ParseStatus;
   events: HarnessEvent[];
   ready: boolean;
   clearEvents(): void;
@@ -104,6 +116,7 @@ const harness: SatsumaHarness = {
   fixture: null,
   viewMode: "lineage",
   theme: "dark",
+  parseStatus: "ok",
   events: [],
   ready: false,
   clearEvents() { this.events = []; },
@@ -142,119 +155,24 @@ const fixtureListEl     = getRequired("fixture-list");
 const fixturePickerBtn  = getRequired("fixture-picker-btn");
 const fixturePickerName = getRequired("fixture-picker-name");
 const fixtureDropdown   = getRequired("fixture-picker-dropdown");
-const sourceCodeEl      = getRequired("source-code");
+const sourceEditorHost  = getRequired("source-editor");
+const parseStatusEl     = getRequired("parse-status");
+const parseStatusDismiss = getRequired("parse-status-dismiss");
 const vizContainer      = getRequired("viz-container");
 const readyBadge        = getRequired("harness-ready-badge");
 const viewModeToggle    = getRequired("view-mode-toggle");
 const themeToggle       = getRequired("theme-toggle");
 
-// ---------- Syntax highlighting ----------
-
-/**
- * Translate Satsuma source text to HTML with <span class="tok-*"> wrappers.
- *
- * The tokeniser is derived from the TextMate grammar in
- * tooling/vscode-satsuma/syntaxes/satsuma.tmLanguage.json.
- * Earlier alternatives in the master regex win (priority ordering mirrors
- * the grammar's include order).  No external library is required.
- */
-function highlightSatsuma(source: string): string {
-  // HTML-escape a plain-text segment.
-  const esc = (s: string) =>
-    s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-
-  const wrap = (cls: string, s: string) => `<span class="${cls}">${esc(s)}</span>`;
-
-  /**
-   * Wrap the contents of a double-quoted string, further highlighting
-   * any @ref cross-references embedded within it.
-   */
-  function highlightStringContents(text: string): string {
-    // @ref pattern from variable.other.reference.satsuma in the grammar.
-    const refRe =
-      /@(?:`[^`]+`|[a-zA-Z_][a-zA-Z0-9_-]*)(?:::[a-zA-Z_][a-zA-Z0-9_-]*)?(?:\.(?:`[^`]+`|[a-zA-Z_][a-zA-Z0-9_-]*))*(?!\w)/g;
-
-    let html = `<span class="tok-string">`;
-    let last = 0;
-    for (const m of text.matchAll(refRe)) {
-      html += esc(text.slice(last, m.index));
-      html += `</span><span class="tok-ref">${esc(m[0])}</span><span class="tok-string">`;
-      last = (m.index ?? 0) + m[0].length;
-    }
-    html += esc(text.slice(last)) + `</span>`;
-    return html;
-  }
-
-  // ── Master token regex ──────────────────────────────────────────────────
-  // Alternatives are listed in priority order (first match wins).
-  // Named capture groups map directly to the rendering logic below.
-  const TOKEN = new RegExp(
-    [
-      // Triple-quoted strings (multiline) must come before single-quoted.
-      String.raw`(?<triple>"""[\s\S]*?(?:"""|$))`,
-      // Double-quoted strings (single line, may contain @ref).
-      String.raw`(?<string>"(?:[^"\\]|\\.)*"?)`,
-      // Warning comments: //! take priority over plain //
-      String.raw`(?<comment_warn>//!.*)`,
-      // Question comments: //?
-      String.raw`(?<comment_q>//\?.*)`,
-      // Regular line comments.
-      String.raw`(?<comment>//.*)`,
-      // Mapping arrow operator.
-      String.raw`(?<arrow>->)`,
-      // Spread: ...
-      String.raw`(?<spread>\.\.\.)`,
-      // Pipe operator.
-      String.raw`(?<pipe>\|)`,
-      // Backtick-quoted identifiers: `field name`.
-      String.raw`(?<backtick>` + "`[^`]*`)",
-      // Block-level and structural keywords.
-      String.raw`(?<kw>\b(?:namespace|schema|fragment|mapping|metric|transform|note|map|source|target|each|flatten|record|list_of|import|from|default)\b)`,
-      // Data type names used in field declarations.
-      String.raw`(?<type>\b(?:STRING|VARCHAR|INT|INTEGER|BIGINT|DECIMAL|CHAR|BOOLEAN|DATE|TIMESTAMPTZ|TIMESTAMP_NTZ|UUID|JSON|TEXT|NUMBER|INT32|FLOAT|DOUBLE|CURRENCY|PICKLIST|ID|PERCENT|DATETIME)\b)`,
-      // Built-in pipeline function names.
-      String.raw`(?<pipeline>\b(?:trim|lowercase|uppercase|coalesce|round|split|first|last|to_utc|to_iso8601|parse|null_if_empty|null_if_invalid|validate_email|now_utc|title_case|escape_html|truncate|to_number|prepend|max_length|assume_utc|join|dedup)\b)`,
-      // Boolean and null literals.
-      String.raw`(?<boolean>\b(?:true|false|null)\b)`,
-      // Numeric literals (integer and decimal).
-      String.raw`(?<number>-?\b\d+(?:\.\d+)?\b)`,
-    ].join("|"),
-    "g",
-  );
-
-  let html = "";
-  let last = 0;
-
-  for (const m of source.matchAll(TOKEN)) {
-    // Emit any plain text that precedes this token.
-    if ((m.index ?? 0) > last) html += esc(source.slice(last, m.index));
-
-    const g = m.groups ?? {};
-    const text = m[0];
-
-    if (g.triple)        html += wrap("tok-string-triple", text);
-    else if (g.string)   html += highlightStringContents(text);
-    else if (g.comment_warn) html += wrap("tok-comment-warn", text);
-    else if (g.comment_q)    html += wrap("tok-comment-q",    text);
-    else if (g.comment)      html += wrap("tok-comment",       text);
-    else if (g.arrow)    html += wrap("tok-arrow",    text);
-    else if (g.spread)   html += wrap("tok-spread",   text);
-    else if (g.pipe)     html += wrap("tok-pipe",     text);
-    else if (g.backtick) html += wrap("tok-backtick", text);
-    else if (g.kw)       html += wrap("tok-kw",       text);
-    else if (g.type)     html += wrap("tok-type",     text);
-    else if (g.pipeline) html += wrap("tok-pipeline", text);
-    else if (g.boolean)  html += wrap("tok-boolean",  text);
-    else if (g.number)   html += wrap("tok-number",   text);
-    else                 html += esc(text);
-
-    last = (m.index ?? 0) + text.length;
-  }
-
-  // Emit any remaining plain text after the last token.
-  html += esc(source.slice(last));
-  return html;
-}
+// ---------- Editor ----------
+//
+// The overlay editor owns the left pane. Its buffer is the single source of
+// truth for both highlighting (done inside the widget via highlightSatsuma) and
+// the model pipeline: every user edit updates the current document in
+// documentSources and triggers a debounced re-render (see handleEdit).
+const editor = new SatsumaEditor(sourceEditorHost, {
+  highlight: highlightSatsuma,
+  onInput: handleEdit,
+});
 
 // ---------- Viz element management ----------
 
@@ -467,15 +385,47 @@ function ensureVizElement(): HTMLElement {
   return el;
 }
 
+// ---------- Live editing ----------
+//
+// The editor buffer is the single source of truth. A user edit (a) replaces the
+// current document's source in documentSources so cross-file lineage sees the
+// edit, and (b) schedules a debounced model rebuild. Highlighting is repainted
+// synchronously inside the editor widget on every keystroke; only the heavier
+// model build is deferred, so the colours never lag the caret.
+
+// Idle gap (ms) after the last keystroke before the model is rebuilt. Long
+// enough to coalesce a burst of typing, short enough to feel live. The PRD calls
+// for ~150–300 ms; 200 ms sits in the middle.
+const RERENDER_DEBOUNCE_MS = 200;
+
+/** Pending debounced rebuild, if any. */
+let rerenderTimer: ReturnType<typeof setTimeout> | undefined;
+
+/**
+ * Handle a user edit to the source buffer. Updates the in-memory document for the
+ * active fixture and debounces a model rebuild. No-op when no document is loaded.
+ */
+function handleEdit(value: string): void {
+  if (!harness.fixture) return;
+  documentSources.set(harness.fixture, value);
+
+  if (rerenderTimer !== undefined) clearTimeout(rerenderTimer);
+  rerenderTimer = setTimeout(() => {
+    rerenderTimer = undefined;
+    if (harness.fixture) renderModel(harness.fixture);
+  }, RERENDER_DEBOUNCE_MS);
+}
+
 // ---------- Fixture loading ----------
 
 /**
- * Render the source and a client-built VizModel for the given document URI.
+ * Load the document at `uri` into the editor and render its VizModel.
  *
  * The source comes from the in-memory document set and the model is built
- * in-browser via buildModel — no /api/model call. The current viewMode decides
- * single-file vs full cross-file lineage; lineage resolves against every
- * document in the set.
+ * in-browser via buildModel — no /api/model call. Loading a document is not a
+ * user edit, so it replaces the buffer via the editor's programmatic setValue
+ * (which does not fire handleEdit) and renders immediately rather than on the
+ * debounce. The current viewMode decides single-file vs full cross-file lineage.
  */
 function loadFixture(uri: string): void {
   harness.fixture = uri;
@@ -484,32 +434,73 @@ function loadFixture(uri: string): void {
 
   const source = documentSources.get(uri);
   if (source === undefined) {
-    sourceCodeEl.textContent = "Failed to load fixture.";
-    sourceCodeEl.className = "empty";
+    editor.setValue("// Failed to load fixture.");
     updateReadyBadge("empty");
     return;
   }
 
-  // Safe: highlightSatsuma HTML-escapes all user content via esc() before
-  // constructing the markup — no raw source text reaches the DOM.
-  sourceCodeEl.innerHTML = highlightSatsuma(source); // nosemgrep: javascript.browser.security.insecure-document-method.insecure-document-method
-  sourceCodeEl.className = "";
-
+  editor.setValue(source);
   renderModel(uri);
+}
+
+/**
+ * The last VizModel that rendered successfully. Retained so a mid-edit buffer
+ * that parses to nothing can keep the previous good visualization on screen
+ * instead of blanking the canvas (feature 33 §2 "resilient rendering").
+ */
+let lastGoodModel: VizModel | null = null;
+
+/** True when a model carries no renderable content (note blocks or namespaces). */
+function isEmptyModel(model: VizModel): boolean {
+  return model.namespaces.length === 0 && model.fileNotes.length === 0;
 }
 
 /**
  * Build the VizModel for `entryUri` from the current document set and hand it to
  * the viz component. Synchronous — the WASM parser must already be initialised
- * (ensureParserReady is awaited once at startup). Model-building errors are kept
- * non-fatal so a mid-edit buffer never blanks the canvas.
+ * (ensureParserReady is awaited once at startup).
+ *
+ * Resilient by design: if the buffer parses to an empty model (mid-edit or
+ * invalid syntax) and a previous good model exists, the previous viz is kept and
+ * a parse-status indicator is shown rather than clearing the canvas.
  */
 function renderModel(entryUri: string): void {
   const lineage = harness.viewMode === "lineage";
   const model = buildModel(entryUri, currentDocuments(), { lineage });
+
+  // An empty model from an edit means the buffer is mid-edit or invalid. Keep
+  // the last good viz if we have one; only an empty *initial* load (nothing
+  // better to show) falls through to render the empty model.
+  if (isEmptyModel(model) && lastGoodModel) {
+    setParseStatus("stale");
+    return;
+  }
+
+  setParseStatus("ok");
+  lastGoodModel = model;
   const viz = ensureVizElement();
   (viz as unknown as { model: unknown }).model = model;
 }
+
+// ---------- Parse-status indicator ----------
+
+/**
+ * Reflect the relationship between the displayed viz and the live buffer in both
+ * the harness state and the on-screen indicator. "stale" reveals the indicator
+ * (the viz is from a previous good buffer); "ok" hides it. The indicator is also
+ * dismissable by the user (see the dismiss handler), but a later stale edit
+ * re-reveals it.
+ */
+function setParseStatus(status: ParseStatus): void {
+  harness.parseStatus = status;
+  parseStatusEl.classList.toggle("hidden", status === "ok");
+}
+
+// Let the user dismiss the indicator without clearing the underlying state: the
+// viz is still stale, we just stop nagging until the next stale edit re-shows it.
+parseStatusDismiss.addEventListener("click", () => {
+  parseStatusEl.classList.add("hidden");
+});
 
 // ---------- Fixture picker (dropdown) ----------
 

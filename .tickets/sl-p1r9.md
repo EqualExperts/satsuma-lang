@@ -1,6 +1,6 @@
 ---
 id: sl-p1r9
-status: open
+status: closed
 deps: [sl-dn29]
 links: []
 created: 2026-06-09T21:14:51Z
@@ -21,3 +21,12 @@ Highlight layer and editable layer share white-space:pre and one horizontal scro
 
 left pane is editable and highlighted via highlightSatsuma with highlight aligned to caret while typing; wide lines scroll horizontally with highlight+caret aligned at non-zero offsets (geometry assertion); edits re-render the viz on a debounce; an invalid intermediate buffer retains the last good viz and shows a parse-status indicator rather than blanking the canvas.
 
+
+## Notes
+
+**2026-06-09T22:31:42Z**
+
+2026-06-09T00:00:00Z
+
+Cause: The left source pane was a read-only <pre>; the playground needs an editable buffer that drives highlighting and the model pipeline.
+Fix: Added a zero-dependency overlay editor (src/client/editor.ts: transparent textarea over a highlightSatsuma-rendered <pre>, scroll-locked) and extracted the tokenizer to src/client/highlight.ts. app.ts now mounts the editor, treats the buffer as the single source of truth, updates documentSources per edit, and rebuilds the model on a 200ms debounce. Empty/invalid buffers retain the last good VizModel and reveal a dismissable #parse-status indicator (harness.parseStatus) instead of blanking the canvas. Covered by test/editor.test.ts (editable+highlight tracking, horizontal-scroll geometry alignment at non-zero offset, debounced re-render, resilience). 65/65 Playwright tests pass.
