@@ -5,6 +5,7 @@ import type { SchemaCard, FieldEntry } from "../model.js";
 import { SzNavigateEvent, SzFieldHoverEvent, SzFieldLineageEvent } from "../satsuma-viz.js";
 import { renderMarkdown } from "../markdown.js";
 import { isCoveredFieldPath } from "@satsuma/core/coverage-paths";
+import { HEADER_HEIGHT, NAMESPACE_PILL_HEIGHT } from "../layout/geometry.js";
 
 /**
  * Detail of the `sz-compact-toggled` CustomEvent a compact card dispatches
@@ -78,11 +79,24 @@ export class SzSchemaCard extends LitElement {
       display: flex;
       align-items: center;
       gap: 8px;
-      padding: 10px 12px;
+      /* Pinned to the shared HEADER_HEIGHT geometry constant: the ELK layout
+         sizes nodes and computes edge anchors from it, so the rendered header
+         must occupy exactly that box (sl-wixe). Flex centres the content. */
+      height: ${HEADER_HEIGHT}px;
+      box-sizing: border-box;
+      padding: 0 12px;
       background: var(--sz-orange);
       color: var(--sz-text-on-accent);
       cursor: pointer;
       user-select: none;
+    }
+
+    /* Without a namespace pill row the header is the top of the card and
+       owns the top rounding. The host normally clips (overflow: hidden), but
+       compact-expanded cards set overflow: visible, so the rounding must be
+       on the header itself. */
+    .header:first-child {
+      border-radius: var(--sz-card-radius) var(--sz-card-radius) 0 0;
     }
 
     .header.report {
@@ -503,28 +517,26 @@ export class SzSchemaCard extends LitElement {
   }
 
   private _renderNamespacePill() {
-    if (this.namespaceLabel) {
-      // The namespace pill is the only visual marker that distinguishes a
-      // namespaced schema card from a vanilla one. Expose a stable test id
-      // (sl-3c2w) so Playwright can assert qualified namespace rendering
-      // without text matching against a positioned <span>.
-      return html`<div
-          style="padding: 8px 12px 0; background: var(--sz-orange);"
-          data-testid=${`${this.testIdPrefix}-namespace-pill`}
-        >
-          <span
-            data-testid=${`${this.testIdPrefix}-namespace-label`}
-            style="display:inline-block;font-size:10px;font-weight:700;padding:1px 8px;border-radius:999px;background:var(--sz-namespace-pill-chip-bg);color:var(--sz-orange-dark);"
-          >${this.namespaceLabel}</span>
-        </div>`;
-    }
-    if (this.compact) {
-      const bg = this.schema && this._isReport(this.schema)
-        ? "var(--sz-report)"
-        : "var(--sz-orange)";
-      return html`<div style="height:24px;background:${bg};border-radius:var(--sz-card-radius) var(--sz-card-radius) 0 0;"></div>`;
-    }
-    return html``;
+    // Cards without a namespace render NO row here — the header is the top of
+    // the card. (A 24px filler bar used to fill this slot on compact cards;
+    // the layout never counted it, so cards overflowed their ELK nodes and
+    // edge anchors missed the header — sl-wixe.)
+    if (!this.namespaceLabel) return html``;
+
+    // The namespace pill is the only visual marker that distinguishes a
+    // namespaced schema card from a vanilla one. Expose a stable test id
+    // (sl-3c2w) so Playwright can assert qualified namespace rendering
+    // without text matching against a positioned <span>. The row is pinned
+    // to the shared NAMESPACE_PILL_HEIGHT the layout reserves for it.
+    return html`<div
+        style="height:${NAMESPACE_PILL_HEIGHT}px;box-sizing:border-box;display:flex;align-items:end;padding:0 12px;background:var(--sz-orange);"
+        data-testid=${`${this.testIdPrefix}-namespace-pill`}
+      >
+        <span
+          data-testid=${`${this.testIdPrefix}-namespace-label`}
+          style="display:inline-block;font-size:10px;font-weight:700;padding:1px 8px;border-radius:999px;background:var(--sz-namespace-pill-chip-bg);color:var(--sz-orange-dark);"
+        >${this.namespaceLabel}</span>
+      </div>`;
   }
 
   private _headerIcon(isReport: boolean) {

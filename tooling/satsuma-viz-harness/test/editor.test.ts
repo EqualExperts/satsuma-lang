@@ -31,7 +31,7 @@ const sfdcUri = libraryUri("sfdc-to-snowflake/pipeline.stm");
  */
 async function openWithFixture(page: Page): Promise<void> {
   await page.goto("/");
-  await page.locator(".toggle-btn[data-mode='single']").click();
+  await page.evaluate(() => window.__satsumaHarness.setViewMode?.("single"));
   await page.locator("#fixture-picker-btn").click();
   await page.locator(`.fixture-item[data-uri="${sfdcUri}"]`).click();
   await expect(page.locator("[data-testid='viz-root']")).toHaveAttribute(

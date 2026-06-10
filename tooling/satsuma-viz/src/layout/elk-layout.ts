@@ -19,6 +19,10 @@ import type {
   FlattenBlock,
 } from "../model.js";
 import { buildMappedFieldsIndex } from "../field-coverage.js";
+import { metricFieldEntries } from "../metric-adapter.js";
+import { HEADER_HEIGHT, NAMESPACE_PILL_HEIGHT } from "./geometry.js";
+
+export { HEADER_HEIGHT, NAMESPACE_PILL_HEIGHT } from "./geometry.js";
 
 export interface LayoutNode {
   id: string;
@@ -83,8 +87,10 @@ export interface OverviewLayoutResult {
   height: number;
 }
 
-// Card dimension constants (px) — must match CSS in sz-schema-card.ts
-const HEADER_HEIGHT = 40;
+// Card dimension constants (px) — must match CSS in sz-schema-card.ts.
+// Header and namespace-pill heights are a hard contract with the card
+// components (edge anchors are computed from them), so they are imported
+// from the shared geometry module (see top of file) instead of re-declared.
 const LABEL_HEIGHT = 24;  // .label padding (4+6) + font ~14px
 const METADATA_PILLS_HEIGHT = 28; // .metadata-pills padding (4+6) + pill line ~17px + border 1px
 const FIELD_HEIGHT = 28;
@@ -114,7 +120,6 @@ const FULL_NOTE_LINE_HEIGHT = 18;
 const FULL_SPREAD_HEIGHT = 24;
 const FULL_META_ROW_HEIGHT = 20;
 const FULL_META_BASE_HEIGHT = 12;
-const NAMESPACE_PILL_HEIGHT = 24;
 
 /** Height of the area above the fields list (header + optional label + optional metadata pills). */
 function preambleHeight(
@@ -490,18 +495,9 @@ function addMetricNodes(
     const metaHeight = metaRows > 0 ? FULL_META_BASE_HEIGHT + metaRows * FULL_META_ROW_HEIGHT : 0;
     const topOffset =
       (hasNamespace ? NAMESPACE_PILL_HEIGHT : 0) + HEADER_HEIGHT + metaHeight + FIELDS_PADDING_TOP;
-    // MetricFieldEntry is a leaner type than FieldEntry (no constraints/comments/children).
-    // Adapt it so buildFieldPorts can generate ports for metric fields.
-    const fieldEntries: FieldEntry[] = m.fields.map((f) => ({
-      name: f.name,
-      type: f.type,
-      constraints: [],
-      notes: f.notes,
-      comments: [],
-      children: [],
-      location: f.location,
-    }));
-    const ports = buildFieldPorts(fieldEntries, m.qualifiedId, mappedFields, topOffset, width);
+    // MetricFieldEntry is a leaner type than FieldEntry; the shared adapter
+    // widens it so buildFieldPorts can generate ports for metric fields.
+    const ports = buildFieldPorts(metricFieldEntries(m), m.qualifiedId, mappedFields, topOffset, width);
 
     target.push({
       id: m.qualifiedId,
@@ -823,11 +819,14 @@ export async function computeOverviewLayout(
       const mappingNodeId = overviewMappingNodeId(ns.name, m.id);
       nodeIds.add(mappingNodeId);
       overviewNodeKinds.set(mappingNodeId, "mapping");
-      overviewNodeHasNamespace.add(mappingNodeId);
+      // Like every other node kind, a mapping pill only reserves namespace-chip
+      // space when it actually belongs to a named namespace; the renderer pins
+      // the card to this exact node height (sl-wixe).
+      if (ns.name) overviewNodeHasNamespace.add(mappingNodeId);
       nsNodes.push({
         id: mappingNodeId,
         width: estimateOverviewLabelWidth(m.id, ns.name),
-        height: NAMESPACE_PILL_HEIGHT + HEADER_HEIGHT + FIELDS_PADDING_BOTTOM,
+        height: (ns.name ? NAMESPACE_PILL_HEIGHT : 0) + HEADER_HEIGHT + FIELDS_PADDING_BOTTOM,
         layoutOptions: {
           "elk.layered.layerConstraint": "NONE",
         },

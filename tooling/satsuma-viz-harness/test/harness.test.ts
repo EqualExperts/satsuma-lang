@@ -115,7 +115,7 @@ test.describe("Overview view — sfdc-to-snowflake fixture", () => {
   test.beforeEach(async ({ page }) => {
     await page.goto("/");
     // Lineage mode is active by default; load the single-file fixture first
-    await page.locator(".toggle-btn[data-mode='single']").click();
+    await page.evaluate(() => window.__satsumaHarness.setViewMode?.("single"));
     await loadFixture(page, sfdcUri);
   });
 
@@ -139,7 +139,7 @@ test.describe("Overview view — sfdc-to-snowflake fixture", () => {
 test.describe("Detail view — clicking a mapping", () => {
   test.beforeEach(async ({ page }) => {
     await page.goto("/");
-    await page.locator(".toggle-btn[data-mode='single']").click();
+    await page.evaluate(() => window.__satsumaHarness.setViewMode?.("single"));
     await loadFixture(page, sfdcUri);
   });
 
@@ -160,7 +160,7 @@ test.describe("Detail view — clicking a mapping", () => {
 test.describe("Hover and highlight interaction", () => {
   test.beforeEach(async ({ page }) => {
     await page.goto("/");
-    await page.locator(".toggle-btn[data-mode='single']").click();
+    await page.evaluate(() => window.__satsumaHarness.setViewMode?.("single"));
     await loadFixture(page, sfdcUri);
   });
 
@@ -196,7 +196,7 @@ test.describe("Cross-file lineage expansion", () => {
     // contains schemas declared across both files — more than metrics.stm alone provides.
     await page.goto("/");
     // Lineage mode is the default; confirm the toggle is active.
-    await expect(page.locator(".toggle-btn[data-mode='lineage']")).toHaveClass(/active/);
+    expect(await page.evaluate(() => window.__satsumaHarness.viewMode)).toBe("lineage");
     await loadFixture(page, metricsUri);
 
     // With both files merged, the count must exceed what a single-file model would show.
@@ -219,7 +219,7 @@ test.describe("Cross-file lineage expansion", () => {
     // Event directly on <satsuma-viz>.  Replace with a real interaction once
     // an expand-lineage control exists in the UI.
     await page.goto("/");
-    await page.locator(".toggle-btn[data-mode='single']").click();
+    await page.evaluate(() => window.__satsumaHarness.setViewMode?.("single"));
     await loadFixture(page, metricsUri);
 
     await page.evaluate(() => window.__satsumaHarness.clearEvents());
@@ -242,7 +242,7 @@ test.describe("Cross-file lineage expansion", () => {
 test.describe("Navigation intent", () => {
   test.beforeEach(async ({ page }) => {
     await page.goto("/");
-    await page.locator(".toggle-btn[data-mode='single']").click();
+    await page.evaluate(() => window.__satsumaHarness.setViewMode?.("single"));
     await loadFixture(page, sfdcUri);
   });
 
@@ -339,7 +339,7 @@ test.describe("Navigation intent", () => {
 // Fixture matrix overview coverage (sl-3c2w)
 //
 // One describe block per fixture family.  Each block clicks the appropriate
-// view-mode toggle, loads the fixture, then asserts overview content that is
+// view-mode automation hook, loads the fixture, then asserts overview content that is
 // specific to that fixture's category — vanilla schemas + mappings, namespaced
 // cards with namespace pills, metric cards merged across imports, report card
 // metadata, and large-fixture layout stability beyond data-ready-state=ready.
@@ -353,7 +353,7 @@ test.describe("Overview view — sfdc-to-snowflake single-file mode", () => {
     // as a connector mapping node. This is the baseline we compare the
     // namespaced fixture against.
     await page.goto("/");
-    await page.locator(".toggle-btn[data-mode='single']").click();
+    await page.evaluate(() => window.__satsumaHarness.setViewMode?.("single"));
     await loadFixture(page, sfdcUri);
 
     const schemaCards = page.locator("[data-testid^='overview-schema-card-']");
@@ -382,7 +382,7 @@ test.describe("Overview view — namespaces/ns-platform lineage mode", () => {
     // (proving the namespace card-height path is hit).
     await page.goto("/");
     // Default mode is lineage; explicitly assert it for clarity.
-    await expect(page.locator(".toggle-btn[data-mode='lineage']")).toHaveClass(/active/);
+    expect(await page.evaluate(() => window.__satsumaHarness.viewMode)).toBe("lineage");
     await loadFixture(page, nsPlatformUri);
 
     // Every namespace declared in the fixture should produce at least one
@@ -424,7 +424,7 @@ test.describe("Overview view — metrics-platform lineage mode", () => {
     // the lineage merge produced cards from BOTH files, not just the entry
     // point.
     await page.goto("/");
-    await expect(page.locator(".toggle-btn[data-mode='lineage']")).toHaveClass(/active/);
+    expect(await page.evaluate(() => window.__satsumaHarness.viewMode)).toBe("lineage");
     await loadFixture(page, metricsUri);
 
     // Metric schemas render via <sz-metric-card>, not <sz-schema-card>, so we
@@ -457,7 +457,7 @@ test.describe("Overview view — reports-and-models", () => {
     // each as a stable schema card so downstream tools can navigate to
     // report/model targets the same way they navigate to ordinary schemas.
     await page.goto("/");
-    await page.locator(".toggle-btn[data-mode='single']").click();
+    await page.evaluate(() => window.__satsumaHarness.setViewMode?.("single"));
     await loadFixture(page, reportsUri);
 
     // sanitizeTestIdSegment lowercases and turns each underscore into `-`.
@@ -484,7 +484,7 @@ test.describe("Overview view — sap-po-to-mfcs layout stability", () => {
     // number of schema cards became visible — guarding against an "empty
     // ready" regression where layout completes but emits no cards.
     await page.goto("/");
-    await page.locator(".toggle-btn[data-mode='single']").click();
+    await page.evaluate(() => window.__satsumaHarness.setViewMode?.("single"));
     await loadFixture(page, sapUri);
 
     const vizRoot = page.locator("[data-testid='viz-root']");
@@ -526,7 +526,7 @@ test.describe("Mapping detail — sfdc opportunity ingestion", () => {
     // mapping every reader sees first when learning Satsuma, so the detail
     // view must render its core elements correctly.
     await page.goto("/");
-    await page.locator(".toggle-btn[data-mode='single']").click();
+    await page.evaluate(() => window.__satsumaHarness.setViewMode?.("single"));
     await loadFixture(page, sfdcUri);
     const detail = await openMappingByName(page, "opportunity-ingestion");
 
@@ -620,7 +620,7 @@ test.describe("Mapping detail — completed orders (multi-source join)", () => {
     // need to be visible in the detail view for the example to read
     // correctly.
     await page.goto("/");
-    await page.locator(".toggle-btn[data-mode='single']").click();
+    await page.evaluate(() => window.__satsumaHarness.setViewMode?.("single"));
     await loadFixture(page, ffgUri);
     const detail = await openMappingByName(page, "completed-orders");
 
@@ -670,7 +670,7 @@ test.describe("Mapping detail — order line facts (flatten)", () => {
     // AND the per-element arrows nested under it — without the section
     // marker, readers cannot tell flatten arrows from top-level arrows.
     await page.goto("/");
-    await page.locator(".toggle-btn[data-mode='single']").click();
+    await page.evaluate(() => window.__satsumaHarness.setViewMode?.("single"));
     await loadFixture(page, ffgUri);
     const detail = await openMappingByName(page, "order-line-facts");
 
@@ -714,7 +714,7 @@ test.describe("Field coverage indicators", () => {
     // therefore distinguishes the two cases — this is the contract that
     // makes coverage circles meaningful in the UI.
     await page.goto("/");
-    await page.locator(".toggle-btn[data-mode='single']").click();
+    await page.evaluate(() => window.__satsumaHarness.setViewMode?.("single"));
     await loadFixture(page, sfdcUri);
     const detail = await openMappingByName(page, "opportunity-ingestion");
 
@@ -741,7 +741,7 @@ test.describe("Field coverage indicators", () => {
     // the test id and reports mapped coverage even though `sku` would
     // collide with any other top-level sku in the same schema.
     await page.goto("/");
-    await page.locator(".toggle-btn[data-mode='single']").click();
+    await page.evaluate(() => window.__satsumaHarness.setViewMode?.("single"));
     await loadFixture(page, ffgUri);
     const detail = await openMappingByName(page, "order-line-facts");
 
@@ -766,7 +766,7 @@ test.describe("Hover highlighting between arrows and field rows", () => {
     // class to BOTH the source field row and the target field row so the
     // reader sees which fields participate in this arrow.
     await page.goto("/");
-    await page.locator(".toggle-btn[data-mode='single']").click();
+    await page.evaluate(() => window.__satsumaHarness.setViewMode?.("single"));
     await loadFixture(page, sfdcUri);
     const detail = await openMappingByName(page, "opportunity-ingestion");
 
@@ -791,7 +791,7 @@ test.describe("Hover highlighting between arrows and field rows", () => {
     // shared highlight state.  Verifies that the highlight pipeline is
     // bidirectional and not arrow-row-only.
     await page.goto("/");
-    await page.locator(".toggle-btn[data-mode='single']").click();
+    await page.evaluate(() => window.__satsumaHarness.setViewMode?.("single"));
     await loadFixture(page, sfdcUri);
     const detail = await openMappingByName(page, "opportunity-ingestion");
 
@@ -1013,7 +1013,7 @@ test.describe("Geometry sanity — overview layout invariants", () => {
     // a small, well-known card set.  Failing this points at a layout
     // regression in the non-namespaced card-height path.
     await page.goto("/");
-    await page.locator(".toggle-btn[data-mode='single']").click();
+    await page.evaluate(() => window.__satsumaHarness.setViewMode?.("single"));
     await loadFixture(page, sfdcUri);
     const boxes = await readOverviewCardBoxes(page);
     assertBoxesAreSane(boxes);
@@ -1085,7 +1085,7 @@ test.describe("Geometry sanity — overview layout invariants", () => {
     // place mapping nodes in fixture-specific layouts and would need
     // per-mapping geometry expectations rather than a global rule.
     await page.goto("/");
-    await page.locator(".toggle-btn[data-mode='single']").click();
+    await page.evaluate(() => window.__satsumaHarness.setViewMode?.("single"));
     await loadFixture(page, sfdcUri);
 
     const sourceBox = await page
@@ -1126,7 +1126,7 @@ test.describe("Geometry sanity — overview layout invariants", () => {
     // rendering and the dot's own radius. A 24px regression of the
     // original kind would push every dot well outside the tolerance.
     await page.goto("/");
-    await page.locator(".toggle-btn[data-mode='single']").click();
+    await page.evaluate(() => window.__satsumaHarness.setViewMode?.("single"));
     await loadFixture(page, sfdcUri);
 
     // Tolerance budget = anchor-dot radius (3.5px) + edge stroke width
@@ -1188,7 +1188,7 @@ test.describe("Geometry sanity — overview layout invariants", () => {
     // sap fixture catch geometry regressions that only surface with more
     // schemas or denser arrows than the small canonical fixtures expose.
     await page.goto("/");
-    await page.locator(".toggle-btn[data-mode='single']").click();
+    await page.evaluate(() => window.__satsumaHarness.setViewMode?.("single"));
     await loadFixture(page, sapUri);
     const boxes = await readOverviewCardBoxes(page);
     assertBoxesAreSane(boxes);
@@ -1210,7 +1210,7 @@ test.describe("Compact card expansion in overview", () => {
 
   test.beforeEach(async ({ page }) => {
     await page.goto("/");
-    await page.locator(".toggle-btn[data-mode='single']").click();
+    await page.evaluate(() => window.__satsumaHarness.setViewMode?.("single"));
     await loadFixture(page, buyToOmUri);
   });
 
@@ -1471,7 +1471,7 @@ test.describe("Theme switching — representative audit tokens", () => {
     const overviewEdge = "sz-overview-edge-layer path.overview-path";
 
     await page.goto("/?theme=light");
-    await page.locator(".toggle-btn[data-mode='single']").click();
+    await page.evaluate(() => window.__satsumaHarness.setViewMode?.("single"));
     await loadFixture(page, reportsUri);
     const reportHeaderLight = await computedStyle(page, reportHeader, "background-color");
     const edgeStrokeLight = await computedStyle(page, overviewEdge, "stroke");
@@ -1483,7 +1483,7 @@ test.describe("Theme switching — representative audit tokens", () => {
     expect(edgeStrokeLight).toMatch(/^rgb\(/);
 
     await page.goto("/?theme=dark");
-    await page.locator(".toggle-btn[data-mode='single']").click();
+    await page.evaluate(() => window.__satsumaHarness.setViewMode?.("single"));
     await loadFixture(page, reportsUri);
     const reportHeaderDark = await computedStyle(page, reportHeader, "background-color");
     const edgeStrokeDark = await computedStyle(page, overviewEdge, "stroke");
