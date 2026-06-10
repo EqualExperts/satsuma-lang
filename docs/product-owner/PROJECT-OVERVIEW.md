@@ -258,6 +258,12 @@ How we'll know Satsuma is working:
 - Unified field syntax (`Name record { }`, `Name list_of record { }`, `Name list_of TYPE`)
 - Data-modelling conventions and examples for Kimball and Data Vault patterns
 - Self-contained [Excel-to-Satsuma prompt](../../useful-prompts/excel-to-stm-prompt.md) for web LLMs
+- **Browser playground ("Try it Live!")** — a zero-install live editor at
+  [equalexperts.github.io/satsuma-lang/playground/](https://equalexperts.github.io/satsuma-lang/playground/):
+  edit Satsuma source (or open a local `.stm` file) and watch the lineage
+  visualization update as you type. Everything — parsing, model building,
+  rendering, persistence — runs client-side in the browser; **source is never
+  uploaded**, which makes the playground safe for proprietary mapping specs.
 
 ### What is strategically important next
 

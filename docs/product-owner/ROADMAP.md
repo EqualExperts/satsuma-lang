@@ -68,6 +68,17 @@ schema crm_database (from dbml "schemas/crm.dbml", table "customers") {
 
 ---
 
+## Browser Playground / Live Editor (Shipped — Feature 33)
+
+The "Try it Live!" playground is live on the website at `/playground/`: a
+server-free, in-browser live editor where visitors edit Satsuma source (or
+open a local `.stm` file) and watch the visualization re-render as they type.
+Parsing, model building, and persistence are entirely client-side — source is
+never uploaded. See [`features/33-live-editor/PRD.md`](../../features/33-live-editor/PRD.md),
+ADR-027, and ADR-028.
+
+---
+
 ## Convention Docs (Completed — Feature 21)
 
 All convention documentation has been written. See [`features/21-convention-docs/PRD.md`](../../features/21-convention-docs/PRD.md) for the full plan.

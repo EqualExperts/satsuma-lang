@@ -14,6 +14,20 @@ them (InfoSec restrictions, locked-down environments, shared machines) or you ar
 working through a web LLM interface like ChatGPT, Gemini, or Claude.ai rather
 than a coding agent, Satsuma still delivers significant value.
 
+## Try it Live in the browser (zero install)
+
+The fastest zero-install path is the
+[**"Try it Live!" playground**](https://equalexperts.github.io/satsuma-lang/playground/):
+a live editor in your browser with syntax highlighting and an interactive
+lineage visualization that re-renders as you type. You can explore the bundled
+example corpus, open a local `.stm` file, and save your buffer back to disk.
+
+Everything runs client-side — parsing, rendering, and persistence happen in
+your browser and **your source is never uploaded** — so it is safe to use with
+proprietary mapping specs even in restricted environments. The rest of this
+guide covers working with Satsuma through an LLM when you want help *writing*
+specs, not just visualizing them.
+
 ## Why Satsuma works without tooling
 
 Satsuma was designed to be readable by humans and parseable by machines — in that

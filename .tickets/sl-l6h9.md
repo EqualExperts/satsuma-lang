@@ -1,6 +1,6 @@
 ---
 id: sl-l6h9
-status: open
+status: in_progress
 deps: [sl-ncu9]
 links: []
 created: 2026-06-09T21:15:33Z

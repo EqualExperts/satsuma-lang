@@ -24,6 +24,9 @@ Read the [language specification](docs/developer/SATSUMA-V2-SPEC.md). For a comp
 **How do I see working examples?**
 Browse [examples/](examples/) — each scenario is a workspace subdirectory with one or more parser-validated `.stm` files.
 
+**How do I try Satsuma without installing anything?**
+Open the ["Try it Live!" playground](https://equalexperts.github.io/satsuma-lang/playground/) — a live editor in your browser with an interactive lineage visualization that updates as you type. Everything runs client-side; your source is never uploaded.
+
 **How do I use Satsuma without the CLI?**
 See [Using Satsuma Without CLI](docs/using-satsuma-without-cli.md) — Satsuma files are readable documentation even without tooling.
 
