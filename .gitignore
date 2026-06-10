@@ -33,6 +33,7 @@ site/playground/
 .claude/*.local.json
 .claude/settings.local.json
 
+**/*.pyc
 **/*.vsix
 **/*.wasm
 **/*.log
