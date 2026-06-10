@@ -80,7 +80,7 @@
       },
       {
         "command": "satsuma.showViz",
-        "title": "Satsuma: Show Mapping Visualization",
+        "title": "Satsuma: Overview Visualization",
         "icon": "$(eye)"
       }
     ],
@@ -121,6 +121,13 @@
           "command": "satsuma.showViz",
           "when": "editorLangId == satsuma",
           "group": "navigation"
+        }
+      ],
+      "explorer/context": [
+        {
+          "command": "satsuma.showViz",
+          "when": "resourceExtname == .stm",
+          "group": "satsuma"
         }
       ]
     },

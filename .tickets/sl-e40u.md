@@ -1,6 +1,6 @@
 ---
 id: sl-e40u
-status: open
+status: closed
 deps: []
 links: []
 created: 2026-06-10T22:04:54Z
@@ -21,3 +21,10 @@ Fix direction: retitle the command (or add a distinct entry) to 'Satsuma: Overvi
 
 Right-clicking in a .stm editor shows a context-menu entry clearly named for the Overview Visualisation which opens the same view as the eye icon. Command palette and eye tooltip use the same accurate title.
 
+
+## Notes
+
+**2026-06-10T22:46:23Z**
+
+Cause: the editor context menu HAS contributed satsuma.showViz since a369815 (2026-03-26), but it was titled 'Satsuma: Show Mapping Visualization' while the command opens the OVERVIEW visualization — users looking for an 'Overview Visualisation' entry (the eye icon's behavior) could not recognize it.
+Fix: retitled the command to 'Satsuma: Overview Visualization' (palette, editor context menu, and eye-icon tooltip all share it), added an explorer/context entry for .stm files, and updated the extension README command table.
