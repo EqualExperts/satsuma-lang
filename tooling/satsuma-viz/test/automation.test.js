@@ -63,6 +63,7 @@ describe("viz automation helpers", () => {
       name: "email",
       type: "STRING",
       constraints: [],
+      metadata: [],
       notes: [],
       comments: [],
       children: [],
@@ -75,6 +76,29 @@ describe("viz automation helpers", () => {
     assert.match(serialized, /mapped/);
     // The parent struct must not collide with a top-level "email" segment.
     assert.ok(!/src-customers-field-email[^-]/.test(serialized));
+  });
+
+  it("renders a field whose model predates the metadata property (sl-6x1o)", async () => {
+    // FieldEntry.metadata was added for sl-6x1o. Models serialized by older
+    // LSP servers or cached webview payloads omit it, and the renderer must
+    // still produce the field row rather than crash in _fieldMetaPills.
+    const mod = await import("../dist/satsuma-viz.js");
+    const card = new mod.SzSchemaCard();
+    card.testIdPrefix = "src-legacy";
+    card.mappedFields = new Set();
+    const legacyField = {
+      name: "amount",
+      type: "DECIMAL",
+      constraints: [],
+      // no metadata property — pre-sl-6x1o payload shape
+      notes: [],
+      comments: [],
+      children: [],
+      location: { uri: "file:///t.stm", line: 1, character: 0 },
+    };
+    const tpl = card._renderField(legacyField, 0);
+    const serialized = [...tpl.strings, ...tpl.values.map(String)].join(" ");
+    assert.match(serialized, /src-legacy-field-amount/);
   });
 
   it("gives mapping-detail source and target schema cards distinct testIdPrefix values", async () => {
@@ -138,6 +162,7 @@ describe("viz automation helpers", () => {
         name: "customer_id",
         type: "UUID",
         constraints: [],
+        metadata: [],
         notes: [],
         comments: [],
         children: [],
