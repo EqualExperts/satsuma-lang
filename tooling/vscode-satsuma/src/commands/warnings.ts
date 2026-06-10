@@ -1,5 +1,6 @@
 import * as vscode from "vscode";
 import { runCli } from "./cli-runner";
+import { resolveEntryFile } from "./entry-file";
 
 export function registerWarningsCommand(
   context: vscode.ExtensionContext,
@@ -10,7 +11,11 @@ export function registerWarningsCommand(
 
   context.subscriptions.push(
     vscode.commands.registerCommand("satsuma.showWarnings", async () => {
-      const result = await runCli(cliPath, ["warnings", "--json"]);
+      // See sl-1ycv: the CLI needs a .stm entry file, not the cwd default.
+      const entryFilePath = await resolveEntryFile();
+      if (!entryFilePath) return;
+
+      const result = await runCli(cliPath, ["warnings", entryFilePath, "--json"]);
       diagnostics.clear();
 
       try {

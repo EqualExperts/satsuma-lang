@@ -2,6 +2,7 @@ import * as vscode from "vscode";
 import { join } from "path";
 import type { LanguageClient } from "vscode-languageclient/node";
 import { FieldLineagePanel } from "../field-lineage/panel";
+import { resolveEntryFile } from "../../commands/entry-file";
 import {
   loadExpandedModels,
   loadFullLineageModel,
@@ -171,14 +172,17 @@ export class VizPanel {
     } else if (message.type === "expandLineage" && message.schemaId) {
       this.expandLineage(message.schemaId);
     } else if (message.type === "fieldLineage" && message.fieldPath) {
-      const workspacePath =
-        vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? ".";
-      FieldLineagePanel.createOrShow(
-        this.extensionUri,
-        this.cliPath,
-        workspacePath,
-        message.fieldPath,
-      );
+      // The CLI rejects directories (ADR-022) — resolve a .stm entry file
+      // before opening the field-lineage panel (sl-1ycv).
+      void resolveEntryFile().then((entryFilePath) => {
+        if (!entryFilePath || !message.fieldPath) return;
+        FieldLineagePanel.createOrShow(
+          this.extensionUri,
+          this.cliPath,
+          entryFilePath,
+          message.fieldPath,
+        );
+      });
     } else if (message.type === "export" && message.content) {
       this.exportSvg(message.content as string);
     }
