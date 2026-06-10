@@ -1,5 +1,117 @@
 # Changelog
 
+## v0.9.0 — 2026-06-10
+
+A visualization-and-playground release: the mapping visualization gains a
+first-class light mode that follows the VS Code colour theme live, the
+published site gains a server-free "Try it Live!" browser playground with a
+test-enforced zero-network privacy guarantee, and a UX polish pass tightens
+both. Also fixes the CLI startup crash on Windows reported in the project's
+first external bug report. No language or grammar changes.
+
+### Visualization light mode & VS Code theme integration (Feature 32)
+
+- **Light and dark are now first-class, equally-supported themes** for the
+  mapping visualization. Both palettes are defined exactly once in
+  `tooling/satsuma-viz/src/tokens.css`; every previously hardcoded colour
+  was tokenized.
+- **`<satsuma-viz>` gains a reflected `theme: "light" | "dark"` property**
+  (default `"light"`); `:host([theme="dark"])` is the single switching
+  mechanism. Edge layers now inherit the host palette instead of pinning
+  their own injected copy of the stylesheet (which had kept arrows
+  permanently light).
+- **VS Code panels follow the editor colour theme live.** All four
+  `ColorThemeKind` values map to a viz theme, the webview envelope carries
+  `theme` instead of the lossy `isDark` boolean, and an open panel restyles
+  itself on theme change without a reload.
+- **Viz harness light mode**: chrome and syntax-highlight colours moved to
+  CSS variables, a Light/Dark header toggle, and `?theme=` →
+  `prefers-color-scheme` → dark resolution. Fixed a latent server bug where
+  the `GET /` redirect dropped the query string, making `?theme=` /
+  `?fixture=` / `?mode=` silent no-ops.
+- **Playwright theme coverage**: computed-colour assertions in both themes
+  plus a both-theme screenshot gallery.
+- **ADR-026** records the theme contract: the component owns rendering,
+  consumers select the theme.
+
+### "Try it Live!" browser playground (Feature 33)
+
+- **The published site now ships a live editor playground at
+  `/playground/`** ("Try it Live!" in the nav, with a home-page CTA): edit
+  Satsuma source — or open a local `.stm` file — and watch the lineage
+  visualization re-render as you type.
+- **The entire pipeline runs in the browser.** The import resolver in
+  `@satsuma/viz-backend` became isomorphic (WHATWG URLs instead of Node
+  path/fs), the client builds models with the same
+  `buildModelResultFromSources` as every other surface, and the harness's
+  `/api/model` endpoint was retired after a client/server parity test.
+- **Zero-network privacy guarantee, enforced by tests.** A dedicated
+  Playwright project serves the static bundle under the GitHub Pages base
+  path and fails if editing, opening, or saving a file issues a single
+  network request. Source never leaves the browser.
+- **localStorage document library** seeded from the bundled example corpus
+  (edits never overwritten by re-seeding); cross-file `import` lineage
+  resolves entirely in-browser.
+- **Editable, highlighted source pane**: a zero-dependency overlay editor
+  (transparent textarea over a coloured highlight layer) with debounced
+  re-render; translucent selection keeps token colours visible.
+- **Collapsible source pane with real viz reflow** — `<satsuma-viz>` gains
+  a host ResizeObserver, so the visualization genuinely reclaims the width;
+  the expanded pane takes half the window.
+- **Client-only Open and Save** for local `.stm` files via
+  `<input type=file>` + Blob download — no upload, no server.
+- **ADR-027** (browser-side viz pipeline) and **ADR-028** (client-only
+  document library) record the architecture.
+
+### Live editor UX polish (Feature 34)
+
+- **Detail view survives live edits**: the selection re-binds by
+  namespace + id across model rebuilds, expansion state is pruned rather
+  than reset, and the view falls back to overview only when the mapping is
+  actually gone.
+- **Edge anchors sit flush on cards**: edge layers share the card layer's
+  origin by construction, and header/pill geometry lives in a shared
+  `layout/geometry.ts` so layout estimates and card CSS cannot drift apart
+  (ADR-029).
+- **Metrics render as detail-view endpoints**, with grain/slice/filter
+  surfaced as pills, via a `metric-adapter` shared with the layout's port
+  builder.
+- **Export SVG downloads a real, self-contained artifact** — theme tokens
+  are inlined at export time, which also fixes SVGs saved from the VS Code
+  panel.
+- **Branded, accessible chrome**: satsuma logo + wordmark in the header,
+  keyboard-operable "Hide source" / "Show source" collapse handle,
+  vertically stacked truncating meta pills, and self-hosted Lexend chrome
+  typography (OFL licence committed) with zero cross-origin font requests
+  (ADR-030).
+
+### Windows support fixes
+
+- **CLI startup crash on Windows fixed** (gh-265 — the project's first
+  external bug report). Command modules were dynamically imported by raw
+  absolute path, which Node's ESM loader rejects on Windows (`C:` read as a
+  URL scheme); a documented `command-loader` now wraps specifiers with
+  `pathToFileURL`. This also restores every CLI-backed feature of the
+  VS Code extension on Windows.
+- **LSP validate diagnostics now build canonical `file://` URIs** with
+  `pathToFileURL` instead of hand-gluing `"file://" + path`, which produced
+  malformed URIs on Windows so validate diagnostics never attached.
+- **Follow-up tracked** to add a Windows job to the CI matrix (`sl-vmqv`).
+
+### Fixes
+
+- **Missing canonical fixture restored** (`sl-dknl`):
+  `examples/contracts/buy-to-om-order.stm` was referenced by Playwright
+  tests but never committed, which made the entire 40-test firefox harness
+  suite throw and silently not run on `main`.
+- **Compact-card expansion re-runs the overview layout** so neighbours
+  re-flow and edges re-route instead of being painted over.
+
+### Dependencies
+
+- typescript-eslint 8.60.1 → 8.61.0; transitive `brace-expansion`
+  5.0.5 → 5.0.6 (GHSA-jxxr-4gwj-5jf2).
+
 ## v0.8.0 — 2026-06-04
 
 Mostly an additive release: five new agent skills, a viz UX improvement for

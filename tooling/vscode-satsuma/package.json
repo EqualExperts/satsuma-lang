@@ -3,7 +3,7 @@
   "displayName": "Satsuma Language Support",
   "description": "VS Code language support for the Satsuma data mapping language",
   "license": "MIT",
-  "version": "0.8.0",
+  "version": "0.9.0",
   "publisher": "satsuma",
   "icon": "icon.png",
   "repository": {
@@ -13,7 +13,9 @@
   "engines": {
     "vscode": "^1.91.0"
   },
-  "categories": ["Programming Languages"],
+  "categories": [
+    "Programming Languages"
+  ],
   "main": "./dist/client/extension.js",
   "activationEvents": [
     "onLanguage:satsuma"
@@ -22,8 +24,14 @@
     "languages": [
       {
         "id": "satsuma",
-        "aliases": ["Satsuma", "satsuma"],
-        "extensions": [".stm", ".satsuma"],
+        "aliases": [
+          "Satsuma",
+          "satsuma"
+        ],
+        "extensions": [
+          ".stm",
+          ".satsuma"
+        ],
         "icon": {
           "light": "./icons/satsuma-file.svg",
           "dark": "./icons/satsuma-file.svg"
@@ -46,12 +54,30 @@
       }
     ],
     "commands": [
-      { "command": "satsuma.validateWorkspace", "title": "Satsuma: Validate Workspace" },
-      { "command": "satsuma.showLineage", "title": "Satsuma: Show Lineage From..." },
-      { "command": "satsuma.showWarnings", "title": "Satsuma: Show Warnings" },
-      { "command": "satsuma.showSummary", "title": "Satsuma: Show Workspace Summary" },
-      { "command": "satsuma.traceFieldLineage", "title": "Satsuma: Show Field Lineage" },
-      { "command": "satsuma.showCoverage", "title": "Satsuma: Show Mapping Coverage" },
+      {
+        "command": "satsuma.validateWorkspace",
+        "title": "Satsuma: Validate Workspace"
+      },
+      {
+        "command": "satsuma.showLineage",
+        "title": "Satsuma: Show Lineage From..."
+      },
+      {
+        "command": "satsuma.showWarnings",
+        "title": "Satsuma: Show Warnings"
+      },
+      {
+        "command": "satsuma.showSummary",
+        "title": "Satsuma: Show Workspace Summary"
+      },
+      {
+        "command": "satsuma.traceFieldLineage",
+        "title": "Satsuma: Show Field Lineage"
+      },
+      {
+        "command": "satsuma.showCoverage",
+        "title": "Satsuma: Show Mapping Coverage"
+      },
       {
         "command": "satsuma.showViz",
         "title": "Satsuma: Show Mapping Visualization",
@@ -60,14 +86,35 @@
     ],
     "menus": {
       "commandPalette": [
-        { "command": "satsuma.traceFieldLineage", "when": "editorLangId == satsuma" },
-        { "command": "satsuma.showCoverage", "when": "editorLangId == satsuma" },
-        { "command": "satsuma.showViz", "when": "editorLangId == satsuma" }
+        {
+          "command": "satsuma.traceFieldLineage",
+          "when": "editorLangId == satsuma"
+        },
+        {
+          "command": "satsuma.showCoverage",
+          "when": "editorLangId == satsuma"
+        },
+        {
+          "command": "satsuma.showViz",
+          "when": "editorLangId == satsuma"
+        }
       ],
       "editor/context": [
-        { "command": "satsuma.showViz", "when": "editorLangId == satsuma", "group": "satsuma" },
-        { "command": "satsuma.traceFieldLineage", "when": "editorLangId == satsuma", "group": "satsuma" },
-        { "command": "satsuma.showCoverage", "when": "editorLangId == satsuma", "group": "satsuma" }
+        {
+          "command": "satsuma.showViz",
+          "when": "editorLangId == satsuma",
+          "group": "satsuma"
+        },
+        {
+          "command": "satsuma.traceFieldLineage",
+          "when": "editorLangId == satsuma",
+          "group": "satsuma"
+        },
+        {
+          "command": "satsuma.showCoverage",
+          "when": "editorLangId == satsuma",
+          "group": "satsuma"
+        }
       ],
       "editor/title": [
         {
