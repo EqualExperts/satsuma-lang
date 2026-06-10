@@ -728,7 +728,9 @@ export class SzSchemaCard extends LitElement {
    * alone would hide.
    */
   private _fieldMetaPills(f: FieldEntry) {
-    return f.metadata.filter(
+    // Tolerate models serialized before FieldEntry carried metadata (older
+    // LSP servers, cached webview payloads) — render no pills, don't crash.
+    return (f.metadata ?? []).filter(
       (m) => !(m.value === "" && f.constraints.includes(m.key)),
     );
   }

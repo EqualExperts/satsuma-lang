@@ -32,3 +32,7 @@ mapping export_to_csv (airflow, note "...") shows 'airflow' and the note in the 
 
 Cause: MappingBlock had no metadata field (extractMapping never read the mapping's metadata_block) and FieldEntry carried only the CONSTRAINT_TAGS-whitelisted constraint keys, dropping all other meta and all kv values — so mapping-level meta (airflow, note, merge strategies) and field governance meta (sensitivity, classification, mask, access_group) were invisible in the viz.
 Fix: added metadata: MetadataEntry[] to MappingBlock and FieldEntry in viz-model; viz-backend now extracts the mapping metadata_block and converts field MetaEntry[] via metaEntriesToViz; the detail header renders mapping meta as labelled rows and field rows render non-constraint meta as key+value pills next to the badges. viz-backend unit tests cover both extractions; Playwright harness covers rendering (mapping-field-meta.test.ts).
+
+**2026-06-10T22:53:10Z**
+
+Follow-up: CI's satsuma-viz suite (automation.test.js, not run locally at first) crashed in _fieldMetaPills on FieldEntry fixtures without the new metadata property. Made the renderer tolerate pre-sl-6x1o payloads ((f.metadata ?? [])), updated the fixtures, and added a legacy-payload regression test.
