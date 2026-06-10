@@ -23,7 +23,13 @@ export { SzEdgeLayer } from "./edges/sz-edge-layer.js";
 export { SzOverviewEdgeLayer, SzOpenMappingEvent } from "./edges/sz-overview-edge-layer.js";
 export { SzMappingDetail } from "./components/sz-mapping-detail.js";
 export { computeLayout, computeOverviewLayout } from "./layout/elk-layout.js";
-export { HEADER_HEIGHT, NAMESPACE_PILL_HEIGHT } from "./layout/geometry.js";
+export {
+  HEADER_HEIGHT,
+  META_PILL_ROW_GAP,
+  META_PILL_ROW_HEIGHT,
+  METADATA_PILLS_CHROME,
+  NAMESPACE_PILL_HEIGHT,
+} from "./layout/geometry.js";
 export { buildMappingCoveredFields, buildMappedFieldsIndex, resolveSchemaLocalFieldPath, schemaHasFieldPath } from "./field-coverage.js";
 export { metricAsSchemaCard, metricFieldEntries } from "./metric-adapter.js";
 export type { LayoutResult, LayoutNode, LayoutEdge, SourceBlockLayout, OverviewLayoutResult, OverviewEdge } from "./layout/elk-layout.js";

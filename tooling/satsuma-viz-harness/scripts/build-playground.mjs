@@ -40,6 +40,7 @@ const BUNDLE_FILES = [
   join(DIST, "client", "satsuma-viz.js"),
   join(DIST, "client", "examples.json"),
   join(DIST, "client", "satsuma-logo.png"),
+  join(DIST, "client", "lexend-latin.woff2"),
   join(DIST, "tree-sitter-satsuma.wasm"),
   join(DIST, "tree-sitter.wasm"),
 ];

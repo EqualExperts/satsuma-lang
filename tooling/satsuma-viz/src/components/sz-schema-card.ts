@@ -5,7 +5,7 @@ import type { SchemaCard, FieldEntry } from "../model.js";
 import { SzNavigateEvent, SzFieldHoverEvent, SzFieldLineageEvent } from "../satsuma-viz.js";
 import { renderMarkdown } from "../markdown.js";
 import { isCoveredFieldPath } from "@satsuma/core/coverage-paths";
-import { HEADER_HEIGHT, NAMESPACE_PILL_HEIGHT } from "../layout/geometry.js";
+import { HEADER_HEIGHT, META_PILL_ROW_GAP, META_PILL_ROW_HEIGHT, NAMESPACE_PILL_HEIGHT } from "../layout/geometry.js";
 
 /**
  * Detail of the `sz-compact-toggled` CustomEvent a compact card dispatches
@@ -258,9 +258,17 @@ export class SzSchemaCard extends LitElement {
     }
 
 .metadata-pills {
+      /* Pills stack one per row and are EXCLUDED from the card's intrinsic
+         width (contain: inline-size) — a long metadata value such as a
+         namespace URI must never widen the card beyond what its field rows
+         need (sl-dw9x). Overlong values end-truncate; the full text lives in
+         each pill's title tooltip. Row heights are pinned to the shared
+         geometry constants the layout estimates with. */
+      contain: inline-size;
       display: flex;
-      flex-wrap: wrap;
-      gap: 4px;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: ${META_PILL_ROW_GAP}px;
       padding: 4px 12px 6px;
       border-bottom: 1px solid var(--sz-card-border);
     }
@@ -269,12 +277,17 @@ export class SzSchemaCard extends LitElement {
       font-family: var(--sz-font-sans);
       font-size: 10px;
       font-weight: 500;
+      height: ${META_PILL_ROW_HEIGHT}px;
+      box-sizing: border-box;
       padding: 1px 6px;
       border-radius: var(--sz-badge-radius);
       background: var(--sz-namespace-bg);
       color: var(--sz-text-muted);
       line-height: 1.4;
       white-space: nowrap;
+      max-width: 100%;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
 
     .meta-pill .meta-key {
@@ -581,7 +594,7 @@ export class SzSchemaCard extends LitElement {
         ${metaPills.length > 0
           ? html`<div class="metadata-pills">
               ${metaPills.map(
-                (m) => html`<span class="meta-pill"><span class="meta-key">${m.key}</span> ${m.value}</span>`
+                (m) => html`<span class="meta-pill" title=${`${m.key} ${m.value}`}><span class="meta-key">${m.key}</span> ${m.value}</span>`
               )}
             </div>`
           : ""}
@@ -733,7 +746,7 @@ export class SzSchemaCard extends LitElement {
         ${metaPills.length > 0
           ? html`<div class="metadata-pills">
               ${metaPills.map(
-                (m) => html`<span class="meta-pill"><span class="meta-key">${m.key}</span> ${m.value}</span>`
+                (m) => html`<span class="meta-pill" title=${`${m.key} ${m.value}`}><span class="meta-key">${m.key}</span> ${m.value}</span>`
               )}
             </div>`
           : ""}

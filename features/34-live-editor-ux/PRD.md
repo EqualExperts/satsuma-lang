@@ -1,10 +1,15 @@
 # Feature 34 — Live Editor UX Polish (Feature 33 follow-up)
 
-> **Status: DRAFT** (2026-06-10) — captured from a user review of the shipped
+> **Status: IMPLEMENTED** (2026-06-10) — all eight requirements delivered
+> under epic `sl-ubbp` (PR #270); full Playwright suite 95/95 via the
+> watcher protocol. Captured from a user review of the shipped
 > "Try it Live!" playground (Feature 33, PR #269). Source material: four
 > annotated screenshots in this folder (`chrome-markup.jpg`,
 > `edge-attachment-markup.jpg`, `metric-target-missing.jpg`,
 > `meta-pill-wasted-space.jpg`) reviewed against the merged code.
+> R8 note: the viz component's `--sz-font-sans` deliberately keeps its
+> Inter/system stack (chrome-only Lexend) — see the `sl-ga3c` close-out
+> notes for the rationale.
 
 ## Goal
 

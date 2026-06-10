@@ -103,6 +103,17 @@ test.describe("Live editor — editing and highlighting", () => {
 
     const SCROLL_BY = 120; // px; comfortably inside the wide line's overflow
 
+    // Wait until the textarea is actually scrollable past the target offset —
+    // setting scrollLeft before layout has grown the scrollable overflow
+    // silently clamps it (observed flake: 120 requested, 10 applied).
+    await expect
+      .poll(() =>
+        page.locator("#source-input").evaluate(
+          (el) => el.scrollWidth - el.clientWidth,
+        ),
+      )
+      .toBeGreaterThan(SCROLL_BY);
+
     const token = page.locator("#source-highlight .tok-comment").first();
     const before = await token.boundingBox();
     if (!before) throw new Error("comment token not rendered");

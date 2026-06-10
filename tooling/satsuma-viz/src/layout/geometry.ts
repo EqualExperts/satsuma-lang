@@ -23,3 +23,19 @@ export const HEADER_HEIGHT = 40;
  * — the header is the top of the card.
  */
 export const NAMESPACE_PILL_HEIGHT = 24;
+
+/**
+ * Metadata pills stack one per row (sl-dw9x) and are excluded from the card's
+ * intrinsic width, so only their HEIGHT participates in layout: each pill row
+ * is pinned to this height in the card CSS.
+ */
+export const META_PILL_ROW_HEIGHT = 16;
+
+/** Vertical gap between stacked metadata pill rows. */
+export const META_PILL_ROW_GAP = 4;
+
+/**
+ * Fixed chrome around the metadata pill stack: 4px top + 6px bottom padding
+ * + 1px bottom border (see .metadata-pills in sz-schema-card.ts).
+ */
+export const METADATA_PILLS_CHROME = 11;
