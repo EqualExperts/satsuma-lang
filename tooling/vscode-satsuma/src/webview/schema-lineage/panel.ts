@@ -2,7 +2,7 @@
  * panel.ts — Extension-host side of the Schema Lineage webview panel.
  *
  * Replaces the output-channel rendering in src/commands/lineage.ts.
- * Calls `satsuma lineage --from <schema> [workspace] --json`, then sends the
+ * Calls `satsuma lineage --from <schema> <entry-file.stm> --json`, then sends the
  * resulting DAG to the webview for ELK-based pill rendering.
  */
 
@@ -35,7 +35,7 @@ export class SchemaLineagePanel {
   private readonly panel: vscode.WebviewPanel;
   private readonly extensionUri: vscode.Uri;
   private readonly cliPath: string;
-  private readonly workspacePath: string;
+  private readonly entryFilePath: string;
   private disposables: vscode.Disposable[] = [];
 
   // ── Public factory ──────────────────────────────────────────────────────
@@ -43,7 +43,7 @@ export class SchemaLineagePanel {
   static createOrShow(
     extensionUri: vscode.Uri,
     cliPath: string,
-    workspacePath: string,
+    entryFilePath: string,
     schema: string,
     direction: "from" | "to",
   ): void {
@@ -70,7 +70,7 @@ export class SchemaLineagePanel {
       panel,
       extensionUri,
       cliPath,
-      workspacePath,
+      entryFilePath,
       schema,
       direction,
     );
@@ -82,14 +82,14 @@ export class SchemaLineagePanel {
     panel: vscode.WebviewPanel,
     extensionUri: vscode.Uri,
     cliPath: string,
-    workspacePath: string,
+    entryFilePath: string,
     schema: string,
     direction: "from" | "to",
   ) {
     this.panel = panel;
     this.extensionUri = extensionUri;
     this.cliPath = cliPath;
-    this.workspacePath = workspacePath;
+    this.entryFilePath = entryFilePath;
 
     this.panel.webview.html = this.getHtml();
 
@@ -113,7 +113,7 @@ export class SchemaLineagePanel {
       "lineage",
       `--${direction}`,
       schema,
-      this.workspacePath,
+      this.entryFilePath,
       "--json",
     ]);
 

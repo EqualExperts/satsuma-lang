@@ -1,5 +1,6 @@
 import * as vscode from "vscode";
 import { runCli } from "./cli-runner";
+import { resolveEntryFile } from "./entry-file";
 
 export function registerValidateCommand(
   context: vscode.ExtensionContext,
@@ -10,7 +11,12 @@ export function registerValidateCommand(
 
   context.subscriptions.push(
     vscode.commands.registerCommand("satsuma.validateWorkspace", async () => {
-      const result = await runCli(cliPath, ["validate", "--json"]);
+      // The CLI rejects directories and defaults a missing path argument to
+      // "." (ADR-022) — name a .stm entry file explicitly (sl-1ycv).
+      const entryFilePath = await resolveEntryFile();
+      if (!entryFilePath) return;
+
+      const result = await runCli(cliPath, ["validate", entryFilePath, "--json"]);
       diagnostics.clear();
 
       let entries: Array<{

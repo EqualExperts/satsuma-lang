@@ -1,5 +1,6 @@
 import * as vscode from "vscode";
 import { runCli } from "./cli-runner";
+import { resolveEntryFile } from "./entry-file";
 
 export function registerSummaryCommand(
   context: vscode.ExtensionContext,
@@ -8,7 +9,11 @@ export function registerSummaryCommand(
 ): void {
   context.subscriptions.push(
     vscode.commands.registerCommand("satsuma.showSummary", async () => {
-      const result = await runCli(cliPath, ["summary", "--json"]);
+      // See sl-1ycv: the CLI needs a .stm entry file, not the cwd default.
+      const entryFilePath = await resolveEntryFile();
+      if (!entryFilePath) return;
+
+      const result = await runCli(cliPath, ["summary", entryFilePath, "--json"]);
 
       if (result.exitCode !== 0) {
         vscode.window.showWarningMessage(

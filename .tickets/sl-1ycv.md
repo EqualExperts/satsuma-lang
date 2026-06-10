@@ -1,6 +1,6 @@
 ---
 id: sl-1ycv
-status: open
+status: closed
 deps: []
 links: []
 created: 2026-06-10T21:51:46Z
@@ -28,3 +28,10 @@ Fix direction: the extension needs an entry-file resolution strategy instead of 
 
 All extension CLI invocations (schema-lineage, field-lineage, validate, warnings, summary) pass a .stm file path, never a directory or implicit cwd. Lineage panel renders for a multi-file workspace. Tests cover the entry-file resolution logic.
 
+
+## Notes
+
+**2026-06-10T22:29:52Z**
+
+Cause: ADR-022 (62479fd) made the CLI reject directory arguments, but the extension still passed the workspace folder (schema-lineage and field-lineage panels, viz panel's fieldLineage message) or no path at all (validate/warnings/summary, which the CLI defaults to '.') — every CLI-backed feature failed with 'directory arguments are not supported'.
+Fix: added resolveEntryFile() (commands/entry-file.ts + pure rules in entry-file-logic.ts): active .stm editor wins, else the single workspace .stm file, else a quick pick (shallowest-first, last choice floated to top); all six runCli call sites now pass a .stm entry file and abort rather than fall back to a directory. Unit tests cover the selection rules (test/entry-file-logic.test.js).

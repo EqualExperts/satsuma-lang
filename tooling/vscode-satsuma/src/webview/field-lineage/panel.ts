@@ -1,7 +1,7 @@
 /**
  * panel.ts — Extension-host side of the Field Lineage webview panel.
  *
- * Drives the panel by calling `satsuma field-lineage <field> <workspace> --json`
+ * Drives the panel by calling `satsuma field-lineage <field> <entry-file.stm> --json`
  * (a single CLI call, not the old hop-by-hop arrows loop) and maintains
  * breadcrumb navigation state as the user re-centres on different fields.
  */
@@ -16,7 +16,7 @@ export class FieldLineagePanel {
   private readonly panel: vscode.WebviewPanel;
   private readonly extensionUri: vscode.Uri;
   private readonly cliPath: string;
-  private readonly workspacePath: string;
+  private readonly entryFilePath: string;
   private breadcrumb: string[] = [];
   private depth = 3;
   private disposables: vscode.Disposable[] = [];
@@ -26,7 +26,7 @@ export class FieldLineagePanel {
   static createOrShow(
     extensionUri: vscode.Uri,
     cliPath: string,
-    workspacePath: string,
+    entryFilePath: string,
     fieldPath: string,
   ): void {
     if (FieldLineagePanel.currentPanel) {
@@ -54,7 +54,7 @@ export class FieldLineagePanel {
       panel,
       extensionUri,
       cliPath,
-      workspacePath,
+      entryFilePath,
       fieldPath,
     );
   }
@@ -65,13 +65,13 @@ export class FieldLineagePanel {
     panel: vscode.WebviewPanel,
     extensionUri: vscode.Uri,
     cliPath: string,
-    workspacePath: string,
+    entryFilePath: string,
     fieldPath: string,
   ) {
     this.panel = panel;
     this.extensionUri = extensionUri;
     this.cliPath = cliPath;
-    this.workspacePath = workspacePath;
+    this.entryFilePath = entryFilePath;
 
     this.panel.webview.html = this.getHtml();
 
@@ -133,7 +133,7 @@ export class FieldLineagePanel {
     const result = await runCli(this.cliPath, [
       "field-lineage",
       bare,
-      this.workspacePath,
+      this.entryFilePath,
       "--json",
       "--depth",
       String(this.depth),

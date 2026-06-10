@@ -1,6 +1,7 @@
 import * as vscode from "vscode";
 import { LanguageClient } from "vscode-languageclient/node";
 import { getEditorActionContext } from "./action-context";
+import { resolveEntryFile } from "./entry-file";
 import { SchemaLineagePanel } from "../webview/schema-lineage/panel";
 
 interface ShowLineageArgs {
@@ -47,13 +48,14 @@ export function registerLineageCommand(
       }
       if (!selected) return;
 
-      const workspacePath =
-        vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? ".";
+      // The CLI rejects directories (ADR-022) — resolve a .stm entry file.
+      const entryFilePath = await resolveEntryFile();
+      if (!entryFilePath) return;
 
       SchemaLineagePanel.createOrShow(
         context.extensionUri,
         cliPath,
-        workspacePath,
+        entryFilePath,
         selected,
         direction,
       );
