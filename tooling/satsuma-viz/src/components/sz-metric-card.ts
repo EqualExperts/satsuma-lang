@@ -2,6 +2,7 @@ import { LitElement, html, css } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import type { MetricCard, MetricFieldEntry } from "../model.js";
 import { SzNavigateEvent } from "../satsuma-viz.js";
+import { HEADER_HEIGHT, NAMESPACE_PILL_HEIGHT } from "../layout/geometry.js";
 
 const MEASURE_ICONS: Record<string, string> = {
   additive: "\u03A3",        // Σ
@@ -30,11 +31,23 @@ export class SzMetricCard extends LitElement {
       display: flex;
       align-items: center;
       gap: 8px;
-      padding: 10px 12px;
+      /* Pinned to the shared HEADER_HEIGHT geometry constant: the ELK layout
+         sizes nodes and computes edge anchors from it, so the rendered header
+         must occupy exactly that box (sl-wixe). Flex centres the content. */
+      height: ${HEADER_HEIGHT}px;
+      box-sizing: border-box;
+      padding: 0 12px;
       background: var(--sz-violet);
       color: var(--sz-text-on-accent);
       cursor: pointer;
       user-select: none;
+    }
+
+    /* Without a namespace pill row the header is the top of the card and
+       owns the top rounding (the host clips when overflow is hidden, but
+       this keeps the geometry honest regardless of clipping). */
+    .header:first-child {
+      border-radius: var(--sz-card-radius) var(--sz-card-radius) 0 0;
     }
 
     .header-icon {
@@ -181,13 +194,15 @@ export class SzMetricCard extends LitElement {
   private _notesExpanded = false;
 
   private _renderNamespacePill() {
-    if (this.namespaceLabel) {
-      return html`<div style="padding: 8px 12px 0; background: var(--sz-violet);">
-          <span style="display:inline-block;font-size:10px;font-weight:700;padding:1px 8px;border-radius:999px;background:var(--sz-namespace-pill-chip-bg);color:var(--sz-orange-dark);">${this.namespaceLabel}</span>
-        </div>`;
-    }
-    if (this.compact) return html`<div style="height:24px;background:var(--sz-violet);border-radius:var(--sz-card-radius) var(--sz-card-radius) 0 0;"></div>`;
-    return html``;
+    // Cards without a namespace render NO row here — the header is the top of
+    // the card. (A 24px filler bar used to fill this slot on compact cards;
+    // the layout never counted it, so cards overflowed their ELK nodes and
+    // edge anchors missed the header — sl-wixe.) The row is pinned to the
+    // shared NAMESPACE_PILL_HEIGHT the layout reserves for it.
+    if (!this.namespaceLabel) return html``;
+    return html`<div style="height:${NAMESPACE_PILL_HEIGHT}px;box-sizing:border-box;display:flex;align-items:end;padding:0 12px;background:var(--sz-violet);">
+        <span style="display:inline-block;font-size:10px;font-weight:700;padding:1px 8px;border-radius:999px;background:var(--sz-namespace-pill-chip-bg);color:var(--sz-orange-dark);">${this.namespaceLabel}</span>
+      </div>`;
   }
 
   override render() {

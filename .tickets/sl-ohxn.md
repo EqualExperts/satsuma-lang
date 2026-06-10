@@ -1,6 +1,6 @@
 ---
 id: sl-ohxn
-status: open
+status: in_progress
 deps: []
 links: []
 created: 2026-06-10T07:19:03Z

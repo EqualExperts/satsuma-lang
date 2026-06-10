@@ -46,7 +46,7 @@ function doc(mappingName: string, extraSourceField = ""): string {
 /** Open the harness in single-file mode and replace the buffer with `text`. */
 async function openWithBuffer(page: Page, text: string): Promise<void> {
   await page.goto("/");
-  await page.locator(".toggle-btn[data-mode='single']").click();
+  await page.evaluate(() => window.__satsumaHarness.setViewMode?.("single"));
   await page.locator("#fixture-picker-btn").click();
   await page.locator(`.fixture-item[data-uri="${sfdcUri}"]`).click();
   await expect(page.locator("[data-testid='viz-root']")).toHaveAttribute(
@@ -67,7 +67,12 @@ test.describe("Detail view persistence across live edits", () => {
   }) => {
     await openWithBuffer(page, doc("orders_load"));
 
-    await page.locator("[data-testid='overview-mapping-card-orders-load']").click();
+    // dispatchEvent rather than a pointer click: the tiny two-schema graph
+    // sits partly under the minimap overlay, which intercepts real pointer
+    // events. Opening the mapping is the precondition here, not the subject.
+    await page
+      .locator("[data-testid='overview-mapping-card-orders-load']")
+      .dispatchEvent("click");
     const detail = page.locator("[data-testid='mapping-detail-orders-load']").first();
     await expect(detail).toBeVisible({ timeout: 10_000 });
 
@@ -88,7 +93,10 @@ test.describe("Detail view persistence across live edits", () => {
   test("an edit that renames the mapping falls back to the overview", async ({ page }) => {
     await openWithBuffer(page, doc("orders_load"));
 
-    await page.locator("[data-testid='overview-mapping-card-orders-load']").click();
+    // See above: dispatchEvent avoids minimap pointer interception.
+    await page
+      .locator("[data-testid='overview-mapping-card-orders-load']")
+      .dispatchEvent("click");
     await expect(
       page.locator("[data-testid='mapping-detail-orders-load']").first(),
     ).toBeVisible({ timeout: 10_000 });

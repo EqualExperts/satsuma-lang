@@ -7,6 +7,7 @@ import { SzOpenMappingEvent } from "./edges/sz-overview-edge-layer.js";
 import tokens from "./tokens.css";
 import { renderMarkdown } from "./markdown.js";
 import { buildMappedFieldsIndex, buildMappingCoveredFields } from "./field-coverage.js";
+import { metricAsSchemaCard } from "./metric-adapter.js";
 
 export { VizModel } from "./model.js";
 export type { NamespaceGroup } from "./model.js";
@@ -22,7 +23,9 @@ export { SzEdgeLayer } from "./edges/sz-edge-layer.js";
 export { SzOverviewEdgeLayer, SzOpenMappingEvent } from "./edges/sz-overview-edge-layer.js";
 export { SzMappingDetail } from "./components/sz-mapping-detail.js";
 export { computeLayout, computeOverviewLayout } from "./layout/elk-layout.js";
+export { HEADER_HEIGHT, NAMESPACE_PILL_HEIGHT } from "./layout/geometry.js";
 export { buildMappingCoveredFields, buildMappedFieldsIndex, resolveSchemaLocalFieldPath, schemaHasFieldPath } from "./field-coverage.js";
+export { metricAsSchemaCard, metricFieldEntries } from "./metric-adapter.js";
 export type { LayoutResult, LayoutNode, LayoutEdge, SourceBlockLayout, OverviewLayoutResult, OverviewEdge } from "./layout/elk-layout.js";
 
 /** Navigate event — dispatched when the user clicks a source-linked element. */
@@ -166,7 +169,10 @@ export class SatsumaViz extends LitElement {
       gap: 8px;
       width: 100%;
       box-sizing: border-box;
-      min-height: 44px;
+      /* Fill the wrapper, which is pinned to the ELK node height — edge
+         anchors are computed from that height, so the rendered card must
+         occupy exactly the same box (sl-wixe). Content centres vertically. */
+      height: 100%;
       padding: 0 40px 0 12px;
       border-radius: var(--sz-card-radius);
       background: var(--sz-overview-mapping-bg), var(--sz-overview-mapping-gloss);
@@ -1466,17 +1472,18 @@ export class SatsumaViz extends LitElement {
     return html`
       <div class="canvas" style="width: ${overview.width + 48}px; height: ${overview.height + 48}px; padding: 24px;"
         @sz-compact-toggled=${this._onCompactToggled}>
-        <!-- Overview SVG edge layer (filtered to visible nodes) -->
-        <sz-overview-edge-layer
-          style="left: 24px; top: 0; z-index: 30;"
-          .edges=${this._filterOverviewEdges(overview.edges, namespaces)}
-          .width=${overview.width}
-          .height=${overview.height}
-          .highlightNodes=${this._hoveredOverviewNodes}
-        ></sz-overview-edge-layer>
-
-        <!-- Compact positioned cards -->
+        <!-- Cards and edges share .card-layer so both use the same coordinate
+             origin by construction — a sibling edge layer anchored to the
+             canvas padding box renders 24px above the in-flow cards (sl-wixe). -->
         <div class="card-layer">
+          <!-- Overview SVG edge layer (filtered to visible nodes) -->
+          <sz-overview-edge-layer
+            style="z-index: 30;"
+            .edges=${this._filterOverviewEdges(overview.edges, namespaces)}
+            .width=${overview.width}
+            .height=${overview.height}
+            .highlightNodes=${this._hoveredOverviewNodes}
+          ></sz-overview-edge-layer>
           ${namespaces.flatMap((ns) => [
             ...ns.schemas.map((s) => {
               const node = overview.nodes.find((n) => n.id === s.qualifiedId);
@@ -1532,12 +1539,12 @@ export class SatsumaViz extends LitElement {
                   class="positioned-card mapping-node"
                   data-testid=${`overview-mapping-node-${sanitizeTestIdSegment(mappingNodeId)}`}
                   data-node-id=${mappingNodeId}
-                  style="left: ${node.x}px; top: ${node.y}px; width: ${node.width}px;"
+                  style="left: ${node.x}px; top: ${node.y}px; width: ${node.width}px; height: ${node.height}px;"
                   @click=${() => this._openOverviewMapping(m)}
                   @mouseenter=${() => this._onOverviewNodeHover(mappingNodeId)}
                   @mouseleave=${() => this._onOverviewNodeLeave()}
                 >
-                  <div class="overview-mapping-card" data-testid=${`overview-mapping-card-${sanitizeTestIdSegment(m.id)}`} style="${!ns.name ? "padding-top:24px;" : ""}" title=${m.id}>
+                  <div class="overview-mapping-card" data-testid=${`overview-mapping-card-${sanitizeTestIdSegment(m.id)}`} title=${m.id}>
                     <div style="display:flex;flex-direction:column;align-items:flex-start;gap:4px;min-width:0;">
                       ${ns.name
                         ? html`<span style="display:inline-block;font-size:10px;font-weight:700;padding:1px 6px;border-radius:999px;background:var(--sz-namespace-pill-bg);color:var(--sz-namespace-pill-text);">${ns.name}</span>`
@@ -1660,14 +1667,23 @@ export class SatsumaViz extends LitElement {
   private _renderMappingDetailView(mapping: MappingBlock) {
     if (!this.model) return html``;
 
-    // Find source and target schemas from the model, expanding spreads
+    // Mapping endpoints may be schemas OR metrics: a pipeline mapping writes
+    // INTO a metric, and a report mapping reads FROM one. Resolving only
+    // against schemas rendered an empty column for metric endpoints
+    // (sl-cw68), so metrics are adapted to the schema-card shape here.
     const allSchemas = this.model.namespaces.flatMap((ns) => ns.schemas);
+    const allMetrics = this.model.namespaces.flatMap((ns) => ns.metrics);
+    const resolveEndpoint = (ref: string): SchemaCard | null => {
+      const schema = allSchemas.find((s) => s.qualifiedId === ref);
+      if (schema) return this._expandSpreads(schema);
+      const metric = allMetrics.find((mt) => mt.qualifiedId === ref);
+      return metric ? metricAsSchemaCard(metric) : null;
+    };
+
     const sourceSchemas = mapping.sourceRefs
-      .map((ref) => allSchemas.find((s) => s.qualifiedId === ref))
-      .filter((s): s is SchemaCard => s !== undefined)
-      .map((s) => this._expandSpreads(s));
-    const targetSchema = allSchemas.find((s) => s.qualifiedId === mapping.targetRef) ?? null;
-    const expandedTarget = targetSchema ? this._expandSpreads(targetSchema) : null;
+      .map(resolveEndpoint)
+      .filter((s): s is SchemaCard => s !== null);
+    const expandedTarget = resolveEndpoint(mapping.targetRef);
 
     const { sourceMapped, targetMapped } = buildMappingCoveredFields(
       mapping,
@@ -2010,21 +2026,23 @@ export class SatsumaViz extends LitElement {
 
     return html`
       <div class="canvas" style="width: ${layout.width + 48}px; height: ${layout.height + 48}px; padding: 24px;">
-        <!-- SVG edge layer (behind cards) -->
-        <sz-edge-layer
-          style="left: 24px; top: 0; z-index: 30;"
-          .edges=${layout.edges}
-          .width=${layout.width}
-          .height=${layout.height}
-          .highlightSchema=${this._hoveredSchema}
-          .highlightField=${this._hoveredField}
-        ></sz-edge-layer>
-
-        <!-- Source block join/filter labels -->
-        ${layout.sourceBlocks.map((sb) => this._renderSourceBlock(sb, layout))}
-
-        <!-- Positioned cards -->
+        <!-- Everything positioned from layout coordinates lives inside
+             .card-layer so cards, edges, and labels share one coordinate
+             origin by construction — siblings anchored to the canvas padding
+             box render 24px above/left of the in-flow cards (sl-wixe). -->
         <div class="card-layer">
+          <!-- SVG edge layer (z-raised above cards) -->
+          <sz-edge-layer
+            style="z-index: 30;"
+            .edges=${layout.edges}
+            .width=${layout.width}
+            .height=${layout.height}
+            .highlightSchema=${this._hoveredSchema}
+            .highlightField=${this._hoveredField}
+          ></sz-edge-layer>
+
+          <!-- Source block join/filter labels -->
+          ${layout.sourceBlocks.map((sb) => this._renderSourceBlock(sb, layout))}
           ${namespaces.flatMap((ns) => [
             ...ns.schemas.flatMap((s) => {
               const node = layout.nodes.get(s.qualifiedId);
