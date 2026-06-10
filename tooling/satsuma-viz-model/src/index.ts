@@ -66,6 +66,11 @@ export interface FieldEntry {
   type: string;
   /** Metadata tag values that are recognised constraint tags (pk, required, pii, …). */
   constraints: string[];
+  /** ALL metadata entries on the field declaration, including key-value tags
+   *  like `sensitivity internal` that are not constraint tags. Rendered as
+   *  pills next to the constraint badges so no authored metadata is hidden
+   *  (sl-6x1o). Constraint tags also appear here; renderers dedupe. */
+  metadata: MetadataEntry[];
   notes: NoteBlock[];
   comments: CommentEntry[];
   /** Non-empty when the field has record type; contains the nested field declarations. */
@@ -88,6 +93,10 @@ export interface MappingBlock {
   flattenBlocks: FlattenBlock[];
   /** Structured source-block info (multi-schema joins, filters). */
   sourceBlock: SourceBlockInfo | null;
+  /** Metadata entries on the mapping declaration itself, e.g.
+   *  `mapping m (airflow, note "...") { ... }`. Rendered in the detail
+   *  view's mapping header alongside source/target/join (sl-6x1o). */
+  metadata: MetadataEntry[];
   notes: NoteBlock[];
   comments: CommentEntry[];
   location: SourceLocation;

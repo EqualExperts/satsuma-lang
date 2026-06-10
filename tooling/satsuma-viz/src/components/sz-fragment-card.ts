@@ -227,7 +227,7 @@ export class SzFragmentCard extends LitElement {
           <span class="header-icon">&#9674;</span>
           <span class="header-name">${fr.id}</span>
           <span class="header-count">${fr.fields.length} fields</span>
-          <span class="header-toggle" ?data-collapsed=${this._collapsed}>&#9660;</span>
+          <span class="header-toggle" ?data-collapsed=${this._collapsed} @click=${this._onToggleClick}>&#9660;</span>
         </div>
         <div class="fields">
           ${fr.fields.map((f) => this._renderField(f))}
@@ -271,8 +271,14 @@ export class SzFragmentCard extends LitElement {
     `;
   }
 
-  private _onHeaderClick() {
+  /** Arrow click: collapse/expand only — never navigate (sl-tw0r). */
+  private _onToggleClick(e: Event) {
+    e.stopPropagation();
     this._collapsed = !this._collapsed;
+  }
+
+  /** Header (name/icon) click: navigation intent only (sl-tw0r). */
+  private _onHeaderClick() {
     if (this.fragment) {
       this._navigate(this.fragment.location);
     }

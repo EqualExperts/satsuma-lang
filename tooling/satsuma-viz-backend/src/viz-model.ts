@@ -231,6 +231,7 @@ function fieldInfoToEntry(fi: FieldInfo, defUri: string): FieldEntry {
     name: fi.name,
     type: fi.type ?? "",
     constraints: [],
+    metadata: [],
     notes: [],
     comments: [],
     children: fi.children.map((c: FieldInfo) => fieldInfoToEntry(c, defUri)),
@@ -320,6 +321,7 @@ function expandedFieldToEntry(decl: FieldDecl): FieldEntry {
     name: decl.name,
     type: decl.type,
     constraints: [],
+    metadata: [],
     notes: [],
     comments: [],
     children: (decl.children ?? []).map(expandedFieldToEntry),
@@ -634,6 +636,7 @@ function fieldDeclToEntry(
     name: decl.name,
     type,
     constraints,
+    metadata: metaEntriesToViz(decl.metadata ?? []),
     notes: cstNode ? extractNotes(uri, cstNode) : [],
     comments: cstNode ? extractComments(uri, cstNode) : [],
     children: fieldChildren,
@@ -828,6 +831,9 @@ function extractMapping(
     }
   }
 
+  // The mapping's own metadata block, e.g. `mapping m (airflow, note "...")`.
+  const meta = child(node, "metadata_block");
+
   return {
     id: name,
     sourceRefs,
@@ -836,6 +842,7 @@ function extractMapping(
     eachBlocks,
     flattenBlocks,
     sourceBlock,
+    metadata: meta ? extractMetadataEntries(meta) : [],
     notes,
     comments: extractComments(uri, node),
     location: nodeLocation(uri, node),
