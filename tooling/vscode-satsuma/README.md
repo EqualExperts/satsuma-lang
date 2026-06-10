@@ -114,7 +114,7 @@ Seven commands available via `Ctrl+Shift+P`:
 | **Satsuma: Show Lineage From...** | Pick a schema and trace its downstream lineage |
 | **Satsuma: Show Warnings** | Show all `//!` warnings in the Problems panel |
 | **Satsuma: Show Workspace Summary** | Display workspace statistics |
-| **Satsuma: Show Mapping Visualization** | Open interactive workspace graph webview |
+| **Satsuma: Overview Visualization** | Open the interactive workspace overview (also the eye icon in the editor title bar and the editor/Explorer context menus) |
 | **Satsuma: Show Field Lineage** | Open field-level lineage webview |
 | **Satsuma: Show Mapping Coverage** | Show mapped/unmapped fields with gutter markers |
 
