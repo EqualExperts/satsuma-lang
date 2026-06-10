@@ -81,3 +81,53 @@ test.describe("Export SVG (sl-7pdf)", () => {
     expect(content).not.toContain("var(");
   });
 });
+
+test.describe("Brand typography (sl-ga3c)", () => {
+  // The EE brand guide names Lexend as the primary font. Chrome text
+  // (header, panel labels, toolbar buttons) must render in the self-hosted
+  // Lexend; code surfaces keep JetBrains Mono. The component's --sz-font-sans
+  // deliberately stays on its Inter/system stack — see the sl-ga3c notes.
+  test("chrome text renders in Lexend; the source editor stays monospace", async ({
+    page,
+  }) => {
+    await page.goto("/");
+
+    // The self-hosted face must actually have loaded — a bad @font-face URL
+    // silently falls back to system-ui and font-family alone wouldn't catch it.
+    await expect
+      .poll(() => page.evaluate(() => document.fonts.check("12px Lexend")))
+      .toBe(true);
+
+    const familyOf = (selector: string) =>
+      page.locator(selector).first().evaluate((el) => getComputedStyle(el).fontFamily);
+
+    for (const selector of ["#header h1", ".panel-label", ".toolbar-action"]) {
+      expect(await familyOf(selector), `${selector} must use Lexend`).toContain("Lexend");
+    }
+
+    // The overlay editor's two layers pin the monospace stack (their glyph
+    // geometry must match exactly — caret alignment depends on it).
+    expect(await familyOf("#source-input")).toContain("JetBrains Mono");
+    expect(await familyOf("#source-highlight")).toContain("JetBrains Mono");
+  });
+
+  test("no font is fetched from a third-party origin", async ({ page }) => {
+    // The playground promises "your source is never uploaded"; it must not
+    // phone out for fonts either. Every font request stays same-origin.
+    const fontRequests: string[] = [];
+    page.on("request", (request) => {
+      if (request.resourceType() === "font") fontRequests.push(request.url());
+    });
+
+    await page.goto("/");
+    await expect
+      .poll(() => page.evaluate(() => document.fonts.check("12px Lexend")))
+      .toBe(true);
+
+    expect(fontRequests.length).toBeGreaterThan(0);
+    const origin = new URL(page.url()).origin;
+    for (const url of fontRequests) {
+      expect(url.startsWith(origin), `font fetched cross-origin: ${url}`).toBe(true);
+    }
+  });
+});

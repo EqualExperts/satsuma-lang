@@ -5,6 +5,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Satsuma Viz Harness</title>
   <style>
+    /* Variable-weight Lexend (300-600 covers the brand's Light/Normal/Medium). */
+    @font-face {
+      font-family: "Lexend";
+      src: url("./lexend-latin.woff2") format("woff2");
+      font-weight: 300 600;
+      font-style: normal;
+      font-display: swap;
+    }
     /* ── Reset and base ──────────────────────────────────────────────────── */
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     /*
@@ -22,6 +30,12 @@
       /* Width of the re-expand rail the source pane collapses to (sl-1qte). */
       --source-rail-width: 26px;
       --font-mono: "JetBrains Mono", "Fira Code", ui-monospace, monospace;
+      /* EE brand primary font (assets/ee-brand/brand-guidelines-summary.md):
+         Lexend for headings and chrome text (sl-ga3c). Self-hosted — the
+         playground promises "never uploaded" and must not phone out for
+         fonts either; ./lexend-latin.woff2 ships with the bundle (OFL 1.1,
+         licence alongside the source asset). */
+      --font-sans: "Lexend", system-ui, -apple-system, sans-serif;
       /* Dark chrome (default). */
       --color-bg: #0f1117;
       --color-surface: #1a1d27;
@@ -90,7 +104,10 @@
     html, body {
       height: 100%; overflow: hidden;
       background: var(--color-bg); color: var(--color-text);
-      font-family: var(--font-mono); font-size: 11px;
+      /* Chrome text follows the EE brand (Lexend); code surfaces — the
+         overlay editor's .code-layer and other snippets — pin var(--font-mono)
+         explicitly and are unaffected by this inherited default (sl-ga3c). */
+      font-family: var(--font-sans); font-size: 11px;
     }
 
     /* ── Layout: header + (source | viz) ───────────────────────────────── */

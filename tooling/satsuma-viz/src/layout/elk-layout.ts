@@ -20,9 +20,15 @@ import type {
 } from "../model.js";
 import { buildMappedFieldsIndex } from "../field-coverage.js";
 import { metricFieldEntries } from "../metric-adapter.js";
-import { HEADER_HEIGHT, NAMESPACE_PILL_HEIGHT } from "./geometry.js";
+import {
+  HEADER_HEIGHT,
+  META_PILL_ROW_GAP,
+  META_PILL_ROW_HEIGHT,
+  METADATA_PILLS_CHROME,
+  NAMESPACE_PILL_HEIGHT,
+} from "./geometry.js";
 
-export { HEADER_HEIGHT, NAMESPACE_PILL_HEIGHT } from "./geometry.js";
+export * from "./geometry.js";
 
 export interface LayoutNode {
   id: string;
@@ -92,7 +98,6 @@ export interface OverviewLayoutResult {
 // components (edge anchors are computed from them), so they are imported
 // from the shared geometry module (see top of file) instead of re-declared.
 const LABEL_HEIGHT = 24;  // .label padding (4+6) + font ~14px
-const METADATA_PILLS_HEIGHT = 28; // .metadata-pills padding (4+6) + pill line ~17px + border 1px
 const FIELD_HEIGHT = 28;
 const FIELDS_PADDING_TOP = 4; // .fields { padding: 4px 0; }
 const FIELDS_PADDING_BOTTOM = 4;
@@ -128,8 +133,14 @@ function preambleHeight(
 ): number {
   let h = HEADER_HEIGHT + (hasNamespace ? NAMESPACE_PILL_HEIGHT : 0);
   if (schema.label) h += LABEL_HEIGHT;
-  const pills = schema.metadata.filter((m) => m.key !== "note");
-  if (pills.length > 0) h += METADATA_PILLS_HEIGHT;
+  // Metadata pills stack one per row (sl-dw9x); each row's height is pinned
+  // in the card CSS to the shared geometry constants used here.
+  const pillCount = schema.metadata.filter((m) => m.key !== "note").length;
+  if (pillCount > 0) {
+    h += METADATA_PILLS_CHROME
+      + pillCount * META_PILL_ROW_HEIGHT
+      + (pillCount - 1) * META_PILL_ROW_GAP;
+  }
   return h;
 }
 
@@ -190,12 +201,10 @@ function estimateCompactSchemaWidth(schema: SchemaCard): number {
     estimateTextWidth(displayName, OVERVIEW_TITLE_CHAR_WIDTH) +
     estimateTextWidth(countText, OVERVIEW_COUNT_CHAR_WIDTH);
 
-  const pillWidths = schema.metadata
-    .filter((m) => m.key !== "note")
-    .map((m) => estimateTextWidth(`${m.key} ${m.value}`, OVERVIEW_PILL_CHAR_WIDTH) + 44);
-  const contentWidth = pillWidths.length > 0 ? Math.max(headerWidth, ...pillWidths) : headerWidth;
-
-  return clamp(Math.ceil(contentWidth), CARD_MIN_WIDTH, CARD_MAX_WIDTH);
+  // Metadata pills are excluded from the card's intrinsic width
+  // (contain: inline-size in the card CSS) — they truncate to whatever width
+  // the header and fields establish, so they contribute nothing here (sl-dw9x).
+  return clamp(Math.ceil(headerWidth), CARD_MIN_WIDTH, CARD_MAX_WIDTH);
 }
 
 function estimateCompactTextCardWidth(id: string): number {
@@ -241,10 +250,7 @@ function estimateSchemaWidth(schema: SchemaCard): number {
     ? estimateTextWidth(schema.label, FULL_META_CHAR_WIDTH) + 48
     : 0;
 
-  const pillWidth = schema.metadata
-    .filter((m) => m.key !== "note")
-    .reduce((max, m) => Math.max(max, estimateTextWidth(`${m.key} ${m.value}`, FULL_META_CHAR_WIDTH) + 48), 0);
-
+  // Metadata pills are width-contained (see estimateCompactSchemaWidth).
   const fieldWidth = measureFieldWidth(schema.fields);
   const spreadWidth = spreads.reduce(
     (max, spread) => Math.max(max, estimateTextWidth(`spreads ${spread}`, FULL_META_CHAR_WIDTH) + 48),
@@ -256,7 +262,7 @@ function estimateSchemaWidth(schema: SchemaCard): number {
   );
 
   return clamp(
-    Math.ceil(Math.max(titleWidth, labelWidth, pillWidth, fieldWidth, spreadWidth, noteWidth)),
+    Math.ceil(Math.max(titleWidth, labelWidth, fieldWidth, spreadWidth, noteWidth)),
     CARD_MIN_WIDTH,
     CARD_MAX_WIDTH,
   );
