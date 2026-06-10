@@ -1,6 +1,6 @@
 ---
 id: sl-sme1
-status: open
+status: closed
 deps: []
 links: []
 created: 2026-06-10T21:52:14Z
@@ -24,3 +24,10 @@ Fix direction: never publish an empty message. Give bare '//!' a sensible fallba
 
 A file containing a bare '//!' produces a non-empty-message warning diagnostic and no client-side TypeError. Test covers the empty-suffix warning_comment case. No diagnostic publish path can emit an empty message.
 
+
+## Notes
+
+**2026-06-10T22:17:34Z**
+
+Cause: a bare '//!' warning comment produced an LSP diagnostic with message: '' (diagnostics.ts walkComments). vscode.Diagnostic's constructor throws illegalArgument('message must be set') on a falsy message, and vscode-languageclient's batch conversion aborts on the throw, freezing all diagnostics for the file (gh-273).
+Fix: bare '//!' now falls back to 'Warning comment (no text)', and sendMergedDiagnostics applies ensureNonEmptyMessages() as a publish-boundary guard so no producer can ship an empty message. Regression tests added in satsuma-lsp/test/diagnostics.test.js.
