@@ -113,6 +113,13 @@ export interface SatsumaHarness {
   events: HarnessEvent[];
   ready: boolean;
   clearEvents(): void;
+  /**
+   * Switch lineage/single view mode. There is no visible toggle in the
+   * public chrome (sl-ohxn); tests use this hook (or the ?mode= URL
+   * parameter) to scope the model to the editor buffer. Assigned during
+   * app start-up, after the document library is ready.
+   */
+  setViewMode?(mode: "lineage" | "single"): void;
 }
 
 declare global {
@@ -182,8 +189,6 @@ const fileSaveBtn       = getRequired("file-save-btn");
 const editorCollapseBtn = getRequired("editor-collapse-btn");
 const editorExpandRail  = getRequired("editor-expand-rail");
 const vizContainer      = getRequired("viz-container");
-const readyBadge        = getRequired("harness-ready-badge");
-const viewModeToggle    = getRequired("view-mode-toggle");
 const themeToggle       = getRequired("theme-toggle");
 
 // ---------- Storage warning ----------
@@ -356,13 +361,13 @@ function recordNormalizedEvent(type: string, event: Event, normalize: (event: Ev
 }
 
 /**
- * Update the badge and harness.ready flag to reflect the current viz state.
+ * Track the viz ready state for automation. The state is published as
+ * data-ready-state on the viz root (the Playwright wait contract) and
+ * mirrored on harness.ready; there is no visible badge (sl-ohxn).
  */
-function updateReadyBadge(state: string): void {
+function updateReadyState(state: string): void {
   vizReadyState = state;
   harness.ready = state === "ready";
-  readyBadge.textContent = state;
-  readyBadge.className = state === "ready" ? "ready" : "";
 }
 
 /**
@@ -385,7 +390,7 @@ function ensureVizElement(): HTMLElement {
   // for `data-ready-state="ready"` on the root element.
   const observer = new MutationObserver(() => {
     const state = (el as HTMLElement).dataset["readyState"] ?? "empty";
-    if (state !== vizReadyState) updateReadyBadge(state);
+    if (state !== vizReadyState) updateReadyState(state);
   });
   observer.observe(el, { attributes: true, attributeFilter: ["data-ready-state"] });
 
@@ -413,7 +418,15 @@ function ensureVizElement(): HTMLElement {
     recordNormalizedEvent("open-mapping", e, normalizeOpenMappingEvent);
   });
   el.addEventListener("export", (e) => {
-    recordNormalizedEvent("export", e, normalizeExportEvent);
+    const payload = recordNormalizedEvent("export", e, normalizeExportEvent) as
+      | HarnessExportPayload
+      | null;
+    // Export SVG must produce an artifact, not just an event: download it
+    // client-side like Save does — nothing leaves the browser (sl-7pdf).
+    if (payload?.format === "svg") {
+      const stem = defaultSaveFilename().replace(/\.(stm|txt)$/, "");
+      downloadFile(`${stem}.svg`, payload.content, "image/svg+xml");
+    }
   });
 
   // Clear the placeholder and mount the element.
@@ -478,12 +491,12 @@ function loadDocument(uri: string): void {
   harness.fixture = uri;
   harness.ready = false;
   library.setActiveUri(uri);
-  updateReadyBadge("loading");
+  updateReadyState("loading");
 
   const doc = library.get(uri);
   if (doc === undefined) {
     editor.setValue("// Failed to load document.");
-    updateReadyBadge("empty");
+    updateReadyState("empty");
     return;
   }
 
@@ -731,20 +744,14 @@ libraryResetBtn.addEventListener("click", (e) => {
  * document so the model is rebuilt under the new mode.
  */
 function setViewMode(mode: "lineage" | "single"): void {
+  if (mode === harness.viewMode) return;
   harness.viewMode = mode;
   library.setViewMode(mode);
-  for (const btn of viewModeToggle.querySelectorAll<HTMLButtonElement>(".toggle-btn")) {
-    btn.classList.toggle("active", btn.dataset["mode"] === mode);
-  }
   if (harness.fixture) loadDocument(harness.fixture);
 }
-
-viewModeToggle.addEventListener("click", (e) => {
-  const btn = (e.target as HTMLElement).closest<HTMLButtonElement>(".toggle-btn");
-  if (!btn) return;
-  const mode = btn.dataset["mode"] as "lineage" | "single" | undefined;
-  if (mode && mode !== harness.viewMode) setViewMode(mode);
-});
+// There is no visible mode toggle (sl-ohxn): lineage is the public default,
+// and automation switches via the ?mode= URL parameter or this hook.
+harness.setViewMode = setViewMode;
 
 // ---------- Theme management ----------
 
@@ -837,11 +844,12 @@ fileOpenInput.addEventListener("change", async () => {
   fileOpenInput.value = "";
 });
 
-// Save: download the LIVE buffer (editor.getValue(), not the possibly
-// debounce-stale library entry) as a Blob via a temporary anchor.
-fileSaveBtn.addEventListener("click", () => {
-  const filename = defaultSaveFilename();
-  const blob = new Blob([editor.getValue()], { type: "text/plain" });
+/**
+ * Download `content` as a file entirely client-side (Blob + temporary
+ * anchor) — nothing leaves the browser. Shared by Save and Export SVG.
+ */
+function downloadFile(filename: string, content: string, mimeType: string): void {
+  const blob = new Blob([content], { type: mimeType });
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement("a");
   anchor.href = url;
@@ -851,6 +859,13 @@ fileSaveBtn.addEventListener("click", () => {
   anchor.click();
   anchor.remove();
   URL.revokeObjectURL(url);
+}
+
+// Save: download the LIVE buffer (editor.getValue(), not the possibly
+// debounce-stale library entry).
+fileSaveBtn.addEventListener("click", () => {
+  const filename = defaultSaveFilename();
+  downloadFile(filename, editor.getValue(), "text/plain");
   recordEvent("file-save", { filename });
 });
 
@@ -924,9 +939,6 @@ async function init(): Promise<void> {
   const storedMode = library.viewMode;
   if (storedMode) harness.viewMode = storedMode;
   if (autoMode === "lineage" || autoMode === "single") harness.viewMode = autoMode;
-  for (const btn of viewModeToggle.querySelectorAll<HTMLButtonElement>(".toggle-btn")) {
-    btn.classList.toggle("active", btn.dataset["mode"] === harness.viewMode);
-  }
 
   // Active document: URL parameter → restored session → first library entry.
   const candidates = [autoFixtureUri, library.activeUri, library.list()[0]?.uri];

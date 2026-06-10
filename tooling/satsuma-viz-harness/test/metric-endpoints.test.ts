@@ -18,7 +18,12 @@ const metricsUri = libraryUri("metrics-platform/metrics.stm");
 
 async function loadMetricsFixture(page: Page, mode: "lineage" | "single"): Promise<void> {
   await page.goto("/");
-  await page.evaluate((m) => window.__satsumaHarness.setViewMode?.(m), mode);
+  await page.waitForFunction((m) => {
+    const harness = window.__satsumaHarness;
+    if (!harness?.setViewMode) return false; // app.js not evaluated yet
+    harness.setViewMode(m);
+    return true;
+  }, mode);
   await page.locator("#fixture-picker-btn").click();
   await page.locator(`.fixture-item[data-uri="${metricsUri}"]`).click();
   await expect(page.locator("[data-testid='viz-root']")).toHaveAttribute(
