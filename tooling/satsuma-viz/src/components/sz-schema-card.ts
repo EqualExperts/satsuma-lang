@@ -128,6 +128,12 @@ export class SzSchemaCard extends LitElement {
       font-size: 12px;
       flex-shrink: 0;
       transition: transform 0.15s ease;
+      /* The arrow is its own click target (toggle only, never navigate —
+         sl-tw0r); pad it so the hit area is comfortably larger than the
+         12px glyph. */
+      padding: 4px 6px;
+      margin: -4px -6px;
+      cursor: pointer;
     }
 
     .header-toggle[data-collapsed] {
@@ -210,6 +216,14 @@ export class SzSchemaCard extends LitElement {
       background: var(--sz-badge-bg);
       color: var(--sz-badge-text);
       line-height: 1.4;
+    }
+
+    /* Field-level metadata pill (sl-6x1o): same chip shape as constraint
+       badges; the key is emphasised so "sensitivity internal" reads as
+       key + value at a glance. */
+    .badge.field-meta .badge-key {
+      font-weight: 700;
+      opacity: 0.85;
     }
 
     .badge.pii {
@@ -588,7 +602,7 @@ export class SzSchemaCard extends LitElement {
           ${this._headerIcon(isReport)}
           <span class="header-name">${s.id}</span>
           <span class="header-count">${mappedCount}/${totalFields}</span>
-          <span class="header-toggle" ?data-collapsed=${this._collapsed}>&#9660;</span>
+          <span class="header-toggle" ?data-collapsed=${this._collapsed} @click=${this._onToggleClick}>&#9660;</span>
         </div>
         ${s.label ? html`<div class="label">${s.label}</div>` : ""}
         ${metaPills.length > 0
@@ -675,6 +689,9 @@ export class SzSchemaCard extends LitElement {
               (c) => html`<span class="badge">${c}</span>`
             )}
           ${hasPii ? html`<span class="badge pii" title="PII">&#128737; pii</span>` : ""}
+          ${this._fieldMetaPills(f).map(
+            (m) => html`<span class="badge field-meta" title=${`${m.key} ${m.value}`.trim()}><span class="badge-key">${m.key}</span>${m.value ? ` ${m.value}` : ""}</span>`
+          )}
         </span>
         ${hasWarning
           ? html`<span class="comment-badge warning" title=${this._commentText(f, "warning")}>&#9888;</span>`
@@ -700,6 +717,20 @@ export class SzSchemaCard extends LitElement {
         : ""}
       ${f.children.map((child) => this._renderField(child, depth + 1, fieldPath))}
     `;
+  }
+
+  /**
+   * Metadata entries to render as pills on a field row: everything the author
+   * wrote except bare tags already shown as constraint badges (sl-6x1o).
+   * Key-value entries always render — `sensitivity internal` and
+   * `access_group property_facilities` must be visible, and a kv whose key is
+   * also a constraint tag (e.g. `encrypt aes`) carries a value the badge
+   * alone would hide.
+   */
+  private _fieldMetaPills(f: FieldEntry) {
+    return f.metadata.filter(
+      (m) => !(m.value === "" && f.constraints.includes(m.key)),
+    );
   }
 
   private _commentText(f: FieldEntry, kind: "warning" | "question"): string {
@@ -737,10 +768,10 @@ export class SzSchemaCard extends LitElement {
     return html`
       <div>
         ${this._renderNamespacePill()}
-        <div class="header ${isReport ? "report" : ""}" @click=${this._onCompactHeaderClick}>
+        <div class="header ${isReport ? "report" : ""}" @click=${this._onHeaderClick}>
           ${this._headerIcon(isReport)}
           <span class="header-name">${displayName}</span>
-          <span class="header-toggle" ?data-collapsed=${!this.compactExpanded}>&#9660;</span>
+          <span class="header-toggle" ?data-collapsed=${!this.compactExpanded} @click=${this._onToggleClick}>&#9660;</span>
           <span class="header-count">${totalFields} fields</span>
         </div>
         ${metaPills.length > 0
@@ -759,27 +790,37 @@ export class SzSchemaCard extends LitElement {
     `;
   }
 
-  private _onCompactHeaderClick() {
-    // Request the toggle rather than flipping local state: the parent owns
-    // compactExpanded because it must re-run the overview layout with this
-    // card's new size (expansion re-flows neighbours; it never overlays them).
-    this.dispatchEvent(
-      new CustomEvent<SzCompactToggledDetail>("sz-compact-toggled", {
-        detail: {
-          schemaId: this.schema?.qualifiedId ?? this.schema?.id ?? "",
-          expanded: !this.compactExpanded,
-        },
-        bubbles: true,
-        composed: true,
-      }),
-    );
-    if (this.schema) {
-      this._navigate(this.schema.location);
+  // Header clicks carry two distinct intents that used to be conflated on one
+  // handler: the toggle arrow expands/collapses, the rest of the header
+  // navigates to the schema source. Hosts that open documents on navigate
+  // (VS Code) made the combined handler unusable — expanding a card yanked
+  // the editor to the source file and hid the panel (sl-tw0r).
+
+  /** Arrow click: expand/collapse only — never navigate. */
+  private _onToggleClick(e: Event) {
+    // Stop the click before the header's navigate handler sees it.
+    e.stopPropagation();
+    if (this.compact) {
+      // Request the toggle rather than flipping local state: the parent owns
+      // compactExpanded because it must re-run the overview layout with this
+      // card's new size (expansion re-flows neighbours; it never overlays them).
+      this.dispatchEvent(
+        new CustomEvent<SzCompactToggledDetail>("sz-compact-toggled", {
+          detail: {
+            schemaId: this.schema?.qualifiedId ?? this.schema?.id ?? "",
+            expanded: !this.compactExpanded,
+          },
+          bubbles: true,
+          composed: true,
+        }),
+      );
+    } else {
+      this._collapsed = !this._collapsed;
     }
   }
 
+  /** Header (name/icon) click: navigation intent only. */
   private _onHeaderClick() {
-    this._collapsed = !this._collapsed;
     if (this.schema) {
       this._navigate(this.schema.location);
     }

@@ -1,6 +1,6 @@
 ---
 id: sl-6x1o
-status: open
+status: closed
 deps: []
 links: []
 created: 2026-06-10T22:04:35Z
@@ -25,3 +25,10 @@ Fix direction: add metadata: MetadataEntry[] to MappingBlock and FieldEntry in v
 
 mapping export_to_csv (airflow, note "...") shows 'airflow' and the note in the central mapping header. Field 'CLOSING_DATE DATE (sensitivity internal, access_group property_facilities)' shows both kv pills with values in the schema card. Existing constraint badges unchanged. Unit tests in viz-backend cover mapping/field metadata extraction; Playwright harness covers rendering.
 
+
+## Notes
+
+**2026-06-10T22:45:08Z**
+
+Cause: MappingBlock had no metadata field (extractMapping never read the mapping's metadata_block) and FieldEntry carried only the CONSTRAINT_TAGS-whitelisted constraint keys, dropping all other meta and all kv values — so mapping-level meta (airflow, note, merge strategies) and field governance meta (sensitivity, classification, mask, access_group) were invisible in the viz.
+Fix: added metadata: MetadataEntry[] to MappingBlock and FieldEntry in viz-model; viz-backend now extracts the mapping metadata_block and converts field MetaEntry[] via metaEntriesToViz; the detail header renders mapping meta as labelled rows and field rows render non-constraint meta as key+value pills next to the badges. viz-backend unit tests cover both extractions; Playwright harness covers rendering (mapping-field-meta.test.ts).

@@ -87,6 +87,7 @@ describe("extractSchema (direct)", () => {
           name: "id",
           type: "INT",
           constraints: ["pk"],
+          metadata: [{ key: "pk", value: "" }],
           notes: [],
           comments: [],
           children: [],
@@ -144,6 +145,7 @@ describe("extractFragment (direct)", () => {
           name: "created_at",
           type: "TIMESTAMP",
           constraints: [],
+          metadata: [],
           notes: [],
           comments: [],
           children: [],
@@ -198,10 +200,28 @@ describe("extractMapping (direct)", () => {
       eachBlocks: [],
       flattenBlocks: [],
       sourceBlock: { schemas: ["s"], joinDescription: null, filters: [] },
+      metadata: [],
       notes: [],
       comments: [],
       location: { uri: URI, line: 2, character: 0 },
     });
+  });
+
+  // Regression for sl-6x1o: meta on the mapping declaration itself — bare
+  // tags like `airflow` and the note text — was dropped at extraction, so the
+  // detail view's header could never show it.
+  it("extracts the mapping's own metadata block (bare tags and note)", () => {
+    const src = "schema s { a INT }\nschema t { b INT }\n" +
+      'mapping export_to_csv (airflow, note "All fields to CSV") {\n' +
+      "  source { s }\n  target { t }\n  a -> b\n}";
+    const { ws, tree } = singleFileIndex(src);
+    const node = findNode(tree.rootNode, "mapping_block");
+    const card = extractMapping(URI, node, null, ws);
+
+    assert.deepStrictEqual(card.metadata, [
+      { key: "airflow", value: "" },
+      { key: "note", value: "All fields to CSV" },
+    ]);
   });
 });
 
@@ -356,6 +376,7 @@ describe("extractFieldEntries (direct)", () => {
         name: "id",
         type: "UUID",
         constraints: ["pk"],
+        metadata: [{ key: "pk", value: "" }],
         notes: [],
         comments: [],
         children: [],
@@ -365,6 +386,7 @@ describe("extractFieldEntries (direct)", () => {
         name: "data",
         type: "record",
         constraints: [],
+        metadata: [],
         notes: [],
         comments: [],
         children: [
@@ -372,6 +394,7 @@ describe("extractFieldEntries (direct)", () => {
             name: "name",
             type: "STRING",
             constraints: [],
+            metadata: [],
             notes: [],
             comments: [],
             children: [],
@@ -384,12 +407,34 @@ describe("extractFieldEntries (direct)", () => {
         name: "tags",
         type: "list_of STRING",
         constraints: [],
+        metadata: [],
         notes: [],
         comments: [],
         children: [],
         location: { uri: URI, line: 5, character: 2 },
       },
     ]);
+  });
+
+  // Regression for sl-6x1o: key-value metadata that is not a recognised
+  // constraint tag (sensitivity, access_group, ...) was silently discarded —
+  // only the CONSTRAINT_TAGS whitelist survived, and even whitelisted kv
+  // entries lost their value. The full entries must be preserved so the card
+  // can render them as pills.
+  it("preserves non-constraint key-value metadata on fields", () => {
+    const src =
+      "schema property {\n" +
+      "  CLOSING_DATE DATE (sensitivity internal, access_group property_facilities)\n" +
+      "}";
+    const body = findNode(root(src), "schema_body");
+    const [field] = extractFieldEntries(URI, body);
+
+    assert.deepStrictEqual(field.metadata, [
+      { key: "sensitivity", value: "internal" },
+      { key: "access_group", value: "property_facilities" },
+    ]);
+    // Neither key is a constraint tag, so the badge list stays empty.
+    assert.deepStrictEqual(field.constraints, []);
   });
 });
 

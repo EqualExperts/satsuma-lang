@@ -605,6 +605,11 @@ export class SzMappingDetail extends LitElement {
               <span class="meta-tag wrap"><span class="label">filter</span> ${f}</span>
             </div>
           `)}
+          ${m.metadata.map((entry) => html`
+            <div class="mapping-meta-row" data-testid=${`${this.testIdPrefix}-meta-${sanitizeTestIdSegment(entry.key)}`}>
+              <span class="meta-tag wrap"><span class="label">${entry.key}</span> ${entry.value}</span>
+            </div>
+          `)}
         </div>
       </div>
     `;

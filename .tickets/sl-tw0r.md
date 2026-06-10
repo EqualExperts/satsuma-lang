@@ -1,6 +1,6 @@
 ---
 id: sl-tw0r
-status: open
+status: closed
 deps: []
 links: []
 created: 2026-06-10T22:04:48Z
@@ -21,3 +21,10 @@ Fix direction: separate the click targets — the toggle arrow (.header-toggle) 
 
 In the VS Code overview, clicking the arrow expands/collapses the card and does not open the source file; clicking the card title still navigates. Behavior matches the viz harness. Playwright harness test covers toggle-without-navigate.
 
+
+## Notes
+
+**2026-06-10T22:45:08Z**
+
+Cause: _onHeaderClick / _onCompactHeaderClick in sz-schema-card (and the same pattern in sz-fragment-card) both toggled expansion AND dispatched SzNavigateEvent on every header click. The harness has no document-opening navigate listener so only the toggle was visible there, but VS Code opens the source file on navigate, so expanding a card yanked the editor away and hid the panel.
+Fix: the toggle arrow (.header-toggle) is now its own click target that only toggles (stopPropagation), and the header name/icon only navigates. Harness tests updated to the new contract, including a regression test asserting the arrow expands without firing navigate while the name still navigates.

@@ -1326,21 +1326,22 @@ test.describe("Compact card expansion in overview", () => {
     await expect(fields).toHaveCount(0);
   });
 
-  test("clicking a compact card header expands fields", async ({ page }) => {
-    // A single click on the compact card header must toggle _compactExpanded
-    // and render the fields list below the header.
+  test("clicking a compact card's toggle arrow expands fields", async ({ page }) => {
+    // A single click on the toggle arrow must request expansion and render
+    // the fields list below the header. The arrow is a dedicated control —
+    // the rest of the header is reserved for navigation (sl-tw0r).
     const card = page.locator("[data-testid^='overview-schema-card-buy-order']");
-    await card.locator(".header").click();
+    await card.locator(".header-toggle").click();
 
     // At least one field row must now appear inside the card.
     const fields = card.locator("[data-testid$='-field-id']");
     await expect(fields.first()).toBeVisible({ timeout: 5_000 });
   });
 
-  test("clicking the compact card header a second time collapses the fields", async ({ page }) => {
+  test("clicking the toggle arrow a second time collapses the fields", async ({ page }) => {
     // Two clicks must return the card to its compact (fields-hidden) state.
     const card = page.locator("[data-testid^='overview-schema-card-buy-order']");
-    const header = card.locator(".header");
+    const header = card.locator(".header-toggle");
 
     await header.click();
     // Fields visible after first click.
@@ -1362,13 +1363,13 @@ test.describe("Compact card expansion in overview", () => {
     const heightBefore = await canvas.evaluate((el) => el.getBoundingClientRect().height);
 
     const card = page.locator("[data-testid^='overview-schema-card-buy-order']");
-    await card.locator(".header").click();
+    await card.locator(".header-toggle").click();
     await expect(card.locator("[data-testid$='-field-id']").first()).toBeVisible({ timeout: 5_000 });
     await expect
       .poll(async () => canvas.evaluate((el) => el.getBoundingClientRect().height))
       .toBeGreaterThan(heightBefore);
 
-    await card.locator(".header").click();
+    await card.locator(".header-toggle").click();
     await expect(card.locator("[data-testid$='-field-id']")).toHaveCount(0);
     await expect
       .poll(async () => canvas.evaluate((el) => el.getBoundingClientRect().height))
@@ -1385,7 +1386,7 @@ test.describe("Compact card expansion in overview", () => {
     // customer_profiles is exactly the geometry that used to overlap.
     await loadFixture(page, ffgUri);
     const card = page.locator("[data-testid^='overview-schema-card-order-events']");
-    await card.locator(".header").click();
+    await card.locator(".header-toggle").click();
     await expect(card.locator("[data-testid$='-field-event-id']").first()).toBeVisible({
       timeout: 5_000,
     });
@@ -1412,14 +1413,20 @@ test.describe("Compact card expansion in overview", () => {
     assertBoxesDoNotOverlap(boxes);
   });
 
-  test("expanding a compact card still fires a navigate event", async ({ page }) => {
-    // Clicking a compact card header both expands the fields and dispatches
-    // SzNavigateEvent so hosts like VS Code can jump to the schema source.
+  test("the toggle arrow expands without navigating; the header name navigates", async ({ page }) => {
+    // Regression for sl-tw0r: the old combined handler made every expansion
+    // also dispatch SzNavigateEvent, so hosts that open documents on navigate
+    // (VS Code) yanked the editor to the source file whenever a card was
+    // expanded. The arrow must be navigation-silent; navigation intent lives
+    // on the header name.
     await page.evaluate(() => window.__satsumaHarness.clearEvents());
 
     const card = page.locator("[data-testid^='overview-schema-card-buy-order']");
-    await card.locator(".header").click();
+    await card.locator(".header-toggle").click();
+    await expect(card.locator("[data-testid$='-field-id']").first()).toBeVisible({ timeout: 5_000 });
+    expect(await recordedEvents(page, "navigate")).toEqual([]);
 
+    await card.locator(".header-name").click();
     await expect.poll(async () => recordedEvents(page, "navigate")).toContainEqual(
       expect.objectContaining({
         detail: expect.objectContaining({

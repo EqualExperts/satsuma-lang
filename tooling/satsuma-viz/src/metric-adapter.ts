@@ -23,6 +23,7 @@ export function metricFieldEntries(metric: MetricCard): FieldEntry[] {
     name: f.name,
     type: f.type,
     constraints: [],
+    metadata: [],
     notes: f.notes,
     comments: [],
     children: [],
