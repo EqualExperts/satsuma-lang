@@ -13,7 +13,7 @@ import * as path from "path";
 import { fileURLToPath, pathToFileURL } from "url";
 import { getParser, initParser } from "./parser-utils";
 import { setHighlightsSource } from "./semantic-tokens";
-import { computeDiagnostics } from "./diagnostics";
+import { computeDiagnostics, ensureNonEmptyMessages } from "./diagnostics";
 import { computeDocumentSymbols } from "./symbols";
 import { computeFoldingRanges } from "./folding";
 import { computeSemanticTokens, semanticTokensLegend } from "./semantic-tokens";
@@ -469,9 +469,15 @@ function sendMergedDiagnostics(uri: string, tree: Tree): void {
     (d) => !validateKeys.has(`${d.code}:${d.range.start.line}`),
   );
 
+  // Publish-boundary guard: an empty message crashes the VS Code client's
+  // diagnostic conversion and freezes all diagnostics for the file (sl-sme1).
   connection.sendDiagnostics({
     uri,
-    diagnostics: [...parseDiags, ...validateDiags, ...dedupedSemanticDiags],
+    diagnostics: ensureNonEmptyMessages([
+      ...parseDiags,
+      ...validateDiags,
+      ...dedupedSemanticDiags,
+    ]),
   });
 }
 
