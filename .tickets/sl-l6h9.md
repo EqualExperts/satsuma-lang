@@ -1,6 +1,6 @@
 ---
 id: sl-l6h9
-status: in_progress
+status: closed
 deps: [sl-ncu9]
 links: []
 created: 2026-06-09T21:15:33Z
@@ -17,3 +17,10 @@ Document the shipped playground. Update: tooling/satsuma-viz-harness/README.md (
 
 harness README documents the dual role, static build target, client-side pipeline, and localStorage library; PROJECT-OVERVIEW adds the playground + privacy guarantee; ROADMAP reflects shipped status; using-satsuma-without-cli and HOW-DO-I each gain a zero-install 'Try it Live' entry.
 
+
+## Notes
+
+**2026-06-10T02:00:00+01:00**
+
+Cause: Feature work — the shipped playground was undocumented outside the PRD and ADRs.
+Fix: harness README documents the dual Playwright-host/playground-source role plus the static build, client pipeline, and document library; PROJECT-OVERVIEW adds the playground + privacy guarantee; ROADMAP marks feature 33 shipped; using-satsuma-without-cli and HOW-DO-I gain zero-install "Try it Live" entries (commit f8b01c0)
