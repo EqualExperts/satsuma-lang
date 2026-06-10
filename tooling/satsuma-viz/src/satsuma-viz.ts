@@ -28,6 +28,24 @@ export { buildMappingCoveredFields, buildMappedFieldsIndex, resolveSchemaLocalFi
 export { metricAsSchemaCard, metricFieldEntries } from "./metric-adapter.js";
 export type { LayoutResult, LayoutNode, LayoutEdge, SourceBlockLayout, OverviewLayoutResult, OverviewEdge } from "./layout/elk-layout.js";
 
+/**
+ * Replace every `var(--*)` reference in an exported SVG with the literal
+ * value the active theme resolves it to. The component's stylesheets are not
+ * shipped with the exported file, so unresolved custom properties would
+ * render as browser defaults (black strokes, invisible fills) outside the
+ * component (sl-7pdf). References that resolve to nothing are left intact
+ * rather than silently emptied.
+ */
+export function inlineCssVariables(
+  svg: string,
+  resolve: (name: string) => string,
+): string {
+  return svg.replace(/var\((--[\w-]+)\)/g, (whole, name: string) => {
+    const value = resolve(name).trim();
+    return value === "" ? whole : value;
+  });
+}
+
 /** Navigate event — dispatched when the user clicks a source-linked element. */
 export class SzNavigateEvent extends Event {
   readonly location: SourceLocation;
@@ -1212,7 +1230,7 @@ export class SatsumaViz extends LitElement {
           : ""}
         <button class="toolbar-btn" data-testid="toolbar-refresh" @click=${this._refresh} title="Re-fetch visualization data">&#8635; Refresh</button>
         ${!inDetail
-          ? html`<button class="toolbar-btn" data-testid="toolbar-export" @click=${this._exportSvg} title="Export as SVG">&#x21E9; Export</button>`
+          ? html`<button class="toolbar-btn" data-testid="toolbar-export" @click=${this._exportSvg} title="Export the overview as an SVG file">&#x21E9; Export SVG</button>`
           : ""}
         ${hasNamespaces && !inDetail
           ? html`
@@ -1368,11 +1386,17 @@ export class SatsumaViz extends LitElement {
   </g>`).join("")}
 </svg>`;
 
+    // Resolve theme tokens to literal colours so the file renders standalone
+    // (custom properties are defined by the component's stylesheets, which an
+    // exported .svg does not carry — sl-7pdf).
+    const styles = getComputedStyle(this);
+    const content = inlineCssVariables(svgStr, (name) => styles.getPropertyValue(name));
+
     this.dispatchEvent(
       new CustomEvent("export", {
         bubbles: true,
         composed: true,
-        detail: { format: "svg", content: svgStr },
+        detail: { format: "svg", content },
       }),
     );
   }

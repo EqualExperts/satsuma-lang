@@ -33,6 +33,10 @@
     "!.claude/**",
     "!.worktrees/**",
     "!site/_site/**",
-    "!site/satsuma-diaries/**"
+    "!site/satsuma-diaries/**",
+    // Playwright failure artifacts (gitignored, but markdownlint scans the
+    // working tree) — a failed browser run must not block later commits
+    "!**/test-results/**",
+    "!**/playwright-report/**"
   ]
 }

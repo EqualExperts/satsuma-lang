@@ -46,7 +46,12 @@ function doc(mappingName: string, extraSourceField = ""): string {
 /** Open the harness in single-file mode and replace the buffer with `text`. */
 async function openWithBuffer(page: Page, text: string): Promise<void> {
   await page.goto("/");
-  await page.evaluate(() => window.__satsumaHarness.setViewMode?.("single"));
+  await page.waitForFunction(() => {
+    const harness = window.__satsumaHarness;
+    if (!harness?.setViewMode) return false; // app.js not evaluated yet
+    harness.setViewMode("single");
+    return true;
+  });
   await page.locator("#fixture-picker-btn").click();
   await page.locator(`.fixture-item[data-uri="${sfdcUri}"]`).click();
   await expect(page.locator("[data-testid='viz-root']")).toHaveAttribute(

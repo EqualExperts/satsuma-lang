@@ -40,9 +40,6 @@
        * syntax colours visible through the selection.
        */
       --editor-selection: rgba(91, 127, 222, 0.30);
-      --color-ready-bg: #0d2b1a;
-      --color-ready-text: #3fb950;
-      --color-ready-border: #2ea043;
       /* Syntax token colours (dark — aligned with Tokyo Night). */
       --tok-comment: #4a5274;
       --tok-comment-warn: #e0af68;
@@ -76,9 +73,6 @@
       --color-selected: #FFE0C7;
       /* Translucent selection for the light theme — see the dark declaration. */
       --editor-selection: rgba(217, 119, 38, 0.25);
-      --color-ready-bg: #E6F4EA;
-      --color-ready-text: #2E7D46;
-      --color-ready-border: #5A9E6F;
       /* Syntax token colours (light) — darker, saturated for contrast on cream. */
       --tok-comment: #8A8077;
       --tok-comment-warn: #B5740A;
@@ -164,8 +158,11 @@
       background: var(--color-surface);
       border-bottom: 1px solid var(--color-border);
     }
-    #header h1 { font-size: 13px; font-weight: 600; color: var(--color-text); white-space: nowrap; }
-    #header h1 span { color: var(--color-accent); }
+    #header h1 {
+      display: flex; align-items: center; gap: 7px;
+      font-size: 13px; font-weight: 600; color: var(--color-text); white-space: nowrap;
+    }
+    #header-logo { height: 20px; width: 20px; object-fit: contain; }
     .toggle-group { display: flex; gap: 4px; }
     .toggle-btn {
       padding: 3px 9px; border-radius: 4px; border: 1px solid var(--color-border);
@@ -174,12 +171,6 @@
     }
     .toggle-btn:hover { background: var(--color-surface-2); color: var(--color-text); }
     .toggle-btn.active { background: var(--color-selected); color: var(--color-accent); border-color: var(--color-accent); }
-    #harness-ready-badge {
-      font-size: 10px; padding: 2px 7px; border-radius: 10px;
-      background: var(--color-surface-2); color: var(--color-text-muted); border: 1px solid var(--color-border);
-      white-space: nowrap;
-    }
-    #harness-ready-badge.ready { background: var(--color-ready-bg); color: var(--color-ready-text); border-color: var(--color-ready-border); }
     /* The always-visible privacy statement (feature 33 AC 11). */
     #privacy-note {
       font-size: 10px; padding: 2px 7px; border-radius: 10px;
@@ -420,16 +411,15 @@
 <body>
   <div id="layout">
     <header id="header">
-      <h1><span>satsuma</span> viz harness</h1>
-      <div class="toggle-group" id="view-mode-toggle">
-        <button class="toggle-btn active" data-mode="lineage" title="Full transitive import lineage">lineage</button>
-        <button class="toggle-btn"        data-mode="single"  title="Single file only">single</button>
-      </div>
+      <!-- Brand header: logo + wordmark only (sl-ohxn). View-mode is an
+           automation concern (?mode= URL parameter or
+           __satsumaHarness.setViewMode); readiness is published on the viz
+           root as data-ready-state — neither belongs in the public chrome. -->
+      <h1><img id="header-logo" src="./satsuma-logo.png" alt="" /> Satsuma</h1>
       <div class="toggle-group" id="theme-toggle">
         <button class="toggle-btn" data-theme="light" title="Light theme">light</button>
         <button class="toggle-btn" data-theme="dark"  title="Dark theme">dark</button>
       </div>
-      <span id="harness-ready-badge">idle</span>
       <!-- The playground's privacy promise, always visible (feature 33 AC 11):
            parsing, rendering, and persistence are entirely client-side. -->
       <span id="privacy-note"
@@ -471,12 +461,14 @@
           <span id="parse-status-text">&#9888; unparsed edits</span>
           <button id="parse-status-dismiss" title="Dismiss" aria-label="Dismiss">&times;</button>
         </span>
-        <button id="editor-collapse-btn" class="toolbar-action" title="Collapse the source pane" aria-label="Collapse the source pane">&#9664;</button>
+        <!-- Labelled collapse handle (sl-i0db): a bare glyph was not
+             discoverable; the action and its payoff are spelled out. -->
+        <button id="editor-collapse-btn" class="toolbar-action" title="Hide the source pane to give the visualization the full width" aria-label="Hide the source pane">&#9664; Hide source</button>
       </div>
       <!-- Overlay editor: app.ts mounts #source-highlight + #source-input here -->
       <div id="source-editor"></div>
       <!-- Re-expand rail: the whole pane while collapsed (sl-1qte) -->
-      <button id="editor-expand-rail" title="Expand the source pane" aria-label="Expand the source pane">source &#9654;</button>
+      <button id="editor-expand-rail" title="Show the source pane" aria-label="Show the source pane">&#9654; Show source</button>
     </section>
 
     <!-- Viz panel: zoom hint + PNG export in toolbar, viz component below -->

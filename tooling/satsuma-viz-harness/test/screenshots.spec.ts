@@ -108,7 +108,12 @@ async function loadFixture(page: Page, fixtureUri: string): Promise<void> {
 }
 
 async function setSingleFileMode(page: Page): Promise<void> {
-  await page.evaluate(() => window.__satsumaHarness.setViewMode?.("single"));
+  await page.waitForFunction(() => {
+    const harness = window.__satsumaHarness;
+    if (!harness?.setViewMode) return false; // app.js not evaluated yet
+    harness.setViewMode("single");
+    return true;
+  });
 }
 
 async function openMapping(page: Page, mappingId: string): Promise<void> {

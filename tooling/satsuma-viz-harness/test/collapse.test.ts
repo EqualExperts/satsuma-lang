@@ -100,3 +100,39 @@ test.describe("Collapsible source pane", () => {
     ).toBe(false);
   });
 });
+
+test.describe("Collapse affordance discoverability (sl-i0db)", () => {
+  // The Feature 34 review flagged the original bare ◀ glyph as "useless —
+  // more obvious hint needed". Both directions must now say what they do in
+  // words, and stay keyboard-operable with accessible names.
+  test("both directions are labelled in words and carry accessible names", async ({
+    page,
+  }) => {
+    await openWithFixture(page);
+
+    const collapseBtn = page.locator("#editor-collapse-btn");
+    await expect(collapseBtn).toHaveText(/Hide source/);
+    await expect(collapseBtn).toHaveAttribute("aria-label", "Hide the source pane");
+
+    await collapseBtn.click();
+    const rail = page.locator("#editor-expand-rail");
+    await expect(rail).toBeVisible();
+    await expect(rail).toHaveText(/Show source/);
+    await expect(rail).toHaveAttribute("aria-label", "Show the source pane");
+  });
+
+  test("collapse and re-expand work with the keyboard alone", async ({ page }) => {
+    await openWithFixture(page);
+
+    // Focus + Enter on the collapse handle, then on the rail: both are real
+    // <button>s, so activation must not depend on a pointer.
+    await page.locator("#editor-collapse-btn").focus();
+    await page.keyboard.press("Enter");
+    await expect(page.locator("#editor-expand-rail")).toBeVisible();
+
+    await page.locator("#editor-expand-rail").focus();
+    await page.keyboard.press("Enter");
+    await expect(page.locator("#editor-expand-rail")).toBeHidden();
+    await expect(page.locator("#source-input")).toBeVisible();
+  });
+});
