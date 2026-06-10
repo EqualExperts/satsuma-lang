@@ -49,44 +49,20 @@ fi
 # 2. LSP standalone npm tarball
 # --------------------------------------------------------------------------- #
 
+# The build copies the WASM and highlights.scm assets into dist/ (see
+# tooling/satsuma-lsp/scripts/copy-assets.js); `npm run pack` then packs,
+# renames to a stable filename, and verifies the tarball contents (sl-vwpr).
+# dist/server.js is a self-contained esbuild bundle, so no node_modules are
+# packed and no file:-symlink replacement is needed.
 echo "==> Building and packing LSP server..."
 npm --prefix "$LSP_DIR" run build
-
-# Replace file: symlinks with real copies so the tarball is self-contained.
-# The LSP depends on @satsuma/core, @satsuma/viz-model, and
-# @satsuma/viz-backend via file: links.
-CORE_SRC="$REPO_ROOT/tooling/satsuma-core"
-VIZ_MODEL_SRC="$REPO_ROOT/tooling/satsuma-viz-model"
-VIZ_BACKEND_SRC="$REPO_ROOT/tooling/satsuma-viz-backend"
-
-LSP_CORE_DEST="$LSP_DIR/node_modules/@satsuma/core"
-LSP_VIZ_DEST="$LSP_DIR/node_modules/@satsuma/viz-model"
-LSP_VIZ_BACKEND_DEST="$LSP_DIR/node_modules/@satsuma/viz-backend"
-
-for pair in \
-  "$CORE_SRC:$LSP_CORE_DEST" \
-  "$VIZ_MODEL_SRC:$LSP_VIZ_DEST" \
-  "$VIZ_BACKEND_SRC:$LSP_VIZ_BACKEND_DEST"; do
-  src="${pair%%:*}"
-  dest="${pair##*:}"
-  if [ -L "$dest" ] || [ -d "$dest" ]; then
-    rm -rf "$dest"
-    cp -rf "$src" "$dest"
-    echo "  replaced symlink at $dest with real copy"
-  fi
-done
-
-(cd "$LSP_DIR" && npm pack)
-
-# Rename the versioned tarball to a stable name.
-LSP_TARBALL=$(find "$LSP_DIR" -maxdepth 1 -name 'satsuma-lsp-*.tgz' -o -name 'at-satsuma-lsp-*.tgz' | head -1)
-if [ -z "$LSP_TARBALL" ]; then
-  echo "ERROR: npm pack did not produce a tarball in $LSP_DIR" >&2
-  exit 1
-fi
+npm --prefix "$LSP_DIR" run pack
 
 LSP_STABLE="$LSP_DIR/satsuma-lsp.tgz"
-mv -f "$LSP_TARBALL" "$LSP_STABLE"
+if [ ! -f "$LSP_STABLE" ]; then
+  echo "ERROR: LSP tarball not found at $LSP_STABLE" >&2
+  exit 1
+fi
 
 # --------------------------------------------------------------------------- #
 # 3. CLI standalone npm tarball

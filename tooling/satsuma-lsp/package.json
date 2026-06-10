@@ -9,9 +9,11 @@
     "satsuma-lsp": "bin/satsuma-lsp.js"
   },
   "scripts": {
-    "prebuild": "npm --prefix ../satsuma-core run build && npm --prefix ../satsuma-viz-backend run build",
+    "prebuild": "npm --prefix ../satsuma-core run build && npm --prefix ../satsuma-viz-backend run build && node scripts/copy-assets.js",
     "build": "esbuild src/server.ts --bundle --platform=node --target=node20 --outfile=dist/server.js --sourcemap --banner:js='var __import_meta_url = require(\"url\").pathToFileURL(__filename).href;' --define:import.meta.url=__import_meta_url",
     "watch": "npm run build -- --watch",
+    "pack": "node scripts/pack.js",
+    "smoke": "node scripts/smoke-initialize.js",
     "test": "node --test test/**/*.test.js",
     "pretest": "npm --prefix ../satsuma-core run build && npm --prefix ../satsuma-viz-backend run build && tsc",
     "test:coverage": "c8 --reporter=text --reporter=lcov --reporter=json-summary --include='dist/**/*.js' --exclude='dist/**/*.d.ts' node --test test/**/*.test.js"
