@@ -86,7 +86,7 @@ namespace staging (note "Cleaned and conformed staging area") {
   // Map GL entries — joins to employees across merged namespace
   mapping `stage gl entries` {
     source {
-      `source::finance_gl`
+      `source::finance_gl`,
       `source::hr_employees`
     }
     target { `stg_gl_entries` }
@@ -121,8 +121,8 @@ namespace reporting (note "Executive reporting layer") {
 
   mapping `build budget vs actual` {
     source {
-      `staging::stg_gl_entries`
-      `source::finance_budgets`
+      `staging::stg_gl_entries`,
+      `source::finance_budgets`,
       `staging::stg_employees`
     }
     target { `dept_budget_vs_actual` }

@@ -652,8 +652,12 @@ function formatSourceBlock(node: SyntaxNode, source: string, indent: number): st
     }
   }
 
-  // Multi-line
-  const inner = items.map(item => ind(indent + 1) + item).join("\n");
+  // Multi-line. The grammar treats commas between source entries as optional,
+  // but the canonical corpus style is comma-separated — preserve it so
+  // formatting matches the single-line style and round-trips (sl-q9oj).
+  const inner = items
+    .map((item, i) => ind(indent + 1) + item + (i < items.length - 1 ? "," : ""))
+    .join("\n");
   return ind(indent) + "source {\n" + inner + "\n" + ind(indent) + "}";
 }
 

@@ -478,8 +478,8 @@ Describe joins in natural language within the source block or as a top-level NL 
 ```
 mapping `opportunity enrichment` {
   source {
-    `sfdc_opportunity`
-    `sfdc_account`
+    `sfdc_opportunity`,
+    `sfdc_account`,
     "Join on sfdc_opportunity.AccountId = sfdc_account.Id"
   }
   target { `snowflake_opps` }

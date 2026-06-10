@@ -415,6 +415,35 @@ describe("mapping formatting", () => {
     const out = fmt(src);
     assert.ok(out.includes("-> t.computed"));
   });
+
+  // Regression for sl-q9oj: the multi-line branch of formatSourceBlock joined
+  // refs with bare newlines, silently dropping the commas the author wrote.
+  // Commas are optional in the grammar but are the canonical corpus style,
+  // so the formatter must preserve them.
+  it("keeps commas between refs when a multi-ref source block goes multi-line", () => {
+    const src = `mapping test {
+  source { store, customers }
+  target { t }
+  store.id -> t.id
+}`;
+    const out = fmt(src);
+    assert.ok(
+      out.includes("    store,\n    customers\n"),
+      `multi-line source refs should stay comma-separated, got:\n${out}`,
+    );
+  });
+
+  // Formatting must be idempotent: re-formatting formatter output (with its
+  // restored commas) must not change it again.
+  it("formats a multi-ref source block idempotently", () => {
+    const src = `mapping test {
+  source { store, customers }
+  target { t }
+  store.id -> t.id
+}`;
+    const once = fmt(src);
+    assert.equal(fmt(once), once);
+  });
 });
 
 // ── Transform, Metric, Note, Import ──────────────────────────────────────────

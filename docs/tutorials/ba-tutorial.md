@@ -331,8 +331,8 @@ Enterprise integrations rarely involve just one source. When a mapping draws fro
 ```satsuma
 mapping `opportunity enrichment` {
   source {
-    `sfdc_opportunity`
-    `sfdc_account`
+    `sfdc_opportunity`,
+    `sfdc_account`,
     "Join on sfdc_opportunity.AccountId = sfdc_account.Id"
   }
   target { `snowflake_opps` }

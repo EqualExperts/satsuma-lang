@@ -62,7 +62,7 @@ schema financial_summary {
 
 mapping order_to_summary {
   source {
-    orders
+    orders,
     billing
   }
   target { financial_summary }

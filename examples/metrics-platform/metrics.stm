@@ -65,7 +65,7 @@ mapping _monthly_recurring_revenue_pipeline {
 
 mapping _customer_lifetime_value_pipeline {
   source {
-    fact_orders
+    fact_orders,
     dim_customer
   }
   target { customer_lifetime_value }
@@ -104,7 +104,7 @@ schema churn_rate (
 
 mapping _churn_rate_pipeline {
   source {
-    fact_subscriptions
+    fact_subscriptions,
     dim_customer
   }
   target { churn_rate }
@@ -148,7 +148,7 @@ schema conversion_rate (
 
 mapping _conversion_rate_pipeline {
   source {
-    fact_opportunities
+    fact_opportunities,
     dim_stage
   }
   target { conversion_rate }
@@ -224,8 +224,8 @@ schema order_revenue (
 
 mapping _order_revenue_pipeline {
   source {
-    fact_orders
-    dim_date
+    fact_orders,
+    dim_date,
     dim_customer
   }
   target { order_revenue }
@@ -276,7 +276,7 @@ schema cart_abandonment_rate (
 
 mapping _cart_abandonment_rate_pipeline {
   source {
-    fact_sessions
+    fact_sessions,
     fact_orders
   }
   target { cart_abandonment_rate }

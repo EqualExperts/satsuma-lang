@@ -201,8 +201,8 @@ mapping `customer 360 assembly` {
   }
 
   source {
-    crm_customers
-    finance_transactions
+    crm_customers,
+    finance_transactions,
     "Left join on @crm_customers.customer_id = @finance_transactions.customer_id.
      All CRM customers appear even if they have no transactions."
   }

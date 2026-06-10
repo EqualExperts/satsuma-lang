@@ -143,8 +143,8 @@ mapping `completed orders` {
   }
 
   source {
-    order_events
-    customer_profiles
+    order_events,
+    customer_profiles,
     "Join on @order_events.customer.customer_id = @customer_profiles.customer_id
      WHERE @order_events.order_status = completed"
   }

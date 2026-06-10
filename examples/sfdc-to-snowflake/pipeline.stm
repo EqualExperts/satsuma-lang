@@ -57,7 +57,7 @@ schema snowflake_opps (note "FACT_OPPORTUNITIES — Snowflake Analytics") {
 // --- Mapping ---
 mapping `opportunity ingestion` {
   source {
-    `sfdc_opportunity`
+    `sfdc_opportunity`,
     `fx_spot_rates`
   }
   target { `snowflake_opps` }
