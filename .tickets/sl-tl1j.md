@@ -1,6 +1,6 @@
 ---
 id: sl-tl1j
-status: in_progress
+status: closed
 deps: [sl-ncu9]
 links: []
 created: 2026-06-09T21:15:33Z
@@ -21,3 +21,10 @@ Eleventy uses no pathPrefix and templates use page-relative asset paths, so a co
 
 'Try it Live!' appears in nav (desktop + mobile) and as a home-page CTA linking to /playground/; deploy workflow copies the static bundle into site/ before the Eleventy build; the published playground loads and renders a seeded example under the GitHub Pages base path; README links to both the published site and the playground (playground link merged together with the deployed build).
 
+
+## Notes
+
+**2026-06-10T01:30:00+01:00**
+
+Cause: Feature work — the playground bundle existed (sl-ncu9) but was not published or linked anywhere on the site or README.
+Fix: deploy-site.yml builds the bundle (ci:all + tree-sitter WASM + build:playground) and copies it into site/playground/ before Eleventy, which ignores+passes it through verbatim (verified byte-identical locally); "Try it Live!" added to desktop/mobile nav and as the primary home CTA; README links playground + site together with the deploy step (commit 69fe254)
