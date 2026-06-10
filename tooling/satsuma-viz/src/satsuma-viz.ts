@@ -734,6 +734,15 @@ export class SatsumaViz extends LitElement {
   @state()
   private _selectedMapping: MappingBlock | null = null;
 
+  /**
+   * Stable identity of the selected mapping across model rebuilds. Live
+   * editing replaces `model` — and every MappingBlock object in it — on each
+   * debounced edit, so the detail-view selection must survive by name rather
+   * than object identity (sl-2ksz). Format: `<namespace ?? "_">::<mapping id>`,
+   * mirroring _overviewMappingNodeId's namespace handling.
+   */
+  private _selectedMappingKey: string | null = null;
+
   @state()
   private _layoutError = false;
 
@@ -834,6 +843,7 @@ export class SatsumaViz extends LitElement {
     }) as EventListener);
     this.addEventListener("open-mapping", ((e: SzOpenMappingEvent) => {
       this._selectedMapping = e.mapping;
+      this._selectedMappingKey = this._mappingKey(e.mapping);
       this._viewMode = "detail";
       this._resetPanZoom();
     }) as EventListener);
@@ -851,9 +861,7 @@ export class SatsumaViz extends LitElement {
 
   override updated(changed: Map<string, unknown>) {
     if (changed.has("model") && this.model) {
-      this._expandedModels = new Map();
-      this._viewMode = "overview";
-      this._selectedMapping = null;
+      this._reconcileViewState(this.model);
       this._runLayout();
     }
 
@@ -878,6 +886,62 @@ export class SatsumaViz extends LitElement {
     ) {
       this._publishAutomationState();
     }
+  }
+
+  /**
+   * Carry user view state across a model replacement.
+   *
+   * Live editing reassigns `model` on every debounced keystroke, so blindly
+   * resetting to the overview here would kick the user out of the mapping
+   * detail view on every edit (sl-2ksz). Instead:
+   *
+   * - keep the detail view open when a mapping with the same namespace + id
+   *   still exists, re-binding the selection to the new model's object
+   *   (pan/zoom is untouched, so the user's viewport survives too);
+   * - keep per-schema expansion state for ids that still resolve, dropping
+   *   entries for schemas that were renamed or deleted;
+   * - fall back to the overview only when the selected mapping is gone.
+   */
+  private _reconcileViewState(model: VizModel) {
+    // Expansion state is keyed by schema/metric/fragment id; prune ids that
+    // no longer exist so a rename doesn't pin a stale subgraph or card state.
+    const liveIds = new Set<string>();
+    for (const ns of model.namespaces) {
+      for (const s of ns.schemas) liveIds.add(s.qualifiedId);
+      for (const m of ns.metrics) liveIds.add(m.qualifiedId);
+      for (const f of ns.fragments) liveIds.add(f.id);
+    }
+    if (this._expandedModels.size > 0) {
+      this._expandedModels = new Map(
+        [...this._expandedModels].filter(([schemaId]) => liveIds.has(schemaId)),
+      );
+    }
+    if (this._compactExpandedIds.size > 0) {
+      this._compactExpandedIds = new Set(
+        [...this._compactExpandedIds].filter((id) => liveIds.has(id)),
+      );
+    }
+
+    if (this._viewMode === "detail" && this._selectedMappingKey) {
+      for (const ns of model.namespaces) {
+        for (const m of ns.mappings) {
+          if (`${ns.name ?? "_"}::${m.id}` === this._selectedMappingKey) {
+            this._selectedMapping = m;
+            return;
+          }
+        }
+      }
+    }
+
+    // No surviving selection (first load, or the mapping was renamed/deleted).
+    this._viewMode = "overview";
+    this._selectedMapping = null;
+    this._selectedMappingKey = null;
+  }
+
+  /** Stable cross-rebuild key for a mapping; see _selectedMappingKey. */
+  private _mappingKey(mapping: MappingBlock): string {
+    return `${this._namespaceForMapping(mapping) ?? "_"}::${mapping.id}`;
   }
 
   /** Add expanded cross-file models triggered by a schema card. */
@@ -1189,6 +1253,7 @@ export class SatsumaViz extends LitElement {
   private _backToOverview() {
     this._viewMode = "overview";
     this._selectedMapping = null;
+    this._selectedMappingKey = null;
     this._resetPanZoom();
   }
 
@@ -1565,6 +1630,7 @@ export class SatsumaViz extends LitElement {
 
   private _openOverviewMapping(mapping: MappingBlock) {
     this._selectedMapping = mapping;
+    this._selectedMappingKey = this._mappingKey(mapping);
     this._viewMode = "detail";
     this._resetPanZoom();
   }
