@@ -67,7 +67,7 @@ mapping `crm to analytics` {
 
 mapping `payments to analytics` {
   source {
-    `payment_gateway`
+    `payment_gateway`,
     `crm_system`
   }
   target { `analytics_db` }
@@ -88,7 +88,7 @@ mapping `payments to analytics` {
 
 mapping `crm to notifications` {
   source {
-    `crm_system`
+    `crm_system`,
     `payment_gateway`
   }
   target { `notification_service` }

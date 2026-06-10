@@ -74,7 +74,7 @@ mapping _weekly_sales_dashboard_report (
   note "represents the logic of the Looker report's underlying query"
 ) {
   source {
-    fact_orders
+    fact_orders,
     dim_product
   }
   target { weekly_sales_dashboard }
@@ -102,7 +102,7 @@ mapping _churn_predictor_pipeline (
   note "represents the logic of the churn_predictor model's underlying pipeline"
 ) {
   source {
-    dim_customer
+    dim_customer,
     fact_orders
   }
   target { churn_predictor }
@@ -132,8 +132,8 @@ mapping _customer_risk_report_pipeline (
   note "represents the logic of the Tableau report's underlying query"
 ) {
   source {
-    dim_customer
-    fact_orders
+    dim_customer,
+    fact_orders,
     churn_predictor
   }
   target { customer_risk_report }

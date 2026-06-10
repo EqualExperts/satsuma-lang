@@ -117,9 +117,9 @@ schema customer_360 (
 // --- Mapping ---
 mapping `customer 360` {
   source {
-    `crm_customers` (filter "email NOT LIKE `%@test.internal`")
-    `order_transactions` (filter "status IN (`completed`, `refunded`)")
-    `support_tickets` (filter "created_at >= date_sub(now(), interval 12 month)")
+    `crm_customers` (filter "email NOT LIKE `%@test.internal`"),
+    `order_transactions` (filter "status IN (`completed`, `refunded`)"),
+    `support_tickets` (filter "created_at >= date_sub(now(), interval 12 month)"),
     "Join @crm_customers to @order_transactions on @crm_customers.customer_id = @order_transactions.customer_id (left join — customers may have no orders).
      Join @crm_customers to @support_tickets on @crm_customers.customer_id = cast(@support_tickets.customer_id as UUID) (left join — customers may have no tickets)."
   }
