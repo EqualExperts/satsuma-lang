@@ -1,14 +1,21 @@
 # @satsuma/viz-harness
 
-Standalone browser harness for the Satsuma mapping visualization. The harness
-hosts the production `@satsuma/viz` web component, serves real `.stm` fixtures
-through `@satsuma/viz-backend`, and provides a Playwright suite that drives
-the rendered viz the same way a user would. Feature 30 (`features/30-viz-test-suite-expansion/PRD.md`)
-expanded the suite into a high-value regression net plus a deterministic
-screenshot review workflow.
+Standalone browser harness for the Satsuma mapping visualization — and, since
+feature 33, the source of the public **"Try it Live!" playground**. The package
+plays two roles:
+
+1. **Playwright host.** The harness hosts the production `@satsuma/viz` web
+   component and provides a Playwright suite that drives the rendered viz the
+   same way a user would. Feature 30
+   (`features/30-viz-test-suite-expansion/PRD.md`) expanded the suite into a
+   high-value regression net plus a deterministic screenshot review workflow.
+2. **Playground source.** The same browser client is published as a
+   server-free live editor (`npm run build:playground`) where visitors edit
+   Satsuma source and watch the visualization update — entirely client-side.
+   See "The playground" below.
 
 This README is the entry point for working on, running, or contributing to
-that suite.
+either.
 
 ---
 
@@ -23,6 +30,34 @@ that suite.
 | `playwright.config.ts` | Two Playwright projects — `firefox` (semantic suite) and `screenshots` (review artifacts). |
 | `watch-and-test.sh` | Sentinel-file watcher that lets agents trigger Playwright runs without spawning a browser themselves. |
 | `scripts/build-playground.mjs` | Assembles the server-free **"Try it Live!"** bundle (`npm run build:playground` → `dist/playground/`): page, client + viz bundles, both WASM files, and the examples manifest — every asset page-relative so it deploys under a non-root base path (GitHub Pages). |
+
+---
+
+## The playground (server-free live editor)
+
+`npm run build:playground` emits `dist/playground/` — a flat, static bundle
+(page, client + viz bundles, both WASM parser artifacts, bundled examples
+manifest) that runs with **no Node process anywhere**. The deploy workflow
+copies it into the website at `/playground/` ("Try it Live!").
+
+Three pieces make it work, all shared with the dev-server harness:
+
+- **Client-side model pipeline** (`src/client/model-pipeline.ts`, ADR-027):
+  the browser initialises the WASM parser and calls the same
+  `buildModelResultFromSources` the Node server used, so the playground
+  renders exactly what every other surface renders. There is no model
+  endpoint — parsing never leaves the page.
+- **localStorage document library** (`src/client/library.ts`, ADR-028): the
+  picker and the workspace are one thing. The bundled example corpus seeds
+  the library on first visit (edited documents are never overwritten by a
+  re-seed), opened/new files become user documents, and cross-file `import`
+  lineage resolves against the whole library in-browser.
+- **Base-path safety** (`scripts/build-playground.mjs`): every asset reference
+  is page-relative, and the bundler refuses to emit a page with a
+  root-absolute (`/…`) reference, so the bundle works unchanged under GitHub
+  Pages' `/satsuma-lang/playground/` prefix. The `playground-static`
+  Playwright project serves the bundle at that prefix and asserts the privacy
+  guarantee: edit, Open, and Save complete with zero network requests.
 
 ---
 
