@@ -225,6 +225,36 @@ mapping m {
     assert.ok(dupDiag, "expected a duplicate-definition diagnostic");
   });
 
+  // Regression for sl-akz6 / gh-274: on Windows the startup scan indexes a
+  // file under pathToFileURL's spelling (file:///C:/...) while didOpen indexes
+  // it under the client's spelling (file:///c%3A/...). Without canonical index
+  // keys the file exists twice and every definition in it is reported as a
+  // duplicate.
+  it("does not report duplicates when the same file is indexed under two Windows URI spellings", () => {
+    const src = `schema orders { id UUID }`;
+    const idx = createWorkspaceIndex();
+    indexFile(idx, "file:///C:/ws/a.stm", parse(src)); // workspace-scan spelling
+    indexFile(idx, "file:///c%3A/ws/a.stm", parse(src)); // didOpen spelling
+    const diags = computeCoreSemanticDiagnostics("file:///c%3A/ws/a.stm", idx);
+    const dup = diags.find((d) => d.code === "duplicate-definition");
+    assert.equal(dup, undefined, "same file under two spellings must not self-duplicate");
+  });
+
+  // Companion to the spelling test: diagnostics must still be FOUND when the
+  // query uses a different spelling than the index — canonicalization must not
+  // trade false positives for false negatives.
+  it("matches a file's diagnostics across URI spellings of the same path", () => {
+    const aSrc = `import { orders } from "b.stm"\nschema orders { id UUID }`;
+    const bSrc = `schema orders { name STRING }`;
+    const idx = createWorkspaceIndex();
+    indexFile(idx, "file:///C:/ws/a.stm", parse(aSrc));
+    indexFile(idx, "file:///C:/ws/b.stm", parse(bSrc));
+    const scoped = createScopedIndex(idx, getImportReachableUris("file:///c%3A/ws/a.stm", idx));
+    const diags = computeCoreSemanticDiagnostics("file:///c%3A/ws/b.stm", scoped);
+    const dupDiag = diags.find((d) => d.code === "duplicate-definition");
+    assert.ok(dupDiag, "expected the genuine duplicate to be reported under the alternate spelling");
+  });
+
   it("returns no diagnostics for a valid single-file workspace", () => {
     const src = `schema customers { id UUID }
 mapping m {

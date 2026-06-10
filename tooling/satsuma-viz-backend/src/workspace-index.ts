@@ -97,6 +97,49 @@ export interface WorkspaceIndex {
   indexedFiles: Set<string>;
 }
 
+// ---------- URI canonicalization ----------
+
+/**
+ * Canonical form of a `file://` URI used as a workspace-index key.
+ *
+ * The same file can legitimately arrive under different URI spellings: VS Code
+ * clients send `file:///c%3A/...` (lowercase drive letter, percent-encoded
+ * colon) while Node's `pathToFileURL` produces `file:///C:/...`. Keying the
+ * index by raw strings would index one file under both spellings, and every
+ * definition in it would then be counted twice and reported as a duplicate
+ * (sl-akz6, gh-274).
+ *
+ * Canonicalization: decode percent-escapes, lowercase a leading Windows drive
+ * letter (drive letters are case-insensitive; lowercase matches VS Code's own
+ * convention), then let the WHATWG URL serializer re-encode uniformly.
+ * Non-file and unparseable URIs are returned unchanged. Browser-safe — no
+ * Node `path`/`url`.
+ */
+export function canonicalizeFileUri(uri: string): string {
+  let url: URL;
+  try {
+    url = new URL(uri);
+  } catch {
+    return uri;
+  }
+  if (url.protocol !== "file:") return uri;
+
+  let pathname: string;
+  try {
+    pathname = decodeURIComponent(url.pathname);
+  } catch {
+    return uri; // malformed percent-escape — leave the spelling alone
+  }
+  pathname = pathname.replace(
+    /^\/([A-Za-z]):/,
+    (_match, drive: string) => `/${drive.toLowerCase()}:`,
+  );
+
+  const canonical = new URL("file:///");
+  canonical.pathname = pathname; // setter re-encodes uniformly
+  return canonical.toString();
+}
+
 // ---------- Index lifecycle ----------
 
 export function createWorkspaceIndex(): WorkspaceIndex {
@@ -122,7 +165,9 @@ function walkImportGraph(
 ): { reachable: Set<string>; unresolved: string[] } {
   const reachable = new Set<string>();
   const unresolved: string[] = [];
-  const queue = [entryUri];
+  // Canonicalize the entry point so a raw client URI spelling still matches
+  // the canonical keys the index stores (sl-akz6).
+  const queue = [canonicalizeFileUri(entryUri)];
 
   while (queue.length > 0) {
     const uri = queue.pop()!;
@@ -240,7 +285,9 @@ export function buildImportSuggestion(
 /** Resolve an import path relative to the importing file URI. Returns null on failure. */
 function resolveImportUri(importerUri: string, pathText: string): string | null {
   try {
-    return new URL(pathText, importerUri).toString();
+    // Canonicalize so the result matches the index's canonical keys whatever
+    // spelling the import path or importer URI used (sl-akz6).
+    return canonicalizeFileUri(new URL(pathText, importerUri).toString());
   } catch {
     return null;
   }
@@ -288,8 +335,13 @@ function relativeUriPath(fromUri: string, toUri: string): string | null {
   return [...up, ...down].join("/");
 }
 
-/** Index (or re-index) a single file. Replaces any existing entries for the URI. */
+/** Index (or re-index) a single file. Replaces any existing entries for the URI.
+ *  The URI is canonicalized first so the same file arriving under different
+ *  spellings (didOpen vs workspace scan) always replaces, never duplicates,
+ *  its own entries (sl-akz6, gh-274). */
 export function indexFile(index: WorkspaceIndex, uri: string, tree: Tree): void {
+  uri = canonicalizeFileUri(uri);
+
   // Remove old entries for this file first
   removeFile(index, uri);
 
@@ -302,8 +354,10 @@ export function indexFile(index: WorkspaceIndex, uri: string, tree: Tree): void 
   }
 }
 
-/** Remove all entries for a file URI from the index. */
+/** Remove all entries for a file URI from the index (canonicalized first —
+ *  see {@link indexFile}). */
 export function removeFile(index: WorkspaceIndex, uri: string): void {
+  uri = canonicalizeFileUri(uri);
   index.indexedFiles.delete(uri);
   index.imports.delete(uri);
 

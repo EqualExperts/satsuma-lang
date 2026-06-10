@@ -22,6 +22,7 @@ import type { Tree } from "./parser-utils";
 import type { WorkspaceIndex, DefinitionEntry } from "./workspace-index";
 import {
   buildImportSuggestion,
+  canonicalizeFileUri,
 } from "./workspace-index";
 import {
   validateSemanticWorkspace,
@@ -73,6 +74,10 @@ export function computeSemanticValidationDiagnostics(
   uri: string,
   wsIndex: WorkspaceIndex,
 ): Diagnostic[] {
+  // The index stores canonical URI keys; the client may send another spelling
+  // of the same file (e.g. percent-encoded Windows drive colon). Canonicalize
+  // before comparing, or this file's diagnostics never match it (sl-akz6).
+  uri = canonicalizeFileUri(uri);
   const fileImports = buildFileImportsMap(wsIndex);
   const semanticIndex = buildSemanticIndex(wsIndex);
   const coreDiags = validateSemanticWorkspace(semanticIndex, {
@@ -148,12 +153,13 @@ function buildFileImportsMap(
   return result;
 }
 
-/** Resolve a relative import path to an absolute file URI. Returns null on failure. */
+/** Resolve a relative import path to an absolute file URI. Returns null on failure.
+ *  Canonicalized so it compares equal to the index's canonical keys (sl-akz6). */
 function resolveImportPathToUri(importerUri: string, pathText: string): string | null {
   try {
     const importerPath = fileURLToPath(importerUri);
     const importerDir = dirname(importerPath);
-    return pathToFileURL(resolve(importerDir, pathText)).toString();
+    return canonicalizeFileUri(pathToFileURL(resolve(importerDir, pathText)).toString());
   } catch {
     return null;
   }
