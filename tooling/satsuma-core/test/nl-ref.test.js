@@ -43,6 +43,15 @@ describe("extractAtRefs()", () => {
     assert.equal(refs[0].ref, "order-id");
   });
 
+  it("preserves backtick quoting in the raw form (sl-g6ga)", () => {
+    // `ref` flattens backticks for display, which makes @`tax.rate`
+    // indistinguishable from the path @tax.rate. `raw` keeps the quoting so
+    // classification and resolution can treat the name as literal.
+    const refs = extractAtRefs("uses @`tax.rate` and @plain.path");
+    assert.deepEqual(refs.map((r) => r.ref), ["tax.rate", "plain.path"]);
+    assert.deepEqual(refs.map((r) => r.raw), ["`tax.rate`", "plain.path"]);
+  });
+
   it("returns empty for text with no refs", () => {
     const refs = extractAtRefs("plain text with no references");
     assert.deepEqual(refs, []);
@@ -205,6 +214,26 @@ describe("classifyRef()", () => {
   it("classifies namespace-qualified field", () => {
     assert.equal(classifyRef("crm::customers.email"), "namespace-qualified-field");
   });
+
+  // sl-g6ga: backtick-quoted names legally contain "." and "::". Classification
+  // previously ran on the backtick-stripped string, so @`tax.rate` was treated
+  // as a schema.field path and @`legacy::thing` as a namespaced schema —
+  // both then failed to resolve. Backticked spans must be opaque.
+
+  it("classifies a backticked name containing a dot as bare (sl-g6ga)", () => {
+    assert.equal(classifyRef("`tax.rate`"), "bare");
+  });
+
+  it("classifies a backticked name containing :: as bare (sl-g6ga)", () => {
+    assert.equal(classifyRef("`legacy::thing`"), "bare");
+  });
+
+  it("only counts separators outside backticks in compound refs (sl-g6ga)", () => {
+    // The dot inside the backticks must not promote the schema ref to a field ref.
+    assert.equal(classifyRef("crm::`my.schema`"), "namespace-qualified-schema");
+    // The separator dot before the literal still makes this a dotted field.
+    assert.equal(classifyRef("customers.`tax.rate`"), "dotted-field");
+  });
 });
 
 // ── resolveRef ────────────────────────────────────────────────────────────────
@@ -301,6 +330,49 @@ describe("resolveRef()", () => {
     assert.equal(r.resolved, true);
     assert.equal(r.resolvedTo.name, "::shared_ref.code");
   });
+
+  // sl-g6ga: refs passed in raw (backticked) form must resolve as literal
+  // names — the embedded "." / "::" are part of the name, not path separators.
+
+  it("resolves a backticked field name containing a dot (sl-g6ga)", () => {
+    const lookup = makeLookup({ "::rates": { fields: [{ name: "tax.rate" }], hasSpreads: false } });
+    const ctx = { sources: ["::rates"], targets: [], namespace: null };
+    const r = resolveRef("`tax.rate`", ctx, lookup);
+    assert.equal(r.resolved, true);
+    assert.equal(r.resolvedTo.kind, "field");
+    assert.equal(r.resolvedTo.name, "::rates.tax.rate");
+  });
+
+  it("resolves a backticked field name containing :: (sl-g6ga)", () => {
+    const lookup = makeLookup({ "::legacy": { fields: [{ name: "legacy::thing" }], hasSpreads: false } });
+    const ctx = { sources: ["::legacy"], targets: [], namespace: null };
+    const r = resolveRef("`legacy::thing`", ctx, lookup);
+    assert.equal(r.resolved, true);
+    assert.equal(r.resolvedTo.name, "::legacy.legacy::thing");
+  });
+
+  it("does not let a backticked literal match a nested field path (sl-g6ga)", () => {
+    // @`tax.rate` names ONE field literally called "tax.rate". A schema that
+    // only has a record field tax{rate} must not satisfy it — that ref is
+    // written @tax.rate, without backticks.
+    const lookup = makeLookup({
+      "::rates": { fields: [{ name: "tax", children: [{ name: "rate" }] }], hasSpreads: false },
+    });
+    const ctx = { sources: ["::rates"], targets: [], namespace: null };
+    assert.equal(resolveRef("`tax.rate`", ctx, lookup).resolved, false);
+    // Control: the unquoted form still resolves through the field tree.
+    assert.equal(resolveRef("tax.rate", ctx, lookup).resolved, true);
+  });
+
+  it("resolves a schema-qualified backticked field name (sl-g6ga)", () => {
+    // Compound form: the separator dot picks the schema, the backticked
+    // literal names the field exactly.
+    const lookup = makeLookup({ "::customers": { fields: [{ name: "tax.rate" }], hasSpreads: false } });
+    const ctx = { sources: ["::customers"], targets: [], namespace: null };
+    const r = resolveRef("customers.`tax.rate`", ctx, lookup);
+    assert.equal(r.resolved, true);
+    assert.equal(r.resolvedTo.name, "::customers.tax.rate");
+  });
 });
 
 // ── resolveAllNLRefs ──────────────────────────────────────────────────────────
@@ -328,6 +400,32 @@ describe("resolveAllNLRefs()", () => {
   it("returns empty array for empty input", () => {
     const lookup = makeLookup({});
     assert.deepEqual(resolveAllNLRefs([], lookup), []);
+  });
+
+  it("resolves a backticked ref with an embedded dot as a literal field name (sl-g6ga)", () => {
+    // End-to-end through extraction: the item text carries the backticks, the
+    // resolved record reports the flattened ref but classifies and resolves it
+    // as one literal name, not a schema.field path.
+    const lookup = makeLookup(
+      { "::rates": { fields: [{ name: "tax.rate" }], hasSpreads: false } },
+      {}, {},
+      { my_mapping: { sources: ["::rates"], targets: [], namespace: null } },
+    );
+    const items = [{
+      text: "apply @`tax.rate` here",
+      mapping: "my_mapping",
+      namespace: null,
+      targetField: null,
+      line: 5,
+      column: 0,
+      file: "test.stm",
+    }];
+    const results = resolveAllNLRefs(items, lookup);
+    assert.equal(results.length, 1);
+    assert.equal(results[0].ref, "tax.rate");
+    assert.equal(results[0].classification, "bare");
+    assert.equal(results[0].resolved, true);
+    assert.equal(results[0].resolvedTo.name, "::rates.tax.rate");
   });
 });
 

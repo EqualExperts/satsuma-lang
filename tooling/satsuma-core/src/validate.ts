@@ -423,9 +423,11 @@ function checkNLRefs(index: SemanticIndex, diagnostics: SemanticDiagnostic[]): v
 
     const lookup = makeSemanticLookup(index);
 
-    for (const { ref, offset } of refs) {
-      const classification = classifyRef(ref);
-      const resolution = resolveRef(ref, mappingContext, lookup);
+    for (const { ref, raw, offset } of refs) {
+      // raw keeps backtick quoting so literal names with "." / "::" classify
+      // and resolve correctly (sl-g6ga); ref is the flattened display form.
+      const classification = classifyRef(raw);
+      const resolution = resolveRef(raw, mappingContext, lookup);
       const { line, column } = computeNLRefPosition(item, offset);
 
       if (!resolution.resolved) {

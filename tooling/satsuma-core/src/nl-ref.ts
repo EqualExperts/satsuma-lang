@@ -16,7 +16,13 @@ import type { SpreadEntity, EntityRefResolver, SpreadEntityLookup } from "./spre
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 export interface AtRef {
+  /** Flattened display form with backtick quoting removed (e.g. "tax.rate"). */
   ref: string;
+  /** Matched form with backtick quoting preserved (e.g. "`tax.rate`"). Pass
+   * THIS to classifyRef/resolveRef — flattening makes a literal name with an
+   * embedded "." or "::" indistinguishable from a path (sl-g6ga). */
+  raw: string;
+  /** Byte offset of the @ character within the scanned text. */
   offset: number;
 }
 
@@ -200,23 +206,95 @@ export function extractAtRefs(text: string): AtRef[] {
   while ((match = AT_REF_RE.exec(text)) !== null) {
     const rawRef = match[0].slice(1); // remove @
     const ref = rawRef.replace(/`([^`]+)`/g, "$1");
-    refs.push({ ref, offset: match.index });
+    refs.push({ ref, raw: rawRef, offset: match.index });
   }
 
   return refs;
 }
 
-// ── Classification ────────────────────────────────────────────────────────────
+// ── Ref parsing & classification ──────────────────────────────────────────────
+
+/** One segment of an @ref path. `literal` marks backtick-quoted segments,
+ * whose names may contain "." and "::" without those acting as separators. */
+interface RefSegment {
+  name: string;
+  literal: boolean;
+}
+
+/** A ref split into path segments. `separators[i]` sits between
+ * `segments[i]` and `segments[i+1]` and is either "::" or ".". */
+interface ParsedRef {
+  segments: RefSegment[];
+  separators: ("::" | ".")[];
+}
 
 /**
- * Classify an @ref by its syntactic form.
+ * Split a ref into path segments, honouring backtick quoting: "::" and "."
+ * are only separators OUTSIDE backticks (sl-g6ga). Accepts both raw
+ * (backticked) and flattened refs — for refs without backticks the result is
+ * identical to a plain split, so legacy callers keep their behaviour.
+ */
+function parseRef(ref: string): ParsedRef {
+  const segments: RefSegment[] = [];
+  const separators: ("::" | ".")[] = [];
+  let name = "";
+  let literal = false;
+  let i = 0;
+  while (i < ref.length) {
+    const ch = ref[i];
+    if (ch === "`") {
+      // Opaque span: everything to the closing backtick is part of the name.
+      const close = ref.indexOf("`", i + 1);
+      if (close === -1) {
+        name += ref.slice(i + 1);
+        i = ref.length;
+      } else {
+        name += ref.slice(i + 1, close);
+        i = close + 1;
+      }
+      literal = true;
+      continue;
+    }
+    if (ch === ":" && ref[i + 1] === ":") {
+      segments.push({ name, literal });
+      separators.push("::");
+      name = "";
+      literal = false;
+      i += 2;
+      continue;
+    }
+    if (ch === ".") {
+      segments.push({ name, literal });
+      separators.push(".");
+      name = "";
+      literal = false;
+      i += 1;
+      continue;
+    }
+    name += ch;
+    i += 1;
+  }
+  segments.push({ name, literal });
+  return { segments, separators };
+}
+
+/** Derive the classification from the separators found outside backticks. */
+function classificationOf(separators: ParsedRef["separators"]): RefClassification {
+  const hasNs = separators.includes("::");
+  const hasDot = separators.includes(".");
+  if (hasNs) return hasDot ? "namespace-qualified-field" : "namespace-qualified-schema";
+  if (hasDot) return "dotted-field";
+  return "bare";
+}
+
+/**
+ * Classify an @ref by its syntactic form. Backtick-quoted spans are opaque:
+ * @`tax.rate` is a bare ref to a field literally named "tax.rate", not a
+ * dotted path (sl-g6ga). Pass the raw (backtick-preserving) form when
+ * available — see AtRef.raw.
  */
 export function classifyRef(ref: string): RefClassification {
-  if (ref.includes("::")) {
-    return ref.includes(".") ? "namespace-qualified-field" : "namespace-qualified-schema";
-  }
-  if (ref.includes(".")) return "dotted-field";
-  return "bare";
+  return classificationOf(parseRef(ref).separators);
 }
 
 // ── Resolution ────────────────────────────────────────────────────────────────
@@ -258,15 +336,16 @@ function hasField(fields: FieldDecl[], name: string): boolean {
 }
 
 /**
- * Check if a dotted path resolves to a nested field within a field tree.
+ * Check if a path (as pre-split segment names) resolves to a nested field
+ * within a field tree. Segment names are matched verbatim — splitting happens
+ * at parse time so literal (backticked) names keep their embedded dots.
  *
  * Tries two strategies in order:
  *  1. matchPath — treat the path as anchored from the root of the field tree.
  *  2. searchNestedPath — search for the path starting from any nested record
  *     field, to handle refs that omit leading path segments.
  */
-function hasNestedFieldPath(fields: FieldDecl[], path: string): boolean {
-  const segments = path.split(".");
+function hasNestedFieldPath(fields: FieldDecl[], segments: string[]): boolean {
   if (matchPath(fields, segments)) return true;
   return searchNestedPath(fields, segments);
 }
@@ -305,17 +384,26 @@ function searchNestedPath(fields: FieldDecl[], segments: string[]): boolean {
   return false;
 }
 
-function hasFieldWithSpreads(schema: SchemaLike, fieldName: string, lookup: DefinitionLookup): boolean {
-  if (fieldName.includes(".")) {
-    if (hasNestedFieldPath(schema.fields, fieldName)) return true;
+/**
+ * Check if a field path (parsed segments) exists on a schema, consulting
+ * fragment-spread expansion when declared fields alone don't match.
+ *
+ * A single segment is matched as an exact field name — a literal (backticked)
+ * segment may contain "." or "::" but still names ONE field, never a nested
+ * path (sl-g6ga). Multi-segment paths walk the field tree per segment.
+ */
+function hasFieldWithSpreads(schema: SchemaLike, fieldSegs: RefSegment[], lookup: DefinitionLookup): boolean {
+  const names = fieldSegs.map((s) => s.name);
+  if (names.length > 1) {
+    if (hasNestedFieldPath(schema.fields, names)) return true;
     if (!schema.hasSpreads) return false;
     const expanded = getExpandedFields(schema, lookup);
-    return hasNestedFieldPath([...schema.fields, ...expanded], fieldName);
+    return hasNestedFieldPath([...schema.fields, ...expanded], names);
   }
+  const fieldName = names[0]!;
   if (hasField(schema.fields, fieldName)) return true;
   if (!schema.hasSpreads) return false;
-  const expanded = getExpandedFields(schema, lookup);
-  return hasField(expanded, fieldName);
+  return hasField(getExpandedFields(schema, lookup), fieldName);
 }
 
 /**
@@ -362,42 +450,52 @@ function contextSchemaKey(name: string, namespace: string | null, lookup: Defini
 }
 
 export function resolveRef(ref: string, mappingContext: MappingContext, lookup: DefinitionLookup): Resolution {
-  const classification = classifyRef(ref);
+  // Parse once, honouring backtick quoting: separators inside backticks are
+  // part of the name (sl-g6ga). All index lookups and resolvedTo names below
+  // use flattened (backtick-free) segment names.
+  const { segments, separators } = parseRef(ref);
+  const classification = classificationOf(separators);
 
   if (classification === "namespace-qualified-schema") {
-    if (lookup.hasSchema(ref)) return { resolved: true, resolvedTo: { kind: "schema", name: canonicalKey(ref) } };
-    if (lookup.hasFragment(ref)) return { resolved: true, resolvedTo: { kind: "fragment", name: canonicalKey(ref) } };
-    if (lookup.hasTransform(ref)) return { resolved: true, resolvedTo: { kind: "transform", name: canonicalKey(ref) } };
+    const key = segments.map((s) => s.name).join("::");
+    if (lookup.hasSchema(key)) return { resolved: true, resolvedTo: { kind: "schema", name: canonicalKey(key) } };
+    if (lookup.hasFragment(key)) return { resolved: true, resolvedTo: { kind: "fragment", name: canonicalKey(key) } };
+    if (lookup.hasTransform(key)) return { resolved: true, resolvedTo: { kind: "transform", name: canonicalKey(key) } };
     return { resolved: false, resolvedTo: null };
   }
 
   if (classification === "namespace-qualified-field") {
-    const dotIdx = ref.indexOf(".", ref.indexOf("::") + 2);
-    const schemaRef = ref.slice(0, dotIdx);
-    const fieldName = ref.slice(dotIdx + 1);
+    // Grammar shape: ns::schema.field(.field)* — every "::" precedes the
+    // first ".", so the segments before it form the schema key.
+    const firstDot = separators.indexOf(".");
+    const schemaRef = segments.slice(0, firstDot + 1).map((s) => s.name).join("::");
+    const fieldSegs = segments.slice(firstDot + 1);
+    const fieldName = fieldSegs.map((s) => s.name).join(".");
     const schema = lookup.getSchema(schemaRef);
-    if (schema && hasFieldWithSpreads(schema, fieldName, lookup)) {
+    if (schema && hasFieldWithSpreads(schema, fieldSegs, lookup)) {
       return { resolved: true, resolvedTo: { kind: "field", name: `${canonicalKey(schemaRef)}.${fieldName}` } };
     }
     return { resolved: false, resolvedTo: null };
   }
 
   if (classification === "dotted-field") {
-    const dotIdx = ref.indexOf(".");
-    const schemaName = ref.slice(0, dotIdx);
-    const fieldName = ref.slice(dotIdx + 1);
+    const names = segments.map((s) => s.name);
+    const schemaName = names[0]!;
+    const fieldSegs = segments.slice(1);
+    const fieldName = fieldSegs.map((s) => s.name).join(".");
+    const fullPath = names.join(".");
 
     const allSchemas = [...(mappingContext.sources ?? []), ...(mappingContext.targets ?? [])];
     for (const s of allSchemas) {
       const key = contextSchemaKey(s, mappingContext.namespace, lookup);
       const schema = lookup.getSchema(key);
-      if (schema && hasNestedFieldPath(schema.fields, ref)) {
-        return { resolved: true, resolvedTo: { kind: "field", name: `${canonicalKey(key)}.${ref}` } };
+      if (schema && hasNestedFieldPath(schema.fields, names)) {
+        return { resolved: true, resolvedTo: { kind: "field", name: `${canonicalKey(key)}.${fullPath}` } };
       }
       if (schema?.hasSpreads) {
         const expanded = getExpandedFields(schema, lookup);
-        if (hasNestedFieldPath([...schema.fields, ...expanded], ref)) {
-          return { resolved: true, resolvedTo: { kind: "field", name: `${canonicalKey(key)}.${ref}` } };
+        if (hasNestedFieldPath([...schema.fields, ...expanded], names)) {
+          return { resolved: true, resolvedTo: { kind: "field", name: `${canonicalKey(key)}.${fullPath}` } };
         }
       }
     }
@@ -408,7 +506,7 @@ export function resolveRef(ref: string, mappingContext: MappingContext, lookup: 
       if (baseName === schemaName || s === schemaName) {
         const key = contextSchemaKey(s, mappingContext.namespace, lookup);
         const schema = lookup.getSchema(key);
-        if (schema && hasFieldWithSpreads(schema, fieldName, lookup)) {
+        if (schema && hasFieldWithSpreads(schema, fieldSegs, lookup)) {
           return { resolved: true, resolvedTo: { kind: "field", name: `${canonicalKey(key)}.${fieldName}` } };
         }
       }
@@ -425,26 +523,28 @@ export function resolveRef(ref: string, mappingContext: MappingContext, lookup: 
         const nsIdx = key.indexOf("::");
         const baseName = nsIdx !== -1 ? key.slice(nsIdx + 2) : key;
         if (baseName === schemaName || key === schemaName) {
-          if (hasFieldWithSpreads(schema, fieldName, lookup)) {
+          if (hasFieldWithSpreads(schema, fieldSegs, lookup)) {
             return { resolved: true, resolvedTo: { kind: "field", name: `${canonicalKey(key)}.${fieldName}` } };
           }
         }
         // Also try as nested path within this schema
-        if (hasNestedFieldPath(schema.fields, ref)) {
-          return { resolved: true, resolvedTo: { kind: "field", name: `${canonicalKey(key)}.${ref}` } };
+        if (hasNestedFieldPath(schema.fields, names)) {
+          return { resolved: true, resolvedTo: { kind: "field", name: `${canonicalKey(key)}.${fullPath}` } };
         }
       }
     }
     return { resolved: false, resolvedTo: null };
   }
 
-  // Bare identifier
+  // Bare identifier — a single segment whose name may legally contain "." or
+  // "::" when backtick-quoted; entity-map lookups use the name verbatim.
+  const bareName = segments[0]!.name;
   const allSchemaNames = [...(mappingContext.sources ?? []), ...(mappingContext.targets ?? [])];
   for (const s of allSchemaNames) {
     const key = contextSchemaKey(s, mappingContext.namespace, lookup);
     const schema = lookup.getSchema(key);
-    if (schema && hasFieldWithSpreads(schema, ref, lookup)) {
-      return { resolved: true, resolvedTo: { kind: "field", name: `${canonicalKey(key)}.${ref}` } };
+    if (schema && hasFieldWithSpreads(schema, segments, lookup)) {
+      return { resolved: true, resolvedTo: { kind: "field", name: `${canonicalKey(key)}.${bareName}` } };
     }
   }
 
@@ -452,22 +552,22 @@ export function resolveRef(ref: string, mappingContext: MappingContext, lookup: 
   // searching all workspace schemas for the bare field name.
   if (allSchemaNames.length === 0 && lookup.iterateSchemas) {
     for (const [key, schema] of lookup.iterateSchemas()) {
-      if (hasFieldWithSpreads(schema, ref, lookup)) {
-        return { resolved: true, resolvedTo: { kind: "field", name: `${canonicalKey(key)}.${ref}` } };
+      if (hasFieldWithSpreads(schema, segments, lookup)) {
+        return { resolved: true, resolvedTo: { kind: "field", name: `${canonicalKey(key)}.${bareName}` } };
       }
     }
   }
 
   if (mappingContext.namespace) {
-    const nsRef = `${mappingContext.namespace}::${ref}`;
+    const nsRef = `${mappingContext.namespace}::${bareName}`;
     if (lookup.hasSchema(nsRef)) return { resolved: true, resolvedTo: { kind: "schema", name: canonicalKey(nsRef) } };
     if (lookup.hasFragment(nsRef)) return { resolved: true, resolvedTo: { kind: "fragment", name: canonicalKey(nsRef) } };
     if (lookup.hasTransform(nsRef)) return { resolved: true, resolvedTo: { kind: "transform", name: canonicalKey(nsRef) } };
   }
 
-  if (lookup.hasSchema(ref)) return { resolved: true, resolvedTo: { kind: "schema", name: canonicalKey(ref) } };
-  if (lookup.hasFragment(ref)) return { resolved: true, resolvedTo: { kind: "fragment", name: canonicalKey(ref) } };
-  if (lookup.hasTransform(ref)) return { resolved: true, resolvedTo: { kind: "transform", name: canonicalKey(ref) } };
+  if (lookup.hasSchema(bareName)) return { resolved: true, resolvedTo: { kind: "schema", name: canonicalKey(bareName) } };
+  if (lookup.hasFragment(bareName)) return { resolved: true, resolvedTo: { kind: "fragment", name: canonicalKey(bareName) } };
+  if (lookup.hasTransform(bareName)) return { resolved: true, resolvedTo: { kind: "transform", name: canonicalKey(bareName) } };
 
   return { resolved: false, resolvedTo: null };
 }
@@ -792,9 +892,12 @@ export function resolveAllNLRefs(
       namespace: item.namespace,
     };
 
-    for (const { ref, offset } of atRefs) {
-      const classification = classifyRef(ref);
-      const resolution = resolveRef(ref, mappingContext, lookup);
+    for (const { ref, raw, offset } of atRefs) {
+      // Classify and resolve on the raw form — backticked names with embedded
+      // separators must stay literal (sl-g6ga). The flattened `ref` is what
+      // consumers display and match on.
+      const classification = classifyRef(raw);
+      const resolution = resolveRef(raw, mappingContext, lookup);
 
       // Use the shared helper, then convert back to the 0-based line that
       // ResolvedNLRef has historically returned (consumers add +1 themselves).
