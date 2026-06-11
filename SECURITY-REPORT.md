@@ -130,9 +130,9 @@ listed in earlier revisions has been **removed** — nothing compiles C on your
 machine at install time.
 
 **Mitigations:**
-- `npm audit --omit=dev --audit-level=high` runs in CI and blocks high/critical findings — but currently only over 5 of the package directories (see [Known Gaps](#known-gaps-and-honest-caveats))
+- `npm audit --omit=dev --audit-level=high` runs in CI and blocks high/critical findings — since 2026-06-11 over **every** directory with a tracked `package-lock.json` (the loop discovers lockfiles automatically, so new packages are covered without workflow edits)
 - A local audit on 2026-06-11 across **all 9 package directories** (production *and* dev dependencies) found **0 vulnerabilities**
-- Dependabot opens weekly update PRs (coverage gaps noted below)
+- Dependabot opens weekly update PRs for every package directory plus GitHub Actions
 - Pre-built release tarballs bundle dependencies so end users skip `npm install` entirely
 - `package-lock.json` pins exact versions
 - All packages are marked `"private": true` — they cannot be accidentally published to npm
@@ -406,13 +406,13 @@ reading the workflows, not the previous report):
 
 | Control | Tool | Status |
 |---|---|---|
-| **Dependency vulnerabilities** | `npm audit --omit=dev --audit-level=high` | ✅ Active — root, CLI, tree-sitter, LSP, VS Code extension. ⚠️ Does **not** yet cover satsuma-core, the four viz packages, or the site |
+| **Dependency vulnerabilities** | `npm audit --omit=dev --audit-level=high` | ✅ Active — every directory with a tracked `package-lock.json` (10 as of 2026-06-11); the CI loop discovers lockfiles automatically, so new packages are covered without workflow edits |
 | **Static analysis (SAST)** | Semgrep (`--config auto`, ERROR+WARNING) | ✅ Active on every push/PR to main; results uploaded as SARIF |
 | **Secret scanning** | Gitleaks | ⚠️ **Disabled since 2026-06-04** pending org licence; re-enables automatically when `GITLEAKS_LICENSE` is provisioned |
 | **Semantic analysis (CodeQL)** | — | ❌ Not running. The previous report listed CodeQL as a control; only the SARIF *upload action* (which is published under `github/codeql-action`) is used. No CodeQL analysis job exists |
 | **Parser integrity** | `tree-sitter generate` + diff | ✅ Active — CI fails if committed parser sources differ from regenerated output |
 | **Grammar conflict budget** | `CONFLICTS.expected` check | ✅ Active — grammar conflict count must match the documented expectation |
-| **Dependency updates** | Dependabot (weekly) | ✅ Active for root, CLI, tree-sitter, VS Code extension (+nested server), GitHub Actions. ⚠️ Missing: satsuma-core, viz packages, site |
+| **Dependency updates** | Dependabot (weekly) | ✅ Active for all 11 package directories plus GitHub Actions. ⚠️ Unlike the audit loop, Dependabot needs a manual entry per directory — add one when creating a new package |
 | **Release gate** | `release.yml` calls `security.yml` | ✅ Active — releases require the security workflow to pass (with the caveat that the gate is only as strong as the checks enabled within it) |
 | **Release smoke tests** | Global-install + LSP handshake checks | ✅ Active — tarballs are installed and exercised before publishing |
 | **Pre-commit hooks** | `scripts/run-repo-checks.sh` | ✅ Lint + full local test suite across packages before every commit |
@@ -437,11 +437,12 @@ discovered. None is a known vulnerability; all reduce *assurance*.
 1. **Secret scanning is currently off.** Gitleaks has been skipped in CI
    since 2026-06-04 pending an organization licence. It re-enables
    automatically once the licence secret is provisioned.
-2. **CI dependency auditing covers 5 of 10 package directories.**
-   `satsuma-core`, the four viz packages, and the website are not in the
-   `npm audit` loop or Dependabot config. (A full local audit of all
-   directories on 2026-06-11 found 0 vulnerabilities, but that is a
-   point-in-time check, not a continuous control.)
+2. **~~CI dependency auditing covers 5 of 10 package directories.~~
+   Closed 2026-06-11 (sl-qpbx).** The `npm audit` CI loop now discovers
+   every tracked `package-lock.json` automatically, and Dependabot has an
+   entry for every package directory. The residual risk is Dependabot
+   coverage drifting when a new package is added without a matching
+   `dependabot.yml` entry (the audit loop has no such drift).
 3. **Allowlist expiry is not enforced.** Expired allowlist entries do not
    fail CI; re-review depends on humans noticing.
 4. **No CodeQL.** SAST coverage is Semgrep `--config auto` only.
@@ -584,9 +585,9 @@ tracing, workflow YAML review) plus direct local `npm audit` runs.
    since 2026-06-04 awaiting an org licence. If procurement stalls, switch to
    a licence-free alternative (e.g. `gitleaks` CLI pinned in CI, or
    `trufflehog`) rather than running without scanning.
-2. **Extend `npm audit` and Dependabot to all package directories.** Six
-   directories with real production dependencies (`satsuma-core`, four viz
-   packages, `site`) have no continuous dependency monitoring.
+2. **~~Extend `npm audit` and Dependabot to all package directories.~~
+   Done 2026-06-11 (sl-qpbx).** The CI audit loop now discovers every
+   tracked lockfile, and `dependabot.yml` covers every package directory.
 3. **Implement allowlist expiry enforcement.** The `expires` field exists in
    `.security-allowlist.yml` but nothing checks it. A few lines in the
    existing parse script would make expired findings fail CI.
