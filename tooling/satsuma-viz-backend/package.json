@@ -34,7 +34,7 @@
   "dependencies": {
     "@satsuma/core": "file:../satsuma-core",
     "@satsuma/viz-model": "file:../satsuma-viz-model",
-    "vscode-languageserver-types": "^3.17.5"
+    "vscode-languageserver-types": "^3.18.0"
   },
   "devDependencies": {
     "@types/node": "^25.5.0",
