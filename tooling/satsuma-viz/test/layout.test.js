@@ -378,6 +378,150 @@ describe("computeLayout", () => {
   });
 });
 
+describe("computeLayout edge metadata survives namespaces and concurrency (sl-i8mo)", () => {
+  /** @type {typeof import("../dist/satsuma-viz.js").computeLayout} */
+  let computeLayout;
+
+  /** Wrap namespace groups into a minimal VizModel. */
+  const model = (...namespaces) => ({ uri: "file:///test.stm", fileNotes: [], namespaces });
+
+  /** A namespace group with defaults for the parts a case doesn't exercise. */
+  const ns = (name, parts = {}) => ({
+    name,
+    schemas: [],
+    mappings: [],
+    metrics: [],
+    fragments: [],
+    ...parts,
+  });
+
+  it("loads the layout module", async () => {
+    computeLayout = (await import("../dist/satsuma-viz.js")).computeLayout;
+  });
+
+  it("keeps edge metadata from an earlier namespace when a later namespace has no mappings", async () => {
+    // sl-i8mo: edge bookkeeping was module-level and cleared once per
+    // namespace, so ANY later namespace group — even one without mappings —
+    // erased every earlier edge's source/target/arrow metadata.
+    const result = await computeLayout(model(
+      ns(null, {
+        schemas: [schema("src", [field("email")]), schema("tgt", [field("email")])],
+        mappings: [mapping("m1", ["src"], "tgt", [arrow("email", "email")])],
+      }),
+      ns("crm", { schemas: [schema("customers", [field("id")], "crm::customers")] }),
+    ));
+
+    assert.equal(result.edges.length, 1, "the global mapping should produce one edge");
+    const edge = result.edges[0];
+    assert.equal(edge.sourceNode, "src", "edge must keep its source node after a later namespace is processed");
+    assert.equal(edge.targetNode, "tgt", "edge must keep its target node after a later namespace is processed");
+    assert.equal(edge.sourceField, "email");
+    assert.equal(edge.arrow.targetField, "email", "edge must keep its real arrow, not the dummy fallback");
+  });
+
+  it("returns each call's own edge metadata when layouts run concurrently", async () => {
+    // sl-i8mo: the shared module-level maps meant a second computeLayout call
+    // could repopulate state between another call's graph build and its
+    // post-await extraction. Identical mapping ids make a stale read visible:
+    // model A's edge would pick up model B's metadata.
+    const modelFor = (suffix) => model(ns(null, {
+      schemas: [schema(`src_${suffix}`, [field("id")]), schema(`tgt_${suffix}`, [field("id")])],
+      mappings: [mapping("m1", [`src_${suffix}`], `tgt_${suffix}`, [arrow("id", "id")])],
+    }));
+
+    const [a, b] = await Promise.all([computeLayout(modelFor("a")), computeLayout(modelFor("b"))]);
+
+    assert.equal(a.edges[0].sourceNode, "src_a", "first call must see its own source node");
+    assert.equal(b.edges[0].sourceNode, "src_b", "second call must see its own source node");
+  });
+});
+
+describe("computeLayout field ports for dotted, prefixed, and namespaced paths (sl-l7u0)", () => {
+  /** @type {typeof import("../dist/satsuma-viz.js").computeLayout} */
+  let computeLayout;
+
+  const model = (schemas, mappings = []) => ({
+    uri: "file:///test.stm",
+    fileNotes: [],
+    namespaces: [{ name: null, schemas, mappings, metrics: [], fragments: [] }],
+  });
+
+  it("loads the layout module", async () => {
+    computeLayout = (await import("../dist/satsuma-viz.js")).computeLayout;
+  });
+
+  it("renders an edge whose arrow uses a schema-prefixed source path", async () => {
+    // sl-l7u0: ports were keyed by bare field name while the edge lookup used
+    // the authored ref verbatim, so "src.email" found no port and the edge
+    // was silently dropped.
+    const result = await computeLayout(model(
+      [schema("src", [field("email")]), schema("tgt", [field("email")])],
+      [mapping("m1", ["src"], "tgt", [arrow("src.email", "email")])],
+    ));
+
+    assert.equal(result.edges.length, 1, "prefixed source ref must resolve to the declared field's port");
+    assert.equal(result.edges[0].sourceNode, "src");
+  });
+
+  it("renders an edge whose target is a nested dotted field path", async () => {
+    const tgt = schema("tgt", [{ ...field("customer", "record"), children: [field("email")] }]);
+    const result = await computeLayout(model(
+      [schema("src", [field("email")]), tgt],
+      [mapping("m1", ["src"], "tgt", [arrow("email", "customer.email")])],
+    ));
+
+    assert.equal(result.edges.length, 1, "nested dotted target path must resolve to the child field's port");
+    assert.equal(result.edges[0].targetField, "customer.email");
+  });
+
+  it("attaches a multi-source arrow to the source schema that declares the field", async () => {
+    // Pre-fix the edge was always pinned to sourceRefs[0]; a ref like "b.id"
+    // then looked up a non-existent port on schema a and the edge vanished.
+    const result = await computeLayout(model(
+      [schema("a", [field("x")]), schema("b", [field("id")]), schema("tgt", [field("id")])],
+      [mapping("m1", ["a", "b"], "tgt", [arrow("b.id", "id")])],
+    ));
+
+    assert.equal(result.edges.length, 1);
+    assert.equal(result.edges[0].sourceNode, "b", "the edge must start at the schema declaring the field");
+  });
+
+  it("keeps ports distinct for same-named fields at different nesting levels", async () => {
+    // Pre-fix both rows produced the id "node:email:src" and the later port
+    // silently overwrote the earlier one in LayoutNode.ports.
+    const result = await computeLayout(model(
+      [schema("s", [field("email"), { ...field("customer", "record"), children: [field("email")] }])],
+    ));
+
+    const ports = result.nodes.get("s").ports;
+    const top = ports.get("email:src");
+    const nested = ports.get("customer.email:src");
+    assert.ok(top, "top-level field must keep its port");
+    assert.ok(nested, "nested same-named field must get its own path-keyed port");
+    assert.notEqual(top.y, nested.y, "the two ports must sit on different field rows");
+  });
+
+  it("keys ports by field path even when the node id contains '::'", async () => {
+    // Pre-fix extractLayout split port ids on ":", so a namespaced node id
+    // like "crm::customers" yielded garbage field keys.
+    const result = await computeLayout({
+      uri: "file:///test.stm",
+      fileNotes: [],
+      namespaces: [{
+        name: "crm",
+        schemas: [schema("customers", [field("id")], "crm::customers")],
+        mappings: [],
+        metrics: [],
+        fragments: [],
+      }],
+    });
+
+    const ports = result.nodes.get("crm::customers").ports;
+    assert.ok(ports.get("id:src"), "field key must be the local path, undamaged by '::' in the node id");
+    assert.ok(ports.get("id:tgt"));
+  });
+});
+
 describe("computeOverviewLayout", () => {
   /** @type {typeof import("../dist/satsuma-viz.js").computeOverviewLayout} */
   let computeOverviewLayout;

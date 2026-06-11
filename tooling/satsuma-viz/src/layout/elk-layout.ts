@@ -8,7 +8,6 @@
 import ELK from "elkjs/lib/elk.bundled.js";
 import type {
   VizModel,
-  NamespaceGroup,
   SchemaCard,
   MetricCard,
   FragmentCard,
@@ -16,9 +15,8 @@ import type {
   FieldEntry,
   ArrowEntry,
   EachBlock,
-  FlattenBlock,
 } from "../model.js";
-import { buildMappedFieldsIndex } from "../field-coverage.js";
+import { resolveSchemaLocalFieldPath, type FieldPathCard } from "../field-coverage.js";
 import { metricFieldEntries } from "../metric-adapter.js";
 import {
   HEADER_HEIGHT,
@@ -38,7 +36,11 @@ export interface LayoutNode {
   height: number;
   kind?: "schema" | "metric" | "fragment" | "mapping";
   hasNamespace?: boolean;
-  /** Port positions keyed by field name */
+  /**
+   * Port positions keyed by `<schema-local dotted field path>:<src|tgt>`,
+   * e.g. "customer.email:tgt". Nested fields use their full dotted path so
+   * same-named fields at different nesting levels stay distinct (sl-l7u0).
+   */
   ports: Map<string, { x: number; y: number }>;
 }
 
@@ -374,21 +376,25 @@ const elk = new ELK();
 
 /**
  * Compute layout for a VizModel. Returns positioned nodes and routed edges.
+ *
+ * Safe to call concurrently: all bookkeeping (port registry, edge metadata)
+ * lives in a per-invocation GraphContext, never in module state (sl-i8mo).
  */
 export async function computeLayout(model: VizModel): Promise<LayoutResult> {
-  // Build sets of mapped fields per schema (from arrows)
-  const mappedFieldsBySchema = buildMappedFieldsIndex(model);
+  const { graph, ctx } = buildElkGraph(model);
+  const result = await elk.layout(graph);
 
-  const elkGraph = buildElkGraph(model, mappedFieldsBySchema);
-  const result = await elk.layout(elkGraph);
-
-  return extractLayout(result, model);
+  return extractLayout(result, model, ctx);
 }
 
-function buildElkGraph(
-  model: VizModel,
-  mappedFields: Map<string, Set<string>>,
-): ElkGraph {
+function buildElkGraph(model: VizModel): { graph: ElkGraph; ctx: GraphContext } {
+  const ctx: GraphContext = {
+    edgeMeta: new Map(),
+    portInfo: new Map(),
+    portsByNode: new Map(),
+    cardsByNode: new Map(),
+  };
+
   // Build fragment lookup for spread expansion in schema port generation
   const fragmentsById = new Map<string, FieldEntry[]>();
   for (const ns of model.namespaces) {
@@ -401,27 +407,21 @@ function buildElkGraph(
   const edges: ElkEdge[] = [];
 
   for (const ns of model.namespaces) {
-    addSchemaNodes(ns.schemas, mappedFields, children, !!ns.name, fragmentsById);
-    addFragmentNodes(ns.fragments, children, !!ns.name);
-    addMetricNodes(ns.metrics, mappedFields, children, !!ns.name);
+    addSchemaNodes(ns.schemas, children, ctx, !!ns.name, fragmentsById);
+    addFragmentNodes(ns.fragments, children, ctx, !!ns.name);
+    addMetricNodes(ns.metrics, children, ctx, !!ns.name);
   }
 
-  // Build a set of all port IDs so we can validate edge endpoints
-  allPortIds = new Set<string>();
-  const collectPorts = (nodes: ElkNode[]) => {
-    for (const n of nodes) {
-      for (const p of n.ports) allPortIds.add(p.id);
-      if (n.children.length > 0) collectPorts(n.children);
-    }
-  };
-  collectPorts(children);
-
-  // Add edges after ports are collected (so missing-port validation works)
+  // Add edges after all nodes are registered: mappings reference schemas and
+  // metrics across namespaces, so every port must be known first. Edge
+  // metadata accumulates across namespaces in the shared context — earlier
+  // namespaces must not lose their entries when a later one is processed
+  // (sl-i8mo).
   for (const ns of model.namespaces) {
-    addMappingEdges(ns.mappings, edges);
+    addMappingEdges(ns.mappings, edges, ctx);
   }
 
-  return {
+  const graph: ElkGraph = {
     id: "root",
     layoutOptions: {
       "elk.algorithm": "layered",
@@ -436,12 +436,14 @@ function buildElkGraph(
     children,
     edges,
   };
+
+  return { graph, ctx };
 }
 
 function addSchemaNodes(
   schemas: SchemaCard[],
-  mappedFields: Map<string, Set<string>>,
   target: ElkNode[],
+  ctx: GraphContext,
   hasNamespace = false,
   fragmentsById: Map<string, FieldEntry[]> = new Map(),
 ) {
@@ -451,7 +453,8 @@ function addSchemaNodes(
     // Expand spread fields so ports exist for arrow endpoints that reference them
     const spreadFields = (s.spreads ?? []).flatMap((name) => fragmentsById.get(name) ?? []);
     const allFields = [...s.fields, ...spreadFields];
-    const ports = buildFieldPorts(allFields, s.qualifiedId, mappedFields, topOffset, width);
+    const ports = buildFieldPorts(allFields, s.qualifiedId, ctx, topOffset, width);
+    ctx.cardsByNode.set(s.qualifiedId, { qualifiedId: s.qualifiedId, fields: allFields });
 
     target.push({
       id: s.qualifiedId,
@@ -464,13 +467,18 @@ function addSchemaNodes(
   }
 }
 
-function addFragmentNodes(fragments: FragmentCard[], target: ElkNode[], hasNamespace = false) {
+function addFragmentNodes(
+  fragments: FragmentCard[],
+  target: ElkNode[],
+  ctx: GraphContext,
+  hasNamespace = false,
+) {
   for (const f of fragments) {
     const width = estimateFragmentWidth(f);
     const ports = buildFieldPorts(
       f.fields,
       f.id,
-      new Map(),
+      ctx,
       (hasNamespace ? NAMESPACE_PILL_HEIGHT : 0) + HEADER_HEIGHT + FIELDS_PADDING_TOP,
       width,
     );
@@ -488,8 +496,8 @@ function addFragmentNodes(fragments: FragmentCard[], target: ElkNode[], hasNames
 
 function addMetricNodes(
   metrics: MetricCard[],
-  mappedFields: Map<string, Set<string>>,
   target: ElkNode[],
+  ctx: GraphContext,
   hasNamespace = false,
 ) {
   for (const m of metrics) {
@@ -503,7 +511,9 @@ function addMetricNodes(
       (hasNamespace ? NAMESPACE_PILL_HEIGHT : 0) + HEADER_HEIGHT + metaHeight + FIELDS_PADDING_TOP;
     // MetricFieldEntry is a leaner type than FieldEntry; the shared adapter
     // widens it so buildFieldPorts can generate ports for metric fields.
-    const ports = buildFieldPorts(metricFieldEntries(m), m.qualifiedId, mappedFields, topOffset, width);
+    const fields = metricFieldEntries(m);
+    const ports = buildFieldPorts(fields, m.qualifiedId, ctx, topOffset, width);
+    ctx.cardsByNode.set(m.qualifiedId, { qualifiedId: m.qualifiedId, fields });
 
     target.push({
       id: m.qualifiedId,
@@ -516,43 +526,56 @@ function addMetricNodes(
   }
 }
 
+/**
+ * Generate left (src) and right (tgt) ports for every field row, nested
+ * fields included, and register them in the context.
+ *
+ * Ports are keyed by the field's full dotted path within the card
+ * ("customer.email"), not its bare name, so same-named fields at different
+ * nesting levels get distinct ports and arrow endpoints that use dotted
+ * paths resolve (sl-l7u0). Port ids are never parsed back — extractLayout
+ * recovers the field path through ctx.portInfo — so node ids containing
+ * ":" or "::" cannot corrupt lookups.
+ */
 function buildFieldPorts(
   fields: FieldEntry[],
   nodeId: string,
-  _mappedFields: Map<string, Set<string>>,
+  ctx: GraphContext,
   topOffset = HEADER_HEIGHT + FIELDS_PADDING_TOP,
   nodeWidth = CARD_MIN_WIDTH,
 ): ElkPort[] {
   const ports: ElkPort[] = [];
+  const nodePorts = new Map<string, { src: string; tgt: string }>();
+  ctx.portsByNode.set(nodeId, nodePorts);
   let index = 0;
 
-  const walk = (fieldList: FieldEntry[], depth: number) => {
+  const addPort = (path: string, side: "src" | "tgt", x: number, y: number): string => {
+    // "|" keeps ids readable; uniqueness is guaranteed by the registry check
+    // below, not by the delimiter (backtick names may contain any character).
+    let id = `${nodeId}|${path}|${side}`;
+    for (let n = 1; ctx.portInfo.has(id); n++) id = `${nodeId}|${path}|${side}#${n}`;
+    ctx.portInfo.set(id, { nodeId, fieldPath: path, side });
+    ports.push({ id, x, y, width: 1, height: 1 });
+    return id;
+  };
+
+  const walk = (fieldList: FieldEntry[], parentPath: string) => {
     for (const f of fieldList) {
+      const path = parentPath ? `${parentPath}.${f.name}` : f.name;
       const y = topOffset + index * FIELD_HEIGHT + PORT_Y_OFFSET;
-      // Left port (source side)
-      ports.push({
-        id: `${nodeId}:${f.name}:src`,
-        x: 0,
-        y,
-        width: 1,
-        height: 1,
-      });
-      // Right port (target side)
-      ports.push({
-        id: `${nodeId}:${f.name}:tgt`,
-        x: nodeWidth,
-        y,
-        width: 1,
-        height: 1,
-      });
+      const srcId = addPort(path, "src", 0, y);
+      const tgtId = addPort(path, "tgt", nodeWidth, y);
+      // First declaration wins for edge lookups when a card somehow declares
+      // the same path twice; both rows still get positioned ports.
+      if (!nodePorts.has(path)) nodePorts.set(path, { src: srcId, tgt: tgtId });
       index++;
       if (f.children.length > 0) {
-        walk(f.children, depth + 1);
+        walk(f.children, path);
       }
     }
   };
 
-  walk(fields, 0);
+  walk(fields, "");
   return ports;
 }
 
@@ -573,30 +596,70 @@ interface EdgeMeta {
   arrow: ArrowEntry;
 }
 
-/** Mapping from edge ID to arrow metadata — used by extractLayout to populate LayoutEdge fields. */
-const edgeMetaMap = new Map<string, EdgeMeta>();
+/** Identity of a generated port, recorded so extractLayout never has to parse port id strings. */
+interface PortRef {
+  nodeId: string;
+  /** Schema-local dotted field path, e.g. "customer.email". */
+  fieldPath: string;
+  side: "src" | "tgt";
+}
 
-/** Set of all port IDs added to the graph, used to validate edge endpoints. */
-let allPortIds = new Set<string>();
+/**
+ * Per-invocation bookkeeping for one buildElkGraph call. Previously this
+ * lived in module-level mutable maps, which (a) were cleared once per
+ * namespace, wiping every namespace's edge metadata except the last, and
+ * (b) raced across concurrent computeLayout calls (sl-i8mo).
+ */
+interface GraphContext {
+  /** Edge id → arrow metadata, threaded into extractLayout. */
+  edgeMeta: Map<string, EdgeMeta>;
+  /** Port id → identity, so extractLayout recovers field paths without string parsing. */
+  portInfo: Map<string, PortRef>;
+  /** Node id → schema-local field path → its src/tgt port ids. */
+  portsByNode: Map<string, Map<string, { src: string; tgt: string }>>;
+  /** Node id → card view used to resolve authored arrow refs against declared fields. */
+  cardsByNode: Map<string, FieldPathCard>;
+}
 
-function addMappingEdges(mappings: MappingBlock[], edges: ElkEdge[]) {
-  edgeMetaMap.clear();
+function addMappingEdges(mappings: MappingBlock[], edges: ElkEdge[], ctx: GraphContext) {
+  /**
+   * Resolve an authored field ref to a concrete port. Arrows reference fields
+   * by authored text — possibly schema-prefixed ("src.id") or a nested dotted
+   * path ("customer.email") — while ports are keyed by schema-local path, so
+   * the ref must be resolved against the card's declared fields first (sl-l7u0).
+   */
+  const findPort = (nodeId: string, fieldRef: string, side: "src" | "tgt", scopeRefs: string[]): string | null => {
+    const card = ctx.cardsByNode.get(nodeId);
+    if (!card) return null;
+    const localPath = resolveSchemaLocalFieldPath(fieldRef, card, scopeRefs);
+    if (!localPath) return null;
+    const pair = ctx.portsByNode.get(nodeId)?.get(localPath);
+    return pair ? pair[side] : null;
+  };
 
   for (const m of mappings) {
     const addArrowEdges = (arrows: ArrowEntry[], prefix: string) => {
       for (let i = 0; i < arrows.length; i++) {
         const a = arrows[i];
-        // Use first source ref as source node (multi-source joins render from first)
-        const sourceNode = m.sourceRefs[0];
-        if (!sourceNode) continue;
         const sourceField = a.sourceFields[0] ?? a.targetField;
         const edgeId = `${prefix}:${i}`;
 
-        const srcPort = `${sourceNode}:${sourceField}:src`;
-        const tgtPort = `${m.targetRef}:${a.targetField}:tgt`;
+        // Attach the edge to the first source ref whose card actually
+        // declares the referenced field (a prefixed ref like "b.id" belongs
+        // to source schema b, not blindly to sourceRefs[0]).
+        let sourceNode: string | null = null;
+        let srcPort: string | null = null;
+        for (const ref of m.sourceRefs) {
+          srcPort = findPort(ref, sourceField, "src", m.sourceRefs);
+          if (srcPort) {
+            sourceNode = ref;
+            break;
+          }
+        }
+        const tgtPort = findPort(m.targetRef, a.targetField, "tgt", [m.targetRef]);
 
         // Skip edges with missing ports — ELK throws if a port doesn't exist
-        if (!allPortIds.has(srcPort) || !allPortIds.has(tgtPort)) continue;
+        if (!sourceNode || !srcPort || !tgtPort) continue;
 
         edges.push({
           id: edgeId,
@@ -604,7 +667,7 @@ function addMappingEdges(mappings: MappingBlock[], edges: ElkEdge[]) {
           targets: [tgtPort],
         });
 
-        edgeMetaMap.set(edgeId, {
+        ctx.edgeMeta.set(edgeId, {
           sourceNode,
           targetNode: m.targetRef,
           sourceField,
@@ -635,6 +698,7 @@ function addMappingEdges(mappings: MappingBlock[], edges: ElkEdge[]) {
 function extractLayout(
   result: ElkLayoutResult,
   _model: VizModel,
+  ctx: GraphContext,
 ): LayoutResult {
   const nodes = new Map<string, LayoutNode>();
   const edges: LayoutEdge[] = [];
@@ -646,10 +710,12 @@ function extractLayout(
 
       const ports = new Map<string, { x: number; y: number }>();
       for (const p of n.ports ?? []) {
-        // Port id format: nodeId:fieldName:src|tgt
-        const parts = p.id.split(":");
-        const fieldName = parts.slice(1, -1).join(":");
-        ports.set(`${fieldName}:${parts[parts.length - 1]}`, {
+        // Recover the field path from the registry rather than parsing the
+        // port id — node ids may contain ":"/"::" and field paths "." so no
+        // delimiter split is reliable (sl-l7u0).
+        const ref = ctx.portInfo.get(p.id);
+        if (!ref) continue;
+        ports.set(`${ref.fieldPath}:${ref.side}`, {
           x: x + (p.x ?? 0),
           y: y + (p.y ?? 0),
         });
@@ -682,7 +748,7 @@ function extractLayout(
       if (section.endPoint) points.push(section.endPoint);
     }
 
-    const meta = edgeMetaMap.get(e.id);
+    const meta = ctx.edgeMeta.get(e.id);
     edges.push({
       id: e.id,
       sourceNode: meta?.sourceNode ?? "",

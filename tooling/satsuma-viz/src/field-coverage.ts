@@ -6,12 +6,23 @@
  */
 
 import { buildCoveredFieldSet } from "@satsuma/core/coverage-paths";
-import type { ArrowEntry, MappingBlock, SchemaCard, VizModel } from "./model.js";
+import type { ArrowEntry, FieldEntry, MappingBlock, SchemaCard, VizModel } from "./model.js";
+
+/**
+ * The subset of SchemaCard that field-path resolution needs. Metric cards
+ * (via the metric-adapter's widened field entries) satisfy it too, so layout
+ * code can resolve arrow refs against metric nodes (sl-l7u0).
+ */
+export interface FieldPathCard {
+  /** Fully qualified name, e.g. "crm::customers". Equal to id when no namespace. */
+  qualifiedId: string;
+  fields: FieldEntry[];
+}
 
 /**
  * Return true when the schema declares the exact local dotted field path.
  */
-export function schemaHasFieldPath(schema: SchemaCard, fieldPath: string): boolean {
+export function schemaHasFieldPath(schema: FieldPathCard, fieldPath: string): boolean {
   const parts = fieldPath.split(".");
   let fields = schema.fields;
   for (const part of parts) {
@@ -49,7 +60,7 @@ function schemaRefPrefixes(schemaId: string): string[] {
  */
 export function resolveSchemaLocalFieldPath(
   fieldRef: string,
-  schema: SchemaCard,
+  schema: FieldPathCard,
   sourceRefs: string[],
 ): string | null {
   for (const prefix of schemaRefPrefixes(schema.qualifiedId)) {
