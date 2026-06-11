@@ -43,6 +43,12 @@ module.exports = grammar({
     // _spread_words so that multi-word spreads like `...audit columns` keep
     // working while `...f\nextra x` is correctly parsed as spread "f" + field.
     $.continuation_word,
+    // INLINE_TYPE is the field type token (identifier shape plus optional
+    // attached parens), restricted to the SAME LINE as the field name.
+    // Without the line restriction, adjacent bare-name fields silently merge
+    // into one field_decl with the second name as the type (sl-hjx1).
+    // Aliased to $.type_expr at the use sites so the CST shape is unchanged.
+    $.inline_type,
   ],
 
   conflicts: (_) => [],
@@ -289,7 +295,9 @@ module.exports = grammar({
     _scalar_field: ($) =>
       seq(
         $.field_name,
-        $.type_expr,
+        // The type must sit on the same line as the field name (sl-hjx1);
+        // inline_type is the external, line-aware spelling of type_expr.
+        alias($.inline_type, $.type_expr),
         optional($.metadata_block),
       ),
 
@@ -324,21 +332,17 @@ module.exports = grammar({
       seq(
         $.field_name,
         "list_of",
-        $.type_expr,
+        alias($.inline_type, $.type_expr),
         optional($.metadata_block),
       ),
 
     field_name: ($) => choice($.identifier, $.backtick_name),
 
-    type_expr: (_) =>
-      token(
-        seq(
-          // Same shape as identifier: hyphens allowed inside, not at the end
-          // (sl-csd2).
-          /[a-zA-Z_]([a-zA-Z0-9_-]*[a-zA-Z0-9_])?/,
-          optional(seq("(", /[^)]*/, ")")),
-        ),
-      ),
+    // type_expr is produced by the external scanner (INLINE_TYPE, aliased at
+    // the use sites above): an identifier-shaped word — hyphens allowed
+    // inside, not at the end (sl-csd2) — plus optional immediately-attached
+    // parenthesized arguments, restricted to the same line as the field name
+    // (sl-hjx1). See src/scanner.c.
 
     // ── Fragment spread ───────────────────────────────────────────────────
 
