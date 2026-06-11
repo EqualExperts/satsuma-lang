@@ -423,3 +423,61 @@ describe("diffIndex", () => {
     assert.equal(typeChange.to, "TEXT");
   });
 });
+
+// ── Anonymous mapping normalization (sl-ndtz) ────────────────────────────────
+
+describe("diffIndex anonymous mappings (sl-ndtz)", () => {
+  /** Build a minimal anonymous MappingRecord stored under its internal positional key. */
+  const anonMapping = (file: string, row: number, sources: string[], targets: string[], arrowCount = 1) => ({
+    [`<anon>@${file}:${row}`]: { name: null, sources, targets, arrowCount, file, row },
+  });
+
+  it("treats structurally identical anonymous mappings at different file paths as unchanged", () => {
+    // The internal anon key embeds the absolute path, so byte-identical v1/v2
+    // files used to report every anonymous mapping as removed-and-added.
+    const a = makeIndex({}, anonMapping("/v1/pipe.stm", 2, ["src"], ["tgt"]));
+    const b = makeIndex({}, anonMapping("/v2/pipe.stm", 2, ["src"], ["tgt"]));
+
+    const delta = diffIndex(a, b);
+    assert.equal(delta.mappings.added.length, 0);
+    assert.equal(delta.mappings.removed.length, 0);
+    assert.equal(delta.mappings.changed.length, 0);
+  });
+
+  it("reports a changed anonymous mapping under a structural id, never the internal key", () => {
+    // The synthetic <anon>@path:row key is an implementation detail and must
+    // not leak into the delta consumed by user-facing formatters.
+    const a = makeIndex({}, anonMapping("/v1/pipe.stm", 2, ["src"], ["tgt"], 1));
+    const b = makeIndex({}, anonMapping("/v2/pipe.stm", 7, ["src"], ["tgt"], 3));
+
+    const delta = diffIndex(a, b);
+    assert.equal(delta.mappings.changed.length, 1);
+    assert.equal(delta.mappings.changed[0].name, "<anonymous src -> tgt>");
+    assert.doesNotMatch(delta.mappings.changed[0].name, /<anon>@/);
+  });
+
+  it("pairs multiple same-signature anonymous mappings positionally across versions", () => {
+    // Two anonymous mappings with identical source/target signatures must get
+    // stable ordinals so each pairs with its counterpart instead of colliding.
+    const twoAnon = (file: string) => ({
+      ...anonMapping(file, 2, ["src"], ["tgt"]),
+      ...anonMapping(file, 9, ["src"], ["tgt"]),
+    });
+    const delta = diffIndex(makeIndex({}, twoAnon("/v1/pipe.stm")), makeIndex({}, twoAnon("/v2/pipe.stm")));
+
+    assert.equal(delta.mappings.added.length, 0);
+    assert.equal(delta.mappings.removed.length, 0);
+    assert.equal(delta.mappings.changed.length, 0);
+  });
+
+  it("preserves the namespace prefix on normalized anonymous mapping ids", () => {
+    // Namespaced anon mappings are keyed `ns::<anon>@path:row`; the structural
+    // id must stay namespace-qualified so scoped blocks do not cross-match.
+    const a = makeIndex({}, { "crm::<anon>@/v1/p.stm:4": { name: null, sources: ["s"], targets: ["t"], arrowCount: 1, file: "/v1/p.stm", row: 4 } });
+    const b = makeIndex({}, { "crm::<anon>@/v2/p.stm:4": { name: null, sources: ["s"], targets: ["t"], arrowCount: 2, file: "/v2/p.stm", row: 4 } });
+
+    const delta = diffIndex(a, b);
+    assert.equal(delta.mappings.changed.length, 1);
+    assert.equal(delta.mappings.changed[0].name, "crm::<anonymous s -> t>");
+  });
+});

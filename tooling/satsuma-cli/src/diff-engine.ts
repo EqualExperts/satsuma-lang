@@ -43,8 +43,16 @@ function noteTextsForParent(index: ExtractedWorkspace, parentName: string): Set<
  * Compares every block type (schemas, mappings, metrics, fragments, transforms)
  * plus standalone note blocks. Block-owned note blocks (those with a non-null
  * parent) are compared within their parent block's diff, not at the top level.
+ *
+ * Anonymous mappings are re-keyed to position-independent structural ids
+ * before comparison (see `normalizeAnonMappingKeys`), so byte-identical files
+ * at different paths diff clean and user-facing output never leaks the
+ * internal `<anon>@file:row` key (sl-ndtz).
  */
 export function diffIndex(indexA: ExtractedWorkspace, indexB: ExtractedWorkspace): Delta {
+  indexA = normalizeAnonMappingKeys(indexA);
+  indexB = normalizeAnonMappingKeys(indexB);
+
   // Collect arrows per mapping for detailed comparison
   const arrowsA = collectArrowsByMapping(indexA);
   const arrowsB = collectArrowsByMapping(indexB);
@@ -68,6 +76,72 @@ export function diffIndex(indexA: ExtractedWorkspace, indexB: ExtractedWorkspace
     fragments: diffBlockMap(indexA.fragments, indexB.fragments, diffFragment),
     transforms: diffBlockMap(indexA.transforms, indexB.transforms, diffTransform),
     notes: diffNotes(indexA.notes ?? [], indexB.notes ?? []),
+  };
+}
+
+// ── Anonymous mapping normalization (sl-ndtz) ────────────────────────────────
+
+/**
+ * The index stores anonymous mappings under synthetic keys of the form
+ * `[ns::]<anon>@<absolute-file-path>:<0-based-row>` (see index-builder.ts).
+ * That key is positional by design — other consumers (arrows, lint fixes)
+ * need to locate the block in its file — but it is wrong for diffing: two
+ * byte-identical files always differ in path, so every anonymous mapping
+ * shows up as removed-and-added, and the internal key leaks into user output.
+ */
+const ANON_KEY = /<anon>@.*:\d+$/;
+
+/**
+ * Re-key anonymous mappings by what they map rather than where they live.
+ *
+ * The structural id is `<anonymous src1,src2 -> tgt1,tgt2>` (namespace prefix
+ * preserved). Several anonymous mappings with the same signature in one
+ * workspace get stable ` #2`, ` #3`… suffixes in file/row order, so they pair
+ * up positionally across the two sides of the diff. Arrow records and note
+ * parents referencing the old keys are rewritten to match.
+ *
+ * Returns a shallow copy; the input index is not mutated.
+ */
+function normalizeAnonMappingKeys(index: ExtractedWorkspace): ExtractedWorkspace {
+  // Map old key → new structural key, assigning ordinals per signature in
+  // deterministic (file, row) order.
+  const rename = new Map<string, string>();
+  const ordinals = new Map<string, number>();
+  const anonEntries = [...index.mappings.entries()]
+    .filter(([key]) => ANON_KEY.test(key))
+    .sort(([, a], [, b]) => (a.file ?? "").localeCompare(b.file ?? "") || a.row - b.row);
+
+  for (const [key, mapping] of anonEntries) {
+    const ns = key.includes("::") ? key.slice(0, key.indexOf("::") + 2) : "";
+    const signature = `${ns}<anonymous ${mapping.sources.join(",")} -> ${mapping.targets.join(",")}>`;
+    const seen = ordinals.get(signature) ?? 0;
+    ordinals.set(signature, seen + 1);
+    rename.set(key, seen === 0 ? signature : `${signature.slice(0, -1)} #${seen + 1}>`);
+  }
+
+  if (rename.size === 0) return index;
+
+  // Arrow records and note parents carry the *bare* (namespace-less) form of
+  // the key, so register those spellings too.
+  for (const [key, newKey] of [...rename]) {
+    const sep = key.indexOf("::");
+    if (sep !== -1) rename.set(key.slice(sep + 2), newKey.slice(newKey.indexOf("::") + 2));
+  }
+
+  return {
+    ...index,
+    mappings: new Map([...index.mappings].map(([key, m]) => [rename.get(key) ?? key, m])),
+    fieldArrows: new Map(
+      [...index.fieldArrows].map(([field, records]) => [
+        field,
+        records.map((r) =>
+          r.mapping && rename.has(r.mapping) ? { ...r, mapping: rename.get(r.mapping) ?? r.mapping } : r,
+        ),
+      ]),
+    ),
+    notes: (index.notes ?? []).map((n) =>
+      n.parent && rename.has(n.parent) ? { ...n, parent: rename.get(n.parent) ?? n.parent } : n,
+    ),
   };
 }
 

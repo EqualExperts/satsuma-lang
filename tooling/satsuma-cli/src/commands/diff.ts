@@ -62,8 +62,8 @@ export function register(program: Command): void {
     .option("--names-only", "list changed block names only")
     .option("--stat", "summary counts only")
     .addHelpText("after", `
-Compares two Satsuma files structurally (not text diff). Each file is
-resolved with its imports before comparison.
+Compares two Satsuma files structurally (not text diff). Only the two
+files themselves are compared — imports are not followed.
 
 JSON shape (--json):
   {
