@@ -1,6 +1,6 @@
 ---
 id: sl-zl55
-status: open
+status: in_progress
 deps: []
 links: [sl-fm0q]
 created: 2026-06-10T23:21:30Z
