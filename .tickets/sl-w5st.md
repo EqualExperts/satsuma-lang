@@ -1,6 +1,6 @@
 ---
 id: sl-w5st
-status: open
+status: closed
 deps: []
 links: []
 created: 2026-06-11T02:43:01Z
@@ -17,3 +17,10 @@ pipe_text includes hidden _arithmetic_op (-) and _comparison_op (>) tokens (gram
 
 Arrow syntax inside any transform body parses as an arrow node (or errors loudly) — never as clean pipe text; corpus tests for all three positions; spec updated if the resolution is to forbid.
 
+
+## Notes
+
+**2026-06-11T23:06:35Z**
+
+Cause: pipe_text's hidden _arithmetic_op '-' and _comparison_op '>' tokens let 'src -> tgt' lex as four NL atoms in any pipe-chain position (computed-arrow body, multi-source body, after a pipe step), producing a clean tree with the arrow — and its lineage edge — silently gone.
+Fix: minus is now the external minus_op token (aliased to '-') that refuses to lex when '>' follows, making an arrow in pipe text a loud parse error; nested arrows remain valid only under plain src->tgt arrow bodies and each/flatten, now documented in spec 4.4. Corpus pins all three repro positions plus minus-still-works. (commit efa5121)
