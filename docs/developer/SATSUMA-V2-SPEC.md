@@ -393,7 +393,7 @@ CUST_ID -> customer_id (note "Deterministic UUID from legacy ID") {
 
 ### 4.3 Value Maps
 
-Use `map { }` for discrete value mappings. The `:` separates input from output:
+Use `map { }` for discrete value mappings. The `:` separates input from output. Output values are usually quoted; a bare (unquoted) value extends to the end of its line, so entries can be newline-separated without commas. Two entries on the *same* line must be comma-separated — `R: retail B: biz` without a comma is an error.
 
 ```
 CUST_TYPE -> customer_type {

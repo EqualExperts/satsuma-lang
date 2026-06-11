@@ -1631,11 +1631,9 @@
       }
     },
     "map_value": {
-      "type": "PREC_LEFT",
-      "value": 0,
-      "content": {
-        "type": "REPEAT1",
-        "content": {
+      "type": "SEQ",
+      "members": [
+        {
           "type": "CHOICE",
           "members": [
             {
@@ -1659,8 +1657,20 @@
               "value": "null"
             }
           ]
+        },
+        {
+          "type": "REPEAT",
+          "content": {
+            "type": "ALIAS",
+            "content": {
+              "type": "SYMBOL",
+              "name": "map_value_word"
+            },
+            "named": true,
+            "value": "identifier"
+          }
         }
-      }
+      ]
     },
     "block_label": {
       "type": "CHOICE",
@@ -2327,6 +2337,10 @@
     {
       "type": "SYMBOL",
       "name": "value_word"
+    },
+    {
+      "type": "SYMBOL",
+      "name": "map_value_word"
     }
   ],
   "inline": [],

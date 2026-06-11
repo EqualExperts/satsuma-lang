@@ -56,6 +56,12 @@ module.exports = grammar({
     // following flags (`(pk note "x")`, `(owner finance\npk)`) — sl-vnty.
     // Aliased to $.identifier at the use site so the CST shape is unchanged.
     $.value_word,
+    // MAP_VALUE_WORD continues a bare map value on the SAME LINE as its key.
+    // Without it map_value reduced after one token and the leftover words
+    // joined the NEXT entry's key, garbling subsequent entries (sl-zzaj).
+    // Unlike the other word tokens it may start with a digit and contain
+    // interior dots ("tier 2.5"). Aliased to $.identifier at the use site.
+    $.map_value_word,
   ],
 
   conflicts: (_) => [],
@@ -548,18 +554,21 @@ module.exports = grammar({
 
     _arithmetic_op: (_) => token(choice("*", "/", "+", "-", "%")),
 
-    // map_value: greedy tokens until `,` or `}`.
+    // map_value: one leading atom, then bare words on the SAME LINE via the
+    // external map_value_word token (aliased to identifier). A newline ends
+    // the value, so the next line's words start a new map_entry instead of
+    // garbling its key (sl-zzaj). Same-line entries still need commas —
+    // `R: retail B: x` is a loud error, not two entries.
     map_value: ($) =>
-      prec.left(
-        repeat1(
-          choice(
-            $.nl_string,
-            $.multiline_string,
-            $.identifier,
-            $.number_literal,
-            "null",
-          ),
+      seq(
+        choice(
+          $.nl_string,
+          $.multiline_string,
+          $.identifier,
+          $.number_literal,
+          "null",
         ),
+        repeat(alias($.map_value_word, $.identifier)),
       ),
 
     // ── Block label ───────────────────────────────────────────────────────
