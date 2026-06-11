@@ -40,7 +40,7 @@ All comma-separated list constructs follow one rule: **a trailing comma after th
 ### 2.2 Strings and Quoting
 
 - **Double quotes** `" "` — natural language strings. Always double quotes. Escape inner double quotes with `\"`.
-- **Triple double quotes** `""" """` — multiline natural language with Markdown support. No escaping needed for inner `"`. Use for notes with headings, bold, lists, or multi-paragraph content. Leading indentation from the content is preserved as-is.
+- **Triple double quotes** `""" """` — multiline natural language with Markdown support. No escaping needed for inner `"`, including at the end of the content (`"""He said "hi""""` is valid). The one limitation: content cannot *end* with three or more consecutive quotes, since that run is indistinguishable from the closing delimiter. Use for notes with headings, bold, lists, or multi-paragraph content. Leading indentation from the content is preserved as-is.
 - **Backticks** `` ` ` `` — identifiers and names that aren't bare-safe. Used for block labels containing special characters (spaces, dots, hyphens) and for field identifiers with special characters.
 - **`@` prefix** — structural cross-references in NL text. `@customers.email` references a schema field. Required inside NL strings for tooling to detect refs; optional but allowed everywhere else.
 

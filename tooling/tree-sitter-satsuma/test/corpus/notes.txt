@@ -165,3 +165,40 @@ schema legacy_customers {
         (type_expr))
       (note_block
         (multiline_string)))))
+
+================================================================================
+Multiline string content may end with a single quote character
+================================================================================
+
+schema s (note """He said "hi"""") {
+  f STRING
+}
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (schema_block
+    (block_label
+      (identifier))
+    (metadata_block
+      (note_tag
+        (multiline_string)))
+    (schema_body
+      (field_decl
+        (field_name
+          (identifier))
+        (type_expr)))))
+
+================================================================================
+Multiline string content may end with two quote characters
+================================================================================
+
+note {
+  """Quote: ends ""like this"""""
+}
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (note_block
+    (multiline_string)))
