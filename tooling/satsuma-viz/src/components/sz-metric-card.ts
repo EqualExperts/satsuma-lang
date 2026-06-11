@@ -231,7 +231,7 @@ export class SzMetricCard extends LitElement {
         <div class="header" @click=${this._onHeaderClick}>
           <span class="header-icon">&#9670;</span>
           <span class="header-name">${m.id}</span>
-          <span class="header-toggle" ?data-collapsed=${this._collapsed}>&#9660;</span>
+          <span class="header-toggle" ?data-collapsed=${this._collapsed} @click=${this._onToggleClick}>&#9660;</span>
         </div>
         ${hasMeta
           ? html`
@@ -282,8 +282,20 @@ export class SzMetricCard extends LitElement {
     `;
   }
 
-  private _onHeaderClick() {
+  // Collapse and navigation are separate intents (sl-37f3): the combined
+  // handler meant hosts that open documents on navigate (VS Code) yanked the
+  // editor to source whenever a metric card was collapsed. Same contract as
+  // sz-schema-card / sz-fragment-card (sl-tw0r).
+
+  /** Arrow click: collapse/expand only — never navigate. */
+  private _onToggleClick(e: Event) {
+    // Stop the click before the header's navigate handler sees it.
+    e.stopPropagation();
     this._collapsed = !this._collapsed;
+  }
+
+  /** Header (name/icon) click: navigation intent only. */
+  private _onHeaderClick() {
     if (this.metric) {
       this._navigate(this.metric.location);
     }
