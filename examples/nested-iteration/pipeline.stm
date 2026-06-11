@@ -1,0 +1,105 @@
+// Satsuma v2 — Nested Iteration (each/flatten sub-blocks)
+
+note {
+  """
+  # Nested Iteration
+
+  Demonstrates iteration blocks nested inside other iteration blocks, as
+  described in spec section 4.4 (Nested Mappings):
+
+  1. **Nested `each`** — preserving a two-level hierarchy (orders and their
+     lines) by iterating a list field of the current element.
+  2. **Nested `flatten`** — lifting a doubly-nested list (every content row
+     of every parcel) into a single flat list on the current target element.
+
+  ## Scenario
+  A warehouse management system emits one dispatch event per van departure.
+  Each event carries the dispatched orders, each order its lines and parcels.
+  The courier needs a manifest document that keeps the order/line hierarchy
+  but presents parcel contents as one flat packed-items list per order.
+  """
+}
+
+// --- Source ---
+schema warehouse_dispatch_events (
+  note "Dispatch confirmations from the warehouse management system"
+) {
+  dispatch_id    UUID         (pk, required)
+  dispatched_at  TIMESTAMPTZ  (required)
+
+  orders list_of record {
+    order_no     STRING(20)  (required)
+    courier_ref  STRING(30)
+
+    lines list_of record {
+      sku       STRING(30)  (required)
+      quantity  INT         (required)
+    }
+
+    parcels list_of record {
+      barcode  STRING(40)  (required)
+      contents list_of record {
+        sku    STRING(30)  (required)
+        units  INT         (required)
+      }
+    }
+  }
+}
+
+// --- Target ---
+schema dispatch_manifest_json (
+  format json,
+  note "Courier-facing dispatch manifest — one document per dispatch event"
+) {
+  manifest_id   UUID         (required)
+  generated_at  TIMESTAMPTZ  (required)
+
+  orders list_of record {
+    order_ref    STRING(20)  (required)
+    courier_ref  STRING(30)
+
+    lines list_of record {
+      sku  STRING(30)  (required)
+      qty  INT         (required)
+    }
+
+    // One element per parcel content row, across all parcels in the order
+    packed_items list_of record {
+      sku    STRING(30)  (required)
+      units  INT         (required)
+    }
+  }
+}
+
+// --- Mapping ---
+mapping `dispatch manifest` {
+  note {
+    "Builds the courier manifest from a dispatch event. Orders and their
+     lines keep their hierarchy via nested each blocks; parcel contents are
+     lifted into a flat per-order packed_items list via a nested flatten."
+  }
+
+  source { warehouse_dispatch_events }
+  target { dispatch_manifest_json }
+
+  dispatch_id -> manifest_id
+  dispatched_at -> generated_at
+
+  each orders -> orders (note "One manifest order per dispatched order.") {
+    .order_no -> .order_ref { trim | uppercase }
+    .courier_ref -> .courier_ref { null_if_empty }
+
+    // Nested each: one manifest line per order line, hierarchy preserved
+    each lines -> .lines {
+      .sku -> .sku { trim | uppercase }
+      .quantity -> .qty
+    }
+
+    // Nested flatten: contents is doubly nested under the order (one list
+    // per parcel); flatten lifts every content row into one flat list
+    flatten parcels.contents -> .packed_items {
+      .sku -> .sku { trim | uppercase }
+      .units -> .units
+    }
+  }
+}

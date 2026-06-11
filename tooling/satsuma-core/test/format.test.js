@@ -582,6 +582,44 @@ describe("edge cases", () => {
     assert.ok(out.includes("  .sku -> .sku { trim }"));
   });
 
+  // Regression for sl-7236: the each/flatten child loop only dispatched on the
+  // three arrow node types, so nested each/flatten sub-blocks (allowed by the
+  // grammar's _nested_block_item) fell through every branch and were silently
+  // deleted — fmt destroyed mapping logic on valid input.
+  it("preserves an each block nested inside an each block", () => {
+    const src = `mapping test {
+  source { s }
+  target { t }
+  each orders -> out_orders {
+    id -> oid
+    each items -> out_items {
+      sku -> out_sku
+    }
+  }
+}`;
+    const out = fmt(src);
+    assert.ok(out.includes("each orders -> out_orders {"));
+    assert.ok(out.includes("  each items -> out_items {"), "inner each header must survive");
+    assert.ok(out.includes("    sku -> out_sku"), "inner each arrows must survive at depth-2 indent");
+    assert.equal(out, fmt(out), "nested each output must be idempotent");
+  });
+
+  it("preserves a flatten block nested inside an each block", () => {
+    const src = `mapping test {
+  source { s }
+  target { t }
+  each orders -> flat {
+    flatten items -> .rows {
+      name -> name
+    }
+  }
+}`;
+    const out = fmt(src);
+    assert.ok(out.includes("  flatten items -> .rows {"), "inner flatten header must survive");
+    assert.ok(out.includes("    name -> name"), "inner flatten arrows must survive at depth-2 indent");
+    assert.equal(out, fmt(out), "nested flatten output must be idempotent");
+  });
+
   it("handles metric schema block with metric_name and metadata", () => {
     // Metrics are now schema blocks with (metric, metric_name "MRR", ...) metadata.
     // Validates that the formatter handles metric schemas correctly.
