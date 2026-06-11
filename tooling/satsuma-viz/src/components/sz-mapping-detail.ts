@@ -9,7 +9,7 @@ import type {
   FlattenBlock,
 } from "../model.js";
 import { SzNavigateEvent, SzFieldHoverEvent } from "../satsuma-viz.js";
-import { resolveSchemaLocalFieldPath } from "../field-coverage.js";
+import { forEachMappingArrow, resolveSchemaLocalFieldPath } from "../field-coverage.js";
 import { highlightAtRefs } from "../markdown.js";
 
 function sanitizeTestIdSegment(value: string): string {
@@ -440,30 +440,24 @@ export class SzMappingDetail extends LitElement {
   /** Find source fields that map to a given target field, grouped by schema id. */
   private _findSourceFieldsForTarget(targetField: string, m: MappingBlock): Map<string, Set<string>> {
     const result = new Map<string, Set<string>>();
-    const sourceSchemaById = new Map(
-      this.sourceSchemas.map((schema) => [schema.qualifiedId, schema] as const),
-    );
-    const search = (arrows: ArrowEntry[]) => {
-      for (const a of arrows) {
-        const targetSchema = this.targetSchema;
-        const localTargetPath = targetSchema
-          ? resolveSchemaLocalFieldPath(a.targetField, targetSchema, [m.targetRef])
-          : null;
-        if (localTargetPath === targetField) {
-          for (const sourceSchema of this.sourceSchemas) {
-            for (const sf of a.sourceFields) {
-              const localSourcePath = resolveSchemaLocalFieldPath(sf, sourceSchema, m.sourceRefs);
-              if (!localSourcePath) continue;
-              if (!result.has(sourceSchema.qualifiedId)) result.set(sourceSchema.qualifiedId, new Set());
-              result.get(sourceSchema.qualifiedId)!.add(localSourcePath);
-            }
+    // forEachMappingArrow recurses into nestedEach — hand-rolled loops over
+    // the top-level collections missed nested-each arrows (sl-fm0q).
+    forEachMappingArrow(m, (a) => {
+      const targetSchema = this.targetSchema;
+      const localTargetPath = targetSchema
+        ? resolveSchemaLocalFieldPath(a.targetField, targetSchema, [m.targetRef])
+        : null;
+      if (localTargetPath === targetField) {
+        for (const sourceSchema of this.sourceSchemas) {
+          for (const sf of a.sourceFields) {
+            const localSourcePath = resolveSchemaLocalFieldPath(sf, sourceSchema, m.sourceRefs);
+            if (!localSourcePath) continue;
+            if (!result.has(sourceSchema.qualifiedId)) result.set(sourceSchema.qualifiedId, new Set());
+            result.get(sourceSchema.qualifiedId)!.add(localSourcePath);
           }
         }
       }
-    };
-    search(m.arrows);
-    for (const eb of m.eachBlocks) search(eb.arrows);
-    for (const fb of m.flattenBlocks) search(fb.arrows);
+    });
     return result;
   }
 
@@ -473,21 +467,18 @@ export class SzMappingDetail extends LitElement {
     const sourceSchema = this.sourceSchemas.find((schema) => schema.qualifiedId === sourceSchemaId);
     const targetSchema = this.targetSchema;
     if (!sourceSchema || !targetSchema) return result;
-    const search = (arrows: ArrowEntry[]) => {
-      for (const a of arrows) {
-        const sourceMatches = a.sourceFields.some((sf) => {
-          const localSourcePath = resolveSchemaLocalFieldPath(sf, sourceSchema, m.sourceRefs);
-          return localSourcePath === sourceField;
-        });
-        if (sourceMatches) {
-          const localTargetPath = resolveSchemaLocalFieldPath(a.targetField, targetSchema, [m.targetRef]);
-          if (localTargetPath) result.add(localTargetPath);
-        }
+    // forEachMappingArrow recurses into nestedEach — hand-rolled loops over
+    // the top-level collections missed nested-each arrows (sl-fm0q).
+    forEachMappingArrow(m, (a) => {
+      const sourceMatches = a.sourceFields.some((sf) => {
+        const localSourcePath = resolveSchemaLocalFieldPath(sf, sourceSchema, m.sourceRefs);
+        return localSourcePath === sourceField;
+      });
+      if (sourceMatches) {
+        const localTargetPath = resolveSchemaLocalFieldPath(a.targetField, targetSchema, [m.targetRef]);
+        if (localTargetPath) result.add(localTargetPath);
       }
-    };
-    search(m.arrows);
-    for (const eb of m.eachBlocks) search(eb.arrows);
-    for (const fb of m.flattenBlocks) search(fb.arrows);
+    });
     return result;
   }
 

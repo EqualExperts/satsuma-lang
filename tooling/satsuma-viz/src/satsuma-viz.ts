@@ -30,7 +30,8 @@ export {
   METADATA_PILLS_CHROME,
   NAMESPACE_PILL_HEIGHT,
 } from "./layout/geometry.js";
-export { buildMappingCoveredFields, buildMappedFieldsIndex, resolveSchemaLocalFieldPath, schemaHasFieldPath } from "./field-coverage.js";
+import { countMappingArrows } from "./field-coverage.js";
+export { buildMappingCoveredFields, buildMappedFieldsIndex, countMappingArrows, resolveSchemaLocalFieldPath, schemaHasFieldPath } from "./field-coverage.js";
 export { metricAsSchemaCard, metricFieldEntries } from "./metric-adapter.js";
 export type { LayoutResult, LayoutNode, LayoutEdge, SourceBlockLayout, OverviewLayoutResult, OverviewEdge } from "./layout/elk-layout.js";
 
@@ -1619,7 +1620,7 @@ export class SatsumaViz extends LitElement {
                           <path d="M4.5 9h7v1.5h-7z" opacity="0.78"></path>
                         </svg>
                         <span class="overview-mapping-name">${m.id}</span>
-                        <span style="opacity:0.6;font-size:11px;font-weight:400;">${m.arrows.length + m.eachBlocks.reduce((s, b) => s + b.arrows.length, 0) + m.flattenBlocks.reduce((s, b) => s + b.arrows.length, 0)} &#8594;s</span>
+                        <span style="opacity:0.6;font-size:11px;font-weight:400;">${countMappingArrows(m)} &#8594;s</span>
                       </div>
                     </div>
                   </div>
