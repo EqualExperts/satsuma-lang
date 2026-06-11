@@ -17,3 +17,10 @@ Trailing commas accepted in metadata_block, enum, slice, and map literals but no
 
 Comma policy consistent across list constructs (documented in spec); no zero-width named nodes in recovery for these cases, or core extraction guards against MISSING; corpus tests.
 
+
+## Notes
+
+**2026-06-11T22:34:09Z**
+
+Cause: import_decl and target_block were the only list constructs without optional trailing commas, and tree-sitter recovery for empty lists (import { } / source { }) inserts zero-width MISSING leaves whose .text is '', which extraction passed through as empty-string names.
+Fix: trailing commas accepted in import/target (policy documented in spec 2.1 'Comma policy'); new isPresent() guard in satsuma-core cst-utils applied in sourceRefText/sourceRefStructuralText/qualifiedNameText/extractImports so MISSING nodes yield null/no names. Corpus + core unit tests added. (commit 02909b0)
