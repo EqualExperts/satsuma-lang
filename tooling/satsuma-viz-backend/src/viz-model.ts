@@ -196,6 +196,7 @@ function injectImportedSchemaStubs(
         character: schemaDef.range.start.character,
       },
       hasExternalLineage: true,
+      isStub: true,
       spreads: [],
     };
 
@@ -1489,10 +1490,14 @@ function nodeLocation(uri: string, node: SyntaxNode): SourceLocation {
  * full transitive lineage reachable from `primaryUri`.
  *
  * The primary file's entities appear first and win any dedup ties. Schemas are
- * deduped by `qualifiedId`, mappings by `id` + source URI, metrics by
- * `qualifiedId`, and fragments by `id`. This means stub schemas injected by
- * `injectImportedSchemaStubs` are naturally superseded when the upstream file's
- * full definition is present.
+ * deduped by `qualifiedId`, mappings by namespace + `id` + source URI, metrics
+ * by `qualifiedId`, and fragments by `id`.
+ *
+ * One exception to first-wins: a stub schema (injected by
+ * `injectImportedSchemaStubs` when the defining file is absent from a
+ * per-file model) is replaced in place by the full definition from a later
+ * model. The primary model sorts first and contains the stub, so without the
+ * upgrade the stub's empty label/metadata/constraints would win (sl-ak00).
  *
  * @param primaryUri - The file URI that anchors the lineage view.
  * @param models     - One VizModel per import-reachable file (including the primary).
@@ -1511,15 +1516,19 @@ export function mergeVizModels(
     a.uri === primaryUri ? -1 : b.uri === primaryUri ? 1 : 0,
   );
 
-  // Global dedup sets — track what has already been included.
-  const seenSchemas = new Set<string>();
+  // Global dedup state — track what has already been included. Schemas keep a
+  // reference to their merged position so a stub can be upgraded in place when
+  // the full definition arrives from a later model (sl-ak00).
+  const keptSchemas = new Map<string, { group: NamespaceGroup; index: number }>();
   const seenMappings = new Set<string>();
   const seenMetrics = new Set<string>();
   const seenFragments = new Set<string>();
 
-  /** Dedup key for a mapping: id + source URI (same name in different files = different mappings). */
-  const mappingKey = (m: MappingBlock): string =>
-    `${m.id}@${m.location.uri}`;
+  /** Dedup key for a mapping: namespace + id + source URI. MappingBlock.id is
+   * unqualified, so the namespace group's name must be part of the key or
+   * same-named mappings in different namespaces of one file collide (sl-aeae). */
+  const mappingKey = (nsName: string | null, m: MappingBlock): string =>
+    `${nsName ?? ""}::${m.id}@${m.location.uri}`;
 
   // Accumulate merged namespace groups keyed by namespace name (null = global).
   const nsMap = new Map<string | null, NamespaceGroup>();
@@ -1538,13 +1547,17 @@ export function mergeVizModels(
       const target = getOrCreate(ns.name);
 
       for (const s of ns.schemas) {
-        if (!seenSchemas.has(s.qualifiedId)) {
-          seenSchemas.add(s.qualifiedId);
+        const kept = keptSchemas.get(s.qualifiedId);
+        if (!kept) {
+          keptSchemas.set(s.qualifiedId, { group: target, index: target.schemas.length });
           target.schemas.push(s);
+        } else if (kept.group.schemas[kept.index]!.isStub && !s.isStub) {
+          // Upgrade a kept stub to the full definition (see doc comment above).
+          kept.group.schemas[kept.index] = s;
         }
       }
       for (const m of ns.mappings) {
-        const key = mappingKey(m);
+        const key = mappingKey(ns.name, m);
         if (!seenMappings.has(key)) {
           seenMappings.add(key);
           target.mappings.push(m);

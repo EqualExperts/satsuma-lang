@@ -987,6 +987,91 @@ namespace billing {
     const nsNames = result.namespaces.map(ns => ns.name).sort();
     assert.deepStrictEqual(nsNames, ["billing", "crm"]);
   });
+
+  it("keeps same-named mappings from different namespaces of one file (sl-aeae)", () => {
+    // Bug sl-aeae: the mapping dedup key was id@uri, omitting the namespace.
+    // Two mappings named "load" in namespaces a and b of the same file
+    // collided and the second was dropped from the merged model.
+    const modelA = vizModel(`
+namespace a {
+  schema s1 { id INT }
+  schema t1 { id INT }
+  mapping load { source { s1 } target { t1 } id -> id }
+}
+namespace b {
+  schema s2 { id INT }
+  schema t2 { id INT }
+  mapping load { source { s2 } target { t2 } id -> id }
+}`, "file:///a.stm");
+    const modelB = vizModel("schema unrelated { id INT }", "file:///b.stm");
+
+    const result = mergeVizModels("file:///a.stm", [modelA, modelB]);
+    const nsA = result.namespaces.find((ns) => ns.name === "a");
+    const nsB = result.namespaces.find((ns) => ns.name === "b");
+    assert.equal(nsA.mappings.length, 1, "namespace a keeps its load mapping");
+    assert.equal(nsB.mappings.length, 1, "namespace b keeps its load mapping");
+  });
+});
+
+// ---------- Stub upgrade in lineage merge (sl-ak00) ----------
+
+describe("lineage merge stub upgrade (sl-ak00)", () => {
+  // Bug sl-ak00: the merge sorts the primary model first and dedup was
+  // first-wins, but the primary model contains only a STUB of each imported
+  // schema. The stub beat the upstream full definition, so labels, metadata,
+  // notes, and field constraints (including pii) vanished in lineage mode.
+  const FILES = {
+    "file:///upstream.stm": `schema customers (note "Customer Master", owner "crm-team") {
+  id INT (pk)
+  email VARCHAR (pii)
+}`,
+    "file:///main.stm": `import { customers } from "./upstream.stm"
+schema dim_customers { id INT email VARCHAR }
+mapping load_dim {
+  source { customers }
+  target { dim_customers }
+  id -> id
+  email -> email
+}`,
+  };
+
+  it("replaces the primary file's stub with the upstream full definition", () => {
+    const result = vizModelFullLineage(FILES, "file:///main.stm");
+    const customers = result.namespaces
+      .flatMap((ns) => ns.schemas)
+      .find((s) => s.qualifiedId === "customers");
+    assert.ok(customers, "customers schema present in merged model");
+    assert.ok(!customers.isStub, "merged card must be the full definition, not the stub");
+    assert.equal(customers.label, "Customer Master", "label from upstream definition survives");
+    assert.ok(
+      customers.metadata.some((m) => m.key === "owner"),
+      `owner metadata survives, got: ${JSON.stringify(customers.metadata)}`,
+    );
+  });
+
+  it("preserves pii field constraints from the upstream definition", () => {
+    const result = vizModelFullLineage(FILES, "file:///main.stm");
+    const customers = result.namespaces
+      .flatMap((ns) => ns.schemas)
+      .find((s) => s.qualifiedId === "customers");
+    const email = customers.fields.find((f) => f.name === "email");
+    assert.ok(email, "email field present");
+    assert.ok(
+      email.constraints.includes("pii"),
+      `pii constraint survives the merge, got: ${JSON.stringify(email.constraints)}`,
+    );
+  });
+
+  it("still lets the primary file win when both models hold full definitions", () => {
+    // The stub upgrade must not change the existing primary-wins rule for
+    // genuinely duplicated definitions across files.
+    const m1 = vizModel("schema foo { id INT }", "file:///a.stm");
+    const m2 = vizModel("schema foo { id INT\nname VARCHAR }", "file:///b.stm");
+    const result = mergeVizModels("file:///a.stm", [m1, m2]);
+    const schemas = result.namespaces.flatMap((ns) => ns.schemas);
+    assert.equal(schemas.length, 1);
+    assert.equal(schemas[0].fields.length, 1, "primary model's full definition still wins");
+  });
 });
 
 // ---------- Full lineage (vizModelFullLineage) ----------
