@@ -257,45 +257,45 @@ function buildUpstream(graph: FullGraph, target: string, maxDepth: number): Dag 
 
 // ── Formatters ────────────────────────────────────────────────────────────────
 
+/**
+ * Print every upstream path to `target`, one "src -> ... -> target" line each.
+ *
+ * Paths are discovered by climbing reverse edges from the target rather than
+ * by locating in-degree-zero roots and walking forward: in a cyclic graph no
+ * node has zero incoming edges, so a root-based search finds nothing and used
+ * to collapse the output to just the target (sl-h5cx). A path ends where a
+ * node has no parents left to climb — either a true source or a cycle closing
+ * back onto the current path — so every node in the DAG appears in some line.
+ */
 function printUpstreamFlat(dag: Dag, target: string): void {
-  // Build adjacency (upstream direction: parent → child)
-  const adj = new Map<string, string[]>();
+  // Reverse adjacency (child → parents), for climbing away from the target.
+  const parentsOf = new Map<string, string[]>();
   for (const { from, to } of dag.edges) {
-    if (!adj.has(from)) adj.set(from, []);
+    if (!parentsOf.has(to)) parentsOf.set(to, []);
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- Safe: key initialized on previous line
-    adj.get(from)!.push(to);
+    parentsOf.get(to)!.push(from);
   }
 
-  // Find roots (nodes with no incoming edges in the dag)
-  const hasIncoming = new Set(dag.edges.map((e) => e.to));
-  const roots = dag.nodes.filter((n) => !hasIncoming.has(n.name)).map((n) => n.name);
-  // If no roots found (e.g. target is isolated), just use target
-  if (roots.length === 0) roots.push(target);
-
-  // Print each root-to-target path
   const paths: string[][] = [];
-  function findPaths(node: string, currentPath: string[]): void {
-    currentPath.push(node);
-    const children = adj.get(node) ?? [];
-    if (children.length === 0 || node === target) {
-      if (node === target) paths.push([...currentPath]);
+  // `onPath` mirrors `pathSoFar` as a set, giving O(1) cycle detection while
+  // still allowing a node to appear on *different* paths.
+  function climb(node: string, pathSoFar: string[], onPath: Set<string>): void {
+    pathSoFar.push(node);
+    onPath.add(node);
+    const climbable = (parentsOf.get(node) ?? []).filter((parent) => !onPath.has(parent));
+    if (climbable.length === 0) {
+      // Reached a source (or broke a cycle): emit the path source-first.
+      paths.push([...pathSoFar].reverse());
     } else {
-      for (const child of children) {
-        findPaths(child, currentPath);
+      for (const parent of climbable) {
+        climb(parent, pathSoFar, onPath);
       }
     }
-    currentPath.pop();
+    pathSoFar.pop();
+    onPath.delete(node);
   }
 
-  for (const root of roots) {
-    findPaths(root, []);
-  }
-
-  if (paths.length === 0) {
-    // Fallback: print all nodes
-    console.log(dag.nodes.map((n) => canonicalKey(n.name)).join(" -> "));
-    return;
-  }
+  climb(target, [], new Set());
 
   for (const path of paths) {
     console.log(path.map((n) => canonicalKey(n)).join(" -> "));
