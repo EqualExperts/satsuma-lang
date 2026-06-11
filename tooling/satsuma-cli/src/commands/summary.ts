@@ -15,6 +15,7 @@
 
 import type { Command } from "commander";
 import { loadWorkspace } from "../load-workspace.js";
+import { runCommand } from "../command-runner.js";
 import { canonicalKey } from "../index-builder.js";
 import { expandEntityFields } from "../spread-expand.js";
 import { countNlDerivedEdgesByMapping } from "../nl-ref-extract.js";
@@ -52,7 +53,7 @@ Examples:
   satsuma summary pipeline.stm           # human overview
   satsuma summary pipeline.stm --json    # structured index
   satsuma summary pipeline.stm --compact # names only`)
-    .action(async (pathArg: string | undefined, opts: { compact?: boolean; json?: boolean }) => {
+    .action(runCommand(async (pathArg: string | undefined, opts: { compact?: boolean; json?: boolean }) => {
       const { files: parsed, index } = await loadWorkspace(pathArg);
 
       if (opts.json) {
@@ -62,7 +63,7 @@ Examples:
       } else {
         printDefault(index, parsed.length);
       }
-    });
+    }));
 }
 
 // ── Formatters ────────────────────────────────────────────────────────────────

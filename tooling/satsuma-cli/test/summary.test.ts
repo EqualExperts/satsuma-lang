@@ -79,4 +79,16 @@ describe("satsuma summary", () => {
     assert.equal(data.questionCount, 0);
     assert.equal(data.totalErrors, 0);
   });
+
+  it("reports an unresolvable path as a bare CommandError message, not an unhandled rejection", async () => {
+    // Regression for sl-00rw: summary was the only command not wrapped in
+    // runCommand, so loadWorkspace failures escaped to the unhandledRejection
+    // net and were prefixed "Unhandled error:" — breaking the error-message
+    // contract shared by every other command.
+    const { stderr, code } = await run("summary", "/nonexistent/path.stm");
+
+    assert.equal(code, 2);
+    assert.match(stderr, /^Error resolving path/);
+    assert.doesNotMatch(stderr, /Unhandled error:/);
+  });
 });
