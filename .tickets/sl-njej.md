@@ -1,6 +1,6 @@
 ---
 id: sl-njej
-status: open
+status: closed
 deps: []
 links: []
 created: 2026-06-11T02:40:29Z
@@ -17,3 +17,10 @@ satsuma-cli/src/commands/field-lineage.ts:191-194 — resolveAllNLRefs already r
 
 field-lineage shows nl-derived edges inside namespaces, matching graph output; regression test with namespaced NL ref lineage.
 
+
+## Notes
+
+**2026-06-11T11:05:00Z**
+
+Cause: resolveAllNLRefs returns nlRef.mapping already namespace-qualified, but field-lineage re-prefixed it with nlRef.namespace, producing `ns::ns::load`; the mapping lookup failed and the nl-derived edge was silently skipped (same trap as sl-qxn5 in arrows.ts).
+Fix: use nlRef.mapping directly in field-lineage.ts; documented the invariant on the ResolvedNLRef.mapping type field in core so future consumers don't re-qualify. Regression test with namespaced NL ref fixture.

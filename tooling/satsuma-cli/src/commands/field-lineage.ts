@@ -183,9 +183,10 @@ function buildFieldEdgeGraph(index: ExtractedWorkspace): FieldEdgeEntry[] {
     if (!nlRef.resolved || !nlRef.resolvedTo || nlRef.resolvedTo.kind !== "field") continue;
     if (!nlRef.targetField) continue;
 
-    const rawMappingKey = nlRef.namespace
-      ? `${nlRef.namespace}::${nlRef.mapping}`
-      : nlRef.mapping;
+    // nlRef.mapping is already namespace-qualified by resolveAllNLRefs —
+    // prepending nlRef.namespace again would produce "crm::crm::load" and
+    // make the mapping lookup fail, silently dropping the edge (sl-njej).
+    const rawMappingKey = nlRef.mapping;
     const mapping = index.mappings.get(rawMappingKey);
     if (!mapping) continue;
 
