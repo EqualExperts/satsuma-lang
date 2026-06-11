@@ -1,6 +1,6 @@
 ---
 id: sl-ndtz
-status: open
+status: closed
 deps: []
 links: []
 created: 2026-06-11T02:40:50Z
@@ -17,3 +17,10 @@ satsuma-cli/src/index-builder.ts:294 keys anonymous mappings as <anon>@<absolute
 
 Identical files diff clean including anonymous mappings; user output never shows internal anon keys; help text matches actual import behaviour.
 
+
+## Notes
+
+**2026-06-11T23:55:00Z**
+
+Cause: the index keys anonymous mappings as <anon>@<absolute-path>:<row>, so structurally identical files at different paths always diffed as removed+added and the internal key leaked into output; diff --help also claimed imports are followed while diff.ts passes followImports:false.
+Fix: diffIndex re-keys anonymous mappings to position-independent structural ids (namespace-qualified, stable ordinals for same-signature duplicates) before comparison, rewriting arrow/note attributions; help text corrected; unit + CLI regression tests added (commit f4a73ff)
