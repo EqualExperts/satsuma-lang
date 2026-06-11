@@ -52,6 +52,65 @@ export function inlineCssVariables(
   });
 }
 
+/**
+ * Escape a user-controlled string for interpolation into SVG/XML markup.
+ * Satsuma backtick names legally contain `& < > " '` (grammar backtick_name),
+ * so anything authored — schema ids, field names — must pass through here
+ * before landing in an exported document, or the file won't parse as XML
+ * (sl-6m5k).
+ */
+export function escapeXml(text: string): string {
+  return text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&apos;");
+}
+
+/** Extra canvas margin (px) added around the layout bounds in an exported SVG. */
+const EXPORT_SVG_PADDING = 48;
+
+/**
+ * Build the standalone SVG document for an overview export: the live edge
+ * layer's paths plus one simplified card (body, header band, name) per
+ * layout node. Authored names are XML-escaped (sl-6m5k); colours are still
+ * `var(--sz-*)` references — the caller inlines them against the active
+ * theme before saving (sl-7pdf). `edgeSvgContent` is markup already
+ * serialized from the component's own SVG layer, not authored text, so it
+ * is embedded verbatim.
+ */
+export function buildExportSvg(layout: LayoutResult, edgeSvgContent: string): string {
+  const w = layout.width + EXPORT_SVG_PADDING;
+  const h = layout.height + EXPORT_SVG_PADDING;
+
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">
+  <style>
+    .edge-path { fill: none; stroke-width: 1.5; }
+    .edge-path.nl { stroke: var(--sz-arrow-nl-stroke); stroke-dasharray: 6 3; }
+    .edge-path.bare { stroke: var(--sz-edge-bare-stroke); stroke-width: 1; }
+    .scope-label { font-family: monospace; font-size: 9px; font-weight: 600; fill: var(--sz-edge-bare-stroke); text-anchor: middle; }
+    .gear-circle { fill: var(--sz-gear-bg); stroke: var(--sz-edge-bare-stroke); stroke-width: 1; }
+    .gear-icon { fill: var(--sz-edge-bare-stroke); font-size: 10px; text-anchor: middle; dominant-baseline: central; }
+    rect.card { fill: var(--sz-card-bg); stroke: var(--sz-card-border); rx: 8; }
+    rect.header { rx: 8; }
+    text.card-name { font-family: system-ui; font-size: 14px; font-weight: 600; fill: var(--sz-text-on-accent); }
+    text.field-name { font-family: monospace; font-size: 12px; fill: var(--sz-text); }
+    text.field-type { font-family: monospace; font-size: 11px; fill: var(--sz-text-muted); }
+  </style>
+  <rect width="${w}" height="${h}" fill="var(--sz-bg)"/>
+  ${edgeSvgContent}
+  ${[...layout.nodes.values()].map((n) => `
+  <g transform="translate(${n.x},${n.y})">
+    <rect class="card" width="${n.width}" height="${n.height}" fill="var(--sz-card-bg)" stroke="var(--sz-card-border)" rx="8"/>
+    <rect class="header" width="${n.width}" height="40" fill="var(--sz-orange)" rx="8"/>
+    <rect x="0" y="32" width="${n.width}" height="8" fill="var(--sz-orange)"/>
+    <text class="card-name" x="12" y="26">${escapeXml(n.id)}</text>
+  </g>`).join("")}
+</svg>`;
+}
+
 /** Navigate event — dispatched when the user clicks a source-linked element. */
 export class SzNavigateEvent extends Event {
   readonly location: SourceLocation;
@@ -1354,8 +1413,6 @@ export class SatsumaViz extends LitElement {
 
   private _exportSvg() {
     if (!this._layout) return;
-    const w = this._layout.width + 48;
-    const h = this._layout.height + 48;
 
     // Capture the canvas HTML and edge SVG
     const canvas = this.renderRoot?.querySelector?.(".canvas") as HTMLElement | null;
@@ -1365,32 +1422,7 @@ export class SatsumaViz extends LitElement {
     const edgeSvg = canvas.querySelector("sz-edge-layer")?.shadowRoot?.querySelector("svg");
     const edgeSvgContent = edgeSvg ? edgeSvg.innerHTML : "";
 
-    // Build a minimal SVG with the edge paths
-    const svgStr = `<?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">
-  <style>
-    .edge-path { fill: none; stroke-width: 1.5; }
-    .edge-path.nl { stroke: var(--sz-arrow-nl-stroke); stroke-dasharray: 6 3; }
-    .edge-path.bare { stroke: var(--sz-edge-bare-stroke); stroke-width: 1; }
-    .scope-label { font-family: monospace; font-size: 9px; font-weight: 600; fill: var(--sz-edge-bare-stroke); text-anchor: middle; }
-    .gear-circle { fill: var(--sz-gear-bg); stroke: var(--sz-edge-bare-stroke); stroke-width: 1; }
-    .gear-icon { fill: var(--sz-edge-bare-stroke); font-size: 10px; text-anchor: middle; dominant-baseline: central; }
-    rect.card { fill: var(--sz-card-bg); stroke: var(--sz-card-border); rx: 8; }
-    rect.header { rx: 8; }
-    text.card-name { font-family: system-ui; font-size: 14px; font-weight: 600; fill: var(--sz-text-on-accent); }
-    text.field-name { font-family: monospace; font-size: 12px; fill: var(--sz-text); }
-    text.field-type { font-family: monospace; font-size: 11px; fill: var(--sz-text-muted); }
-  </style>
-  <rect width="${w}" height="${h}" fill="var(--sz-bg)"/>
-  ${edgeSvgContent}
-  ${[...this._layout.nodes.values()].map((n) => `
-  <g transform="translate(${n.x},${n.y})">
-    <rect class="card" width="${n.width}" height="${n.height}" fill="var(--sz-card-bg)" stroke="var(--sz-card-border)" rx="8"/>
-    <rect class="header" width="${n.width}" height="40" fill="var(--sz-orange)" rx="8"/>
-    <rect x="0" y="32" width="${n.width}" height="8" fill="var(--sz-orange)"/>
-    <text class="card-name" x="12" y="26">${n.id}</text>
-  </g>`).join("")}
-</svg>`;
+    const svgStr = buildExportSvg(this._layout, edgeSvgContent);
 
     // Resolve theme tokens to literal colours so the file renders standalone
     // (custom properties are defined by the component's stylesheets, which an
