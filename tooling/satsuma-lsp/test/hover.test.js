@@ -31,6 +31,18 @@ describe("computeHover", () => {
     assert.ok(md.includes("*(pk)*"));
   });
 
+  it("shows the schema summary when the cursor sits at the end of the block label (sl-ogd5)", () => {
+    // Word-end regression: column 16 is immediately after the final "s" of
+    // "customers"; hover must resolve the label, not the following node.
+    const md = hover(
+      "schema customers {\n  id UUID (pk)\n  name VARCHAR(200)\n}",
+      0,
+      16,
+    );
+    assert.ok(md, "expected hover content at end-of-identifier cursor");
+    assert.ok(md.includes("**schema** `customers`"));
+  });
+
   it("shows fragment summary on block label", () => {
     const md = hover(
       "fragment audit {\n  created_at TIMESTAMPTZ\n  updated_at TIMESTAMPTZ\n}",

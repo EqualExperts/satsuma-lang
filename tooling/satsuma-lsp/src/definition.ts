@@ -1,7 +1,7 @@
 import { Location } from "vscode-languageserver";
 import { createAtRefRegex, fieldNameText, qualifiedNameText, sourceRefText } from "@satsuma/core";
 import type { SyntaxNode, Tree } from "./parser-utils";
-import { child, children, labelText } from "./parser-utils";
+import { child, children, labelText, nodeAtPosition } from "./parser-utils";
 import {
   WorkspaceIndex,
   resolveDefinition,
@@ -19,10 +19,7 @@ export function computeDefinition(
   uri: string,
   index: WorkspaceIndex,
 ): Location | Location[] | null {
-  const node = tree.rootNode.descendantForPosition({
-    row: line,
-    column: character,
-  });
+  const node = nodeAtPosition(tree, line, character);
   if (!node) return null;
 
   // Check if cursor is on an @ref inside an NL string

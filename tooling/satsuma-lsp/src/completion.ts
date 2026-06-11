@@ -3,7 +3,7 @@ import {
   CompletionItemKind,
 } from "vscode-languageserver";
 import type { SyntaxNode, Tree } from "./parser-utils";
-import { child } from "./parser-utils";
+import { child, nodeAtPosition } from "./parser-utils";
 import { sourceRefStructuralText } from "@satsuma/core";
 import {
   WorkspaceIndex,
@@ -22,10 +22,7 @@ export function computeCompletions(
   _uri: string,
   index: WorkspaceIndex,
 ): CompletionItem[] {
-  const node = tree.rootNode.descendantForPosition({
-    row: line,
-    column: character,
-  });
+  const node = nodeAtPosition(tree, line, character);
   if (!node) return [];
 
   const ctx = detectCompletionContext(node);

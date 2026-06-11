@@ -58,6 +58,32 @@ mapping \`test\` {
     }
   });
 
+  it("jumps to definition when the cursor sits at the end of the identifier (sl-ogd5)", () => {
+    // tree-sitter ranges are half-open: before nodeAtPosition, a cursor
+    // immediately after "customers" resolved to the following node and
+    // go-to-definition returned null at word end while working mid-word.
+    const result = definition(
+      {
+        "file:///a.stm": `schema customers {
+  id UUID (pk)
+  name VARCHAR
+}
+mapping \`test\` {
+  source { customers }
+  target { dim }
+  id -> id
+}`,
+      },
+      "file:///a.stm",
+      5,
+      20, // cursor immediately after the final "s" of "customers"
+    );
+    assert.ok(result, "expected a definition at end-of-identifier cursor");
+    const loc = Array.isArray(result) ? result[0] : result;
+    assert.equal(loc.uri, "file:///a.stm");
+    assert.equal(loc.range.start.line, 0);
+  });
+
   it("jumps from target ref to schema definition", () => {
     const result = definition(
       {

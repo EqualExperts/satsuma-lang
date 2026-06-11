@@ -1,6 +1,6 @@
 import { Hover, MarkupKind } from "vscode-languageserver";
 import type { SyntaxNode, Tree } from "./parser-utils";
-import { nodeRange, child, children, labelText, stringText } from "./parser-utils";
+import { nodeRange, child, children, labelText, stringText, nodeAtPosition } from "./parser-utils";
 import { isMetricSchema } from "@satsuma/core";
 
 // Maximum number of fields shown in a schema/fragment hover preview.
@@ -19,10 +19,7 @@ export function computeHover(
   line: number,
   character: number,
 ): Hover | null {
-  const node = tree.rootNode.descendantForPosition({
-    row: line,
-    column: character,
-  });
+  const node = nodeAtPosition(tree, line, character);
   if (!node) return null;
 
   // Walk up the tree to find a meaningful hover target

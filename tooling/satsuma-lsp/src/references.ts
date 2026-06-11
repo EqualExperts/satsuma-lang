@@ -1,5 +1,6 @@
 import { Location } from "vscode-languageserver";
 import type { Tree } from "./parser-utils";
+import { nodeAtPosition } from "./parser-utils";
 import { findNodeContext } from "./definition";
 import {
   WorkspaceIndex,
@@ -19,10 +20,7 @@ export function computeReferences(
   index: WorkspaceIndex,
   includeDeclaration: boolean,
 ): Location[] {
-  const node = tree.rootNode.descendantForPosition({
-    row: line,
-    column: character,
-  });
+  const node = nodeAtPosition(tree, line, character);
   if (!node) return [];
 
   const ctx = findNodeContext(node);
