@@ -1,0 +1,18 @@
+namespace ns {
+
+schema s1 {
+  a INTEGER
+  b INTEGER
+}
+
+schema s2 {
+  x INTEGER
+}
+
+mapping `load_s2` {
+  source { s1 }
+  target { s2 }
+  -> x { "derived from @s1.a plus b" }
+}
+
+}

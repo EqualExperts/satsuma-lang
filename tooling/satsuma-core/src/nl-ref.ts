@@ -81,7 +81,12 @@ export interface ResolvedNLRef {
   classification: RefClassification;
   resolved: boolean;
   resolvedTo: { kind: string; name: string } | null;
+  /** Index key of the owning mapping, ALREADY namespace-qualified
+   * ("crm::load") when the mapping lives in a namespace. Do not prepend
+   * `namespace` again — double-qualifying breaks lookups (sl-qxn5, sl-njej). */
   mapping: string;
+  /** Namespace the ref was authored in, kept for scope-aware resolution.
+   * Informational alongside `mapping`, which already embeds it. */
   namespace: string | null;
   targetField: string | null;
   /** Propagated from the source NLRefDataItem. "source_block" means the ref

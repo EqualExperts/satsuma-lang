@@ -152,3 +152,23 @@ describe("field-lineage same-line arrows sharing a target (sl-201z)", () => {
       "both same-line arrows should contribute an upstream connection");
   });
 });
+
+// ---------------------------------------------------------------------------
+// sl-njej: NL-derived edges inside namespaces
+// ---------------------------------------------------------------------------
+describe("field-lineage NL-derived edges in namespaced mappings (sl-njej)", () => {
+  it("reports an nl-derived upstream edge for an @ref inside a namespaced mapping", async () => {
+    // Bug sl-njej: resolveAllNLRefs returns nlRef.mapping already namespace-
+    // qualified, but field-lineage re-prefixed it with nlRef.namespace,
+    // producing "ns::ns::load_s2" — the mapping lookup failed and the
+    // nl-derived edge was silently dropped (graph showed it; field-lineage didn't).
+    const fixture = resolve(FIXTURES, "ns-nl-lineage.stm");
+    const { stdout, code } = await run("field-lineage", "ns::s2.x", fixture, "--json", "--upstream");
+    assert.equal(code, 0, `expected exit 0\n${stdout}`);
+    const data = JSON.parse(stdout);
+    const nlEdges = (data.upstream as any[]).filter((e) => e.classification === "nl-derived");
+    assert.equal(nlEdges.length, 1, `expected one nl-derived upstream edge, got: ${JSON.stringify(data.upstream)}`);
+    assert.equal(nlEdges[0].field, "ns::s1.a");
+    assert.equal(nlEdges[0].via_mapping, "ns::load_s2");
+  });
+});
