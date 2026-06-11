@@ -15,6 +15,11 @@ export type { MetaEntry };
  * The grammar wraps key/value payloads in `value_text`, so quoted string values
  * often arrive as `value_text.text === "\"INTERNAL\""`. Downstream JSON
  * consumers expect the value without those source delimiters.
+ *
+ * Delimiters are stripped ONLY when the whole value is a single quoted string.
+ * `value_text` legally mixes tokens (`default "unknown" if null`), and mixed
+ * values must round-trip verbatim — quoted parts included — rather than being
+ * truncated to the first string child (sl-cvx9).
  */
 function normalizeMetadataValue(valueNode: SyntaxNode | null | undefined): string {
   if (!valueNode) return "";
@@ -23,11 +28,14 @@ function normalizeMetadataValue(valueNode: SyntaxNode | null | undefined): strin
     return valueNode.text.slice(1, -1);
   }
 
-  const nestedValue = valueNode.namedChildren.find(
-    (child) => child.type === "nl_string" || child.type === "backtick_name",
-  );
-  if (nestedValue) {
-    return normalizeMetadataValue(nestedValue);
+  // Unwrap a wrapper node (value_text) only when its single child spans the
+  // entire value — otherwise unnamed sibling tokens would be silently dropped.
+  const children = valueNode.namedChildren;
+  if (children.length === 1 && children[0]?.text === valueNode.text) {
+    return normalizeMetadataValue(children[0]);
+  }
+  if (children.length > 1) {
+    return valueNode.text;
   }
 
   const text = valueNode.text;
