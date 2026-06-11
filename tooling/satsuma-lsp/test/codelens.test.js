@@ -51,6 +51,23 @@ describe("computeCodeLenses", () => {
     assert.ok(result.some((lens) => lens.command.title.includes("used in 2 mapping(s)")));
   });
 
+  it("counts a mapping once when it uses the schema as both source and target", () => {
+    // sl-0tgo: findMappingsUsing deduped reference sites by line, so a mapping
+    // naming the schema in its source AND target blocks counted twice. The
+    // lens must report distinct mappings.
+    const result = lenses(
+      {
+        "file:///a.stm": "schema customers {\n  id UUID\n}",
+        "file:///b.stm": "mapping `self` {\n  source { customers }\n  target { customers }\n  id -> id\n}",
+      },
+      "file:///a.stm",
+    );
+    assert.ok(
+      result.some((lens) => lens.command.title.includes("used in 1 mapping(s)")),
+      `expected one distinct mapping, got: ${result.map((l) => l.command.title).join("; ")}`,
+    );
+  });
+
   it("adds clickable lineage actions for schemas", () => {
     const result = lenses(
       { "file:///a.stm": "schema customers {\n  id UUID\n}" },

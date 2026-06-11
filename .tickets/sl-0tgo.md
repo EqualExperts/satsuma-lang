@@ -1,6 +1,6 @@
 ---
 id: sl-0tgo
-status: open
+status: closed
 deps: []
 links: []
 created: 2026-06-11T02:41:30Z
@@ -17,3 +17,10 @@ Three small confirmed issues. (1) server.ts:147-152 — closing a modified-but-u
 
 Close re-indexes from disk; hidden-rule checks replaced with reachable node types (with tests proving the branches fire); codelens counts distinct mappings.
 
+
+## Notes
+
+**2026-06-11T07:00:02Z**
+
+Cause: (1) onDidClose kept whatever buffer content was last indexed, including unsaved edits the user discarded; (2) definition.ts and completion.ts tested for "_source_entry" / "_arrow_transform_body", hidden grammar rules that inline away and never appear as node types; (3) findMappingsUsing deduped reference sites by uri:line, double-counting mappings that name a schema in both source and target blocks.
+Fix: (1) close now re-indexes from disk via reindexFromDisk (removing files with no on-disk presence); (2) dead checks removed/replaced — target detection uses the real direct parent, and empty arrow bodies (parsed as declaration-less nested_arrow) get pipe completions; (3) source/target references now carry their containing mapping's qualified name and findMappingsUsing dedups on it. Tests added for empty-arrow-body completions and source+target single-mapping counting.
