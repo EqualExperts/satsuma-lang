@@ -18,6 +18,7 @@
 import type { Command } from "commander";
 import { loadWorkspace } from "../load-workspace.js";
 import { runCommand, CommandError, EXIT_NOT_FOUND } from "../command-runner.js";
+import { parsePositiveInt } from "../option-parsers.js";
 import { resolveIndexKey, canonicalKey } from "../index-builder.js";
 import { buildFullGraph } from "../schema-graph.js";
 import type { FullGraph } from "../schema-graph.js";
@@ -45,7 +46,7 @@ export function register(program: Command): void {
     .description("Trace data lineage through a Satsuma file and its imports")
     .option("--from <name>", "start node for downstream walk")
     .option("--to <name>", "target node for upstream BFS")
-    .option("--depth <n>", "maximum recursion depth", (v: string) => parseInt(v, 10), 10)
+    .option("--depth <n>", "maximum recursion depth", parsePositiveInt, 10)
     .option("--compact", "print names only")
     .option("--json", "emit {nodes, edges} DAG")
     .addHelpText("after", `

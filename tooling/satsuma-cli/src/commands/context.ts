@@ -21,6 +21,7 @@
 import type { Command } from "commander";
 import { loadWorkspace } from "../load-workspace.js";
 import { runCommand, EXIT_NOT_FOUND } from "../command-runner.js";
+import { parsePositiveInt } from "../option-parsers.js";
 import { extractAtRefs } from "../nl-ref-extract.js";
 import { extractNLContent } from "../nl-extract.js";
 import { expandEntityFields } from "../spread-expand.js";
@@ -39,7 +40,7 @@ export function register(program: Command): void {
   program
     .command("context <query> [path]")
     .description("Rank and emit blocks relevant to a query from a Satsuma file and its imports")
-    .option("--budget <n>", "token budget", (v: string) => parseInt(v, 10), 4000)
+    .option("--budget <n>", "token budget", parsePositiveInt, 4000)
     .option("--compact", "omit notes and transform bodies")
     .option("--json", "emit ranked JSON list")
     .addHelpText("after", `

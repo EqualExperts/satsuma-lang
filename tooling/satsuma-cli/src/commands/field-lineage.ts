@@ -15,6 +15,7 @@
 import type { Command } from "commander";
 import { loadWorkspace } from "../load-workspace.js";
 import { runCommand, CommandError, EXIT_NOT_FOUND, EXIT_PARSE_ERROR } from "../command-runner.js";
+import { parsePositiveInt } from "../option-parsers.js";
 import { resolveIndexKey, canonicalKey } from "../index-builder.js";
 import { resolveAllNLRefs } from "../nl-ref-extract.js";
 import { expandEntityFields } from "../spread-expand.js";
@@ -40,7 +41,7 @@ export function register(program: Command): void {
     .description("Trace the full upstream and downstream lineage of a single field")
     .option("--upstream", "only upstream chain")
     .option("--downstream", "only downstream chain")
-    .option("--depth <n>", "maximum traversal depth", (v: string) => parseInt(v, 10), 10)
+    .option("--depth <n>", "maximum traversal depth", parsePositiveInt, 10)
     .option("--json", "structured JSON output")
     .addHelpText("after", `
 Traces all fields that flow into (upstream) and out of (downstream) the given
