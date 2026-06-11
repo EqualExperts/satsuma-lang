@@ -8,7 +8,7 @@
  *   cd tooling/tree-sitter-satsuma && npx node-gyp configure && npx node-gyp build
  */
 
-import { copyFileSync, mkdtempSync, readFileSync, unlinkSync } from "node:fs";
+import { copyFileSync, mkdtempSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve, join } from "node:path";
@@ -2147,6 +2147,31 @@ describe("satsuma diff", () => {
     );
     assert.equal(code, 0);
     assert.ok(stdout.trim().length > 0);
+  });
+
+  it("reports no differences for byte-identical files containing anonymous mappings (sl-ndtz)", async () => {
+    // Anonymous mappings were keyed by absolute path + row internally, so two
+    // identical files at different paths always produced phantom +/- entries.
+    const dir = mkdtempSync(join(tmpdir(), "satsuma-diff-"));
+    const source = "schema s {\n  id INTEGER\n}\n\nschema t {\n  id INTEGER\n}\n\nmapping {\n  source { s }\n  target { t }\n  id -> id\n}\n";
+    const v1 = join(dir, "v1.stm");
+    const v2 = join(dir, "v2.stm");
+    writeFileSync(v1, source);
+    writeFileSync(v2, source);
+
+    const { stdout, code } = await run("diff", v1, v2);
+    assert.equal(code, 0);
+    assert.match(stdout, /no structural differences/i);
+    assert.doesNotMatch(stdout, /<anon>@/, "internal anon keys must never reach user output");
+  });
+
+  it("documents that imports are not followed, matching actual behaviour (sl-ndtz)", async () => {
+    // diff resolves both inputs with followImports:false; the help text used
+    // to claim the opposite.
+    const { stdout, code } = await run("diff", "--help");
+    assert.equal(code, 0);
+    assert.match(stdout, /imports are not followed/i);
+    assert.doesNotMatch(stdout, /resolved with its imports/i);
   });
 
   it("diffs metrics, fragments, and transforms", async () => {
