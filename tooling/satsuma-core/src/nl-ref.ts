@@ -71,6 +71,10 @@ export interface NLRefDataItem {
    * describes join conditions and filters — it must not generate NL-derived
    * arrows. Absent means an arrow body or note block. */
   context?: "source_block";
+  /** Width of the opening delimiter stripped from `text` (3 for `"""`, 1 for
+   * `"`, 0 for bare at_refs). `column` points at the delimiter in the source,
+   * so position math must add this back for first-line refs (sl-o3ea). */
+  delimiterWidth?: number;
   line: number;
   column: number;
   file: string;
@@ -152,13 +156,16 @@ const AT_REF_RE = createAtRefRegex();
  * that line. This helper handles both cases and is the single source of truth
  * for diagnostic positions of NL refs (sl-2ji3).
  *
- * @param item   The NL ref source item; only `text`, `line`, `column` are read.
- *               `item.line` and `item.column` are 0-based (CST positions).
+ * @param item   The NL ref source item; only `text`, `line`, `column`, and
+ *               `delimiterWidth` are read. `item.line` and `item.column` are
+ *               0-based (CST positions); `item.column` points at the node's
+ *               opening delimiter, while `item.text` has that delimiter
+ *               stripped — `delimiterWidth` bridges the two (sl-o3ea).
  * @param offset Byte offset of the `@` character within `item.text`.
  * @returns      1-based `{line, column}` suitable for diagnostic reporting.
  */
 export function computeNLRefPosition(
-  item: { text: string; line: number; column: number },
+  item: { text: string; line: number; column: number; delimiterWidth?: number },
   offset: number,
 ): { line: number; column: number } {
   const textBefore = item.text.slice(0, offset);
@@ -172,9 +179,12 @@ export function computeNLRefPosition(
     const lastNl = textBefore.lastIndexOf("\n");
     column = offset - lastNl;
   } else {
-    // No newline crossed — the @ is on the same line as the string opener,
-    // so add the offset to the string's start column (+1 to make 1-based).
-    column = item.column + offset + 1;
+    // No newline crossed — the @ is on the same line as the string opener.
+    // item.column is the opening delimiter, but offset counts from the start
+    // of the delimiter-stripped text, so add the delimiter width back before
+    // converting to 1-based (sl-o3ea: without it, first-line refs pointed at
+    // the character before the @).
+    column = item.column + (item.delimiterWidth ?? 0) + offset + 1;
   }
   return { line, column };
 }
@@ -534,6 +544,14 @@ function nlRefNodesInPipeStep(step: SyntaxNode): SyntaxNode[] {
   return [];
 }
 
+// Width of the opening delimiter that the extraction helpers strip from a
+// ref-bearing node's text: `"""` multiline strings (3), `"` NL strings (1),
+// bare at_refs (0). Recorded on every NLRefDataItem so computeNLRefPosition
+// can map text offsets back to source columns on the first line (sl-o3ea).
+function openingDelimiterWidth(node: SyntaxNode): number {
+  return node.type === "multiline_string" ? 3 : node.type === "nl_string" ? 1 : 0;
+}
+
 // The text payload of one ref-bearing node, or null when it cannot contain a
 // ref. Quoted NL strings are unwrapped from their delimiters; a bare at_ref
 // keeps its "@name" text verbatim so the downstream regex scan finds the ref
@@ -565,6 +583,7 @@ function extractTransformNLRefs(transformNode: SyntaxNode, namespace: string | n
             mapping: `transform:${transformName}`,
             namespace,
             targetField: null,
+            delimiterWidth: openingDelimiterWidth(nlNode),
             line: nlNode.startPosition.row,
             column: nlNode.startPosition.column,
           });
@@ -591,6 +610,7 @@ function extractStandaloneNoteRefs(
           mapping: parentLabel ? `note:${parentLabel}` : "note:",
           namespace,
           targetField: null,
+          delimiterWidth: openingDelimiterWidth(inner),
           line: inner.startPosition.row,
           column: inner.startPosition.column,
         });
@@ -663,6 +683,7 @@ function walkArrowsForNL(
               mapping: mappingName,
               namespace,
               targetField: null,
+              delimiterWidth: openingDelimiterWidth(inner),
               line: inner.startPosition.row,
               column: inner.startPosition.column,
             });
@@ -692,6 +713,7 @@ function walkArrowsForNL(
             namespace,
             targetField: null,
             context: "source_block",
+            delimiterWidth: openingDelimiterWidth(nlNode),
             line: nlNode.startPosition.row,
             column: nlNode.startPosition.column,
           });
@@ -721,6 +743,7 @@ function walkArrowsForNL(
                   mapping: mappingName,
                   namespace,
                   targetField: tgt,
+                  delimiterWidth: openingDelimiterWidth(nlNode),
                   line: nlNode.startPosition.row,
                   column: nlNode.startPosition.column,
                 });
