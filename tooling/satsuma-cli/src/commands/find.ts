@@ -96,6 +96,28 @@ Examples:
 // ── Search logic ──────────────────────────────────────────────────────────────
 
 /**
+ * CST node type to search for each user-facing block type. In v2 there is no
+ * `metric_block` node — a metric is a `schema_block` decorated with the
+ * `metric` tag (see the aggregation notes in index-builder.ts), so the metric
+ * scope must look up schema_block nodes.
+ */
+const CST_NODE_TYPE: Record<string, string> = {
+  schema: "schema_block",
+  metric: "schema_block",
+  fragment: "fragment_block",
+};
+
+/**
+ * A v2 metric registers the same schema_block node in both `index.schemas`
+ * and `index.metrics`. Row equality identifies that twin entry, as opposed to
+ * a plain schema that merely shares a name with a separate metric block.
+ */
+function isMetricTwin(index: ExtractedWorkspace, name: string, entry: { row: number }): boolean {
+  const metric = index.metrics.get(name);
+  return metric !== undefined && metric.row === entry.row;
+}
+
+/**
  * Search for fields whose metadata contains the given tag/key.
  */
 function searchTag(index: ExtractedWorkspace, parsedFiles: ParsedFile[], tag: string, scope: string): Match[] {
@@ -107,7 +129,8 @@ function searchTag(index: ExtractedWorkspace, parsedFiles: ParsedFile[], tag: st
     const parsed = fileMap.get(blockEntry.file);
     if (!parsed) return;
 
-    const blockNode = findBlockNode(parsed.tree.rootNode, blockType + "_block", blockName);
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- Safe: blockType is always a CST_NODE_TYPE key
+    const blockNode = findBlockNode(parsed.tree.rootNode, CST_NODE_TYPE[blockType]!, blockName);
     if (!blockNode) {
       // Fallback: use index fields (no tag info)
       return;
@@ -138,17 +161,24 @@ function searchTag(index: ExtractedWorkspace, parsedFiles: ParsedFile[], tag: st
     collectFieldMatches(body, blockType, blockName, blockEntry.file, tag, matches);
   };
 
-  for (const [name, entry] of index.schemas) search("schema", name, entry, "schema_body");
+  for (const [name, entry] of index.schemas) {
+    // Metric twins are reported by the metrics loop below with blockType
+    // "metric" — searching them here too would misreport them as "schema"
+    // and duplicate every match under scope "all".
+    if (isMetricTwin(index, name, entry)) continue;
+    search("schema", name, entry, "schema_body");
+  }
   // Metrics are schema_blocks decorated with the `metric` tag; their body is a schema_body.
   for (const [name, entry] of index.metrics) search("metric", name, entry, "schema_body");
   for (const [name, entry] of index.fragments) search("fragment", name, entry, "schema_body");
 
-  // For schemas with fragment spreads, also search spread fragment fields
-  if (scope === "all" || scope === "schema") {
-    for (const [schemaName, schema] of index.schemas) {
-      if (!schema.hasSpreads || !schema.spreads?.length) continue;
-      collectSpreadFieldMatches(schemaName, schema, index, fileMap, tag, matches);
-    }
+  // For schemas (and metric-tagged schemas) with fragment spreads, also search
+  // the spread fragments' fields, reporting them under the consuming block.
+  for (const [schemaName, schema] of index.schemas) {
+    if (!schema.hasSpreads || !schema.spreads?.length) continue;
+    const blockType = isMetricTwin(index, schemaName, schema) ? "metric" : "schema";
+    if (scope !== "all" && scope !== blockType) continue;
+    collectSpreadFieldMatches(schemaName, schema, blockType, index, fileMap, tag, matches);
   }
 
   return matches;
@@ -280,12 +310,14 @@ function renderMetadataValue(valueNode: SyntaxNode | undefined): string {
 }
 
 /**
- * For a schema with fragment spreads, search each spread fragment's CST for
- * tagged fields and report them under the consuming schema.
+ * For a schema (or metric-tagged schema) with fragment spreads, search each
+ * spread fragment's CST for tagged fields and report them under the consuming
+ * block with the given blockType ("schema" or "metric").
  */
 function collectSpreadFieldMatches(
   schemaName: string,
   schema: { spreads?: string[]; namespace?: string | null; file: string; row: number },
+  blockType: string,
   index: ExtractedWorkspace,
   fileMap: Map<string, ParsedFile>,
   tag: string,
@@ -297,7 +329,7 @@ function collectSpreadFieldMatches(
 
   // Collect already-matched field names to avoid duplicates
   const existing = new Set(
-    acc.filter((m) => m.blockType === "schema" && m.block === schemaName).map((m) => m.field),
+    acc.filter((m) => m.blockType === blockType && m.block === schemaName).map((m) => m.field),
   );
 
   while (queue.length > 0) {
@@ -322,7 +354,7 @@ function collectSpreadFieldMatches(
     // Search the fragment's body for matching fields, but report under the consuming schema
     // Use the consuming schema's file and row, not the fragment's
     const fragMatches: Match[] = [];
-    collectFieldMatches(body, "schema", schemaName, fragment.file, tag, fragMatches);
+    collectFieldMatches(body, blockType, schemaName, fragment.file, tag, fragMatches);
     for (const m of fragMatches) {
       if (!existing.has(m.field)) {
         existing.add(m.field);
