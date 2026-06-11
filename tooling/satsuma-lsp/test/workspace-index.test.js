@@ -734,6 +734,33 @@ describe("NL string reference indexing", () => {
     const refs = (idx.references.get("customers") || []).filter((r) => r.context === "nl");
     assert.equal(refs.length, 1);
   });
+
+  // bptar-l6n8: bare (unquoted) pipe text parses to structural at_ref nodes,
+  // not nl_strings, so the regex-over-strings walk never saw them and
+  // find-references/rename skipped bare-text refs entirely.
+
+  it("indexes a bare @ref in unquoted pipe text, range excluding the @ sigil", () => {
+    const line = '  a -> b { derived from @customers }';
+    const source = `mapping test {\n  source { customers }\n  target { dim }\n${line}\n}`;
+    const idx = buildIndex({ "file:///a.stm": source });
+    const refs = (idx.references.get("customers") || []).filter((r) => r.context === "nl");
+    assert.equal(refs.length, 1);
+    // sl-xf3f contract: rename replaces the range verbatim, so the @ must
+    // stay outside it.
+    assert.equal(refs[0].range.start.line, 3);
+    assert.equal(refs[0].range.start.character, line.indexOf("@") + 1);
+    assert.equal(refs[0].range.end.character, line.indexOf("@") + 1 + "customers".length);
+  });
+
+  it("indexes a bare backtick-named @ref under its unquoted name", () => {
+    // Backtick delimiters are stripped from the keyed name, mirroring the
+    // quoted-string regex path, so lookups by the plain name find it.
+    const idx = buildIndex({
+      "file:///a.stm": "mapping test {\n  source { customers }\n  target { dim }\n  a -> b { lookup @`order id` }\n}",
+    });
+    const refs = (idx.references.get("order id") || []).filter((r) => r.context === "nl");
+    assert.equal(refs.length, 1);
+  });
 });
 
 describe("transform spread indexing in arrows", () => {
