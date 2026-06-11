@@ -1,6 +1,6 @@
 ---
 id: sl-xf3f
-status: open
+status: in_progress
 deps: []
 links: [sl-p256]
 created: 2026-06-11T02:41:29Z
