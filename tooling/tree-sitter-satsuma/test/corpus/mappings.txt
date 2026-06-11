@@ -336,3 +336,23 @@ mapping {
             (pipe_text
               (identifier))))))))
 
+================================================================================
+Target entry allows a trailing comma
+================================================================================
+
+mapping {
+  source { customers, }
+  target { customers_v2, }
+}
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (mapping_block
+    (mapping_body
+      (source_block
+        (source_ref
+          (identifier)))
+      (target_block
+        (source_ref
+          (identifier))))))

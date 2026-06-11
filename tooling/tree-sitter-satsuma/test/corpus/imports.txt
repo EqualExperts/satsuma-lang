@@ -154,3 +154,34 @@ import { `audit fields` } from "lib/audit.stm"
     (import_path
       (nl_string))))
 
+================================================================================
+Import name list allows a trailing comma
+================================================================================
+
+import { crm::customers, billing::invoices, } from "crm/pipeline.stm"
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (import_decl
+    (import_name
+      (qualified_name
+        (identifier)
+        (identifier)))
+    (import_name
+      (qualified_name
+        (identifier)
+        (identifier)))
+    (import_path
+      (nl_string))))
+
+================================================================================
+Empty import name list is rejected
+:error
+================================================================================
+
+import { } from "crm/pipeline.stm"
+
+--------------------------------------------------------------------------------
+
+

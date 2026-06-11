@@ -8,6 +8,17 @@
 import type { SyntaxNode } from "./types.js";
 
 /**
+ * True when a node is real input text rather than a tree-sitter recovery
+ * artifact. Error recovery can insert zero-width MISSING nodes (e.g.
+ * `import { } from "x"` yields an import_name containing a MISSING
+ * identifier whose .text is ""). Extraction helpers must check this before
+ * trusting .text, or downstream tooling reports empty-string names (sl-0nvt).
+ */
+export function isPresent(node: SyntaxNode | null | undefined): node is SyntaxNode {
+  return node != null && !node.isMissing && node.text.length > 0;
+}
+
+/**
  * First named child of the given type, or null.
  * Filters out null entries for compatibility with web-tree-sitter's nullable array.
  */
@@ -86,7 +97,7 @@ export function entryText(node: SyntaxNode | null | undefined): string | null {
  */
 export function qualifiedNameText(node: SyntaxNode | null | undefined): string | null {
   if (!node || node.type !== "qualified_name") return null;
-  const ids = node.namedChildren.filter((c) => c.type === "identifier");
+  const ids = node.namedChildren.filter((c) => c.type === "identifier" && isPresent(c));
   if (ids.length < 2 || !ids[0] || !ids[1]) return null;
   return `${ids[0].text}::${ids[1].text}`;
 }
@@ -100,13 +111,13 @@ export function qualifiedNameText(node: SyntaxNode | null | undefined): string |
 export function sourceRefText(node: SyntaxNode | null | undefined): string | null {
   if (!node) return null;
   const qn = child(node, "qualified_name");
-  if (qn) return qualifiedNameText(qn) ?? qn.text;
+  if (isPresent(qn)) return qualifiedNameText(qn) ?? qn.text;
   const bn = child(node, "backtick_name");
-  if (bn) return bn.text.slice(1, -1);
+  if (isPresent(bn)) return bn.text.slice(1, -1);
   const id = child(node, "identifier");
-  if (id) return id.text;
+  if (isPresent(id)) return id.text;
   const ns = child(node, "nl_string");
-  if (ns) return ns.text.slice(1, -1);
+  if (isPresent(ns)) return ns.text.slice(1, -1);
   return null;
 }
 
@@ -120,11 +131,11 @@ export function sourceRefText(node: SyntaxNode | null | undefined): string | nul
 export function sourceRefStructuralText(node: SyntaxNode | null | undefined): string | null {
   if (!node) return null;
   const qn = child(node, "qualified_name");
-  if (qn) return qualifiedNameText(qn) ?? qn.text;
+  if (isPresent(qn)) return qualifiedNameText(qn) ?? qn.text;
   const bn = child(node, "backtick_name");
-  if (bn) return bn.text.slice(1, -1);
+  if (isPresent(bn)) return bn.text.slice(1, -1);
   const id = child(node, "identifier");
-  if (id) return id.text;
+  if (isPresent(id)) return id.text;
   return null;
 }
 
