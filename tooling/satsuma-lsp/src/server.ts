@@ -147,9 +147,34 @@ documents.onDidChangeContent((change) => {
 documents.onDidClose((event) => {
   trees.delete(event.document.uri);
   validateDiagCache.delete(event.document.uri);
-  // Keep the file in the index (it's still on disk) — just clear the tree cache
+  // The index may hold modified-but-unsaved buffer content the user just
+  // discarded by closing; re-index from what is actually on disk (sl-0tgo).
+  reindexFromDisk(event.document.uri);
   connection.sendDiagnostics({ uri: event.document.uri, diagnostics: [] });
 });
+
+/**
+ * Replace a file's index entries with its on-disk content. Files that have no
+ * on-disk presence (non-file schemes, deleted or never-saved files) are
+ * removed from the index instead — their last indexed content no longer
+ * corresponds to anything the user can navigate to.
+ */
+function reindexFromDisk(uri: string): void {
+  let fsPath: string;
+  try {
+    fsPath = fileURLToPath(uri);
+  } catch {
+    removeFile(wsIndex, uri);
+    return;
+  }
+  try {
+    const content = fs.readFileSync(fsPath, "utf-8");
+    const tree = getParser().parse(content);
+    if (tree) indexFile(wsIndex, uri, tree);
+  } catch {
+    removeFile(wsIndex, uri);
+  }
+}
 
 // Run satsuma validate on save
 documents.onDidSave(async (event) => {

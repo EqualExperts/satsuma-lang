@@ -79,9 +79,9 @@ function tryContext(node: SyntaxNode): NodeContext | null {
     case "source_ref": {
       const name = sourceRefText(node);
       if (!name) return null;
-      const parentType = node.parent?.type;
-      const inTarget = parentType === "target_block" ||
-        (parentType === "_source_entry" && node.parent?.parent?.type === "target_block");
+      // _source_entry is a hidden grammar rule that inlines away, so a
+      // source_ref's parent is the source_block/target_block itself (sl-0tgo).
+      const inTarget = node.parent?.type === "target_block";
       return {
         kind: inTarget ? "target_ref" : "source_ref",
         name,

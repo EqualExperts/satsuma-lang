@@ -75,6 +75,10 @@ export interface ReferenceEntry {
    *  src/tgt path references; "nl" marks @refs found inside NL prose strings
    *  (arrow bodies, note tags/blocks, metadata values — sl-ellp). */
   context: "source" | "target" | "spread" | "import" | "arrow" | "nl" | "metric_source";
+  /** Qualified name of the mapping whose source/target block contains this
+   *  reference. Set only for "source"/"target" contexts; lets consumers count
+   *  distinct mappings rather than reference sites (sl-0tgo). */
+  container?: string;
 }
 
 export interface ImportEntry {
@@ -496,10 +500,13 @@ export function findMappingsUsing(
   const mappingRefs = refs.filter(
     (r) => r.context === "source" || r.context === "target",
   );
-  // Deduplicate by URI + parent mapping (approximate: use URI since each mapping body is in one file)
+  // Deduplicate by the containing mapping, not by reference site — a mapping
+  // that names the schema in both its source and target blocks is still one
+  // mapping (sl-0tgo). The uri:line fallback covers entries indexed before
+  // container existed (none in practice, but keeps the function total).
   const seen = new Set<string>();
   for (const ref of mappingRefs) {
-    seen.add(`${ref.uri}:${ref.range.start.line}`);
+    seen.add(ref.container ?? `${ref.uri}:${ref.range.start.line}`);
   }
   return [...seen];
 }
@@ -649,10 +656,19 @@ function indexMappingRefs(
   index: WorkspaceIndex,
   uri: string,
   mappingNode: SyntaxNode,
-  _namespace: string | null,
+  namespace: string | null,
 ): void {
   const body = child(mappingNode, "mapping_body");
   if (!body) return;
+
+  // Identity of the containing mapping, recorded on each source/target ref so
+  // consumers can count distinct mappings rather than reference sites
+  // (sl-0tgo). Anonymous mappings fall back to their position, which is
+  // unique per mapping.
+  const mappingName = labelText(mappingNode);
+  const container = mappingName
+    ? (namespace ? `${namespace}::${mappingName}` : mappingName)
+    : `<anon>@${uri}:${mappingNode.startPosition.row}`;
 
   for (const ch of body.namedChildren) {
     if (ch.type === "source_block") {
@@ -664,6 +680,7 @@ function indexMappingRefs(
             range: nodeRange(ref),
             name,
             context: "source",
+            container,
           });
         }
       }
@@ -676,6 +693,7 @@ function indexMappingRefs(
             range: nodeRange(ref),
             name,
             context: "target",
+            container,
           });
         }
       }

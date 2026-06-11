@@ -63,7 +63,18 @@ function detectCompletionContext(node: SyntaxNode): CompletionContext | null {
     }
 
     // Inside a pipe chain → suggest transform functions
-    if (current.type === "pipe_chain" || current.type === "_arrow_transform_body") {
+    if (current.type === "pipe_chain") {
+      return { kind: "pipe_chain" };
+    }
+
+    // Inside the empty braces of an arrow body (`a -> b {  }`): the grammar
+    // parses this as a nested_arrow with no declarations (its transform-body
+    // form requires at least one pipe step), so the cursor lands on the
+    // nested_arrow node itself. The user has just opened a transform body —
+    // suggest pipe functions (sl-0tgo). Arrows with actual nested declarations
+    // resolve deeper nodes first, so this only fires for empty bodies.
+    if (current.type === "nested_arrow" && !child(current, "map_arrow") &&
+        !child(current, "computed_arrow") && !child(current, "nested_arrow")) {
       return { kind: "pipe_chain" };
     }
 

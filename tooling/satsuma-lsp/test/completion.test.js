@@ -101,6 +101,24 @@ schema customers {
     assert.ok(items.every((i) => i.kind === 14)); // CompletionItemKind.Keyword = 14
   });
 
+  it("suggests transform functions inside an empty arrow body", () => {
+    // sl-0tgo: the old check tested for "_arrow_transform_body", a hidden
+    // grammar rule that never surfaces as a node type, so the branch was
+    // unreachable. `a -> b {  }` parses as a nested_arrow with no
+    // declarations and the cursor lands on the nested_arrow node itself —
+    // the user just opened a transform body and expects pipe functions.
+    const items = complete(
+      {
+        "file:///a.stm": "mapping m {\n  source { s }\n  target { t }\n  a -> b {  }\n}",
+      },
+      "file:///a.stm",
+      3,
+      11, // cursor between the empty braces
+    );
+    const labels = items.map((i) => i.label);
+    assert.ok(labels.includes("trim"), "expected pipe-function completions in empty arrow body");
+  });
+
   it("suggests transform functions in pipe chain", () => {
     const items = complete(
       {
