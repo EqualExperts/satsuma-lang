@@ -1,6 +1,6 @@
 ---
 id: sl-fm0q
-status: open
+status: closed
 deps: []
 links: [sl-zl55]
 created: 2026-06-11T02:42:20Z
@@ -17,3 +17,10 @@ satsuma-viz/src/components/sz-mapping-detail.ts:465,489 — _findSourceFieldsFor
 
 Hover highlighting and both arrow counters recurse into nestedEach (reuse forEachMappingArrow); nested-each test fixture.
 
+
+## Notes
+
+**2026-06-11T20:57:33Z**
+
+Cause: _findSourceFieldsForTarget/_findTargetFieldsForSource iterated m.eachBlocks[].arrows but never nestedEach, and both arrow counters (sz-overview-edge-layer tooltip, satsuma-viz mapping pill) summed only top-level collections.
+Fix: hover lookups now walk arrows via forEachMappingArrow (which recurses into nestedEach); both counters use a new shared countMappingArrows in field-coverage.ts. Regression tests use an arrow-at-every-level fixture, verified red pre-fix (commit dfa8bc5)
