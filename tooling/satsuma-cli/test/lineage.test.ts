@@ -15,6 +15,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const CLI = resolve(__dirname, "../dist/index.js");
 const LINEAGE_CHAIN = resolve(__dirname, "fixtures/lineage-chain.stm");
 const LINEAGE_CYCLE = resolve(__dirname, "fixtures/lineage-cycle.stm");
+const LINEAGE_DIAMOND = resolve(__dirname, "fixtures/lineage-diamond.stm");
 const NAMESPACES = resolve(__dirname, "fixtures/namespaces.stm");
 
 const run = (...args: string[]) => runCli(CLI, ...args);
@@ -78,6 +79,22 @@ describe("satsuma lineage", () => {
     assert.equal(code, 0);
     assert.match(stdout, /::cycle_a {2}\[schema\] \(cycle\)/);
     assert.ok(stdout.trim().split(/\r?\n/).length <= 5);
+  });
+
+  it("includes nodes reachable within the depth limit via a shorter path found later (sl-y89y)", async () => {
+    // Diamond graph: s0→s1→s2→s3 plus shortcut s0→s2. A first-visit-wins
+    // visited set expands s2 at depth 2 (via s1) and never re-expands it when
+    // the shortcut reaches it at depth 1, wrongly dropping s3 from --depth 2.
+    const { stdout, code } = await run("lineage", "--from", "s0", "--depth", "2", "--json", LINEAGE_DIAMOND);
+
+    assert.equal(code, 0);
+    const data = JSON.parse(stdout);
+    const names = data.nodes.map((node: { name: string }) => node.name);
+    assert.ok(names.includes("s3"), `s3 is two schema hops from s0 via the shortcut; got: ${names.join(", ")}`);
+    // Re-expansion must not duplicate nodes or edges in the emitted DAG.
+    assert.equal(new Set(names).size, names.length, "nodes must be unique");
+    const edgeKeys = data.edges.map((edge: { from: string; to: string }) => `${edge.from}->${edge.to}`);
+    assert.equal(new Set(edgeKeys).size, edgeKeys.length, "edges must be unique");
   });
 
   it("emits upstream JSON for --to with edge direction preserved", async () => {

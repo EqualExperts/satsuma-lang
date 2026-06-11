@@ -140,12 +140,10 @@ Examples:
  * Returns {nodes: [...], edges: [{from, to}]}.
  */
 function buildDownstream(graph: FullGraph, start: string, maxDepth: number): Dag {
-  const visitedNodes = new Set<string>();
-  const dagEdges: DagEdge[] = [];
+  const traversal = new DepthAwareTraversal();
 
   function dfs(node: string, depth: number): void {
-    if (depth > maxDepth || visitedNodes.has(node)) return;
-    visitedNodes.add(node);
+    if (depth > maxDepth || !traversal.shouldExpand(node, depth)) return;
     const children = graph.edges.get(node) ?? new Set<string>();
     for (const child of children) {
       const childType = graph.nodes.get(child)?.type;
@@ -156,7 +154,7 @@ function buildDownstream(graph: FullGraph, start: string, maxDepth: number): Dag
       // hop beyond them, so we never emit a mapping with no visible outgoing edge.
       const withinLimit = isSchemaLike ? nextDepth <= maxDepth : depth < maxDepth;
       if (withinLimit) {
-        dagEdges.push({ from: node, to: child });
+        traversal.recordEdge(node, child);
         dfs(child, nextDepth);
       }
     }
@@ -164,10 +162,54 @@ function buildDownstream(graph: FullGraph, start: string, maxDepth: number): Dag
 
   dfs(start, 0);
 
-  return {
-    nodes: [...visitedNodes].map((n) => ({ name: n, ...graph.nodes.get(n) })),
-    edges: dagEdges,
-  };
+  return traversal.toDag(graph);
+}
+
+/**
+ * Shared bookkeeping for depth-limited lineage walks.
+ *
+ * A plain visited-set is wrong under a depth limit: a node first reached at
+ * deep depth would never be re-expanded when a later, shorter path reaches it
+ * with depth budget remaining, silently truncating its subtree (sl-y89y).
+ * Instead we record the shallowest depth each node was expanded at and allow
+ * re-expansion whenever a strictly shallower visit arrives. Cycles still
+ * terminate because depth never decreases along a path, so re-entering a
+ * cycle at equal depth is rejected.
+ *
+ * Re-expansion can rediscover edges, so edges are deduplicated by endpoint pair.
+ */
+class DepthAwareTraversal {
+  /** Shallowest depth at which each node has been expanded so far. */
+  private readonly shallowestVisit = new Map<string, number>();
+  /** Edge endpoint pairs already recorded, to dedupe re-expansions. */
+  private readonly seenEdges = new Set<string>();
+  private readonly dagEdges: DagEdge[] = [];
+
+  /** True (and records the visit) if `node` has not yet been expanded this shallow. */
+  shouldExpand(node: string, depth: number): boolean {
+    const prior = this.shallowestVisit.get(node);
+    if (prior !== undefined && prior <= depth) return false;
+    this.shallowestVisit.set(node, depth);
+    return true;
+  }
+
+  /** Record a traversed edge once, regardless of how many paths rediscover it. */
+  recordEdge(from: string, to: string): void {
+    // NUL separator: node names may contain spaces (e.g. "ns::load hub_store")
+    // but never control characters, so the endpoint-pair key cannot collide.
+    const key = `${from}\u0000${to}`;
+    if (this.seenEdges.has(key)) return;
+    this.seenEdges.add(key);
+    this.dagEdges.push({ from, to });
+  }
+
+  /** Materialize the visited nodes and recorded edges as a Dag. */
+  toDag(graph: FullGraph): Dag {
+    return {
+      nodes: [...this.shallowestVisit.keys()].map((n) => ({ name: n, ...graph.nodes.get(n) })),
+      edges: this.dagEdges,
+    };
+  }
 }
 
 /**
@@ -191,12 +233,10 @@ function buildUpstream(graph: FullGraph, target: string, maxDepth: number): Dag 
     }
   }
 
-  const visitedNodes = new Set<string>();
-  const dagEdges: DagEdge[] = [];
+  const traversal = new DepthAwareTraversal();
 
   function dfs(node: string, depth: number): void {
-    if (depth > maxDepth || visitedNodes.has(node)) return;
-    visitedNodes.add(node);
+    if (depth > maxDepth || !traversal.shouldExpand(node, depth)) return;
     const parents = reverseEdges.get(node) ?? new Set<string>();
     for (const parent of parents) {
       const parentType = graph.nodes.get(parent)?.type;
@@ -204,7 +244,7 @@ function buildUpstream(graph: FullGraph, target: string, maxDepth: number): Dag 
       const nextDepth = isSchemaLike ? depth + 1 : depth;
       const withinLimit = isSchemaLike ? nextDepth <= maxDepth : depth < maxDepth;
       if (withinLimit) {
-        dagEdges.push({ from: parent, to: node });
+        traversal.recordEdge(parent, node);
         dfs(parent, nextDepth);
       }
     }
@@ -212,10 +252,7 @@ function buildUpstream(graph: FullGraph, target: string, maxDepth: number): Dag 
 
   dfs(target, 0);
 
-  return {
-    nodes: [...visitedNodes].map((n) => ({ name: n, ...graph.nodes.get(n) })),
-    edges: dagEdges,
-  };
+  return traversal.toDag(graph);
 }
 
 // ── Formatters ────────────────────────────────────────────────────────────────
