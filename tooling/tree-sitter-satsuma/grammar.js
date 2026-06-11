@@ -62,6 +62,14 @@ module.exports = grammar({
     // Unlike the other word tokens it may start with a digit and contain
     // interior dots ("tier 2.5"). Aliased to $.identifier at the use site.
     $.map_value_word,
+    // The arithmetic minus is external so it can refuse to lex when '>'
+    // follows. pipe_text otherwise lexes `src -> tgt` as src,-,>,tgt — a
+    // CLEAN parse that silently drops the arrow from lineage (sl-w5st).
+    // With this token, an arrow inside pipe text is a loud parse error.
+    // Declared as a named external (not the literal "-") because a literal
+    // would fall back to the internal lexer when the scanner refuses it,
+    // defeating the refusal. Aliased to "-" at the use site.
+    $.minus_op,
   ],
 
   conflicts: (_) => [],
@@ -552,7 +560,10 @@ module.exports = grammar({
     _comparison_op: (_) =>
       token(choice(">=", "<=", ">", "<", "!=", "==", "=")),
 
-    _arithmetic_op: (_) => token(choice("*", "/", "+", "-", "%")),
+    // Each operator is its own anonymous token (no combined token() wrapper)
+    // so the minus can be the external scanner's token, which refuses to lex
+    // the start of an arrow (see externals, sl-w5st).
+    _arithmetic_op: ($) => choice("*", "/", "+", alias($.minus_op, "-"), "%"),
 
     // map_value: one leading atom, then bare words on the SAME LINE via the
     // external map_value_word token (aliased to identifier). A newline ends

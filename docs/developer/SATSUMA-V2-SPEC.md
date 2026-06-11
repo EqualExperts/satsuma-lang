@@ -458,6 +458,8 @@ each POReferences -> ShipmentHeader.asnDetails (
 
 The `.` prefix indicates a field relative to the current nesting context. The `each` keyword introduces an iteration over a source list, producing elements in the target list.
 
+**Where nested arrows are valid.** Arrows nest inside `each`/`flatten` blocks and inside the braced body of a plain `src -> tgt` arrow. The bodies of *computed* arrows (`-> tgt { ... }`) and *multi-source* arrows (`a, b -> tgt { ... }`) are transform pipelines, not nesting scopes — an arrow written there is a parse error, never silently treated as pipeline prose (it would otherwise vanish from lineage).
+
 ### 4.5 Fallback Sources
 
 When a primary source may be null, specify a fallback within the transform:

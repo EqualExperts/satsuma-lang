@@ -35,6 +35,14 @@
  *     Unlike the other word tokens it may start with a digit and contain
  *     interior dots, since bare map values are free prose ("tier 2.5").
  *
+ *   MINUS
+ *     The arithmetic '-' operator in pipe text and map keys. Refuses to lex
+ *     when '>' follows, so `src -> tgt` written inside a pipe-chain position
+ *     (computed-arrow body, multi-source body, after a pipe step) is a LOUD
+ *     parse error instead of cleanly degrading to NL text and silently
+ *     dropping a lineage edge (sl-w5st). Unlike the word tokens, minus may
+ *     follow a newline — pipe chains span lines.
+ *
  *   VALUE_WORD
  *     A bare word inside a metadata tag value (value_text), on the SAME LINE
  *     as the tag. Refuses structural metadata keywords (note/enum/slice) and
@@ -58,6 +66,7 @@ enum TokenType {
   INLINE_TYPE,
   VALUE_WORD,
   MAP_VALUE_WORD,
+  MINUS,
 };
 
 /* ── Keyword tables ─────────────────────────────────────────────────────── */
@@ -208,21 +217,40 @@ bool tree_sitter_satsuma_external_scanner_scan(void *payload, TSLexer *lexer, co
   if (!valid_symbols[CONTINUATION_WORD] &&
       !valid_symbols[INLINE_TYPE] &&
       !valid_symbols[VALUE_WORD] &&
-      !valid_symbols[MAP_VALUE_WORD]) return false;
+      !valid_symbols[MAP_VALUE_WORD] &&
+      !valid_symbols[MINUS]) return false;
 
-  /* Skip horizontal whitespace only (space, tab, form-feed). */
+  /* Skip whitespace. Horizontal whitespace (space, tab, form-feed) never
+   * carries meaning. Newlines do for the word tokens (they are all same-line),
+   * so crossing one rules those out; MINUS is line-agnostic — pipe chains
+   * span lines. \r counts as a line terminator so both \r\n and classic-Mac
+   * CR-only line endings end the line (sl-2gle). */
+  bool crossed_newline = false;
   while (!lexer->eof(lexer) &&
          (lexer->lookahead == ' '  ||
           lexer->lookahead == '\t' ||
-          lexer->lookahead == '\f')) {
+          lexer->lookahead == '\f' ||
+          ((lexer->lookahead == '\n' || lexer->lookahead == '\r') &&
+           valid_symbols[MINUS]))) {
+    if (lexer->lookahead == '\n' || lexer->lookahead == '\r') crossed_newline = true;
     lexer->advance(lexer, true);
   }
 
-  /* Every token this scanner produces is same-line: a newline or EOF before
-   * the word means the construct (spread, field) ended on the previous line.
-   * \r counts as a line terminator too, so both \r\n and classic-Mac CR-only
-   * line endings end the line (sl-2gle). */
-  if (lexer->eof(lexer) ||
+  /* MINUS: refuse when '>' follows — that spells an arrow, and an arrow in a
+   * pipe-text position must surface as a parse error (sl-w5st). */
+  if (lexer->lookahead == '-' && valid_symbols[MINUS]) {
+    lexer->advance(lexer, false);
+    if (lexer->lookahead == '>') return false;
+    lexer->mark_end(lexer);
+    lexer->result_symbol = MINUS;
+    return true;
+  }
+
+  /* Every remaining token is same-line: a newline or EOF before the word
+   * means the construct (spread, field, tag value, map value) ended on the
+   * previous line. */
+  if (crossed_newline ||
+      lexer->eof(lexer) ||
       lexer->lookahead == '\n' ||
       lexer->lookahead == '\r') return false;
 
