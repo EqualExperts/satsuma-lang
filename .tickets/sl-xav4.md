@@ -1,6 +1,6 @@
 ---
 id: sl-xav4
-status: in_progress
+status: closed
 deps: []
 links: []
 created: 2026-06-11T02:40:29Z
@@ -17,3 +17,10 @@ satsuma-cli/src/commands/find.ts:110 builds CST node type as blockType + "_block
 
 find --in metric matches fields in metric-tagged schemas; blockType reported as metric for metric blocks; test against metrics-platform example.
 
+
+## Notes
+
+**2026-06-11T08:58:24Z**
+
+Cause: find.ts built the CST node type as blockType + "_block" -> "metric_block", which does not exist in v2 (metrics are schema_block nodes tagged metric), so --in metric never matched; the schema loop meanwhile claimed metric fields with blockType "schema".
+Fix: map block types to CST node types explicitly (metric -> schema_block), skip metric twins (row-equal entries in both index.schemas and index.metrics) in the schema loop, and report fragment-spread fields of metric-tagged schemas as blockType metric. Verified against examples/metrics-platform/metrics.stm: all 14 measure fields found, no duplicates under scope all. (commit ab3ace9)
