@@ -41,19 +41,21 @@ bool tree_sitter_satsuma_external_scanner_scan(void *payload, TSLexer *lexer, co
 
   if (!valid_symbols[CONTINUATION_WORD]) return false;
 
-  /* Skip horizontal whitespace only (space, tab, form-feed).
-   * Carriage return (\r) is also skipped so that \r\n line endings are handled
-   * correctly: we skip \r here and then stop at the \n below.             */
+  /* Skip horizontal whitespace only (space, tab, form-feed). */
   while (!lexer->eof(lexer) &&
          (lexer->lookahead == ' '  ||
           lexer->lookahead == '\t' ||
-          lexer->lookahead == '\f' ||
-          lexer->lookahead == '\r')) {
+          lexer->lookahead == '\f')) {
     lexer->advance(lexer, true);
   }
 
-  /* A newline or EOF terminates the spread — no continuation on the next line. */
-  if (lexer->eof(lexer) || lexer->lookahead == '\n') return false;
+  /* A newline or EOF terminates the spread — no continuation on the next
+   * line.  \r counts as a line terminator too, so both \r\n and classic-Mac
+   * CR-only line endings end the line (sl-2gle: treating \r as horizontal
+   * whitespace silently merged the next line's field into the spread).     */
+  if (lexer->eof(lexer) ||
+      lexer->lookahead == '\n' ||
+      lexer->lookahead == '\r') return false;
 
   /* Must start with a letter or underscore (identifier start character). */
   int32_t c = lexer->lookahead;

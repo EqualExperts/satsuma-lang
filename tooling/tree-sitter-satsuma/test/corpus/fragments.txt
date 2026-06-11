@@ -159,3 +159,25 @@ schema customers {
         (spread_label
           (identifier))))))
 
+================================================================================
+Fragment accepts a metadata block like schema/mapping do
+================================================================================
+
+fragment address (note "Reusable address fields") {
+  street STRING
+}
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (fragment_block
+    (block_label
+      (identifier))
+    (metadata_block
+      (note_tag
+        (nl_string)))
+    (schema_body
+      (field_decl
+        (field_name
+          (identifier))
+        (type_expr)))))

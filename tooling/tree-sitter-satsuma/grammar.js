@@ -117,11 +117,14 @@ module.exports = grammar({
       ),
 
     // ── Fragment block ────────────────────────────────────────────────────
+    // Metadata is accepted on every definition block (spec 2.1 describes
+    // metadata generically); fragment/transform parity with schema/mapping.
 
     fragment_block: ($) =>
       seq(
         "fragment",
         $.block_label,
+        optional($.metadata_block),
         "{",
         optional($.schema_body),
         "}",
@@ -133,6 +136,7 @@ module.exports = grammar({
       seq(
         "transform",
         $.block_label,
+        optional($.metadata_block),
         "{",
         optional($.pipe_chain),
         "}",
@@ -146,7 +150,9 @@ module.exports = grammar({
         optional($.block_label),
         optional($.metadata_block),
         "{",
-        $.mapping_body,
+        // Optional so `mapping m { }` parses like empty schema/transform
+        // bodies do — an empty mapping is a valid skeleton while authoring.
+        optional($.mapping_body),
         "}",
       ),
 
@@ -509,16 +515,20 @@ module.exports = grammar({
           $.identifier,
           $.number_literal,
           $._comparison_op,
+          // Arithmetic ops let keys express signed numbers (`< -5: "low"`).
+          $._arithmetic_op,
           "_",
           "null",
           "default",
         ),
       ),
 
+    // `=` is included so NL pipe text like `rate = 0.5` lexes; `==` wins by
+    // maximal munch where both could match.
     _comparison_op: (_) =>
-      token(choice(">=", "<=", ">", "<", "!=", "==")),
+      token(choice(">=", "<=", ">", "<", "!=", "==", "=")),
 
-    _arithmetic_op: (_) => token(choice("*", "/", "+", "-")),
+    _arithmetic_op: (_) => token(choice("*", "/", "+", "-", "%")),
 
     // map_value: greedy tokens until `,` or `}`.
     map_value: ($) =>
@@ -540,11 +550,12 @@ module.exports = grammar({
 
     // ── Metadata block ────────────────────────────────────────────────────
 
+    // `()` (empty) is allowed; a trailing comma is allowed only after at
+    // least one entry, so `(,)` is a parse error rather than silently empty.
     metadata_block: ($) =>
       seq(
         "(",
-        optional(commaSep1($._metadata_entry)),
-        optional(","),
+        optional(seq(commaSep1($._metadata_entry), optional(","))),
         ")",
       ),
 
