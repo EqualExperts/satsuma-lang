@@ -1,6 +1,6 @@
 ---
 id: sl-sewl
-status: open
+status: closed
 deps: []
 links: []
 created: 2026-06-11T02:42:20Z
@@ -17,3 +17,10 @@ satsuma-viz/src/edges/sz-overview-edge-layer.ts:1-21 class doc says click dispat
 
 Either edge click opens the mapping again (with test) or the dead event/listener/doc are removed; no stale contract remains.
 
+
+## Notes
+
+**2026-06-11T21:01:28Z**
+
+Cause: commit 8690754 (overview edge routing rework) dropped the @click binding from the edge path template; the SzOpenMappingEvent class, the open-mapping listener in satsuma-viz.ts, and the class doc all survived, leaving a dead contract and click-inert edges.
+Fix: restored the click handler (_onEdgeClick dispatches SzOpenMappingEvent with the edge's mapping) and added cursor:pointer; chose restore over removal because the receiving listener still switches to the mapping detail view. Component tests pin dispatch, composed/bubbles, and the template binding (commit fc52cee)
