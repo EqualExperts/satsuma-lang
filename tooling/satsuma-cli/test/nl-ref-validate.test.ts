@@ -366,6 +366,57 @@ describe("NL ref validation: standalone notes (sl-xrc8)", () => {
     assert.equal(nlWarnings.length, 0, "Refs in schema-scoped notes should not warn");
   });
 
+  it("does not warn for resolvable refs in namespaced note blocks (sl-1don)", () => {
+    // Bug sl-1don: the note-context check tested the namespace-qualified key
+    // ("crm::note:schema:foo"), which never starts with "note:", so namespaced
+    // notes were treated as mapping contexts and resolvable schema refs hit the
+    // source-membership check against an undefined mapping.
+    const index = makeIndex({
+      schemas: [
+        { name: "crm::foo", namespace: "crm", fields: [{ name: "id" }] },
+        { name: "crm::other", namespace: "crm", fields: [{ name: "key" }] },
+      ],
+      nlRefData: [{
+        text: "derived from @other",
+        mapping: "note:schema:foo",
+        namespace: "crm",
+        targetField: null,
+        file: "test.stm",
+        line: 5,
+        column: 2,
+      }],
+    });
+
+    const warnings = collectSemanticWarnings(index);
+    const nlWarnings = warnings.filter((w) => w.rule === "unresolved-nl-ref" || w.rule === "nl-ref-not-in-source");
+    assert.equal(nlWarnings.length, 0, "Resolvable refs in namespaced notes should not warn");
+  });
+
+  it("never leaks the internal note: scope prefix into namespaced note messages (sl-1don)", () => {
+    // Unresolvable refs in namespaced notes should warn with a human-readable
+    // scope ("schema 'crm::foo'"), not the internal key ("crm::note:schema:foo").
+    const index = makeIndex({
+      schemas: [
+        { name: "crm::foo", namespace: "crm", fields: [{ name: "id" }] },
+      ],
+      nlRefData: [{
+        text: "needs @does_not_exist provisioned",
+        mapping: "note:schema:foo",
+        namespace: "crm",
+        targetField: null,
+        file: "test.stm",
+        line: 5,
+        column: 2,
+      }],
+    });
+
+    const warnings = collectSemanticWarnings(index);
+    const nlWarnings = warnings.filter((w) => w.rule === "unresolved-nl-ref");
+    assert.equal(nlWarnings.length, 1, "Unresolvable ref in a namespaced note should still warn");
+    assert.ok(nlWarnings[0].message.includes("schema 'crm::foo'"), `message names the schema scope: ${nlWarnings[0].message}`);
+    assert.ok(!nlWarnings[0].message.includes("note:"), `internal note: prefix must not leak: ${nlWarnings[0].message}`);
+  });
+
   it("still warns for unresolved refs inside mapping notes", () => {
     const index = makeIndex({
       schemas: [
