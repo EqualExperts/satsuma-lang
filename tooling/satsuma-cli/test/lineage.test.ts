@@ -111,6 +111,25 @@ describe("satsuma lineage", () => {
     assert.ok(data.edges.some((edge: { from: string; to: string }) => edge.from === "c_to_d" && edge.to === "target_d"));
   });
 
+  it("renders upstream text paths covering every JSON node when upstream contains a cycle (sl-h5cx)", async () => {
+    // In a cyclic graph no node has zero incoming edges, so a root-based path
+    // search finds nothing and used to print only the target, silently losing
+    // all upstream info that --json correctly reported.
+    const text = await run("lineage", "--to", "cycle_a", LINEAGE_CYCLE);
+    const json = await run("lineage", "--to", "cycle_a", "--json", LINEAGE_CYCLE);
+
+    assert.equal(text.code, 0);
+    assert.equal(json.code, 0);
+    // JSON names are bare index keys ("cycle_a"); text prints canonical refs ("::cycle_a").
+    const jsonNames = JSON.parse(json.stdout).nodes.map((node: { name: string }) => node.name);
+    assert.ok(jsonNames.length >= 4, `cycle fixture should yield all 4 nodes in JSON, got: ${jsonNames.join(", ")}`);
+    for (const name of jsonNames) {
+      assert.ok(text.stdout.includes(`::${name}`), `text output must mention '${name}'; got:\n${text.stdout}`);
+    }
+    // The upstream path itself must be visible, not just the target line.
+    assert.match(text.stdout, /::cycle_b -> ::b_to_a -> ::cycle_a/);
+  });
+
   it("resolves namespace-qualified --from names without crossing namespace scope", async () => {
     // Namespaced platform entry points depend on qualified node lookup; this
     // guards the public CLI path rather than only the graph builder.
