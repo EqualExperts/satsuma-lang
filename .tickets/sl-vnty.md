@@ -1,6 +1,6 @@
 ---
 id: sl-vnty
-status: open
+status: closed
 deps: []
 links: []
 created: 2026-06-11T02:43:01Z
@@ -17,3 +17,10 @@ tag_with_value value_text (grammar.js:586-611) greedily eats identifiers, includ
 
 value_text no longer absorbs entries across the comma boundary (e.g. stop at newline, or known-constraint keywords), or the construct errors; corpus tests for the three repros; extraction tests confirm constraints reported.
 
+
+## Notes
+
+**2026-06-11T22:55:30Z**
+
+Cause: tag_with_value's value_text greedily consumed bare identifiers, including across newlines and over structural keywords, so a forgotten comma silently folded the next flag/note entry into the previous value and extraction misreported constraints.
+Fix: bare value words are now the external VALUE_WORD token — same-line only, refusing note/enum/slice and the spec-7.1 constraint flags (quoted form required to use those words as values), deferring dotted/qualified refs and booleans to the internal lexer. All three repros now error loudly; corpus pins them plus the still-valid multi-word value; spec 7.1 documents the boundary. (commit 7f4e847)
