@@ -1,6 +1,6 @@
 ---
 id: sl-2gle
-status: open
+status: closed
 deps: []
 links: []
 created: 2026-06-11T02:43:02Z
