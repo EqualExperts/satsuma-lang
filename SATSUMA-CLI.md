@@ -47,6 +47,7 @@ Fine-grained extraction — slice below block level to get specific arrows, NL c
 | `arrows <schema.field>` | All arrows involving a field, with transform classification | `satsuma arrows loyalty_sfdc.LoyaltyTier` |
 | `field-lineage <schema.field>` | Full upstream + downstream field lineage chain in one command | `satsuma field-lineage sat_customer_demographics.loyalty_tier --json` |
 | `nl <scope>` | NL content (notes, transforms, comments) in a scope | `satsuma nl "demographics to mart"` |
+| `nl-refs [path]` | All `@ref` references in NL transform bodies, with resolution status | `satsuma nl-refs pipeline.stm --unresolved` |
 | `meta <scope>` | Metadata entries for a block or field | `satsuma meta loyalty_sfdc.Email` |
 | `fields <schema>` | Field list with types and metadata | `satsuma fields sat_customer_demographics` |
 | `match-fields --source <s> --target <t>` | Normalized name comparison between two schemas | `satsuma match-fields --source loyalty_sfdc --target sat_customer_demographics` |

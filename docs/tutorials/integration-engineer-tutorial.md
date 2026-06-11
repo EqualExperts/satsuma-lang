@@ -455,7 +455,7 @@ The more integrations you document this way, the more value compounds. Your team
 - [BA Tutorial](ba-tutorial.md) — full syntax walkthrough from scratch
 - [Schema format conventions](../conventions-for-schema-formats/README.md) — metadata conventions for XML, JSON, COBOL, EDI, Protobuf, HL7, and more
 - [Using Satsuma without CLI](../using-satsuma-without-cli.md) — workflow for web LLMs without tooling
-- [CLI reference](../../SATSUMA-CLI.md) — the 16-command CLI for validation, extraction, and lineage
+- [CLI reference](../../SATSUMA-CLI.md) — the Satsuma CLI for validation, extraction, and lineage
 - [XML-to-Parquet example](../../examples/xml-to-parquet/pipeline.stm) — XML with namespaces and XPath
 - [EDI-to-JSON example](../../examples/edi-to-json/pipeline.stm) — EDI 856 with segment filters and data gaps
 - [COBOL-to-Avro example](../../examples/cobol-to-avro/pipeline.stm) — mainframe copybook to Kafka events

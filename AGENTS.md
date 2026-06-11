@@ -2,7 +2,7 @@
 
 ## Project Summary
 
-Satsuma is a domain-specific language for source-to-target data mapping. The repository contains the language specification, a canonical example corpus, a tree-sitter parser, a 16-command CLI for structural extraction and validation, and a VS Code syntax highlighting extension.
+Satsuma is a domain-specific language for source-to-target data mapping. The repository contains the language specification, a canonical example corpus, a tree-sitter parser, a multi-command CLI for structural extraction and validation, and a VS Code syntax highlighting extension.
 
 All tooling is parser-backed. Downstream tools should be built on the tree-sitter CST and stable AST conventions rather than ad hoc text processing.
 
@@ -10,7 +10,7 @@ All tooling is parser-backed. Downstream tools should be built on the tree-sitte
 
 - `SATSUMA-V2-SPEC.md`: authoritative language specification (v2)
 - `PROJECT-OVERVIEW.md`: product vision, motivation, and roadmap
-- `SATSUMA-CLI.md`: CLI command reference (16 commands)
+- `SATSUMA-CLI.md`: CLI command reference
 - `AI-AGENT-REFERENCE.md`: compact grammar and agent-oriented Satsuma guidance (v2) — also available via `satsuma agent-reference`
 - `HOW-DO-I.md`: question-based index to all guides and conventions
 - `ROADMAP.md`: deferred work items, ideas, and convention docs still to write

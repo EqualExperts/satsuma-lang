@@ -246,7 +246,7 @@ and 4 role-specific playbooks adapt it to how you actually work:
 | [05 — Mapping Blocks](lessons/05-mappings.md) | Arrows, transforms, value maps, multi-source mappings |
 | [06 — Natural Language Transforms](lessons/06-nl-transforms.md) | When to formalize vs. keep it natural, `@ref` references |
 | [07 — Nested Data, Arrays, and Complex Shapes](lessons/07-nested-mappings.md) | Dotted paths, array notation, nested arrow blocks |
-| [08 — The Satsuma CLI](lessons/08-satsuma-cli.md) | 16 commands as the agent's deterministic toolkit |
+| [08 — The Satsuma CLI](lessons/08-satsuma-cli.md) | The CLI as the agent's deterministic toolkit |
 | [09 — Human-Agent Workflows](lessons/09-agent-workflows.md) | Impact analysis, coverage checks, PII audits, change review |
 | [10 — End-to-End Delivery](lessons/10-real-world-workflows.md) | The full delivery loop from gathering to versioned source of truth |
 
@@ -261,7 +261,7 @@ Start with Lesson 01 or jump to a [suggested reading path](lessons/README.md#sug
 
 - [SATSUMA-V2-SPEC.md](docs/developer/SATSUMA-V2-SPEC.md): authoritative language specification
 - [PROJECT-OVERVIEW.md](docs/product-owner/PROJECT-OVERVIEW.md): problem statement, vision, and roadmap
-- [SATSUMA-CLI.md](SATSUMA-CLI.md): CLI command reference (21 commands for structural extraction, analysis, and validation)
+- [SATSUMA-CLI.md](SATSUMA-CLI.md): CLI command reference (structural extraction, analysis, and validation)
 - [AI-AGENT-REFERENCE.md](AI-AGENT-REFERENCE.md): compact grammar and quick reference for agents (also available via `satsuma agent-reference`)
 - [docs/tutorials/](docs/tutorials/): role-based tutorials (BA, data engineer, integration engineer) plus a [Copilot + Excel reverse-engineering workflow](docs/tutorials/copilot-excel-reverse-engineering-tutorial.md)
 - [USE_CASES.md](docs/product-owner/USE_CASES.md): practical scenarios and personas
@@ -289,7 +289,7 @@ What exists today:
 - the Satsuma v2 language specification
 - a canonical example corpus (20 `.stm` files covering major integration patterns)
 - a tree-sitter parser (245 corpus tests, all examples parse clean)
-- a TypeScript CLI (`satsuma`) with 21 commands for structural extraction, analysis, validation, formatting, and diff — see [SATSUMA-CLI.md](SATSUMA-CLI.md)
+- a TypeScript CLI (`satsuma`) with commands for structural extraction, analysis, validation, formatting, and diff — see [SATSUMA-CLI.md](SATSUMA-CLI.md)
 - `satsuma fmt` — opinionated, zero-config formatter (CLI + VS Code Format Document)
 - a VS Code extension with an LSP server (go-to-definition, find-references, completions, hover, rename, code lens, semantic tokens, diagnostics, folding, document symbols, formatting) and TextMate grammar
 - `satsuma lint` with 3 rules (hidden NL source refs, unresolved NL refs, duplicate definitions) and `--fix` support

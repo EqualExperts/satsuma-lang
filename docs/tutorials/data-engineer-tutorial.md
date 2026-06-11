@@ -455,5 +455,5 @@ If you are ready to adopt Satsuma in your data engineering workflow, here is a p
 - **[Kimball conventions](../data-modelling/kimball/README.md)** — dimensional modelling tokens and patterns
 - **[Data Vault conventions](../data-modelling/datavault/README.md)** — hub, satellite, and link patterns
 - **[Merge strategy conventions](../conventions-for-merge-strategy/README.md)** — upsert, append, soft delete, full refresh
-- **[CLI reference](../../SATSUMA-CLI.md)** — the 16-command CLI for validation, extraction, and lineage
+- **[CLI reference](../../SATSUMA-CLI.md)** — the Satsuma CLI for validation, extraction, and lineage
 - **[Using Satsuma without CLI](../using-satsuma-without-cli.md)** — working with web LLMs and no installation
