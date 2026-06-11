@@ -23,7 +23,7 @@
     "@lit-labs/ssr-dom-shim": "^1.5.1",
     "@types/node": "^22.0.0",
     "c8": "^11.0.0",
-    "esbuild": "^0.27.4",
+    "esbuild": "^0.28.0",
     "typescript": "^5.9.3"
   }
 }
