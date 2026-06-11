@@ -9,7 +9,7 @@
 import { canonicalRef } from "./canonical-ref.js";
 import { classifyTransform, classifyArrow } from "./classify.js";
 import { extractMetadata } from "./meta-extract.js";
-import { child, children, allDescendants, labelText, stringText, entryText, qualifiedNameText, sourceRefText as cstSourceRefText, sourceRefStructuralText } from "./cst-utils.js";
+import { child, children, allDescendants, labelText, stringText, entryText, qualifiedNameText, sourceRefStructuralText } from "./cst-utils.js";
 import type { Classification, FieldDecl, MetaEntry, PipeStep, SyntaxNode } from "./types.js";
 
 // ── Internal field tree ────────────────────────────────────────────────────
@@ -763,6 +763,13 @@ export interface ExtractedArrow {
 
 /**
  * Extract detailed arrow records from all mapping blocks in the CST.
+ *
+ * Arrows nest to arbitrary depth (nested_arrow bodies hold further arrow
+ * declarations; each/flatten bodies hold arrow declarations plus nested
+ * each/flatten blocks — spec §4.4), so the walk recurses through every
+ * container. Each container (nested_arrow, each_block, flatten_block) emits
+ * its own record — for each/flatten this is the list-to-list arrow — and its
+ * children's relative paths are made absolute against the container's paths.
  */
 export function extractArrowRecords(rootNode: SyntaxNode): ExtractedArrow[] {
   const records: ExtractedArrow[] = [];
@@ -771,52 +778,55 @@ export function extractArrowRecords(rootNode: SyntaxNode): ExtractedArrow[] {
     const mappingName = labelText(mappingNode);
     const body = child(mappingNode, "mapping_body");
     if (!body) continue;
-
-    const directArrows = body.namedChildren.filter(
-      (c) => c.type === "map_arrow" || c.type === "computed_arrow",
-    );
-    const nestedArrows = body.namedChildren.filter(
-      (c) => c.type === "nested_arrow",
-    );
-    const eachBlocks = body.namedChildren.filter(
-      (c) => c.type === "each_block",
-    );
-    const flattenBlocks = body.namedChildren.filter(
-      (c) => c.type === "flatten_block",
-    );
-
-    for (const arrow of directArrows) {
-      records.push(extractSingleArrow(arrow, mappingName, namespace, null, null));
-    }
-
-    for (const nested of nestedArrows) {
-      const parentSrc = pathText(child(nested, "src_path"));
-      const parentTgt = pathText(child(nested, "tgt_path"));
-
-      records.push(extractSingleArrow(nested, mappingName, namespace, null, null));
-
-      for (const childArrow of nested.namedChildren) {
-        if (childArrow.type === "map_arrow" || childArrow.type === "computed_arrow") {
-          records.push(extractSingleArrow(childArrow, mappingName, namespace, parentSrc, parentTgt));
-        }
-      }
-    }
-
-    for (const block of [...eachBlocks, ...flattenBlocks]) {
-      const parentSrc = pathText(child(block, "src_path"));
-      const parentTgt = pathText(child(block, "tgt_path"));
-
-      records.push(extractSingleArrow(block, mappingName, namespace, null, null));
-
-      for (const childArrow of block.namedChildren) {
-        if (childArrow.type === "map_arrow" || childArrow.type === "computed_arrow" || childArrow.type === "nested_arrow") {
-          records.push(extractSingleArrow(childArrow, mappingName, namespace, parentSrc, parentTgt));
-        }
-      }
-    }
+    collectArrowRecords(body.namedChildren, mappingName, namespace, null, null, records);
   }
 
   return records;
+}
+
+/**
+ * Recursively collect arrow records from a list of sibling CST nodes,
+ * appending to `records` in document order.
+ *
+ * `parentSrc`/`parentTgt` are the absolute paths of the enclosing container
+ * (null at mapping-body level). A container's own record already has the
+ * parent prefixes applied, so its source/target become the prefixes for the
+ * next level down — accumulating across arbitrary depth (sl-zl55).
+ */
+function collectArrowRecords(
+  nodes: SyntaxNode[],
+  mappingName: string | null,
+  namespace: string | null,
+  parentSrc: string | null,
+  parentTgt: string | null,
+  records: ExtractedArrow[],
+): void {
+  for (const node of nodes) {
+    switch (node.type) {
+      case "map_arrow":
+      case "computed_arrow":
+        records.push(extractSingleArrow(node, mappingName, namespace, parentSrc, parentTgt));
+        break;
+
+      case "nested_arrow":
+      case "each_block":
+      case "flatten_block": {
+        const container = extractSingleArrow(node, mappingName, namespace, parentSrc, parentTgt);
+        records.push(container);
+        // nested_arrow / each / flatten declare exactly one src_path, so the
+        // container's single (already absolute) source is the child prefix.
+        collectArrowRecords(
+          node.namedChildren, mappingName, namespace,
+          container.sources[0] ?? null, container.target, records,
+        );
+        break;
+      }
+
+      default:
+        // src_path / tgt_path / metadata_block etc. — not arrow declarations.
+        break;
+    }
+  }
 }
 
 /**
