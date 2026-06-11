@@ -101,6 +101,18 @@ export function forEachMappingArrow(
 }
 
 /**
+ * Total arrow count of a mapping, including arrows nested arbitrarily deep
+ * in each_blocks (and their nestedEach) and flatten_blocks. Every "N arrows"
+ * surface must use this rather than summing the top-level collections, which
+ * silently undercounts nested iteration (sl-fm0q).
+ */
+export function countMappingArrows(mapping: MappingBlock): number {
+  let count = 0;
+  forEachMappingArrow(mapping, () => count++);
+  return count;
+}
+
+/**
  * Build schema-local covered-field sets for one mapping detail view.
  */
 export function buildMappingCoveredFields(

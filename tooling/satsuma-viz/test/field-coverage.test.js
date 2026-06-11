@@ -176,3 +176,89 @@ describe("field-coverage helpers", () => {
     assert.equal(targetMapped.has("total"), true);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Nested-each arrow visibility (sl-fm0q)
+//
+// Arrows can nest arbitrarily deep: each_block → nestedEach → nestedEach.
+// Surfaces that sum only the top-level collections (mapping.arrows +
+// eachBlocks[].arrows + flattenBlocks[].arrows) silently lose every arrow
+// below the first nesting level.
+// ---------------------------------------------------------------------------
+
+/** A mapping with one arrow at each level: top, each, nested-each, flatten. */
+const arrowAtEveryLevel = () => ({
+  id: "m1",
+  sourceRefs: ["order"],
+  targetRef: "invoice",
+  arrows: [{ sourceFields: ["id"], targetField: "id", transform: null, metadata: [], comments: [], location: loc }],
+  eachBlocks: [{
+    sourceField: "items",
+    targetField: "lines",
+    arrows: [{ sourceFields: ["items.sku"], targetField: "lines.sku", transform: null, metadata: [], comments: [], location: loc }],
+    nestedEach: [{
+      sourceField: "items.discounts",
+      targetField: "lines.discounts",
+      arrows: [{ sourceFields: ["items.discounts.code"], targetField: "lines.discounts.code", transform: null, metadata: [], comments: [], location: loc }],
+      nestedEach: [],
+      location: loc,
+    }],
+    location: loc,
+  }],
+  flattenBlocks: [{
+    sourceField: "tags",
+    arrows: [{ sourceFields: ["tags.label"], targetField: "tag_label", transform: null, metadata: [], comments: [], location: loc }],
+    location: loc,
+  }],
+  sourceBlock: null,
+  notes: [],
+  comments: [],
+  location: loc,
+});
+
+describe("countMappingArrows (sl-fm0q)", () => {
+  it("counts arrows inside nestedEach blocks, not just the top-level collections", async () => {
+    // Pre-fix the two "N arrows" surfaces summed top-level collections and
+    // reported 3 for this mapping; the nested-each arrow makes it 4.
+    const { countMappingArrows } = await import("../dist/satsuma-viz.js");
+    assert.equal(countMappingArrows(arrowAtEveryLevel()), 4);
+  });
+});
+
+describe("sz-mapping-detail hover lookups recurse into nestedEach (sl-fm0q)", () => {
+  const order = schema("order", [
+    field("id"),
+    field("items", [field("sku"), field("discounts", [field("code")])]),
+    field("tags", [field("label")]),
+  ]);
+  const invoice = schema("invoice", [
+    field("id"),
+    field("lines", [field("sku"), field("discounts", [field("code")])]),
+    field("tag_label"),
+  ]);
+
+  async function makeDetail() {
+    const m = await import("../dist/satsuma-viz.js");
+    const detail = new m.SzMappingDetail();
+    detail.mapping = arrowAtEveryLevel();
+    detail.sourceSchemas = [order];
+    detail.targetSchema = invoice;
+    return detail;
+  }
+
+  it("hovering a nested-each target field highlights its source counterpart", async () => {
+    const detail = await makeDetail();
+    const bySchema = detail._findSourceFieldsForTarget("lines.discounts.code", detail.mapping);
+    assert.deepEqual(
+      [...(bySchema.get("order") ?? [])],
+      ["items.discounts.code"],
+      "the nested-each arrow's source field must be found",
+    );
+  });
+
+  it("hovering a nested-each source field highlights its target counterpart", async () => {
+    const detail = await makeDetail();
+    const targets = detail._findTargetFieldsForSource("items.discounts.code", "order", detail.mapping);
+    assert.deepEqual([...targets], ["lines.discounts.code"]);
+  });
+});

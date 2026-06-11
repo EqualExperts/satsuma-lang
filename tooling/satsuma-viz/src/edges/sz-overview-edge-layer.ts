@@ -10,6 +10,7 @@ import { LitElement, html, svg, css, type SVGTemplateResult } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import type { OverviewEdge } from "../layout/elk-layout.js";
 import type { MappingBlock } from "../model.js";
+import { countMappingArrows } from "../field-coverage.js";
 
 /** Event dispatched when a user clicks an overview edge to open a mapping detail. */
 export class SzOpenMappingEvent extends Event {
@@ -213,16 +214,10 @@ export class SzOverviewEdgeLayer extends LitElement {
     this._hoveredEdge = null;
   }
 
-  private _countAllArrows(m: MappingBlock): number {
-    let count = m.arrows.length;
-    for (const eb of m.eachBlocks) count += eb.arrows.length;
-    for (const fb of m.flattenBlocks) count += fb.arrows.length;
-    return count;
-  }
-
   private _renderTooltip(edge: OverviewEdge) {
     const m = edge.mapping;
-    const arrowCount = this._countAllArrows(m);
+    // Includes arrows nested in each/nestedEach/flatten blocks (sl-fm0q).
+    const arrowCount = countMappingArrows(m);
 
     return html`
       <div class="tooltip" style="left: ${this._hoverPos.x}px; top: ${this._hoverPos.y}px;">
