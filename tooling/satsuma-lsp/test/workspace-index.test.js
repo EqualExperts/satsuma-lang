@@ -362,6 +362,63 @@ describe("findReferences", () => {
     const refs = findReferences(idx, "customers");
     assert.equal(refs.length, 0);
   });
+
+  // sl-p256: findReferences fanned out namespace-blind — a qualified query
+  // also returned every bare ref of that name anywhere, and a bare query
+  // returned every *::name ref. Renames consumed these unfiltered, so
+  // renaming a::foo rewrote source { foo } inside namespace b. Each bare
+  // ref must bind to the namespace-local definition when one exists.
+
+  const TWO_NAMESPACES =
+    "namespace a {\n  schema foo { id UUID }\n}\n" +
+    "namespace b {\n  schema foo { id UUID }\n  mapping m {\n    source { foo }\n    target { foo }\n    id -> id\n  }\n}";
+
+  it("does not return bare refs that resolve in a different namespace (sl-p256)", () => {
+    const idx = buildIndex({ "file:///a.stm": TWO_NAMESPACES });
+    // b's source { foo } binds to b::foo, so a::foo has no references.
+    const aRefs = findReferences(idx, "a::foo").filter((r) => r.context === "source" || r.context === "target");
+    assert.equal(aRefs.length, 0, "a::foo must not inherit namespace b's refs");
+    const bRefs = findReferences(idx, "b::foo").filter((r) => r.context === "source");
+    assert.equal(bRefs.length, 1, "b::foo keeps its own bare source ref");
+  });
+
+  it("excludes bare refs shadowed by a namespace-local definition from the global query (sl-p256)", () => {
+    const idx = buildIndex({
+      "file:///a.stm":
+        "schema foo { id UUID }\n" +
+        "namespace b {\n  schema foo { id UUID }\n  mapping m {\n    source { foo }\n    target { foo }\n    id -> id\n  }\n}",
+    });
+    // namespace b declares its own foo, so b's refs bind there — the global
+    // schema foo is unreferenced.
+    const refs = findReferences(idx, "foo").filter((r) => r.context === "source" || r.context === "target");
+    assert.equal(refs.length, 0, "shadowed bare refs must not count against the global name");
+  });
+
+  it("binds bare refs inside a namespace to the global definition when nothing local shadows it (sl-p256)", () => {
+    const idx = buildIndex({
+      "file:///a.stm":
+        "schema shared { id UUID }\n" +
+        "namespace b {\n  schema tgt { id UUID }\n  mapping m {\n    source { shared }\n    target { tgt }\n    id -> id\n  }\n}",
+    });
+    const refs = findReferences(idx, "shared").filter((r) => r.context === "source");
+    assert.equal(refs.length, 1, "unshadowed bare ref falls through to the global definition");
+  });
+
+  it("excludes refs authored with an explicit namespace from the bare-name query (sl-p256)", () => {
+    const idx = buildIndex({
+      "file:///a.stm":
+        "schema foo { id UUID }\n" +
+        "namespace x {\n  schema foo { id UUID }\n}\n" +
+        "mapping m {\n  source { x::foo }\n  target { foo }\n  id -> id\n}",
+    });
+    // source { x::foo } binds to x::foo; only the bare target ref binds to
+    // the global foo.
+    const refs = findReferences(idx, "foo").filter((r) => r.context === "source" || r.context === "target");
+    assert.equal(refs.length, 1);
+    assert.equal(refs[0].context, "target");
+    const qualified = findReferences(idx, "x::foo").filter((r) => r.context === "source");
+    assert.equal(qualified.length, 1, "the qualified query owns the authored-qualified ref");
+  });
 });
 
 describe("allBlockNames", () => {

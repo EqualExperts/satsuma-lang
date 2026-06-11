@@ -81,6 +81,12 @@ export interface ReferenceEntry {
    *  and attribute refs to the right block instead of unioning per file
    *  (sl-ei1e). */
   container?: string;
+  /** Namespace block the reference is authored inside, or null at the top
+   *  level. Bare names resolve against a namespace-local definition before
+   *  the global one, so reference queries must know the authoring scope —
+   *  without it, renaming a::foo also rewrote bare refs that bind to b::foo
+   *  (sl-p256). */
+  namespace?: string | null;
 }
 
 export interface ImportEntry {
@@ -418,38 +424,64 @@ export function resolveDefinition(
   return index.definitions.get(name) ?? [];
 }
 
-/** Find all references to a name. */
+/**
+ * The canonical definition key a name binds to when authored inside
+ * `namespace`, mirroring resolveDefinition's order: a name written with "::"
+ * binds to that key directly; a bare name binds to the namespace-local
+ * definition when the enclosing namespace declares one, else to the global
+ * key. Consumers querying references for a bare name they found in source
+ * should canonicalize through this first (sl-p256).
+ */
+export function resolveReferenceKey(
+  index: WorkspaceIndex,
+  name: string,
+  namespace: string | null | undefined,
+): string {
+  if (name.includes("::")) return name;
+  if (namespace && index.definitions.has(`${namespace}::${name}`)) {
+    return `${namespace}::${name}`;
+  }
+  return name;
+}
+
+/**
+ * Find all references that bind to the definition keyed by `name`.
+ *
+ * Each candidate reference is re-resolved against its own authoring
+ * namespace rather than fanned out by spelling: the old behaviour returned
+ * every bare ref for a qualified query (and every `*::name` ref for a bare
+ * query), so renaming a::foo also rewrote `source { foo }` inside namespace
+ * b — a reference that binds to b::foo (sl-p256).
+ */
 export function findReferences(
   index: WorkspaceIndex,
   name: string,
 ): ReferenceEntry[] {
   const results: ReferenceEntry[] = [];
 
-  // Direct match
-  const direct = index.references.get(name);
-  if (direct) results.push(...direct);
-
-  // If the name is qualified (ns::foo), also check for bare references
-  // that could resolve to this qualified name
   if (name.includes("::")) {
-    const bare = name.split("::").pop()!;
-    const bareRefs = index.references.get(bare);
-    if (bareRefs) {
-      // Only include bare refs that are in files where the namespace context matches
-      // For simplicity, include all bare refs — the caller can filter by context
-      results.push(...bareRefs);
-    }
-  }
+    // References authored with the explicit qualifier bind here directly.
+    results.push(...(index.references.get(name) ?? []));
 
-  // If the name is bare, also check for qualified forms
-  if (!name.includes("::")) {
-    for (const [key, entries] of index.references) {
-      if (key.endsWith(`::${name}`) && key !== name) {
-        results.push(...entries);
+    // Bare references bind here when authored inside this namespace
+    // (namespace-local resolution wins over global).
+    const bare = name.split("::").pop()!;
+    for (const ref of index.references.get(bare) ?? []) {
+      if (resolveReferenceKey(index, bare, ref.namespace) === name) {
+        results.push(ref);
       }
     }
+    return results;
   }
 
+  // Bare key: a bare reference binds to the global definition only when no
+  // namespace-local definition shadows it. References authored with an
+  // explicit qualifier bind to their own qualified key, never the bare one.
+  for (const ref of index.references.get(name) ?? []) {
+    if (resolveReferenceKey(index, name, ref.namespace) === name) {
+      results.push(ref);
+    }
+  }
   return results;
 }
 
@@ -607,7 +639,7 @@ function indexTopLevel(
   if (effectiveKind === "schema" || effectiveKind === "fragment") {
     const body = child(node, "schema_body");
     if (body) {
-      indexSpreadRefs(index, uri, body);
+      indexSpreadRefs(index, uri, body, namespace);
     }
   }
 }
@@ -649,6 +681,7 @@ function indexImport(index: WorkspaceIndex, uri: string, node: SyntaxNode): void
         range: nodeRange(nameNode),
         name: text,
         context: "import",
+        namespace: null, // import declarations are top-level only
       });
     }
   }
@@ -683,6 +716,7 @@ function indexMappingRefs(
             name,
             context: "source",
             container,
+            namespace,
           });
         }
       }
@@ -696,6 +730,7 @@ function indexMappingRefs(
             name,
             context: "target",
             container,
+            namespace,
           });
         }
       }
@@ -703,12 +738,12 @@ function indexMappingRefs(
 
     // Index spread refs inside mapping body
     if (ch.type === "source_block" || ch.type === "target_block") continue;
-    indexArrowSpreadRefs(index, uri, ch);
+    indexArrowSpreadRefs(index, uri, ch, namespace);
   }
 
   // Index field-level references from arrow src_path / tgt_path nodes.
   // (@refs in NL strings are indexed file-wide by indexFile, not here.)
-  indexArrowFieldRefs(index, uri, body);
+  indexArrowFieldRefs(index, uri, body, namespace);
 }
 
 /**
@@ -733,6 +768,7 @@ function indexArrowSpreadRefs(
   index: WorkspaceIndex,
   uri: string,
   node: SyntaxNode,
+  namespace: string | null,
 ): void {
   // Walk all descendants looking for fragment_spread nodes
   walkDescendants(node, (n) => {
@@ -748,6 +784,7 @@ function indexArrowSpreadRefs(
           range: nodeRange(sl),
           name,
           context: "spread",
+          namespace,
         });
       }
     }
@@ -758,6 +795,7 @@ function indexArrowFieldRefs(
   index: WorkspaceIndex,
   uri: string,
   body: SyntaxNode,
+  namespace: string | null,
 ): void {
   const sourceSchemas = getMappingBodySchemas(body, "source_block");
   const targetSchemas = getMappingBodySchemas(body, "target_block");
@@ -787,6 +825,7 @@ function indexArrowFieldRefs(
       range: firstSegmentRange,
       name: fieldName,
       context: "arrow",
+      namespace,
     });
 
     // schema.fullPath — canonical qualified keys, matching CLI index-builder
@@ -798,6 +837,7 @@ function indexArrowFieldRefs(
           range: fullPathRange,
           name: qualKey,
           context: "arrow",
+          namespace,
         });
       }
       // Also index the full path without a schema prefix when it differs from
@@ -808,6 +848,7 @@ function indexArrowFieldRefs(
           range: fullPathRange,
           name: fullPath,
           context: "arrow",
+          namespace,
         });
       }
     }
@@ -928,6 +969,20 @@ function extractArrowFieldName(pathNode: SyntaxNode): string | null {
 const NL_AT_REF_RE = createAtRefRegex();
 
 /**
+ * Namespace block enclosing a node, or null at the top level. NL refs are
+ * indexed in one file-wide walk (sl-ellp), so their authoring scope has to be
+ * recovered from the ancestor chain rather than threaded down (sl-p256).
+ */
+function enclosingNamespace(node: SyntaxNode): string | null {
+  for (let p = node.parent; p; p = p.parent) {
+    if (p.type === "namespace_block") {
+      return p.childForFieldName?.("name")?.text ?? null;
+    }
+  }
+  return null;
+}
+
+/**
  * Index every @ref inside NL prose under `node` as an "nl" reference.
  *
  * Called once per file with the root node (sl-ellp): NL prose carrying refs
@@ -963,6 +1018,7 @@ function indexNlRefs(
         ),
         name: refName,
         context: "nl",
+        namespace: enclosingNamespace(n),
       });
       return;
     }
@@ -991,6 +1047,7 @@ function indexNlRefs(
         range,
         name: refName,
         context: "nl",
+        namespace: enclosingNamespace(n),
       });
     }
 
@@ -1040,6 +1097,7 @@ function indexSpreadRefs(
   index: WorkspaceIndex,
   uri: string,
   body: SyntaxNode,
+  namespace: string | null,
 ): void {
   for (const spread of children(body, "fragment_spread")) {
     const sl = child(spread, "spread_label");
@@ -1051,6 +1109,7 @@ function indexSpreadRefs(
         range: nodeRange(sl),
         name,
         context: "spread",
+        namespace,
       });
     }
   }
@@ -1088,6 +1147,7 @@ function indexMetricRefs(
             name,
             context: "metric_source",
             container,
+            namespace,
           });
         }
       }

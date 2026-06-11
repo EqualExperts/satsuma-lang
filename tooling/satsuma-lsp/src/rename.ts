@@ -10,6 +10,7 @@ import {
   WorkspaceIndex,
   resolveDefinition,
   findReferences,
+  resolveReferenceKey,
 } from "./workspace-index";
 
 /**
@@ -91,17 +92,19 @@ export function computeRename(
     addEdit(changes, def.uri, def.selectionRange, newName);
   }
 
-  // 2. Rename all reference sites
-  const refs = findReferences(index, oldName);
+  // 2. Rename all reference sites. Query by the canonical key the symbol
+  // binds to — a bare name inside a namespace binds to the namespace-local
+  // definition, and findReferences returns only refs resolving to that key,
+  // so same-named symbols in other namespaces are never touched (sl-p256).
+  const refs = findReferences(index, resolveReferenceKey(index, oldName, ctx.namespace ?? null));
+  const oldBare = oldName.includes("::") ? oldName.split("::").pop()! : oldName;
   for (const ref of refs) {
-    // For qualified references like "ns::oldName", only replace the name part
-    if (ref.name.includes("::") && !oldName.includes("::")) {
-      // The reference is qualified but the old name is bare — this ref
-      // might match via namespace fallback. Compute the sub-range for just
-      // the name part after "::"
+    // For references authored qualified ("ns::oldName"), only replace the
+    // name part — rewriting the whole range would delete the "ns::" prefix.
+    if (ref.name.includes("::")) {
       const colonIdx = ref.name.indexOf("::");
       const bareInRef = ref.name.slice(colonIdx + 2);
-      if (bareInRef === oldName) {
+      if (bareInRef === oldBare) {
         // Adjust range to only cover the part after "::"
         const prefixLen = colonIdx + 2;
         const adjusted: Range = {
