@@ -126,7 +126,7 @@
       "explorer/context": [
         {
           "command": "satsuma.showViz",
-          "when": "resourceExtname == .stm",
+          "when": "resourceExtname == .stm || resourceExtname == .satsuma",
           "group": "satsuma"
         }
       ]
@@ -175,6 +175,7 @@
     "package": "npm run build && npx @vscode/vsce package --no-dependencies -o vscode-satsuma.vsix"
   },
   "dependencies": {
+    "@satsuma/core": "file:../satsuma-core",
     "@satsuma/lsp": "file:../satsuma-lsp",
     "vscode-languageclient": "^10.0.0"
   },

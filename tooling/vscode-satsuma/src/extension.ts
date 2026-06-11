@@ -1,6 +1,7 @@
 import { join } from "path";
 import * as vscode from "vscode";
 import { ExtensionContext, window, workspace } from "vscode";
+import { SATSUMA_FILE_GLOB } from "@satsuma/core/source-files";
 import {
   LanguageClient,
   LanguageClientOptions,
@@ -42,10 +43,9 @@ export function activate(context: ExtensionContext): void {
       cliPath,
     },
     synchronize: {
-      fileEvents: [
-        workspace.createFileSystemWatcher("**/*.stm"),
-        workspace.createFileSystemWatcher("**/*.satsuma"),
-      ],
+      // One watcher covering every registered Satsuma extension — the server
+      // gates incoming events with the same shared predicate (sl-v215).
+      fileEvents: [workspace.createFileSystemWatcher(SATSUMA_FILE_GLOB)],
     },
   };
 

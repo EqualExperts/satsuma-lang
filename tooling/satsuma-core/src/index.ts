@@ -1,4 +1,9 @@
 export { capitalize, normalizeName } from "./string-utils.js";
+export {
+  SATSUMA_FILE_EXTENSIONS,
+  SATSUMA_FILE_GLOB,
+  isSatsumaFilePath,
+} from "./source-files.js";
 export { findFieldByPath, collectFieldNames } from "./field-utils.js";
 export type { FieldTreeNode } from "./field-utils.js";
 export { collectSemanticDiagnostics, validateSemanticWorkspace } from "./validate.js";

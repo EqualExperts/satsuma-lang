@@ -42,6 +42,8 @@ import { computeFormatting, initFormatting } from "./formatting";
 import { computeFullLineage } from "./full-lineage";
 import { buildVizModel } from "@satsuma/viz-backend";
 import { computeMappingCoverage } from "./coverage";
+import { isSatsumaFilePath } from "@satsuma/core";
+import { findSatsumaSourceFiles } from "./source-scan";
 
 // ---------- Connection setup ----------
 
@@ -222,11 +224,13 @@ documents.onDidSave(async (event) => {
   }
 });
 
-// Watch for .stm file changes outside the editor
+// Watch for Satsuma source file changes outside the editor. The client
+// watches both registered extensions, so the gate must accept both — a
+// bare .endsWith(".stm") check silently dropped .satsuma events (sl-v215).
 connection.onDidChangeWatchedFiles((params) => {
   const parser = getParser();
   for (const change of params.changes) {
-    if (!change.uri.endsWith(".stm")) continue;
+    if (!isSatsumaFilePath(change.uri)) continue;
 
     if (change.type === FileChangeType.Deleted) {
       removeFile(wsIndex, change.uri);
@@ -509,12 +513,12 @@ function sendMergedDiagnostics(uri: string, tree: Tree): void {
   });
 }
 
-/** Recursively find all .stm files in a directory and index them. */
+/** Recursively find all Satsuma source files in a directory and index them. */
 function indexWorkspaceFolder(folderPath: string): void {
   const parser = getParser();
-  const stmFiles = findStmFiles(folderPath);
+  const sourceFiles = findSatsumaSourceFiles(folderPath);
 
-  for (const filePath of stmFiles) {
+  for (const filePath of sourceFiles) {
     try {
       const content = fs.readFileSync(filePath, "utf-8");
       const tree = parser.parse(content);
@@ -525,26 +529,6 @@ function indexWorkspaceFolder(folderPath: string): void {
       // Unreadable file — skip
     }
   }
-}
-
-/** Recursively find .stm files, skipping hidden dirs and node_modules. */
-function findStmFiles(dir: string): string[] {
-  const results: string[] = [];
-  try {
-    const entries = fs.readdirSync(dir, { withFileTypes: true });
-    for (const entry of entries) {
-      if (entry.name.startsWith(".") || entry.name === "node_modules") continue;
-      const full = path.join(dir, entry.name);
-      if (entry.isDirectory()) {
-        results.push(...findStmFiles(full));
-      } else if (entry.name.endsWith(".stm")) {
-        results.push(full);
-      }
-    }
-  } catch {
-    // Unreadable directory — skip
-  }
-  return results;
 }
 
 // ---------- Start ----------

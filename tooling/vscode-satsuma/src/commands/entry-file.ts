@@ -8,14 +8,15 @@
  */
 
 import * as vscode from "vscode";
+import { SATSUMA_FILE_GLOB } from "@satsuma/core/source-files";
 import { classifyEntryFileCandidates } from "./entry-file-logic";
 
 /**
- * Cap on the workspace .stm search. Far above any realistic workspace size —
- * it only guards against pathological folders (e.g. a home directory opened
- * by accident).
+ * Cap on the workspace source-file search. Far above any realistic workspace
+ * size — it only guards against pathological folders (e.g. a home directory
+ * opened by accident).
  */
-const MAX_STM_SEARCH_RESULTS = 200;
+const MAX_SOURCE_SEARCH_RESULTS = 200;
 
 /**
  * The user's last quick-pick choice, offered as the top item next time.
@@ -25,11 +26,11 @@ const MAX_STM_SEARCH_RESULTS = 200;
 let lastPickedEntryFile: string | undefined;
 
 /**
- * Resolve the .stm file that anchors a CLI invocation, prompting only when
- * the workspace is genuinely ambiguous (several .stm files and none active).
- * Returns undefined when the user dismisses the prompt or the workspace has
- * no .stm files — callers must abort their CLI call in that case, never
- * substitute a directory.
+ * Resolve the Satsuma file (.stm or .satsuma) that anchors a CLI invocation,
+ * prompting only when the workspace is genuinely ambiguous (several source
+ * files and none active). Returns undefined when the user dismisses the
+ * prompt or the workspace has no Satsuma files — callers must abort their
+ * CLI call in that case, never substitute a directory.
  */
 export async function resolveEntryFile(): Promise<string | undefined> {
   const activeDoc = vscode.window.activeTextEditor?.document;
@@ -37,9 +38,9 @@ export async function resolveEntryFile(): Promise<string | undefined> {
     activeDoc && !activeDoc.isUntitled ? activeDoc.uri.fsPath : undefined;
 
   const found = await vscode.workspace.findFiles(
-    "**/*.stm",
+    SATSUMA_FILE_GLOB,
     "**/node_modules/**",
-    MAX_STM_SEARCH_RESULTS,
+    MAX_SOURCE_SEARCH_RESULTS,
   );
 
   const resolution = classifyEntryFileCandidates(
@@ -79,7 +80,7 @@ export async function resolveEntryFile(): Promise<string | undefined> {
 
     case "none":
       vscode.window.showInformationMessage(
-        "No .stm files found in this workspace.",
+        "No Satsuma files (.stm or .satsuma) found in this workspace.",
       );
       return undefined;
   }

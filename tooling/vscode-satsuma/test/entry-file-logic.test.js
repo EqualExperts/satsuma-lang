@@ -2,9 +2,9 @@
  * Tests for the pure entry-file selection rules (sl-1ycv).
  *
  * Since ADR-022 the CLI rejects directory arguments, so every extension CLI
- * invocation must name a .stm file. These rules decide which file that is;
- * regressions here mean the extension either prompts when it shouldn't or
- * silently picks a surprising workspace root.
+ * invocation must name a Satsuma source file (.stm or .satsuma, sl-v215).
+ * These rules decide which file that is; regressions here mean the extension
+ * either prompts when it shouldn't or silently picks a surprising root.
  */
 const { describe, it } = require("node:test");
 const assert = require("node:assert/strict");
@@ -24,11 +24,22 @@ describe("classifyEntryFileCandidates", () => {
     assert.deepEqual(res, { kind: "active", fsPath: "/ws/crm/pipeline.stm" });
   });
 
-  // A non-.stm active editor (e.g. README.md) must not be passed to the CLI —
-  // that is exactly the class of bad argument ADR-022 rejects.
-  it("ignores a non-.stm active editor and falls through to the workspace files", () => {
+  // A non-Satsuma active editor (e.g. README.md) must not be passed to the
+  // CLI — that is exactly the class of bad argument ADR-022 rejects.
+  it("ignores a non-Satsuma active editor and falls through to the workspace files", () => {
     const res = classifyEntryFileCandidates("/ws/README.md", ["/ws/pipeline.stm"]);
     assert.deepEqual(res, { kind: "single", fsPath: "/ws/pipeline.stm" });
+  });
+
+  // .satsuma is registered alongside .stm; an active .satsuma editor was
+  // previously skipped here, leaving the user with "No .stm files found"
+  // in an all-.satsuma workspace (sl-v215).
+  it("uses the active editor's file when it is a .satsuma file (sl-v215)", () => {
+    const res = classifyEntryFileCandidates("/ws/pipeline.satsuma", [
+      "/ws/pipeline.satsuma",
+      "/ws/other.stm",
+    ]);
+    assert.deepEqual(res, { kind: "active", fsPath: "/ws/pipeline.satsuma" });
   });
 
   it("uses the only .stm file in the workspace without prompting", () => {
