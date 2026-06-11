@@ -1,6 +1,6 @@
 ---
 id: sl-o3ea
-status: open
+status: closed
 deps: []
 links: []
 created: 2026-06-10T23:21:30Z
@@ -17,3 +17,10 @@ satsuma-core/src/nl-ref.ts:167 — NL text passed in has the opening delimiter s
 
 Reported column points exactly at the @ for single-line strings, first line of multiline strings, and post-newline refs; regression tests for all three.
 
+
+## Notes
+
+**2026-06-11T12:32:25Z**
+
+Cause: NL ref items strip the opening string delimiter from their text, but computeNLRefPosition's first-line branch added the offset to the column of the delimiter, reporting refs 1 column short (3 for multiline strings).
+Fix: every NLRefDataItem now records the opening delimiterWidth (3 for triple-quoted, 1 for quoted, 0 for bare at_refs) and computeNLRefPosition adds it back in the no-newline branch. Regression tests cover single-line, multiline first-line, post-newline, note blocks, standalone notes, transform bodies, and bare refs.

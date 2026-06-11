@@ -465,13 +465,76 @@ describe("extractNLRefData — bare pipe-text at_refs (bptar-l6n8)", () => {
   });
 
   it("anchors a bare @ref so position math matches the quoted form", () => {
-    // For quoted items, column points at the opening delimiter and
-    // computeNLRefPosition's +1 lands on the @. A bare item has no delimiter,
-    // so its column is the @ itself and the same +1 yields the 1-based column.
+    // A bare at_ref has no delimiter (delimiterWidth 0): its column is the @
+    // itself, and the +1 in computeNLRefPosition only converts to 1-based.
     const src = "mapping m {\n  a -> b { from @z }\n}";
     const [item] = nlRefItems(src);
     const pos = computeNLRefPosition(item, item.text.indexOf("@"));
     assert.equal(pos.line, 2); // 1-based line of the arrow
     assert.equal(pos.column, src.split("\n")[1].indexOf("@") + 1); // 1-based @ column
+  });
+});
+
+// ── NL ref positions vs string delimiters (sl-o3ea) ──────────────────────────
+//
+// Items extracted from quoted NL strings have the opening delimiter stripped
+// from their text (1 char for ", 3 for """), but item.column still points at
+// the delimiter in the source. computeNLRefPosition previously ignored that
+// gap, so refs on the first line of a string were reported one (or three)
+// columns short — lint output pointed at the space before the @. Each case
+// asserts the reported column is exactly the 1-based source column of the @.
+
+describe("NL ref positions account for string delimiters (sl-o3ea)", () => {
+  before(async () => {
+    await initParser(WASM_PATH);
+  });
+
+  // Extract the single NL ref item from a snippet and return the 1-based
+  // position computeNLRefPosition reports for its first @.
+  function positionOfRef(src) {
+    const items = extractNLRefData(getParser().parse(src).rootNode);
+    assert.equal(items.length, 1, "expected exactly one NL ref item");
+    return computeNLRefPosition(items[0], items[0].text.indexOf("@"));
+  }
+
+  // 1-based position of the first @ in the source itself — ground truth.
+  function atPositionIn(src) {
+    const lines = src.split("\n");
+    const row = lines.findIndex((l) => l.includes("@"));
+    return { line: row + 1, column: lines[row].indexOf("@") + 1 };
+  }
+
+  it("points exactly at the @ in a single-line quoted string", () => {
+    const src = 'mapping m {\n  a -> b { "see @x for ids" }\n}';
+    assert.deepEqual(positionOfRef(src), atPositionIn(src));
+  });
+
+  it("points exactly at the @ on the opening line of a multiline string", () => {
+    const src = 'mapping m {\n  a -> b { """see @x\nmore text""" }\n}';
+    assert.deepEqual(positionOfRef(src), atPositionIn(src));
+  });
+
+  it("keeps refs after a newline anchored to their own line", () => {
+    // Continuation-line refs never included the delimiter in their column
+    // math; this guards that the first-line fix does not disturb them.
+    const src = 'mapping m {\n  a -> b { """first\n  see @x""" }\n}';
+    assert.deepEqual(positionOfRef(src), atPositionIn(src));
+  });
+
+  it("points exactly at the @ in a mapping note block string", () => {
+    // note blocks are a separate extraction site from pipe steps; the
+    // delimiter width must be recorded there too.
+    const src = 'mapping m {\n  note { "uses @x" }\n}';
+    assert.deepEqual(positionOfRef(src), atPositionIn(src));
+  });
+
+  it("points exactly at the @ in a standalone note string", () => {
+    const src = 'note {\n  "platform docs reference @x"\n}';
+    assert.deepEqual(positionOfRef(src), atPositionIn(src));
+  });
+
+  it("points exactly at the @ in a transform body string", () => {
+    const src = 'transform t {\n  "lookup against @x"\n}';
+    assert.deepEqual(positionOfRef(src), atPositionIn(src));
   });
 });
