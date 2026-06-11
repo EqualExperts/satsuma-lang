@@ -27,7 +27,7 @@ import { capitalize } from "./string-utils.js";
 import { extractAtRefs, classifyRef, resolveRef, isSchemaInMappingSources, stripNLRefScopePrefix, computeNLRefPosition } from "./nl-ref.js";
 import type { DefinitionLookup } from "./nl-ref.js";
 import { expandSpreads, collectFieldPaths } from "./spread-expand.js";
-import type { SpreadEntity } from "./spread-expand.js";
+import type { SpreadEntity, EntityRefResolver, SpreadEntityLookup } from "./spread-expand.js";
 import { resolveScopedEntityRef } from "./canonical-ref.js";
 import type { FieldDecl, MetaEntry, PipeStep } from "./types.js";
 import { computeImportReachability } from "./import-reachability.js";
@@ -543,34 +543,36 @@ function checkArrowFieldRefs(index: SemanticIndex, diagnostics: SemanticDiagnost
 
     const srcSchema = resolvedSrcKeys[0];
 
-    // Build the set of valid source field paths (flat, possibly multi-schema).
+    const { resolveRef, lookupFragment, lookupSchema } = makeSpreadLookups(index, currentNs);
+
+    // Build the set of valid source field paths (flat, possibly multi-schema),
+    // expanding spreads; field checks are suppressed below if any spread is
+    // unresolvable.
     const srcFieldPaths = new Set<string>();
     for (const s of resolvedSrcKeys) {
       collectFieldPaths(index.schemas.get(s)?.fields ?? [], "", srcFieldPaths);
     }
+    const srcHasUnresolved = expandSpreads(resolvedSrcKeys, currentNs, resolveRef, lookupFragment, srcFieldPaths, diagnostics as never[], lookupSchema);
+
+    // Multi-source mappings let arrows qualify a path with the authored
+    // source name (s2.created_at). The qualified set must include
+    // spread-inherited fields too (sl-kkao) — expand each source into a
+    // scratch set, then add its paths with the authored prefix. Spread
+    // diagnostics were already emitted by the combined expansion above, so
+    // this pass discards them to avoid duplicates.
     if (resolvedSrcKeys.length > 1) {
       for (let i = 0; i < mapping.sources.length; i++) {
         const key = resolveScopedEntityRef(mapping.sources[i]!, currentNs, index.schemas as Map<string, unknown>);
         if (!key) continue;
-        collectFieldPaths(index.schemas.get(key)?.fields ?? [], mapping.sources[i]! + ".", srcFieldPaths);
+        const perSourcePaths = new Set<string>();
+        collectFieldPaths(index.schemas.get(key)?.fields ?? [], "", perSourcePaths);
+        expandSpreads([key], currentNs, resolveRef, lookupFragment, perSourcePaths, [], lookupSchema);
+        for (const p of perSourcePaths) srcFieldPaths.add(`${mapping.sources[i]}.${p}`);
       }
     }
 
     const tgtFieldPaths = new Set<string>();
     collectFieldPaths(resolvedTgtKey ? (index.schemas.get(resolvedTgtKey)?.fields ?? []) : [], "", tgtFieldPaths);
-
-    // Expand spreads; suppress field checks if any spread is unresolvable.
-    const resolveRef = (ref: string, _ns: string | null) =>
-      resolveScopedEntityRef(ref, currentNs, index.fragments as Map<string, unknown>);
-    const lookupFragment = (key: string): SpreadEntity | undefined => {
-      const f = index.fragments.get(key);
-      return f ? { fields: f.fields, hasSpreads: f.hasSpreads ?? false, spreads: f.spreads, file: f.file, row: f.row } : undefined;
-    };
-    const lookupSchema = (key: string): SpreadEntity | undefined => {
-      const s = index.schemas.get(key);
-      return s ? { fields: s.fields, hasSpreads: s.hasSpreads ?? false, spreads: s.spreads, file: s.file, row: s.row } : undefined;
-    };
-    const srcHasUnresolved = expandSpreads(resolvedSrcKeys, currentNs, resolveRef, lookupFragment, srcFieldPaths, diagnostics as never[], lookupSchema);
     const tgtHasUnresolved = resolvedTgtKey
       ? expandSpreads([resolvedTgtKey], currentNs, resolveRef, lookupFragment, tgtFieldPaths, diagnostics as never[], lookupSchema)
       : false;
@@ -608,7 +610,7 @@ function checkArrowFieldRefs(index: SemanticIndex, diagnostics: SemanticDiagnost
           diagnostics.push({
             file: arrow.file, line: arrow.line + 1, column: 1, severity: "warning",
             rule: "field-not-in-schema",
-            message: `Arrow source '${source}' not declared in schema '${srcSchema}'`,
+            message: `Arrow source '${source}' not declared in schema '${blamedSourceSchema(source, resolvedSrcKeys, srcSchema)}'`,
           });
         }
       }
@@ -955,33 +957,83 @@ function getConventionFields(schema: SemanticSchema): Set<string> {
 }
 
 /**
+ * Build the resolver/lookup trio that expandSpreads needs from a
+ * SemanticIndex. Fragment refs resolve relative to `currentNs` — the
+ * namespace of whichever entity owns the spread being expanded.
+ */
+function makeSpreadLookups(index: SemanticIndex, currentNs: string | null): {
+  resolveRef: EntityRefResolver;
+  lookupFragment: SpreadEntityLookup;
+  lookupSchema: SpreadEntityLookup;
+} {
+  return {
+    resolveRef: (ref, _ns) => resolveScopedEntityRef(ref, currentNs, index.fragments as Map<string, unknown>),
+    lookupFragment: (key): SpreadEntity | undefined => {
+      const f = index.fragments.get(key);
+      return f ? { fields: f.fields, hasSpreads: f.hasSpreads ?? false, spreads: f.spreads, file: f.file, row: f.row } : undefined;
+    },
+    lookupSchema: (key): SpreadEntity | undefined => {
+      const s = index.schemas.get(key);
+      return s ? { fields: s.fields, hasSpreads: s.hasSpreads ?? false, spreads: s.spreads, file: s.file, row: s.row } : undefined;
+    },
+  };
+}
+
+/**
+ * Find the source schema a qualified arrow path refers to, matching the
+ * qualifier against resolved keys both verbatim and by their post-"::" base
+ * name (paths are authored with bare names even inside namespaces).
+ * Returns null for unqualified paths or unknown qualifiers.
+ */
+function qualifiedSourceSchema(path: string, schemaNames: string[]): string | null {
+  const dotIdx = path.indexOf(".");
+  if (dotIdx <= 0) return null;
+  const qualifier = path.slice(0, dotIdx);
+  return schemaNames.find((s) => {
+    if (s === qualifier) return true;
+    const nsIdx = s.indexOf("::");
+    return nsIdx !== -1 && s.slice(nsIdx + 2) === qualifier;
+  }) ?? null;
+}
+
+/**
+ * Pick the schema to blame in a field-not-in-schema message: a qualified path
+ * (s2.created_at) blames the schema it is qualified with; anything else
+ * blames the first source schema (sl-kkao — the message previously always
+ * named the first source, even for paths qualified with another one).
+ */
+function blamedSourceSchema(path: string, schemaNames: string[], firstSource: string): string {
+  return qualifiedSourceSchema(path, schemaNames) ?? firstSource;
+}
+
+/**
  * Resolve an arrow field path against the known field paths for the mapping's schema.
  * Returns true when the path is valid (no diagnostic needed).
  *
  * Special cases:
  *  - Paths starting with "." are always valid (computed / expression paths).
  *  - The schema name itself is valid (for container arrows targeting the schema root).
- *  - Qualified paths like "source_schema.field" are resolved by stripping the prefix.
+ *  - Qualified paths like "source_schema.field" are resolved by stripping the
+ *    prefix; the qualified schema's spread-inherited fields count too (sl-kkao).
  */
 function resolveFieldPath(path: string, schemaNames: string[], index: SemanticIndex, fieldPaths: Set<string>): boolean {
   if (path.startsWith(".")) return true;
   if (fieldPaths.has(path)) return true;
   if (schemaNames.includes(path)) return true;
 
-  const dotIdx = path.indexOf(".");
-  if (dotIdx > 0) {
-    const qualifier = path.slice(0, dotIdx);
-    const matchedSchema = schemaNames.find((s) => {
-      if (s === qualifier) return true;
-      const nsIdx = s.indexOf("::");
-      return nsIdx !== -1 && s.slice(nsIdx + 2) === qualifier;
-    });
-    if (matchedSchema) {
-      const rest = path.slice(dotIdx + 1);
-      const qualPaths = new Set<string>();
-      collectFieldPaths(index.schemas.get(matchedSchema)?.fields ?? [], "", qualPaths);
-      if (qualPaths.has(rest)) return true;
+  const matchedSchema = qualifiedSourceSchema(path, schemaNames);
+  if (matchedSchema) {
+    const rest = path.slice(path.indexOf(".") + 1);
+    const schema = index.schemas.get(matchedSchema);
+    const qualPaths = new Set<string>();
+    collectFieldPaths(schema?.fields ?? [], "", qualPaths);
+    if (schema?.hasSpreads) {
+      // Spread expansion diagnostics are already emitted when the caller
+      // builds its field path sets — discard them here to avoid duplicates.
+      const { resolveRef, lookupFragment, lookupSchema } = makeSpreadLookups(index, schema.namespace ?? null);
+      expandSpreads([matchedSchema], schema.namespace ?? null, resolveRef, lookupFragment, qualPaths, [], lookupSchema);
     }
+    if (qualPaths.has(rest)) return true;
   }
   return false;
 }

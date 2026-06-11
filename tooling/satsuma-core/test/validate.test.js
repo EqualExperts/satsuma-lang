@@ -335,6 +335,57 @@ describe("arrow field-not-in-schema diagnostics", () => {
     const fieldDiags = diags.filter((d) => d.rule === "field-not-in-schema" && d.message.includes("spread_sourced_field"));
     assert.equal(fieldDiags.length, 0, "must not warn when source has unresolved spreads");
   });
+
+  // sl-kkao: multi-source mappings let arrows qualify a source path with the
+  // schema name (s2.created_at). The qualified path sets were built from
+  // declared fields only — spread-inherited fields validated clean in the
+  // unqualified form but warned in the qualified form.
+
+  it("accepts a schema-qualified spread-inherited field in a multi-source mapping (sl-kkao)", () => {
+    const index = makeIndex({
+      fragments: [{ name: "audit", fields: [{ name: "created_at", type: "TIMESTAMP" }] }],
+      schemas: [
+        { name: "s1", fields: [{ name: "id", type: "INT" }] },
+        { name: "s2", fields: [{ name: "code", type: "STRING" }], spreads: ["audit"] },
+        { name: "z", fields: [{ name: "z_created", type: "TIMESTAMP" }] },
+      ],
+      mappings: [{ name: "m", sources: ["s1", "s2"], targets: ["z"] }],
+      fieldArrows: [{
+        mapping: "m", namespace: null,
+        sources: ["s2.created_at"],
+        target: "z_created",
+        steps: [], line: 5, file: "test.stm",
+      }],
+    });
+    const diags = collectSemanticDiagnostics(index);
+    const fieldDiags = diags.filter((d) => d.rule === "field-not-in-schema");
+    assert.deepEqual(fieldDiags.map((d) => d.message), [],
+      "qualified spread-inherited field must validate clean");
+  });
+
+  it("blames the schema a qualified path names, not the first source (sl-kkao)", () => {
+    // s2.missing exists nowhere — the warning must point the author at s2,
+    // the schema they qualified the path with, not at s1.
+    const index = makeIndex({
+      schemas: [
+        { name: "s1", fields: [{ name: "id", type: "INT" }] },
+        { name: "s2", fields: [{ name: "code", type: "STRING" }] },
+        { name: "z", fields: [{ name: "z_created", type: "TIMESTAMP" }] },
+      ],
+      mappings: [{ name: "m", sources: ["s1", "s2"], targets: ["z"] }],
+      fieldArrows: [{
+        mapping: "m", namespace: null,
+        sources: ["s2.missing"],
+        target: "z_created",
+        steps: [], line: 5, file: "test.stm",
+      }],
+    });
+    const diags = collectSemanticDiagnostics(index);
+    const diag = diags.find((d) => d.rule === "field-not-in-schema" && d.message.includes("s2.missing"));
+    assert.ok(diag, "should still warn for a genuinely missing qualified field");
+    assert.match(diag.message, /schema 's2'/);
+    assert.ok(!diag.message.includes("'s1'"), "must not blame the first source schema");
+  });
 });
 
 // ---------- Section 7: Transform spread references ----------
