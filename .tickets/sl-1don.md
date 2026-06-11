@@ -1,6 +1,6 @@
 ---
 id: sl-1don
-status: open
+status: closed
 deps: []
 links: []
 created: 2026-06-10T23:21:30Z
@@ -17,3 +17,10 @@ satsuma-core/src/validate.ts:413 — isNoteContext tests mappingKey.startsWith("
 
 Note-block refs inside namespaces produce no source-membership warnings; internal note: scope keys never appear in user-facing messages; namespaced + global note tests.
 
+
+## Notes
+
+**2026-06-11T10:49:19Z**
+
+Cause: checkNLRefs tested the namespace-qualified mappingKey (`crm::note:schema:foo`) for the `note:` scope prefix, so namespaced notes were never recognised as note contexts — resolvable refs hit the source-membership check against an undefined mapping and the internal scope key leaked into the user-facing message.
+Fix: test `item.mapping` (unqualified) for the `note:` prefix in satsuma-core validate.ts; regression tests cover namespaced note resolution and the human-readable scope label.

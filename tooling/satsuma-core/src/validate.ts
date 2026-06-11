@@ -409,8 +409,10 @@ function checkNLRefs(index: SemanticIndex, diagnostics: SemanticDiagnostic[]): v
 
     // Note contexts have no source/target list, so hidden-source checks are
     // suppressed. Unresolved-ref checks still apply — an @ref in a note should
-    // resolve to some known workspace entity.
-    const isNoteContext = mappingKey.startsWith("note:");
+    // resolve to some known workspace entity. Tested against item.mapping, not
+    // mappingKey: the key is namespace-qualified first ("crm::note:schema:foo"),
+    // which would hide the note: scope prefix for namespaced notes (sl-1don).
+    const isNoteContext = item.mapping.startsWith("note:");
 
     // Build a human-readable scope label for diagnostic messages.
     // Strip internal prefixes (e.g. "note:metric:") so messages say
