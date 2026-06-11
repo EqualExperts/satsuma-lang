@@ -198,6 +198,12 @@ schema order {
 
 `record` and `list_of record` can be nested to any depth. Metadata goes in `( )` between the type (or name) and `{ }`.
 
+**Line and omission rules.** The unified pattern is positional, so three constraints keep it unambiguous:
+
+- The TYPE (and `record` / `list_of`) must appear on the **same line** as the field name. A bare name on one line followed by a word on the next line is two (invalid) fields, never one field whose type wrapped.
+- TYPE may be omitted only when a metadata block is present (`legacy_flag (deprecated)`). A bare name with neither type nor metadata is an error.
+- A braced body always requires `record` or `list_of record` before it; `customer { ... }` without the keyword is an error.
+
 **Scalar lists** — When a list contains primitives rather than structures, use `list_of TYPE` with no braces:
 
 ```
