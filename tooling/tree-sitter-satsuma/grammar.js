@@ -658,7 +658,11 @@ module.exports = grammar({
 
     backtick_name: (_) => /`(?:[^`\\]|\\.)+`/,
 
-    multiline_string: (_) => token(prec(1, /"""([^"]|"[^"]|""[^"])*"""/)),
+    // Content is any run without three consecutive quotes; the optional
+    // `"?"?` before the closing delimiter lets content END in one or two
+    // quotes (sl-xb85: `"""He said "hi""""`). Content cannot end in three
+    // or more quotes — that is indistinguishable from the terminator.
+    multiline_string: (_) => token(prec(1, /"""([^"]|"[^"]|""[^"])*"?"?"""/)),
 
     nl_string: (_) => /"(?:[^"\\]|\\.)*"/,
 

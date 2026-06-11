@@ -1548,17 +1548,17 @@ static bool ts_lex(TSLexer *lexer, TSStateId state) {
           ('a' <= lookahead && lookahead <= 'z')) ADVANCE(78);
       END_STATE();
     case 5:
-      if (lookahead == '"') ADVANCE(82);
+      if (lookahead == '"') ADVANCE(84);
       if (lookahead == '\\') ADVANCE(23);
       if (lookahead != 0) ADVANCE(6);
       END_STATE();
     case 6:
-      if (lookahead == '"') ADVANCE(81);
+      if (lookahead == '"') ADVANCE(83);
       if (lookahead == '\\') ADVANCE(23);
       if (lookahead != 0) ADVANCE(6);
       END_STATE();
     case 7:
-      if (lookahead == '"') ADVANCE(80);
+      if (lookahead == '"') ADVANCE(82);
       if (lookahead != 0) ADVANCE(10);
       END_STATE();
     case 8:
@@ -1613,7 +1613,7 @@ static bool ts_lex(TSLexer *lexer, TSStateId state) {
       if (lookahead == '.') ADVANCE(49);
       END_STATE();
     case 14:
-      if (lookahead == '/') ADVANCE(85);
+      if (lookahead == '/') ADVANCE(87);
       END_STATE();
     case 15:
       if (lookahead == '/') ADVANCE(14);
@@ -1943,7 +1943,7 @@ static bool ts_lex(TSLexer *lexer, TSStateId state) {
       END_STATE();
     case 62:
       ACCEPT_TOKEN(sym__arithmetic_op);
-      if (lookahead == '/') ADVANCE(85);
+      if (lookahead == '/') ADVANCE(87);
       END_STATE();
     case 63:
       ACCEPT_TOKEN(sym__arithmetic_op);
@@ -2074,33 +2074,41 @@ static bool ts_lex(TSLexer *lexer, TSStateId state) {
       ACCEPT_TOKEN(sym_multiline_string);
       END_STATE();
     case 81:
-      ACCEPT_TOKEN(sym_nl_string);
+      ACCEPT_TOKEN(sym_multiline_string);
+      if (lookahead == '"') ADVANCE(80);
       END_STATE();
     case 82:
+      ACCEPT_TOKEN(sym_multiline_string);
+      if (lookahead == '"') ADVANCE(81);
+      END_STATE();
+    case 83:
+      ACCEPT_TOKEN(sym_nl_string);
+      END_STATE();
+    case 84:
       ACCEPT_TOKEN(sym_nl_string);
       if (lookahead == '"') ADVANCE(10);
       END_STATE();
-    case 83:
+    case 85:
       ACCEPT_TOKEN(sym_warning_comment);
       if (lookahead != 0 &&
-          lookahead != '\n') ADVANCE(83);
-      END_STATE();
-    case 84:
-      ACCEPT_TOKEN(sym_question_comment);
-      if (lookahead != 0 &&
-          lookahead != '\n') ADVANCE(84);
-      END_STATE();
-    case 85:
-      ACCEPT_TOKEN(sym_comment);
-      if (lookahead == '!') ADVANCE(83);
-      if (lookahead == '?') ADVANCE(84);
-      if (lookahead != 0 &&
-          lookahead != '\n') ADVANCE(86);
+          lookahead != '\n') ADVANCE(85);
       END_STATE();
     case 86:
-      ACCEPT_TOKEN(sym_comment);
+      ACCEPT_TOKEN(sym_question_comment);
       if (lookahead != 0 &&
           lookahead != '\n') ADVANCE(86);
+      END_STATE();
+    case 87:
+      ACCEPT_TOKEN(sym_comment);
+      if (lookahead == '!') ADVANCE(85);
+      if (lookahead == '?') ADVANCE(86);
+      if (lookahead != 0 &&
+          lookahead != '\n') ADVANCE(88);
+      END_STATE();
+    case 88:
+      ACCEPT_TOKEN(sym_comment);
+      if (lookahead != 0 &&
+          lookahead != '\n') ADVANCE(88);
       END_STATE();
     default:
       return false;
