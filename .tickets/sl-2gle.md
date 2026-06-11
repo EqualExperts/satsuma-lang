@@ -17,3 +17,10 @@ Confirmed small issues. (1) mapping m { } ERRORs (mapping_body is repeat1, gramm
 
 Each item either fixed with corpus coverage or explicitly documented as invalid in the spec; the mislabeled lexical.txt snapshots corrected.
 
+
+## Notes
+
+**2026-06-11T22:34:09Z**
+
+Cause: Six separate grammar/scanner corner cases: mapping_body was repeat1 (empty body ERROR), fragment/transform blocks lacked optional metadata_block, metadata_block allowed a lone comma, pipe_text atom set was missing % and =, map_key lacked arithmetic ops for negative numbers, and scanner.c treated \r as horizontal whitespace so CR-only line endings merged fields into spreads.
+Fix: mapping body optional; fragment/transform accept metadata; trailing metadata comma requires an entry; % and = added to pipe atoms; arithmetic ops added to map_key; \r now terminates lines in the external scanner. Mislabeled lexical.txt ERROR snapshots corrected; corpus coverage for every item; spec 4.1/5.1 updated. (commit 6799db3)
