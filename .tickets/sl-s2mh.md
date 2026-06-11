@@ -1,6 +1,6 @@
 ---
 id: sl-s2mh
-status: open
+status: closed
 deps: []
 links: []
 created: 2026-06-11T02:40:50Z
@@ -17,3 +17,10 @@ Metric schemas live in both index.schemas and index.metrics. satsuma-cli/src/com
 
 context emits each metric once (as metric); summary schema/metric counts consistent with graph stats; test against metrics-platform example.
 
+
+## Notes
+
+**2026-06-11T23:30:00Z**
+
+Cause: metric schemas live in both index.schemas and index.metrics; context scored both maps (emitting each metric block twice) and summary listed metrics under both sections in JSON, compact, and default modes, so schema counts disagreed with graph stats.
+Fix: context and summary now skip metric ids in their schemas loops via the same partition graph-builder already applied; CLI-level tests added against the metrics-platform example (commit 551c515)
