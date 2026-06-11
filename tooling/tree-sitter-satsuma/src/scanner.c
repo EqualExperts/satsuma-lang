@@ -28,6 +28,13 @@
  *     forms), and neither is `note` (better recovery when a bare field name
  *     precedes a note block).
  *
+ *   MAP_VALUE_WORD
+ *     A bare word continuing a map value (`R: retail customer`) on the SAME
+ *     LINE as its key. A newline ends the value, so the next line's words
+ *     start a new map_entry instead of being folded into its key (sl-zzaj).
+ *     Unlike the other word tokens it may start with a digit and contain
+ *     interior dots, since bare map values are free prose ("tier 2.5").
+ *
  *   VALUE_WORD
  *     A bare word inside a metadata tag value (value_text), on the SAME LINE
  *     as the tag. Refuses structural metadata keywords (note/enum/slice) and
@@ -50,6 +57,7 @@ enum TokenType {
   CONTINUATION_WORD,
   INLINE_TYPE,
   VALUE_WORD,
+  MAP_VALUE_WORD,
 };
 
 /* ── Keyword tables ─────────────────────────────────────────────────────── */
@@ -159,6 +167,39 @@ static unsigned scan_word(TSLexer *lexer, char *buf, bool *comparable) {
   return len;
 }
 
+/**
+ * Consume a bare map-value word: letters, digits, or underscore to start,
+ * with interior hyphens and dots ("tier-2", "v1.2.3"). Map values are free
+ * prose, so no keyword capture is needed. A hyphen or dot is only included
+ * once a following word character confirms it is interior — the token never
+ * ends with either, so `,`-less prose still terminates cleanly before
+ * punctuation.
+ */
+static bool scan_map_value_word(TSLexer *lexer) {
+  if (!is_word_char(lexer->lookahead)) return false;
+  lexer->advance(lexer, false);
+  lexer->mark_end(lexer);
+  while (!lexer->eof(lexer)) {
+    int32_t c = lexer->lookahead;
+    if (is_word_char(c)) {
+      lexer->advance(lexer, false);
+      lexer->mark_end(lexer);
+    } else if (c == '-' || c == '.') {
+      /* Tentatively consume the punctuation run; the token end is only
+       * extended once a word character follows. */
+      while (!lexer->eof(lexer) &&
+             (lexer->lookahead == '-' || lexer->lookahead == '.')) {
+        lexer->advance(lexer, false);
+      }
+      if (lexer->eof(lexer) || !is_word_char(lexer->lookahead)) break;
+    } else {
+      break;
+    }
+  }
+  lexer->result_symbol = MAP_VALUE_WORD;
+  return true;
+}
+
 /* ── Scanner entry point ────────────────────────────────────────────────── */
 
 bool tree_sitter_satsuma_external_scanner_scan(void *payload, TSLexer *lexer, const bool *valid_symbols) {
@@ -166,7 +207,8 @@ bool tree_sitter_satsuma_external_scanner_scan(void *payload, TSLexer *lexer, co
 
   if (!valid_symbols[CONTINUATION_WORD] &&
       !valid_symbols[INLINE_TYPE] &&
-      !valid_symbols[VALUE_WORD]) return false;
+      !valid_symbols[VALUE_WORD] &&
+      !valid_symbols[MAP_VALUE_WORD]) return false;
 
   /* Skip horizontal whitespace only (space, tab, form-feed). */
   while (!lexer->eof(lexer) &&
@@ -184,7 +226,17 @@ bool tree_sitter_satsuma_external_scanner_scan(void *payload, TSLexer *lexer, co
       lexer->lookahead == '\n' ||
       lexer->lookahead == '\r') return false;
 
-  if (!is_ident_start(lexer->lookahead)) return false;
+  /* Dispatch: the identifier-shaped tokens share scan_word; MAP_VALUE_WORD
+   * has its own scan (digit start, interior dots). The token groups are
+   * valid in disjoint parser states, so the order below only matters during
+   * error recovery, where every symbol is marked valid. */
+  bool ident_token_valid = valid_symbols[CONTINUATION_WORD] ||
+                           valid_symbols[INLINE_TYPE] ||
+                           valid_symbols[VALUE_WORD];
+  if (!ident_token_valid || !is_ident_start(lexer->lookahead)) {
+    if (valid_symbols[MAP_VALUE_WORD]) return scan_map_value_word(lexer);
+    return false;
+  }
 
   char word[WORD_BUF_CAP];
   word[0] = (char)lexer->lookahead;

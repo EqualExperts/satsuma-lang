@@ -344,3 +344,99 @@ mapping {
                 (map_key)
                 (map_value
                   (nl_string))))))))))
+
+================================================================================
+Bare multi-word map value stays on its line; next line starts a new entry
+================================================================================
+
+mapping {
+  CUST_TYPE -> customer_type {
+    map {
+      R: retail customer
+      B: "business"
+    }
+  }
+}
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (mapping_block
+    (mapping_body
+      (map_arrow
+        (src_path
+          (field_path
+            (identifier)))
+        (tgt_path
+          (field_path
+            (identifier)))
+        (pipe_chain
+          (pipe_step
+            (map_literal
+              (map_entry
+                (map_key
+                  (identifier))
+                (map_value
+                  (identifier)
+                  (identifier)))
+              (map_entry
+                (map_key
+                  (identifier))
+                (map_value
+                  (nl_string))))))))))
+
+================================================================================
+Bare map value continues over digits and dotted words
+================================================================================
+
+mapping {
+  T -> tier {
+    map {
+      A: tier 2.5 plan
+      B: basic
+    }
+  }
+}
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (mapping_block
+    (mapping_body
+      (map_arrow
+        (src_path
+          (field_path
+            (identifier)))
+        (tgt_path
+          (field_path
+            (identifier)))
+        (pipe_chain
+          (pipe_step
+            (map_literal
+              (map_entry
+                (map_key
+                  (identifier))
+                (map_value
+                  (identifier)
+                  (identifier)
+                  (identifier)))
+              (map_entry
+                (map_key
+                  (identifier))
+                (map_value
+                  (identifier))))))))))
+
+================================================================================
+Two map entries on one line still require a comma
+:error
+================================================================================
+
+mapping {
+  T -> t {
+    map { R: retail B: biz }
+  }
+}
+
+--------------------------------------------------------------------------------
+
+
