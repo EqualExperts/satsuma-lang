@@ -3,17 +3,26 @@
  */
 
 import assert from "node:assert/strict";
-import { describe, it } from "node:test";
+import { describe, it, before } from "node:test";
+import { resolve, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
 import {
   AT_REF_PATTERN,
   createAtRefRegex,
   extractAtRefs,
+  extractNLRefData,
   computeNLRefPosition,
   classifyRef,
   resolveRef,
   resolveAllNLRefs,
   stripNLRefScopePrefix,
 } from "../dist/nl-ref.js";
+import { initParser, getParser } from "../dist/parser.js";
+
+// Real-parser cases below (sl-74m6) parse minimal Satsuma snippets against the
+// committed grammar WASM, mirroring the bootstrap in parse-errors.test.js.
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const WASM_PATH = resolve(__dirname, "../../tree-sitter-satsuma/tree-sitter-satsuma.wasm");
 
 // ── extractAtRefs ─────────────────────────────────────────────────────────────
 
@@ -77,6 +86,29 @@ describe("extractAtRefs()", () => {
     assert.deepEqual(extractAtRefs("coalesce(@a, @b)").map(r => r.ref), ["a", "b"]);
     assert.deepEqual(extractAtRefs("[@a; @b]").map(r => r.ref), ["a", "b"]);
     assert.deepEqual(extractAtRefs("{@a}").map(r => r.ref), ["a"]);
+  });
+
+  // sl-74m6: quotes, `=` and `:` were excluded from the lookbehind as collateral
+  // of the sl-gl21 fix, silently dropping refs that abut them in real NL prose.
+  // None of these shapes overlap the email/wildcard false positives sl-gl21
+  // exists to block, so they must be extracted.
+
+  it("extracts a @ref immediately after a double or single quote (sl-74m6)", () => {
+    // Prose like `"@customers" table` quotes the ref itself — the ref must
+    // still reach lineage and validation.
+    assert.deepEqual(extractAtRefs('"@customers" table').map(r => r.ref), ["customers"]);
+    assert.deepEqual(extractAtRefs("'@customers' table").map(r => r.ref), ["customers"]);
+  });
+
+  it("extracts a @ref immediately after = (sl-74m6)", () => {
+    // SQL-ish condition text with no space around the operator:
+    // `where id =@customers.id`.
+    assert.deepEqual(extractAtRefs("where id =@customers.id").map(r => r.ref), ["customers.id"]);
+  });
+
+  it("extracts a @ref immediately after : (sl-74m6)", () => {
+    // Key/value prose with no space after the colon: `key:@customers.id`.
+    assert.deepEqual(extractAtRefs("key:@customers.id").map(r => r.ref), ["customers.id"]);
   });
 
   it("extracts @refs across multiple lines (after newline counts as whitespace)", () => {
@@ -283,5 +315,58 @@ describe("stripNLRefScopePrefix", () => {
   it("returns mapping names without scope prefix unchanged", () => {
     assert.equal(stripNLRefScopePrefix("crm sync"), "crm sync");
     assert.equal(stripNLRefScopePrefix("ns::load data"), "ns::load data");
+  });
+});
+
+// ── extractNLRefData — map literal NL strings (sl-74m6) ──────────────────────
+//
+// Real-parser tests: a map literal is a structured pipe-step shape, so mock
+// CSTs would just restate the implementation. These parse minimal mappings and
+// assert the walker reaches the NL strings inside map entries — previously only
+// pipe_text steps were scanned and refs in map values escaped lineage entirely.
+
+describe("extractNLRefData — map literal NL strings (sl-74m6)", () => {
+  before(async () => {
+    await initParser(WASM_PATH);
+  });
+
+  function nlRefItems(src) {
+    return extractNLRefData(getParser().parse(src).rootNode);
+  }
+
+  it("extracts a @ref inside a map literal string value", () => {
+    // The ticket repro: a ref mentioned in a map value must produce an NL ref
+    // item attributed to the arrow's target field.
+    const src = 'mapping m {\n  a -> b { map { "x": "see @customers.id" } }\n}';
+    const items = nlRefItems(src);
+    assert.equal(items.length, 1);
+    assert.equal(items[0].text, "see @customers.id");
+    assert.equal(items[0].mapping, "m");
+    assert.equal(items[0].targetField, "b");
+  });
+
+  it("extracts a @ref inside a map literal string key", () => {
+    // Keys are condition text and may also reference fields; they must not be
+    // a blind spot either.
+    const src = 'mapping m {\n  a -> b { map { "matches @customers.tier": "gold" } }\n}';
+    const items = nlRefItems(src);
+    assert.equal(items.length, 1);
+    assert.equal(items[0].text, "matches @customers.tier");
+  });
+
+  it("extracts a @ref from a map literal in a transform body", () => {
+    // Transforms share the pipe-step walker with arrows — the map-literal fix
+    // must apply there too.
+    const src = 'transform grade {\n  map { "a": "top tier per @customers.tier" }\n}';
+    const items = nlRefItems(src);
+    assert.equal(items.length, 1);
+    assert.equal(items[0].mapping, "transform:grade");
+  });
+
+  it("ignores map literal values with no refs or backticks", () => {
+    // The walker pre-filters NL strings: plain map values must not generate
+    // NL ref items (they would inflate nl-refs output with noise).
+    const src = 'mapping m {\n  a -> b { map { "r": "retail", "w": "wholesale" } }\n}';
+    assert.deepEqual(nlRefItems(src), []);
   });
 });

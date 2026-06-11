@@ -116,11 +116,16 @@ function canonicalKey(key: string): string {
 // digits, `_` and `.` so that `%@foo` and `user@bar` are not extracted, while
 // `(@foo`, `[@foo`, `, @foo` and start-of-string `@foo` still are.
 //
+// Quotes, `=` and `:` are allowed prefixes (sl-74m6): NL prose legitimately
+// abuts refs against them — `"@customers" table`, `where id =@customers.id`,
+// `key:@customers.id` — and none of those shapes overlap the email/wildcard
+// false positives the lookbehind exists to block.
+//
 // AT_REF_PATTERN is the canonical source. Consumers that need a fresh regex
 // instance (because /g state is mutable) should call createAtRefRegex(); this
 // is the single source of truth shared by core, the LSP, the viz backend and
 // the viz UI to avoid drift between copies.
-export const AT_REF_PATTERN = "(?<=^|[\\s(\\[{,;])@(`[^`]+`|[a-zA-Z_][a-zA-Z0-9_-]*)(?:::(`[^`]+`|[a-zA-Z_][a-zA-Z0-9_-]*))?(?:\\.(`[^`]+`|[a-zA-Z_][a-zA-Z0-9_-]*))*";
+export const AT_REF_PATTERN = "(?<=^|[\\s(\\[{,;\"'=:])@(`[^`]+`|[a-zA-Z_][a-zA-Z0-9_-]*)(?:::(`[^`]+`|[a-zA-Z_][a-zA-Z0-9_-]*))?(?:\\.(`[^`]+`|[a-zA-Z_][a-zA-Z0-9_-]*))*";
 
 /**
  * Build a fresh global @ref regex. Always returns a new instance so callers
@@ -478,6 +483,25 @@ function extractMappingNLRefs(mappingNode: SyntaxNode, namespace: string | null,
   walkArrowsForNL(body, mappingName, namespace, null, results);
 }
 
+// Collect the NL string nodes carried by a single pipe step. A step is one of
+// three shapes: pipe_text (NL strings are direct children), a map literal
+// (NL strings live inside each entry's key and value — sl-74m6: refs in
+// `map { "x": "see @customers.id" }` must reach lineage and validation), or a
+// fragment spread (never carries NL text).
+function nlStringNodesInPipeStep(step: SyntaxNode): SyntaxNode[] {
+  const isNL = (n: SyntaxNode) => n.type === "nl_string" || n.type === "multiline_string";
+  const inner = step.namedChildren[0];
+  if (!inner) return [];
+  if (inner.type === "pipe_text") return inner.namedChildren.filter(isNL);
+  if (inner.type === "map_literal") {
+    return inner.namedChildren
+      .filter((e) => e.type === "map_entry")
+      .flatMap((e) => e.namedChildren)            // map_key and map_value parts
+      .flatMap((part) => part.namedChildren.filter(isNL));
+  }
+  return [];
+}
+
 function extractTransformNLRefs(transformNode: SyntaxNode, namespace: string | null, results: NLRefDataItemNoFile[]): void {
   const lbl = transformNode.namedChildren.find((c) => c.type === "block_label");
   const inner = lbl?.namedChildren[0];
@@ -489,11 +513,7 @@ function extractTransformNLRefs(transformNode: SyntaxNode, namespace: string | n
 
   for (const step of pipeChain.namedChildren) {
     if (step.type === "pipe_step") {
-      const innerNode = step.namedChildren[0];
-      const nlNodes = innerNode?.type === "pipe_text"
-        ? innerNode.namedChildren.filter((k) => k.type === "nl_string" || k.type === "multiline_string")
-        : [];
-      for (const nlNode of nlNodes) {
+      for (const nlNode of nlStringNodesInPipeStep(step)) {
         const text = nlNode.type === "multiline_string"
           ? nlNode.text.slice(3, -3)
           : nlNode.text.slice(1, -1);
@@ -651,11 +671,7 @@ function walkArrowsForNL(
       if (pipeChain) {
         for (const step of pipeChain.namedChildren) {
           if (step.type === "pipe_step") {
-            const innerNode = step.namedChildren[0];
-            const nlNodes2 = innerNode?.type === "pipe_text"
-              ? innerNode.namedChildren.filter((k) => k.type === "nl_string" || k.type === "multiline_string")
-              : [];
-            for (const nlNode of nlNodes2) {
+            for (const nlNode of nlStringNodesInPipeStep(step)) {
               const text = nlNode.type === "multiline_string"
                 ? nlNode.text.slice(3, -3)
                 : nlNode.text.slice(1, -1);
