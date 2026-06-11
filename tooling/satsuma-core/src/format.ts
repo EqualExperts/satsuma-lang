@@ -108,8 +108,8 @@ function collectBlockLeadingComments(
     if (braceRow < 0) continue;                           // still before `{`
     if (BODY_TYPES.has(child.type) || child.type === "}") break;
     if (isComment(child)) {
-      // Skip inline comments on the brace line — those are handled by
-      // the caller (e.g. formatMultiLineField's inline-comment loop).
+      // Skip inline comments on the brace line — callers keep those on the
+      // header line via braceLineCommentSuffix.
       if (child.startPosition.row === braceRow) continue;
       comments.push(formatComment(child, indent + 1));
     }
@@ -117,6 +117,25 @@ function collectBlockLeadingComments(
   return comments.length > 0
     ? "\n" + comments.join("\n")
     : "";
+}
+
+/**
+ * Inline comments sitting on the same line as a block's opening `{`
+ * (e.g. `schema s {  // why this schema exists`). Returns a suffix string
+ * ready to append to the header line, or "" when none exist. A comment can
+ * never precede `{` on that line (it would comment the brace out), so every
+ * brace-row comment belongs after the brace (sl-dz3n).
+ */
+function braceLineCommentSuffix(node: SyntaxNode): string {
+  const openBrace = node.children.find(c => c.type === "{");
+  if (!openBrace) return "";
+  let suffix = "";
+  for (const child of node.children) {
+    if (isComment(child) && child.startPosition.row === openBrace.startPosition.row) {
+      suffix += "  " + formatInlineComment(child);
+    }
+  }
+  return suffix;
 }
 
 /**
@@ -302,7 +321,7 @@ function formatSchemaBlock(node: SyntaxNode, source: string, indent: number): st
 
   let line = ind(indent) + "schema " + formatBlockLabel(label!);
   if (meta) line += " " + formatMetadataBlock(meta, source, indent);
-  line += " {";
+  line += " {" + braceLineCommentSuffix(node);
 
   const leading = collectBlockLeadingComments(node, indent);
 
@@ -323,7 +342,7 @@ function formatFragmentBlock(node: SyntaxNode, source: string, indent: number): 
   const body = findChild(node, "schema_body");
 
   let line = ind(indent) + "fragment " + formatBlockLabel(label!);
-  line += " {";
+  line += " {" + braceLineCommentSuffix(node);
 
   const leading = collectBlockLeadingComments(node, indent);
 
@@ -458,8 +477,9 @@ function formatSingleLineField(
   let line = ind(indent) + name + " ".repeat(nameGap) + type;
 
   if (meta) {
-    // Check if metadata should be multi-line (contains multiline_string or too long)
-    if (hasMultilineString(meta)) {
+    // Check if metadata should be multi-line (contains multiline_string,
+    // comments, or too long) — formatMetadataBlock handles all three.
+    if (hasMultilineString(meta) || meta.children.some(isComment)) {
       line += " " + formatMetadataBlock(meta, source, indent);
     } else {
       const metaStr = formatMetadataInline(meta, source);
@@ -492,18 +512,9 @@ function formatMultiLineField(node: SyntaxNode, source: string, indent: number):
     line += " " + formatMetadataBlock(meta, source, indent);
   }
 
-  line += " {";
+  line += " {" + braceLineCommentSuffix(node);
 
-  // Collect inline comments between { and body (on same line as {)
   const openBrace = node.children.find(c => c.type === "{");
-  if (openBrace) {
-    for (const child of node.children) {
-      if (isComment(child) && child.startPosition.row === openBrace.startPosition.row) {
-        line += "  " + formatInlineComment(child);
-      }
-    }
-  }
-
   const leading = collectBlockLeadingComments(node, indent);
 
   if (!body || body.namedChildren.length === 0) {
@@ -549,7 +560,7 @@ function formatMappingBlock(node: SyntaxNode, source: string, indent: number): s
   let line = ind(indent) + "mapping";
   if (label) line += " " + formatBlockLabel(label);
   if (meta) line += " " + formatMetadataBlock(meta, source, indent);
-  line += " {";
+  line += " {" + braceLineCommentSuffix(node);
 
   const leading = collectBlockLeadingComments(node, indent);
 
@@ -626,28 +637,81 @@ function formatMappingBody(body: SyntaxNode, source: string, indent: number): st
 
 // ── Source/Target Blocks ──────────────────────────────────────────────────────
 
-function formatSourceBlock(node: SyntaxNode, source: string, indent: number): string {
-  const nlStrings = node.children.filter(c => c.type === "nl_string");
+// An entry (source ref / join string) or a comment inside a source/target
+// block, in source order. Comments force the multi-line layout (sl-dz3n).
+type SourceBlockItem = { node: SyntaxNode; text: string; isComment: boolean };
 
-  // Gather all content items: refs and nl_strings
-  const items: string[] = [];
+/** Gather refs, join strings, and body comments of a source/target block in order. */
+function collectSourceBlockItems(node: SyntaxNode, source: string): SourceBlockItem[] {
+  const openBrace = node.children.find(c => c.type === "{");
+  const braceRow = openBrace?.startPosition.row ?? -1;
+
+  const items: SourceBlockItem[] = [];
   for (const child of node.children) {
     if (child.type === "source_ref") {
-      items.push(formatSourceRef(child, source));
+      items.push({ node: child, text: formatSourceRef(child, source), isComment: false });
     } else if (child.type === "nl_string") {
-      items.push(child.text);
+      items.push({ node: child, text: child.text, isComment: false });
+    } else if (isComment(child) && child.startPosition.row !== braceRow) {
+      // Brace-row comments stay on the header line via braceLineCommentSuffix.
+      items.push({ node: child, text: "", isComment: true });
     }
   }
+  return items;
+}
+
+/**
+ * Lay out source/target block entries one per line, interleaving comments:
+ * a comment on the same line as the previous entry stays appended to it,
+ * others get their own line. `withCommas` selects the source-block style
+ * (comma-separated, sl-q9oj); target blocks have no commas.
+ */
+function formatSourceBlockBody(
+  items: SourceBlockItem[], indent: number, withCommas: boolean
+): string {
+  const entryCount = items.filter(i => !i.isComment).length;
+  const lines: string[] = [];
+  let entryIdx = 0;
+  let prev: SyntaxNode | null = null;
+
+  for (const item of items) {
+    if (item.isComment) {
+      if (prev !== null && sameLine(prev, item.node) && lines.length > 0) {
+        lines[lines.length - 1] += "  " + formatInlineComment(item.node);
+      } else {
+        lines.push(formatComment(item.node, indent + 1));
+      }
+    } else {
+      entryIdx += 1;
+      const comma = withCommas && entryIdx < entryCount ? "," : "";
+      lines.push(ind(indent + 1) + item.text + comma);
+    }
+    prev = item.node;
+  }
+  return lines.join("\n");
+}
+
+function formatSourceBlock(node: SyntaxNode, source: string, indent: number): string {
+  const items = collectSourceBlockItems(node, source);
+  const entries = items.filter(i => !i.isComment);
+  const nlStrings = entries.filter(i => i.node.type === "nl_string");
+  const braceSuffix = braceLineCommentSuffix(node);
+  const hasComments = braceSuffix !== "" || items.some(i => i.isComment);
 
   if (items.length === 0) {
-    return ind(indent) + "source { }";
+    // An empty block can still carry a brace-row comment: `source {  // c`
+    return braceSuffix
+      ? ind(indent) + "source {" + braceSuffix + "\n" + ind(indent) + "}"
+      : ind(indent) + "source { }";
   }
 
-  // Try single-line
-  const singleLine = ind(indent) + "source { " + items.join(", ") + " }";
-  if (singleLine.length <= 80 && !items.some(s => s.includes("\n"))) {
+  // Try single-line (comments can never share a single line — they would
+  // comment out the closing brace)
+  const entryTexts = entries.map(i => i.text);
+  const singleLine = ind(indent) + "source { " + entryTexts.join(", ") + " }";
+  if (!hasComments && singleLine.length <= 80 && !entryTexts.some(s => s.includes("\n"))) {
     // For multi-ref sources, use multi-line
-    if (items.length <= 1 && nlStrings.length === 0) {
+    if (entries.length <= 1 && nlStrings.length === 0) {
       return singleLine;
     }
   }
@@ -655,32 +719,31 @@ function formatSourceBlock(node: SyntaxNode, source: string, indent: number): st
   // Multi-line. The grammar treats commas between source entries as optional,
   // but the canonical corpus style is comma-separated — preserve it so
   // formatting matches the single-line style and round-trips (sl-q9oj).
-  const inner = items
-    .map((item, i) => ind(indent + 1) + item + (i < items.length - 1 ? "," : ""))
-    .join("\n");
-  return ind(indent) + "source {\n" + inner + "\n" + ind(indent) + "}";
+  const inner = formatSourceBlockBody(items, indent, true);
+  return ind(indent) + "source {" + braceSuffix + "\n" + inner + "\n" + ind(indent) + "}";
 }
 
 function formatTargetBlock(node: SyntaxNode, source: string, indent: number): string {
-
-  const items: string[] = [];
-  for (const child of node.children) {
-    if (child.type === "source_ref") {
-      items.push(formatSourceRef(child, source));
-    }
-  }
+  const items = collectSourceBlockItems(node, source)
+    .filter(i => i.isComment || i.node.type === "source_ref");
+  const entries = items.filter(i => !i.isComment);
+  const braceSuffix = braceLineCommentSuffix(node);
+  const hasComments = braceSuffix !== "" || items.some(i => i.isComment);
 
   if (items.length === 0) {
-    return ind(indent) + "target { }";
+    // An empty block can still carry a brace-row comment: `target {  // c`
+    return braceSuffix
+      ? ind(indent) + "target {" + braceSuffix + "\n" + ind(indent) + "}"
+      : ind(indent) + "target { }";
   }
 
-  const singleLine = ind(indent) + "target { " + items[0] + " }";
-  if (singleLine.length <= 80 && items.length === 1) {
+  const singleLine = ind(indent) + "target { " + (entries[0]?.text ?? "") + " }";
+  if (!hasComments && singleLine.length <= 80 && entries.length === 1) {
     return singleLine;
   }
 
-  const inner = items.map(item => ind(indent + 1) + item).join("\n");
-  return ind(indent) + "target {\n" + inner + "\n" + ind(indent) + "}";
+  const inner = formatSourceBlockBody(items, indent, false);
+  return ind(indent) + "target {" + braceSuffix + "\n" + inner + "\n" + ind(indent) + "}";
 }
 
 function formatSourceRef(node: SyntaxNode, source: string): string {
@@ -697,6 +760,34 @@ function formatSourceRef(node: SyntaxNode, source: string): string {
 
 // ── Arrows ────────────────────────────────────────────────────────────────────
 
+/**
+ * Render an arrow's transform body (` { pipe_chain }`) appended to the given
+ * header line. Inline when the chain is comment-free and fits in 80 columns;
+ * otherwise multi-line, preserving comments in all four body positions:
+ * on the brace row, between `{` and the chain, between pipe steps, and
+ * between the chain and `}` (sl-dz3n).
+ */
+function formatArrowTransformBody(
+  node: SyntaxNode, pipeChain: SyntaxNode, line: string, source: string, indent: number
+): string {
+  // Comments that are direct children of the arrow node all live inside the
+  // braces: a `//` comment before `{` would comment the brace out.
+  const hasBodyComments = node.children.some(isComment);
+
+  const chainStr = formatPipeChain(pipeChain, source, indent);
+  const inlineCandidate = line + " { " + chainStr + " }";
+  if (!hasBodyComments && isInlinePipeChain(pipeChain) && inlineCandidate.length <= 80) {
+    return inlineCandidate;
+  }
+
+  const braceSuffix = braceLineCommentSuffix(node);
+  const leading = collectBlockLeadingComments(node, indent);
+  const trailing = collectBlockTrailingComments(node, pipeChain.endPosition.row, indent);
+  return line + " {" + braceSuffix + leading + "\n"
+    + formatPipeChainMultiLine(pipeChain, source, indent + 1)
+    + trailing + "\n" + ind(indent) + "}";
+}
+
 function formatMapArrow(node: SyntaxNode, source: string, indent: number): string {
   const srcPaths = findChildren(node, "src_path");
   const tgtPath = findChild(node, "tgt_path");
@@ -707,17 +798,10 @@ function formatMapArrow(node: SyntaxNode, source: string, indent: number): strin
   if (srcPaths.length > 0) line += srcPaths.map((s) => formatPath(s)).join(", ");
   line += " -> " + formatPath(tgtPath!);
 
-  if (meta) line += " " + formatMetadataInline(meta, source);
+  if (meta) line += " " + formatMetadataInline(meta, source, indent);
 
   if (pipeChain) {
-    const chainStr = formatPipeChain(pipeChain, source, indent);
-    // Check if inline transform fits on one line
-    const inlineCandidate = line + " { " + chainStr + " }";
-    if (isInlinePipeChain(pipeChain) && inlineCandidate.length <= 80) {
-      return inlineCandidate;
-    }
-    // Multi-line
-    return line + " {\n" + formatPipeChainMultiLine(pipeChain, source, indent + 1) + "\n" + ind(indent) + "}";
+    return formatArrowTransformBody(node, pipeChain, line, source, indent);
   }
 
   return line;
@@ -730,15 +814,10 @@ function formatComputedArrow(node: SyntaxNode, source: string, indent: number): 
 
   let line = ind(indent) + "-> " + formatPath(tgtPath!);
 
-  if (meta) line += " " + formatMetadataInline(meta, source);
+  if (meta) line += " " + formatMetadataInline(meta, source, indent);
 
   if (pipeChain) {
-    const chainStr = formatPipeChain(pipeChain, source, indent);
-    const inlineCandidate = line + " { " + chainStr + " }";
-    if (isInlinePipeChain(pipeChain) && inlineCandidate.length <= 80) {
-      return inlineCandidate;
-    }
-    return line + " {\n" + formatPipeChainMultiLine(pipeChain, source, indent + 1) + "\n" + ind(indent) + "}";
+    return formatArrowTransformBody(node, pipeChain, line, source, indent);
   }
 
   return line;
@@ -750,7 +829,7 @@ function formatNestedArrow(node: SyntaxNode, source: string, indent: number): st
   const meta = findChild(node, "metadata_block");
 
   let line = ind(indent) + formatPath(srcPath!) + " -> " + formatPath(tgtPath!);
-  if (meta) line += " " + formatMetadataInline(meta, source);
+  if (meta) line += " " + formatMetadataInline(meta, source, indent);
 
   // Inner arrows
   const innerArrows = node.children.filter(c =>
@@ -875,10 +954,12 @@ function formatPath(node: SyntaxNode): string {
 
 function isInlinePipeChain(node: SyntaxNode): boolean {
   // A pipe chain can be formatted inline unless it contains a multiline string
-  // (triple-quoted). Single-quoted NL strings are fine on one line. All pipe
-  // steps are NL after Feature 28 — the old heuristic that excluded any
-  // nl_string is moot.
+  // (triple-quoted) or a comment — a `//` comment on a single line would
+  // comment out everything after it (sl-dz3n). Single-quoted NL strings are
+  // fine on one line. All pipe steps are NL after Feature 28 — the old
+  // heuristic that excluded any nl_string is moot.
   for (const child of node.children) {
+    if (isComment(child)) return false;
     if (child.type === "pipe_step") {
       const inner = child.children[0];
       if (inner && inner.type === "multiline_string") {
@@ -901,21 +982,26 @@ function formatPipeChain(node: SyntaxNode, source: string, indent: number): stri
 }
 
 function formatPipeChainMultiLine(node: SyntaxNode, source: string, indent: number): string {
-  // Multi-line: each step on its own line, pipe continuation
-  const steps: string[] = [];
+  // Multi-line: each step on its own line, pipe continuation. Comments
+  // between steps are preserved in place — same-line comments stay appended
+  // to their step, own-line comments keep their own line (sl-dz3n).
+  const lines: string[] = [];
+  let stepCount = 0;
+  let prev: SyntaxNode | null = null;
+
   for (const child of node.children) {
     if (child.type === "pipe_step") {
-      steps.push(formatPipeStep(child, source, indent));
-    }
-  }
-
-  // First step at indent, subsequent with | prefix
-  const lines: string[] = [];
-  for (let i = 0; i < steps.length; i++) {
-    if (i === 0) {
-      lines.push(ind(indent) + steps[i]);
-    } else {
-      lines.push(ind(indent) + "| " + steps[i]);
+      const step = formatPipeStep(child, source, indent);
+      lines.push(ind(indent) + (stepCount === 0 ? "" : "| ") + step);
+      stepCount += 1;
+      prev = child;
+    } else if (isComment(child)) {
+      if (prev !== null && sameLine(prev, child) && lines.length > 0) {
+        lines[lines.length - 1] += "  " + formatInlineComment(child);
+      } else {
+        lines.push(formatComment(child, indent));
+      }
+      prev = child;
     }
   }
   return lines.join("\n");
@@ -980,50 +1066,66 @@ function formatTransformBlock(node: SyntaxNode, source: string, indent: number):
     return line + " { }";
   }
 
+  const braceSuffix = braceLineCommentSuffix(node);
   const leading = collectBlockLeadingComments(node, indent);
   const trailing = collectBlockTrailingComments(node, pipeChain.endPosition.row, indent);
 
-  // Try single-line (only when no gap comments exist)
+  // Try single-line (only when no comments exist anywhere in the body)
   const chainStr = formatPipeChain(pipeChain, source, indent);
   const singleLine = line + " { " + chainStr + " }";
-  if (!leading && !trailing && isInlinePipeChain(pipeChain) && singleLine.length <= 80) {
+  if (!braceSuffix && !leading && !trailing && isInlinePipeChain(pipeChain) && singleLine.length <= 80) {
     return line + " {\n" + ind(indent + 1) + chainStr + "\n" + ind(indent) + "}";
   }
 
   const bodyStr = formatPipeChainMultiLine(pipeChain, source, indent + 1);
-  return line + " {" + leading + "\n" + bodyStr + trailing + "\n" + ind(indent) + "}";
+  return line + " {" + braceSuffix + leading + "\n" + bodyStr + trailing + "\n" + ind(indent) + "}";
 }
 
 // ── Note Block ────────────────────────────────────────────────────────────────
 
 function formatNoteBlock(node: SyntaxNode, _source: string, indent: number): string {
   // note { "..." } or note { """...""" } or note { "line1" "line2" }
-  const strings: SyntaxNode[] = [];
+  // Body items in source order: strings plus any comments between them
+  // (sl-dz3n). Brace-row comments stay on the `note {` line via the suffix.
+  const braceSuffix = braceLineCommentSuffix(node);
+  const openBrace = node.children.find(c => c.type === "{");
+  const braceRow = openBrace?.startPosition.row ?? -1;
+
+  const items: SyntaxNode[] = [];
   for (const child of node.children) {
     if (child.type === "nl_string" || child.type === "multiline_string") {
-      strings.push(child);
+      items.push(child);
+    } else if (isComment(child) && child.startPosition.row !== braceRow) {
+      items.push(child);
     }
   }
 
-  if (strings.length === 0) {
-    return ind(indent) + "note { }";
+  if (items.length === 0) {
+    return braceSuffix
+      ? ind(indent) + "note {" + braceSuffix + "\n" + ind(indent) + "}"
+      : ind(indent) + "note { }";
   }
 
-  // Single short string: try inline
-  if (strings.length === 1 && strings[0]!.type === "nl_string") {
-    const singleLine = ind(indent) + "note {\n" + ind(indent + 1) + strings[0]!.text + "\n" + ind(indent) + "}";
-    return singleLine;
-  }
-
-  // Multi-line: preserve string content verbatim
-  const inner = strings.map(s => {
-    if (s.type === "multiline_string") {
-      return formatMultilineString(s, indent + 1);
+  // Lay out one item per line; a comment on the same line as the previous
+  // string stays appended to it, other comments keep their own line.
+  const lines: string[] = [];
+  let prev: SyntaxNode | null = null;
+  for (const item of items) {
+    if (isComment(item)) {
+      if (prev !== null && sameLine(prev, item) && lines.length > 0) {
+        lines[lines.length - 1] += "  " + formatInlineComment(item);
+      } else {
+        lines.push(formatComment(item, indent + 1));
+      }
+    } else if (item.type === "multiline_string") {
+      lines.push(formatMultilineString(item, indent + 1));
+    } else {
+      lines.push(ind(indent + 1) + item.text);
     }
-    return ind(indent + 1) + s.text;
-  }).join("\n");
+    prev = item;
+  }
 
-  return ind(indent) + "note {\n" + inner + "\n" + ind(indent) + "}";
+  return ind(indent) + "note {" + braceSuffix + "\n" + lines.join("\n") + "\n" + ind(indent) + "}";
 }
 
 function formatMultilineString(node: SyntaxNode, indent: number): string {
@@ -1126,53 +1228,81 @@ function hasMultilineString(node: SyntaxNode): boolean {
   return false;
 }
 
+// A metadata entry or a comment between entries, in source order. Comments
+// force the multi-line layout, where they survive on their own line or
+// appended to the entry they share a line with (sl-dz3n).
+type MetadataItem = { node: SyntaxNode; text: string; isComment: boolean };
+
 function formatMetadataBlock(node: SyntaxNode, source: string, indent: number): string {
-  const entries = collectMetadataEntries(node, source);
+  const items = collectMetadataItems(node, source);
 
-  if (entries.length === 0) return "()";
+  if (items.length === 0) return "()";
 
-  // Check if any entry has a multiline string
-  if (hasMultilineString(node)) {
-    return formatMetadataMultiLine(entries, node, source, indent);
+  // Comments cannot share a single line (they would comment out everything
+  // after them), and multiline strings never fit one — both force multi-line.
+  if (items.some(i => i.isComment) || hasMultilineString(node)) {
+    return formatMetadataMultiLine(items, indent);
   }
 
   // Try single-line
-  const singleLine = "(" + entries.join(", ") + ")";
+  const singleLine = "(" + items.map(i => i.text).join(", ") + ")";
   if (singleLine.length + ind(indent).length + 20 <= 80) { // rough line length check
     return singleLine;
   }
 
   // Multi-line
-  return formatMetadataMultiLine(entries, node, source, indent);
+  return formatMetadataMultiLine(items, indent);
 }
 
-function formatMetadataInline(node: SyntaxNode, source: string): string {
-  const entries = collectMetadataEntries(node, source);
-  return "(" + entries.join(", ") + ")";
+function formatMetadataInline(node: SyntaxNode, source: string, indent: number = 0): string {
+  const items = collectMetadataItems(node, source);
+  // Inline contexts (arrows, source refs) still fall back to the multi-line
+  // layout when comments are present — there is no way to keep a `//`
+  // comment on a shared line without commenting out the rest of it (sl-dz3n).
+  if (items.some(i => i.isComment)) {
+    return formatMetadataMultiLine(items, indent);
+  }
+  return "(" + items.map(i => i.text).join(", ") + ")";
 }
 
-function formatMetadataMultiLine(
-  entries: string[], _node: SyntaxNode, _source: string, indent: number
-): string {
-  if (entries.length === 0) return "()";
+function formatMetadataMultiLine(items: MetadataItem[], indent: number): string {
+  if (items.length === 0) return "()";
 
+  const entryCount = items.filter(i => !i.isComment).length;
   const lines: string[] = ["("];
-  for (let i = 0; i < entries.length; i++) {
-    const comma = i < entries.length - 1 ? "," : "";
-    lines.push(ind(indent + 1) + entries[i]! + comma);
+  let entryIdx = 0;
+  let prev: SyntaxNode | null = null;
+
+  for (const item of items) {
+    if (item.isComment) {
+      if (prev !== null && sameLine(prev, item.node) && lines.length > 1) {
+        lines[lines.length - 1] += "  " + formatInlineComment(item.node);
+      } else {
+        lines.push(formatComment(item.node, indent + 1));
+      }
+    } else {
+      entryIdx += 1;
+      const comma = entryIdx < entryCount ? "," : "";
+      lines.push(ind(indent + 1) + item.text + comma);
+    }
+    prev = item.node;
   }
   lines.push(ind(indent) + ")");
   return lines.join("\n");
 }
 
-function collectMetadataEntries(node: SyntaxNode, source: string): string[] {
-  const entries: string[] = [];
+/** Gather metadata entries and the comments between them, in source order. */
+function collectMetadataItems(node: SyntaxNode, source: string): MetadataItem[] {
+  const items: MetadataItem[] = [];
   for (const child of node.children) {
     if (child.type === "(" || child.type === ")" || child.type === ",") continue;
-    if (isComment(child)) continue;
-    entries.push(formatMetadataEntry(child, source));
+    if (isComment(child)) {
+      items.push({ node: child, text: "", isComment: true });
+    } else {
+      items.push({ node: child, text: formatMetadataEntry(child, source), isComment: false });
+    }
   }
-  return entries;
+  return items;
 }
 
 function formatMetadataEntry(node: SyntaxNode, source: string): string {
