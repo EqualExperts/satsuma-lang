@@ -1,152 +1,147 @@
 /**
- * find.test.js — Unit tests for find command helpers.
+ * find.test.ts — Unit tests for the `satsuma find` tag-matching helpers.
+ *
+ * These tests parse minimal Satsuma snippets with the real WASM parser and
+ * call the real helpers exported from src/commands/find.ts. An earlier
+ * version of this file asserted against inline *copies* of the helpers,
+ * which silently diverged from the implementation — the sl-xav4 regression
+ * was invisible to it. Never re-inline the helpers here.
+ *
+ * End-to-end command behaviour (scopes, JSON shape, exit codes, fragment
+ * spreads) is covered in integration.test.ts.
  */
 
 import assert from "node:assert/strict";
-import { describe, it } from "node:test";
+import { before, describe, it } from "node:test";
 
-// ── Mock CST helpers ──────────────────────────────────────────────────────────
+let parseSource: (src: string) => { tree: any };
+let findTagInMeta: (metaNode: any, tag: string) => string | null;
+let collectFieldMatches: (
+  bodyNode: any,
+  blockType: string,
+  blockName: string,
+  file: string,
+  tag: string,
+  acc: any[],
+) => void;
 
-function n(type: string, namedChildren: any[] = [], text = "", row = 0): any {
-  return { type, text, startPosition: { row, column: 0 }, namedChildren };
-}
-function ident(t: string) { return n("identifier", [], t); }
-function blockLabel(name: string) { return n("block_label", [ident(name)]); }
-function fieldName(name: string) { return n("field_name", [ident(name)]); }
-function typeExpr(t: string) { return n("type_expr", [], t); }
+before(async () => {
+  ({ parseSource } = await import("#src/parser.js"));
+  ({ findTagInMeta, collectFieldMatches } = await import("#src/commands/find.js"));
+});
 
-// ── Inline findTagInMeta ──────────────────────────────────────────────────────
+// ── CST helpers ───────────────────────────────────────────────────────────────
 
-function findTagInMeta(metaNode: any, tag: string) {
-  for (const c of metaNode.namedChildren) {
-    if (c.type === "tag_token" && c.text.toLowerCase() === tag) return c.text;
-    if (c.type === "tag_with_value") {
-      const key = c.namedChildren[0];
-      if (key && key.text.toLowerCase() === tag) return key.text;
-    }
-    if (c.type === "enum_body" || c.type === "slice_body") {
-      for (const id of c.namedChildren) {
-        if (id.type === "identifier" && id.text.toLowerCase() === tag) return id.text;
-      }
-    }
+/** Depth-first search for the first named node of the given type. */
+function findNode(node: any, type: string): any {
+  if (node.type === type) return node;
+  for (const c of node.namedChildren) {
+    const hit = findNode(c, type);
+    if (hit) return hit;
   }
   return null;
 }
 
-// ── Inline collectFieldMatches ────────────────────────────────────────────────
+/** Parse a snippet and return its first node of the given type, asserting it exists. */
+function parseAndFind(src: string, type: string): any {
+  const { tree } = parseSource(src);
+  const node = findNode(tree.rootNode, type);
+  assert.ok(node, `expected a ${type} node in:\n${src}`);
+  return node;
+}
 
-function collectFieldMatches(bodyNode: any, blockType: string, blockName: string, file: string, tag: string, acc: any[] = []) {
-  for (const c of bodyNode.namedChildren) {
-    if (c.type === "field_decl") {
-      const nameNode = c.namedChildren.find((x: any) => x.type === "field_name");
-      const meta = c.namedChildren.find((x: any) => x.type === "metadata_block");
-      const inner = nameNode?.namedChildren[0];
-      let fname = inner?.text ?? "";
-      if (inner?.type === "backtick_name") fname = fname.slice(1, -1);
-      if (meta) {
-        const matched = findTagInMeta(meta, tag);
-        if (matched) acc.push({ blockType, block: blockName, field: fname, tag: matched, file, row: c.startPosition.row });
-      }
-    } else if (c.type === "record_block" || c.type === "list_block") {
-      const nested = c.namedChildren.find((x: any) => x.type === "schema_body");
-      const lbl = c.namedChildren.find((x: any) => x.type === "block_label");
-      const inner = lbl?.namedChildren[0];
-      let lname = inner?.text ?? "";
-      if (inner?.type === "backtick_name") lname = lname.slice(1, -1);
-      if (nested) collectFieldMatches(nested, blockType, `${blockName}.${lname}`, file, tag, acc);
-    }
-  }
+/** Run the real collectFieldMatches over the first schema_body of a snippet. */
+function matchesFor(src: string, tag: string): any[] {
+  const body = parseAndFind(src, "schema_body");
+  const acc: any[] = [];
+  collectFieldMatches(body, "schema", "s", "s.stm", tag, acc);
   return acc;
 }
 
-// ── Tests ─────────────────────────────────────────────────────────────────────
+// ── findTagInMeta ─────────────────────────────────────────────────────────────
 
 describe("findTagInMeta", () => {
-  it("finds a tag_token match", () => {
-    const tag = n("tag_token", [], "pii");
-    const meta = n("metadata_block", [tag]);
+  it("matches a bare tag token and returns its source text", () => {
+    const meta = parseAndFind("schema s {\n  email TEXT (pii)\n}\n", "metadata_block");
     assert.equal(findTagInMeta(meta, "pii"), "pii");
   });
 
-  it("is case-insensitive", () => {
-    const tag = n("tag_token", [], "PII");
-    const meta = n("metadata_block", [tag]);
+  it("matches case-insensitively but preserves the source casing in the result", () => {
+    const meta = parseAndFind("schema s {\n  email TEXT (PII)\n}\n", "metadata_block");
     assert.equal(findTagInMeta(meta, "pii"), "PII");
   });
 
-  it("finds a tag_with_value key", () => {
-    const key = n("identifier", [], "format");
-    const val = n("value_text", [n("identifier", [], "email")], "email");
-    const kv = n("tag_with_value", [key, val]);
-    const meta = n("metadata_block", [kv]);
+  it("matches a key-value pair by its key", () => {
+    const meta = parseAndFind('schema s {\n  email TEXT (format "email")\n}\n', "metadata_block");
     assert.equal(findTagInMeta(meta, "format"), "format");
   });
 
-  it("returns null when no match", () => {
-    const tag = n("tag_token", [], "required");
-    const meta = n("metadata_block", [tag]);
+  it("returns null when no tag in the block matches", () => {
+    const meta = parseAndFind("schema s {\n  id INT (required)\n}\n", "metadata_block");
     assert.equal(findTagInMeta(meta, "pii"), null);
   });
 
-  it("finds identifier inside enum_body", () => {
-    const id = n("identifier", [], "pk");
-    const enumBody = n("enum_body", [id]);
-    const meta = n("metadata_block", [enumBody]);
-    // pk inside enum_body doesn't match 'pk' via tag_token, but does via enum
-    assert.equal(findTagInMeta(meta, "pk"), "pk");
+  it("matches individual enum values inside an enum body", () => {
+    const meta = parseAndFind("schema s {\n  kind TEXT (enum {home, work})\n}\n", "metadata_block");
+    assert.equal(findTagInMeta(meta, "work"), "work");
+  });
+
+  it("matches the enum construct itself via --tag enum", () => {
+    const meta = parseAndFind("schema s {\n  kind TEXT (enum {home, work})\n}\n", "metadata_block");
+    assert.equal(findTagInMeta(meta, "enum"), "enum");
+  });
+
+  it("matches a note tag via --tag note", () => {
+    const meta = parseAndFind('schema s {\n  id INT (note "primary id")\n}\n', "metadata_block");
+    assert.equal(findTagInMeta(meta, "note"), "note");
   });
 });
 
-describe("collectFieldMatches", () => {
-  it("matches fields with pii tag", () => {
-    const piiTag = n("tag_token", [], "pii");
-    const meta = n("metadata_block", [piiTag]);
-    const fd = n("field_decl", [fieldName("email"), typeExpr("VARCHAR(255)"), meta], "", 5);
-    const body = n("schema_body", [fd]);
+// ── collectFieldMatches ───────────────────────────────────────────────────────
 
-    const matches = collectFieldMatches(body, "schema", "orders", "orders.stm", "pii");
+describe("collectFieldMatches", () => {
+  it("collects a tagged field with its name, type, and 1-indexed line", () => {
+    const matches = matchesFor("schema s {\n  email VARCHAR(255) (pii)\n}\n", "pii");
     assert.equal(matches.length, 1);
     assert.equal(matches[0].field, "email");
-    assert.equal(matches[0].row, 5);
+    assert.equal(matches[0].fieldType, "VARCHAR(255)");
+    assert.equal(matches[0].line, 2);
   });
 
-  it("ignores fields without matching tag", () => {
-    const pkTag = n("tag_token", [], "pk");
-    const meta = n("metadata_block", [pkTag]);
-    const fd = n("field_decl", [fieldName("id"), typeExpr("INT"), meta]);
-    const body = n("schema_body", [fd]);
-
-    const matches = collectFieldMatches(body, "schema", "orders", "orders.stm", "pii");
-    assert.equal(matches.length, 0);
-  });
-
-  it("descends into record_block", () => {
-    const piiTag = n("tag_token", [], "pii");
-    const meta = n("metadata_block", [piiTag]);
-    const fd = n("field_decl", [fieldName("ssn"), typeExpr("VARCHAR(20)"), meta], "", 10);
-    const innerBody = n("schema_body", [fd]);
-    const recBlock = n("record_block", [blockLabel("personal"), innerBody]);
-    const body = n("schema_body", [recBlock]);
-
-    const matches = collectFieldMatches(body, "schema", "customer", "c.stm", "pii");
+  it("ignores fields whose metadata does not contain the tag", () => {
+    const matches = matchesFor("schema s {\n  id INT (pk)\n  email TEXT (pii)\n}\n", "pii");
     assert.equal(matches.length, 1);
-    assert.equal(matches[0].block, "customer.personal");
-    assert.equal(matches[0].field, "ssn");
+    assert.equal(matches[0].field, "email");
   });
 
-  it("collects multiple matches", () => {
-    const makeField = (name: string, tagText: string, row: number) => {
-      const tag = n("tag_token", [], tagText);
-      const meta = n("metadata_block", [tag]);
-      return n("field_decl", [fieldName(name), typeExpr("TEXT"), meta], "", row);
-    };
-    const body = n("schema_body", [
-      makeField("email", "pii", 1),
-      makeField("phone", "pii", 2),
-      makeField("id", "pk", 3),
-    ]);
+  it("descends into nested record fields, reporting a dotted block path", () => {
+    const src = "schema s {\n  contact record {\n    email TEXT (pii)\n  }\n}\n";
+    const matches = matchesFor(src, "pii");
+    assert.equal(matches.length, 1);
+    assert.equal(matches[0].block, "s.contact");
+    assert.equal(matches[0].field, "email");
+  });
 
-    const matches = collectFieldMatches(body, "schema", "user", "u.stm", "pii");
-    assert.equal(matches.length, 2);
+  it("strips backtick delimiters from quoted field names", () => {
+    const matches = matchesFor("schema s {\n  `First Name` TEXT (pii)\n}\n", "pii");
+    assert.equal(matches.length, 1);
+    assert.equal(matches[0].field, "First Name");
+  });
+
+  it("reports list_of fields with their list_of element type", () => {
+    const src = "schema s {\n  phones list_of record {\n    number TEXT (pii)\n  }\n}\n";
+    const body = parseAndFind(src, "schema_body");
+    const acc: any[] = [];
+    collectFieldMatches(body, "schema", "s", "s.stm", "pii", acc);
+    // The tagged field lives inside the list element record
+    assert.equal(acc.length, 1);
+    assert.equal(acc[0].block, "s.phones");
+    assert.equal(acc[0].field, "number");
+  });
+
+  it("includes all of a field's tags in the metadata array", () => {
+    const matches = matchesFor("schema s {\n  email TEXT (pii, required)\n}\n", "pii");
+    assert.equal(matches.length, 1);
+    assert.deepEqual(matches[0].metadata, ["pii", "required"]);
   });
 });
