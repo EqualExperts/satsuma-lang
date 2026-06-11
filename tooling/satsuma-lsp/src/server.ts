@@ -452,7 +452,7 @@ connection.onRequest(
     };
   }) => {
     const tree = trees.get(params.uri);
-    if (!tree) return { schemaName: null, fieldPath: null };
+    if (!tree) return { schemaName: null, fieldPath: null, mappingName: null, targetSchema: null };
     return computeActionContext(
       tree,
       params.position.line,
