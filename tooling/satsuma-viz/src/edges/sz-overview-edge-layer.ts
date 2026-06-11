@@ -49,6 +49,7 @@ export class SzOverviewEdgeLayer extends LitElement {
       stroke-width: 3;
       stroke: var(--sz-edge-default);
       pointer-events: stroke;
+      cursor: pointer;
       transition: stroke-width 0.15s ease, stroke 0.15s ease, opacity 0.15s ease, filter 0.15s ease;
       opacity: 0.55;
     }
@@ -173,6 +174,7 @@ export class SzOverviewEdgeLayer extends LitElement {
       <path
         class="overview-path ${cls}"
         d=${d}
+        @click=${() => this._onEdgeClick(edge)}
         @mouseenter=${(ev: MouseEvent) => this._onEdgeHover(edge.id, ev)}
         @mouseleave=${() => this._onEdgeLeave()}
       />
@@ -202,6 +204,16 @@ export class SzOverviewEdgeLayer extends LitElement {
     }
     // Fallback: straight segments
     return [`M ${first.x} ${first.y}`, ...rest.map((p) => `L ${p.x} ${p.y}`)].join(" ");
+  }
+
+  /**
+   * Edge click opens the mapping the edge represents. The handler was lost
+   * in the 8690754 routing rework, leaving SzOpenMappingEvent dispatched by
+   * nobody and edges hover-only (sl-sewl); <satsuma-viz> listens for
+   * "open-mapping" and switches to the mapping detail view.
+   */
+  private _onEdgeClick(edge: OverviewEdge) {
+    this.dispatchEvent(new SzOpenMappingEvent(edge.mapping));
   }
 
   private _onEdgeHover(edgeId: string, ev: MouseEvent) {
