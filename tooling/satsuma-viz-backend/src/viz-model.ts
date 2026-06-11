@@ -254,9 +254,13 @@ function fieldInfoToEntry(fi: FieldInfo, defUri: string): FieldEntry {
  * Pre-resolve all fragment spreads into schema fields, then strip fragment
  * nodes from every namespace group.
  *
- * Resolution is cross-namespace (a schema in `src` can spread `common::frag`)
- * and transitive (a fragment may itself spread another fragment). Core's
- * expandEntityFields() handles cycle detection and diamond-shaped graphs.
+ * Resolution is cross-namespace (a schema in `src` can spread `common::frag`),
+ * namespace-relative (a bare `...frag` resolves within the schema's own
+ * namespace first), and transitive (a fragment may itself spread another
+ * fragment). Core's expandEntityFields() handles cycle detection and
+ * diamond-shaped graphs. Spreads that resolve are replaced by their fields and
+ * removed; spreads that don't resolve are left in place so the schema card can
+ * surface the dangling reference instead of silently dropping it.
  */
 function resolveAndStripSpreads(namespaces: NamespaceGroup[]): void {
   // Build a flat entity lookup for spread resolution across all namespaces.
@@ -273,15 +277,19 @@ function resolveAndStripSpreads(namespaces: NamespaceGroup[]): void {
   const resolveRef = makeEntityRefResolver(entityMap);
   const lookupFragment = (key: string) => entityMap.get(key) ?? null;
 
-  // Expand schema spreads using core and append resulting fields.
+  // Expand schema spreads using core and append resulting fields. The schema's
+  // own namespace is the resolution context, so a bare `...audit` inside
+  // `namespace crm` finds the fragment keyed `crm::audit` (sl-22ym).
   for (const ns of namespaces) {
     for (const s of ns.schemas) {
       if (s.spreads.length === 0) continue;
       const spreadEntity = schemaToSpreadEntity(s);
-      const expanded = expandEntityFields(spreadEntity, null, resolveRef, lookupFragment);
+      const expanded = expandEntityFields(spreadEntity, ns.name, resolveRef, lookupFragment);
       const extraFields: FieldEntry[] = expanded.map((ef) => expandedFieldToEntry(ef));
       s.fields = [...s.fields, ...extraFields];
-      s.spreads = [];
+      // Keep spreads that could not be resolved: the schema card renders them
+      // as a "… spreads X" indicator, which beats silently losing the reference.
+      s.spreads = s.spreads.filter((name) => resolveRef(name, ns.name) === null);
     }
     // Fragments are resolved away — remove them so the viz never renders them.
     ns.fragments = [];

@@ -1,6 +1,6 @@
 ---
 id: sl-22ym
-status: open
+status: closed
 deps: []
 links: []
 created: 2026-06-11T02:41:53Z
@@ -17,3 +17,10 @@ satsuma-viz-backend/src/viz-model.ts:261-289 — resolveAndStripSpreads keys fra
 
 Namespaced spreads expand correctly; unresolvable spreads are preserved/flagged rather than erased; namespaced spread test.
 
+
+## Notes
+
+**2026-06-11T07:23:03Z**
+
+Cause: resolveAndStripSpreads built the fragment lookup keyed by namespace-qualified ids (crm::audit) but invoked core expandEntityFields with currentNs=null, so a bare ...audit spread inside a namespace never resolved; the spread list was then unconditionally cleared, erasing both the fields and any trace of the spread.
+Fix: pass the namespace group's name as the resolution context so bare same-namespace spreads expand, and only remove spreads that actually resolved — unresolvable ones stay on the SchemaCard, which the frontend already renders as a '… spreads X' indicator. Regression tests for both behaviours.
