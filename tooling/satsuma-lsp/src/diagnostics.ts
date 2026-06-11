@@ -52,10 +52,20 @@ export function computeDiagnostics(tree: Tree): Diagnostic[] {
  */
 export function ensureNonEmptyMessages(diags: Diagnostic[]): Diagnostic[] {
   return diags.map((d) =>
-    d.message.trim()
+    hasNonEmptyMessage(d)
       ? d
       : { ...d, message: d.code ? `Diagnostic '${d.code}' (no message)` : "Diagnostic (no message)" },
   );
+}
+
+/**
+ * Since LSP 3.18 a diagnostic message may be plain text or MarkupContent
+ * (markdown/plaintext with an explicit kind); the markup form carries its
+ * text in `.value`. Treat whitespace-only text as empty in both forms.
+ */
+function hasNonEmptyMessage(d: Diagnostic): boolean {
+  const text = typeof d.message === "string" ? d.message : d.message.value;
+  return text.trim().length > 0;
 }
 
 /** Collect //! and //? comments as diagnostics. */

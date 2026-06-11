@@ -1,18 +1,13 @@
 {
   "compilerOptions": {
-    "module": "commonjs",
-    "moduleResolution": "node",
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
     "baseUrl": ".",
     "ignoreDeprecations": "6.0",
     "target": "es2022",
     "types": ["node"],
     "paths": {
-      "web-tree-sitter": ["./src/web-tree-sitter.d.ts"],
-      "@satsuma/core": ["./node_modules/@satsuma/core/dist/index.d.ts"],
-      "@satsuma/core/format": ["./node_modules/@satsuma/core/dist/format.d.ts"],
-      "@satsuma/viz-backend": ["./node_modules/@satsuma/viz-backend/dist/index.d.ts"],
-      "@satsuma/viz-backend/workspace-index": ["./node_modules/@satsuma/viz-backend/dist/workspace-index.d.ts"],
-      "@satsuma/viz-backend/viz-model": ["./node_modules/@satsuma/viz-backend/dist/viz-model.d.ts"]
+      "web-tree-sitter": ["./src/web-tree-sitter.d.ts"]
     },
     "strict": true,
     "noUncheckedIndexedAccess": true,
