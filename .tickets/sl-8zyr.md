@@ -1,6 +1,6 @@
 ---
 id: sl-8zyr
-status: open
+status: closed
 deps: []
 links: []
 created: 2026-06-11T02:40:29Z
@@ -17,3 +17,10 @@ satsuma-cli/src/workspace.ts:51-64 followImports keys the visited set on path.re
 
 Imports resolving to the same physical file (case alias or symlink) load once; validate clean; tests for case alias and symlink.
 
+
+## Notes
+
+**2026-06-11T22:30:00Z**
+
+Cause: followImports keyed its visited set on path.resolve output only, so case-aliased or symlinked imports of one physical file loaded it twice, causing false duplicate-definition errors from validate and inflated file counts in summary.
+Fix: canonicalize the entry and every import path with realpathSync.native (follows symlinks, restores on-disk casing) before the visited check; added case-alias and symlink regression tests (commit 774a29e)
