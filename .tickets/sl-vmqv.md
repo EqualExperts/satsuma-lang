@@ -2,7 +2,7 @@
 id: sl-vmqv
 status: open
 deps: []
-links: [sl-2a7k]
+links: [sl-2a7k, sl-ku3c]
 created: 2026-06-09T22:15:23Z
 type: chore
 priority: 2

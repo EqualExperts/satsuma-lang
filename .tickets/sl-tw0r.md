@@ -2,7 +2,7 @@
 id: sl-tw0r
 status: closed
 deps: []
-links: []
+links: [sl-37f3]
 created: 2026-06-10T22:04:48Z
 type: bug
 priority: 2
