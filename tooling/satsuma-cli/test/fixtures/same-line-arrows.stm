@@ -1,0 +1,20 @@
+// Regression fixture for sl-201z: two distinct arrows on one line sharing a
+// target field. Positional dedup keys (file:line:target) collapse these into
+// one arrow, silently dropping `b -> x` from graph/lineage/coverage output.
+// The NL @b ref on the second arrow annotates its own declared source, so it
+// must be suppressed by declared-arrow coverage — not counted as nl-derived.
+schema s {
+  a STRING
+  b STRING
+}
+
+schema t {
+  x STRING
+}
+
+mapping m {
+  source { s }
+  target { t }
+
+  a -> x { trim } b -> x { "derived from @b" }
+}

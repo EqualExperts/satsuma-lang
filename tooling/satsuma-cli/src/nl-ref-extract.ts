@@ -33,7 +33,7 @@ import type {
 } from "@satsuma/core";
 import type { MappingRecord, NLRefData, ExtractedWorkspace } from "./types.js";
 import { expandEntityFields } from "./spread-expand.js";
-import { canonicalKey, qualifyField } from "./index-builder.js";
+import { canonicalKey, distinctArrowRecords, qualifyField } from "./index-builder.js";
 
 // Re-export pure functions and types directly.
 export { extractAtRefs, computeNLRefPosition, classifyRef, extractNLRefData };
@@ -102,34 +102,29 @@ export function countNlDerivedEdgesByMapping(index: ExtractedWorkspace): Map<str
   // Pre-qualify all declared arrow source/target fields so they can be compared
   // against canonical nl ref names without re-running the full graph builder.
   const declaredCoverage = new Set<string>();
-  const seenArrow = new Set<string>();
 
-  for (const [, records] of index.fieldArrows) {
-    for (const record of records) {
-      // fieldArrows stores each record under multiple keys — deduplicate by position.
-      const arrowDedupKey = `${record.file}:${record.line}:${record.target}`;
-      if (seenArrow.has(arrowDedupKey)) continue;
-      seenArrow.add(arrowDedupKey);
+  // fieldArrows stores each record under multiple keys — distinctArrowRecords
+  // deduplicates by reference (a positional key would collapse distinct
+  // same-line arrows; see its doc-comment).
+  for (const record of distinctArrowRecords(index.fieldArrows)) {
+    // Only declared (non-synthetic) arrows can cover an nl-derived edge.
+    if (record.classification === "nl-derived") continue;
 
-      // Only declared (non-synthetic) arrows can cover an nl-derived edge.
-      if (record.classification === "nl-derived") continue;
+    const mappingKey = record.namespace
+      ? `${record.namespace}::${record.mapping}`
+      : (record.mapping ?? "");
+    const mapping = index.mappings.get(mappingKey);
+    const sourceSchemas = mapping?.sources ?? [];
+    const targetSchemas = mapping?.targets ?? [];
 
-      const mappingKey = record.namespace
-        ? `${record.namespace}::${record.mapping}`
-        : (record.mapping ?? "");
-      const mapping = index.mappings.get(mappingKey);
-      const sourceSchemas = mapping?.sources ?? [];
-      const targetSchemas = mapping?.targets ?? [];
+    const toField = record.target
+      ? canonicalKey(qualifyField(record.target, targetSchemas))
+      : null;
+    if (!toField) continue;
 
-      const toField = record.target
-        ? canonicalKey(qualifyField(record.target, targetSchemas))
-        : null;
-      if (!toField) continue;
-
-      for (const src of record.sources) {
-        const fromField = canonicalKey(qualifyField(src, sourceSchemas));
-        declaredCoverage.add(`${fromField}|${toField}|${mappingKey}`);
-      }
+    for (const src of record.sources) {
+      const fromField = canonicalKey(qualifyField(src, sourceSchemas));
+      declaredCoverage.add(`${fromField}|${toField}|${mappingKey}`);
     }
   }
 

@@ -544,3 +544,23 @@ describe("satsuma graph vs summary (nl-derived count consistency)", () => {
       "summary arrowCount sum should equal graph stats.arrows for the same workspace");
   });
 });
+
+// ---------------------------------------------------------------------------
+// sl-201z: same-line arrows sharing a target must not be collapsed
+// ---------------------------------------------------------------------------
+describe("satsuma graph (same-line arrows sharing a target, sl-201z)", () => {
+  it("reports both arrows when two arrows on one line target the same field", async () => {
+    // Bug sl-201z: arrow records were deduplicated by file:line:target, which
+    // collides for two distinct arrows written on one line targeting the same
+    // field — the second arrow was silently dropped from edges and stats.
+    const fixture = resolve(FIXTURES, "same-line-arrows.stm");
+    const { stdout, code } = await run("graph", "--json", fixture);
+    assert.ok(code === 0 || code === 2, `expected exit 0 or 2, got ${code}`);
+    const data = JSON.parse(stdout);
+    const pairs = (data.edges as any[]).map((e) => `${e.from}->${e.to}`);
+    assert.ok(pairs.includes("::s.a->::t.x"), "edge from s.a should be present");
+    assert.ok(pairs.includes("::s.b->::t.x"),
+      "edge from s.b (same line, same target as s.a->x) should be present");
+    assert.equal(data.stats.arrows, 2, "both same-line arrows should be counted");
+  });
+});

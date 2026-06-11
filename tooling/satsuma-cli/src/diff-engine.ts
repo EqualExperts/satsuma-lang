@@ -26,6 +26,7 @@ import type {
   TransformRecord,
   ExtractedWorkspace,
 } from "./types.js";
+import { distinctArrowRecords } from "./index-builder.js";
 
 /** Collect note texts for a given parent name from an index's notes. */
 function noteTextsForParent(index: ExtractedWorkspace, parentName: string): Set<string> {
@@ -75,18 +76,12 @@ export function diffIndex(indexA: ExtractedWorkspace, indexB: ExtractedWorkspace
  */
 function collectArrowsByMapping(index: ExtractedWorkspace): Map<string, ArrowRecord[]> {
   const byMapping = new Map<string, ArrowRecord[]>();
-  const seen = new Set<string>();
 
-  for (const [, records] of index.fieldArrows) {
-    for (const r of records) {
-      const dedupKey = `${r.file}:${r.line}:${r.sources.join(",")}:${r.target}`;
-      if (seen.has(dedupKey)) continue;
-      seen.add(dedupKey);
-      const key = r.namespace ? `${r.namespace}::${r.mapping}` : (r.mapping ?? "");
-      if (!byMapping.has(key)) byMapping.set(key, []);
-      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- Safe: key initialized on previous line
-      byMapping.get(key)!.push(r);
-    }
+  for (const r of distinctArrowRecords(index.fieldArrows)) {
+    const key = r.namespace ? `${r.namespace}::${r.mapping}` : (r.mapping ?? "");
+    if (!byMapping.has(key)) byMapping.set(key, []);
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- Safe: key initialized on previous line
+    byMapping.get(key)!.push(r);
   }
 
   return byMapping;

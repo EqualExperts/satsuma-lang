@@ -16,7 +16,7 @@ import type { Command } from "commander";
 import { loadWorkspace } from "../load-workspace.js";
 import { runCommand, CommandError, EXIT_NOT_FOUND, EXIT_PARSE_ERROR } from "../command-runner.js";
 import { parsePositiveInt } from "../option-parsers.js";
-import { resolveIndexKey, canonicalKey } from "../index-builder.js";
+import { resolveIndexKey, canonicalKey, distinctArrowRecords } from "../index-builder.js";
 import { resolveAllNLRefs } from "../nl-ref-extract.js";
 import { expandEntityFields } from "../spread-expand.js";
 import { collectFieldNames, findFieldByPath, qualifyField } from "@satsuma/core";
@@ -144,41 +144,35 @@ Examples:
  */
 function buildFieldEdgeGraph(index: ExtractedWorkspace): FieldEdgeEntry[] {
   const edges: FieldEdgeEntry[] = [];
-  const seen = new Set<string>();
 
-  // Declared arrows from the field arrows index
-  for (const [, records] of index.fieldArrows) {
-    for (const record of records) {
-      const dedupKey = `${record.file}:${record.line}:${record.target}`;
-      if (seen.has(dedupKey)) continue;
-      seen.add(dedupKey);
+  // Declared arrows from the field arrows index, deduplicated by reference
+  // (see distinctArrowRecords for why a positional key is not a safe identity).
+  for (const record of distinctArrowRecords(index.fieldArrows)) {
+    const mappingKey = canonicalKey(
+      record.namespace ? `${record.namespace}::${record.mapping}` : (record.mapping ?? ""),
+    );
 
-      const mappingKey = canonicalKey(
-        record.namespace ? `${record.namespace}::${record.mapping}` : (record.mapping ?? ""),
-      );
+    const mapping = index.mappings.get(
+      record.namespace ? `${record.namespace}::${record.mapping}` : (record.mapping ?? ""),
+    );
+    const sourceSchemas = mapping?.sources ?? [];
+    const targetSchemas = mapping?.targets ?? [];
 
-      const mapping = index.mappings.get(
-        record.namespace ? `${record.namespace}::${record.mapping}` : (record.mapping ?? ""),
-      );
-      const sourceSchemas = mapping?.sources ?? [];
-      const targetSchemas = mapping?.targets ?? [];
+    const toField = record.target
+      ? canonicalKey(qualifyField(record.target, targetSchemas))
+      : null;
+    if (!toField) continue;
 
-      const toField = record.target
-        ? canonicalKey(qualifyField(record.target, targetSchemas))
+    for (const src of record.sources.length > 0 ? record.sources : [null]) {
+      const fromField = src
+        ? canonicalKey(qualifyField(src, sourceSchemas))
         : null;
-      if (!toField) continue;
-
-      for (const src of record.sources.length > 0 ? record.sources : [null]) {
-        const fromField = src
-          ? canonicalKey(qualifyField(src, sourceSchemas))
-          : null;
-        edges.push({
-          from: fromField,
-          to: toField,
-          via_mapping: mappingKey,
-          classification: record.classification,
-        });
-      }
+      edges.push({
+        from: fromField,
+        to: toField,
+        via_mapping: mappingKey,
+        classification: record.classification,
+      });
     }
   }
 

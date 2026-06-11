@@ -1,7 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { canonicalRef, canonicalEntityName } from "@satsuma/core";
-import { canonicalKey, resolveCanonicalKey, resolveScopedEntityRef, resolveIndexKey } from "#src/index-builder.js";
+import { buildIndex, canonicalKey, distinctArrowRecords, resolveCanonicalKey, resolveScopedEntityRef, resolveIndexKey } from "#src/index-builder.js";
 
 describe("canonicalRef", () => {
   it("returns ::schema.field when no namespace", () => {
@@ -170,5 +170,67 @@ describe("resolveIndexKey", () => {
   it("returns null for unqualified name with no matches", () => {
     const result = resolveIndexKey("nonexistent", map);
     assert.equal(result, null);
+  });
+});
+
+// ── distinctArrowRecords ─────────────────────────────────────────────────────
+
+describe("distinctArrowRecords", () => {
+  /** Minimal arrow record for buildIndex; only identity-relevant fields vary. */
+  const arrow = (sources: string[], target: string) => ({
+    mapping: "m",
+    namespace: null,
+    sources,
+    target,
+    transform_raw: "",
+    steps: [],
+    classification: "none" as const,
+    derived: false,
+    line: 13,
+    file: "test.stm",
+  });
+
+  const fileData = (arrowRecords: any[]) => ({
+    filePath: "test.stm",
+    errorCount: 0,
+    schemas: [
+      { name: "s", namespace: null, fields: [], row: 0 },
+      { name: "t", namespace: null, fields: [], row: 1 },
+    ],
+    metrics: [],
+    mappings: [{ name: "m", namespace: null, sources: ["s"], targets: ["t"], arrowCount: arrowRecords.length, row: 2 }],
+    fragments: [],
+    transforms: [],
+    warnings: [],
+    questions: [],
+    arrowRecords,
+    namespaces: [],
+  });
+
+  it("yields each record exactly once despite multi-key registration", () => {
+    // buildFieldArrows indexes one record under canonical, schema-prefixed,
+    // bare, and leaf key forms — a whole-index walk must not multiply it.
+    const index = buildIndex([fileData([arrow(["a"], "x")])]);
+    const records = [...distinctArrowRecords(index.fieldArrows)];
+    assert.equal(records.length, 1);
+  });
+
+  it("keeps two same-line arrows that share a target (sl-201z)", () => {
+    // Two distinct arrows on one line targeting the same field share file,
+    // line, and target — any positional dedup key collapses them. Identity
+    // must be by record reference, so both survive.
+    const index = buildIndex([fileData([arrow(["a"], "x"), arrow(["b"], "x")])]);
+    const records = [...distinctArrowRecords(index.fieldArrows)];
+    assert.equal(records.length, 2);
+    assert.deepEqual(records.map((r) => r.sources[0]).sort(), ["a", "b"]);
+  });
+
+  it("keeps two same-line arrows that share both sources and target", () => {
+    // Even a content key including sources (file:line:sources:target) cannot
+    // distinguish `a -> x { trim }` from `a -> x { upper }` on one line.
+    // Reference identity keeps both records.
+    const index = buildIndex([fileData([arrow(["a"], "x"), arrow(["a"], "x")])]);
+    const records = [...distinctArrowRecords(index.fieldArrows)];
+    assert.equal(records.length, 2);
   });
 });
