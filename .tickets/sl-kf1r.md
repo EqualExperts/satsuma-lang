@@ -1,6 +1,6 @@
 ---
 id: sl-kf1r
-status: in_progress
+status: closed
 deps: []
 links: [sl-xf3f]
 created: 2026-06-11T06:32:46Z
@@ -17,3 +17,10 @@ Two more reference-index entry kinds in satsuma-viz-backend/src/workspace-index.
 
 source_ref reference ranges cover only the name node (qualified_name/backtick_name/identifier), never the metadata block; fragment_spread reference ranges cover only the spread_label; rename round-trip tests prove metadata blocks and ... sigils survive; both spread indexing sites (mapping bodies and schema/fragment bodies) covered.
 
+
+## Notes
+
+**2026-06-11T06:39:45Z**
+
+Cause: Same destructive-rename class as sl-xf3f — source/target reference entries stored nodeRange(source_ref) which includes the optional metadata_block, and both fragment-spread indexing sites stored nodeRange(fragment_spread) which includes the "..." sigil; rename.ts replaces the stored range verbatim.
+Fix: source/target ranges now cover only the name node inside source_ref (sourceRefNameRange helper), and both spread sites store the spread_label range only. Rename round-trip tests prove the metadata block and the spread sigil survive; exact-range index tests pin the spans. (commit 377e0c8)
