@@ -75,9 +75,11 @@ export interface ReferenceEntry {
    *  src/tgt path references; "nl" marks @refs found inside NL prose strings
    *  (arrow bodies, note tags/blocks, metadata values — sl-ellp). */
   context: "source" | "target" | "spread" | "import" | "arrow" | "nl" | "metric_source";
-  /** Qualified name of the mapping whose source/target block contains this
-   *  reference. Set only for "source"/"target" contexts; lets consumers count
-   *  distinct mappings rather than reference sites (sl-0tgo). */
+  /** Qualified name of the mapping (or metric) whose body contains this
+   *  reference. Set for "source"/"target"/"metric_source" contexts; lets
+   *  consumers count distinct mappings rather than reference sites (sl-0tgo)
+   *  and attribute refs to the right block instead of unioning per file
+   *  (sl-ei1e). */
   container?: string;
 }
 
@@ -1058,11 +1060,19 @@ function indexMetricRefs(
   index: WorkspaceIndex,
   uri: string,
   metricNode: SyntaxNode,
-  _namespace: string | null,
+  namespace: string | null,
 ): void {
   // Metric sources are in the metadata block as "source <name>" key-value pairs
   const meta = child(metricNode, "metadata_block");
   if (!meta) return;
+
+  // Identity of the containing metric, mirroring the mapping container — so
+  // consumers can attribute each source to its own metric instead of unioning
+  // every metric_source ref in the file (sl-ei1e).
+  const metricName = labelText(metricNode);
+  const container = metricName
+    ? (namespace ? `${namespace}::${metricName}` : metricName)
+    : `<anon>@${uri}:${metricNode.startPosition.row}`;
 
   walkDescendants(meta, (n) => {
     if (n.type === "tag_with_value") {
@@ -1077,6 +1087,7 @@ function indexMetricRefs(
             range: nodeRange(valNode),
             name,
             context: "metric_source",
+            container,
           });
         }
       }

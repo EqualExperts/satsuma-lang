@@ -182,6 +182,54 @@ mapping m {
 });
 
 describe("computeCoreSemanticDiagnostics", () => {
+  // sl-ei1e: the index-to-semantic adapter gathered source/target refs for a
+  // mapping from EVERY reference in the same file, so each mapping inherited
+  // every other mapping's refs — an undefined source in one mapping produced
+  // one diagnostic per mapping in the file, most of them misattributed.
+
+  it("attributes an undefined mapping source only to the mapping that references it (sl-ei1e)", () => {
+    const src = `schema s { id INT }
+schema t { id INT }
+mapping good {
+  source { s }
+  target { t }
+  id -> id
+}
+mapping bad {
+  source { does_not_exist }
+  target { t }
+  id -> id
+}`;
+    const idx = buildIndex({ "file:///a.stm": src });
+    const diags = computeCoreSemanticDiagnostics("file:///a.stm", idx);
+    const undef = diags.filter(
+      (d) => d.code === "undefined-ref" && d.message.includes("does_not_exist"),
+    );
+    assert.equal(undef.length, 1, "exactly one diagnostic for the single bad ref");
+    // The diagnostic must sit on mapping `bad` (line 7), not on `good`.
+    assert.equal(undef[0].range.start.line, 7);
+    assert.ok(undef[0].message.includes("bad"), "message should name the offending mapping");
+  });
+
+  it("attributes an undefined metric source only to the metric that references it (sl-ei1e)", () => {
+    // Metrics share the same per-file ref-gathering shape as mappings, so the
+    // same union bug applied to metric_source refs.
+    const src = `schema fact_orders { amount DECIMAL }
+schema good_metric (metric, source fact_orders) {
+  value DECIMAL (measure additive)
+}
+schema bad_metric (metric, source missing_fact) {
+  value DECIMAL (measure additive)
+}`;
+    const idx = buildIndex({ "file:///a.stm": src });
+    const diags = computeCoreSemanticDiagnostics("file:///a.stm", idx);
+    const undef = diags.filter(
+      (d) => d.code === "undefined-ref" && d.message.includes("missing_fact"),
+    );
+    assert.equal(undef.length, 1, "exactly one diagnostic for the single bad metric source");
+    assert.equal(undef[0].range.start.line, 4);
+  });
+
   it("does not report quoted join descriptions as undefined mapping sources", () => {
     const src = `schema a { id INT }
 schema b { id INT }

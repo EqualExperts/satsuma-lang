@@ -223,7 +223,7 @@ function buildSemanticIndex(wsIndex: WorkspaceIndex): SemanticIndex {
           break;
         case "metric":
           if (!metrics.has(name)) {
-            metrics.set(name, defEntryToMetric(entry, wsIndex));
+            metrics.set(name, defEntryToMetric(name, entry, wsIndex));
           }
           break;
         case "transform":
@@ -287,12 +287,15 @@ function defEntryToMapping(
   entry: DefinitionEntry,
   wsIndex: WorkspaceIndex,
 ): SemanticMapping {
-  // Gather source/target refs for this mapping from the reference index
+  // Gather source/target refs belonging to THIS mapping, matched by the
+  // container identity recorded at index time. Filtering by file alone made
+  // every mapping inherit every other mapping's refs, duplicating and
+  // misattributing undefined-ref diagnostics in multi-mapping files (sl-ei1e).
   const sources: string[] = [];
   const targets: string[] = [];
   for (const [refName, refs] of wsIndex.references) {
     for (const ref of refs) {
-      if (ref.uri !== entry.uri) continue;
+      if (ref.uri !== entry.uri || ref.container !== name) continue;
       if (ref.context === "source") {
         if (!sources.includes(refName)) sources.push(refName);
       } else if (ref.context === "target") {
@@ -313,13 +316,17 @@ function defEntryToMapping(
 
 /** Convert a DefinitionEntry with kind "metric" to a SemanticMetric. */
 function defEntryToMetric(
+  name: string,
   entry: DefinitionEntry,
   wsIndex: WorkspaceIndex,
 ): SemanticMetric {
+  // Matched by container identity, not just file — see defEntryToMapping
+  // (sl-ei1e applies equally to metric_source refs).
   const sources: string[] = [];
   for (const [refName, refs] of wsIndex.references) {
     for (const ref of refs) {
-      if (ref.uri === entry.uri && ref.context === "metric_source" && !sources.includes(refName)) {
+      if (ref.uri !== entry.uri || ref.container !== name) continue;
+      if (ref.context === "metric_source" && !sources.includes(refName)) {
         sources.push(refName);
       }
     }
