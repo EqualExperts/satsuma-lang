@@ -1,6 +1,6 @@
 ---
 id: sl-vryu
-status: open
+status: closed
 deps: []
 links: []
 created: 2026-06-11T02:43:01Z
@@ -17,3 +17,10 @@ type_expr is a single token name(...) (grammar.js:322-328). "customer_id UUID(pk
 
 Either parenthesized type args and metadata are structurally distinguished, or known constraint tokens inside type parens are flagged; corpus tests for both spellings; spec clarified.
 
+
+## Notes
+
+**2026-06-11T22:43:52Z**
+
+Cause: type_expr is a single token that absorbs immediately-attached parens, so UUID(pk) parsed cleanly with the pk constraint hidden in the type text, while DECIMAL (12,2) (spaced) ERRORed as numeric metadata. The type vocabulary is open-ended (VARCHAR(MAX) exists in the canonical examples), so structurally restricting type args would reject real types.
+Fix: new core semantic check constraint-in-type-args warns when a spec-7.1 constraint flag (pk/required/unique/indexed/pii/encrypt) appears inside type arguments and suggests the metadata spelling; spec 3.2 now documents the no-space rule; corpus pins both tree shapes. Surfaced by both CLI validate and LSP diagnostics via the shared validator. (commit 5f870e3)
