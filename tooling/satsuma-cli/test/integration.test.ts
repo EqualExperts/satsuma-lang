@@ -764,6 +764,40 @@ describe("satsuma find", () => {
     assert.match(stderr, /invalid scope/i);
   });
 
+  // sl-xav4: metrics are schema_block nodes tagged `metric` (no metric_block
+  // CST node exists), so the metric scope must search schema_block nodes.
+  it("--in metric matches fields in metric-tagged schemas (sl-xav4)", async () => {
+    const METRICS = resolve(EXAMPLES, "metrics-platform/metrics.stm");
+    const { stdout, code } = await run("find", "--tag", "measure", "--in", "metric", "--json", METRICS);
+    assert.equal(code, 0, "metric scope should find measure fields, not exit 1");
+    const data = JSON.parse(stdout);
+    assert.ok(data.length > 0, "expected measure-tagged fields in metric blocks");
+    for (const m of data) {
+      assert.equal(m.blockType, "metric", `${m.block}.${m.field} should report blockType metric, not ${m.blockType}`);
+    }
+  });
+
+  // sl-xav4: a metric registers in both index.schemas and index.metrics, so
+  // without twin filtering the schema scope claimed metric fields as schemas.
+  it("--in schema does not claim fields from metric-tagged schemas (sl-xav4)", async () => {
+    const METRICS = resolve(EXAMPLES, "metrics-platform/metrics.stm");
+    const { stdout, code } = await run("find", "--tag", "measure", "--in", "schema", METRICS);
+    assert.equal(code, 1, "no plain schema carries measure tags in the metrics example");
+    assert.match(stdout, /No matches found/);
+  });
+
+  // sl-xav4: under scope `all`, each metric field must be reported exactly
+  // once (as metric) — not duplicated by the schema and metric loops.
+  it("default scope reports each metric field once, as blockType metric (sl-xav4)", async () => {
+    const METRICS = resolve(EXAMPLES, "metrics-platform/metrics.stm");
+    const { stdout, code } = await run("find", "--tag", "measure", "--json", METRICS);
+    assert.equal(code, 0);
+    const data = JSON.parse(stdout);
+    const keys = data.map((m: any) => `${m.block}.${m.field}`);
+    assert.equal(new Set(keys).size, keys.length, "no field should be reported twice");
+    for (const m of data) assert.equal(m.blockType, "metric");
+  });
+
   it("finds schema-level metadata tags", async () => {
     const { stdout, code } = await run("find", "--tag", "format", "--json", PLATFORM);
     assert.equal(code, 0);
