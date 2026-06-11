@@ -189,8 +189,14 @@ export class VizPanel {
   }
 
   private async exportSvg(content: string): Promise<void> {
+    // A bare relative Uri.file resolves to the filesystem root, opening the
+    // save dialog at "/" (sl-wlta). Default into the workspace instead; with
+    // no workspace open, let the dialog choose its own starting location.
+    const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri;
     const uri = await vscode.window.showSaveDialog({
-      defaultUri: vscode.Uri.file("mapping-viz.svg"),
+      defaultUri: workspaceRoot
+        ? vscode.Uri.joinPath(workspaceRoot, "mapping-viz.svg")
+        : undefined,
       filters: { "SVG files": ["svg"] },
     });
     if (uri) {

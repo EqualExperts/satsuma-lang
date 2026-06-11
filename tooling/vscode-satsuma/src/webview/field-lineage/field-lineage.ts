@@ -522,12 +522,6 @@ function formatMappingKey(key: string): string {
   return key.startsWith("::") ? key.slice(2) : key;
 }
 
-function escapeHtml(s: string): string {
-  return s
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
-}
 
 // Minimal ELK type stubs for the @ts-nocheck context
 interface ElkNode {

@@ -1,5 +1,6 @@
 import { execFile } from "child_process";
 import { workspace } from "vscode";
+import { exitCodeFrom, spawnFailureMessage } from "./cli-runner-logic";
 
 export interface CliResult {
   stdout: string;
@@ -27,8 +28,8 @@ export function runCli(
       (error, stdout, stderr) => {
         resolve({
           stdout: stdout ?? "",
-          stderr: stderr ?? "",
-          exitCode: error?.code ? Number(error.code) : error ? 1 : 0,
+          stderr: spawnFailureMessage(error, cliPath) ?? stderr ?? "",
+          exitCode: exitCodeFrom(error),
         });
       },
     );

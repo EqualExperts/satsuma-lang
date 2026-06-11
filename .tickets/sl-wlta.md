@@ -1,6 +1,6 @@
 ---
 id: sl-wlta
-status: open
+status: closed
 deps: []
 links: []
 created: 2026-06-11T02:43:30Z
@@ -17,3 +17,10 @@ Three small confirmed issues. (1) cli-runner.ts exitCode uses Number(error.code)
 
 ENOENT reports a clear "CLI not found" message; save dialog defaults inside the workspace; dead escapeHtml removed.
 
+
+## Notes
+
+**2026-06-11T07:08:11Z**
+
+Cause: (1) cli-runner coerced execFile's error.code with Number(), so string errnos (ENOENT when the CLI is not installed) yielded "exit code NaN" in messages; (2) exportSvg passed a bare relative Uri.file which resolves to the filesystem root, opening the save dialog at "/"; (3) field-lineage.ts and schema-lineage.ts each carried an escapeHtml that nothing called and that did not escape quotes.
+Fix: (1) added vscode-free cli-runner-logic.ts with exitCodeFrom (string errno -> 1, never NaN) and spawnFailureMessage (ENOENT -> install/cliPath hint surfaced via stderr to every caller toast), unit-tested; (2) save dialog now defaults to <workspaceRoot>/mapping-viz.svg, or the dialog default when no workspace is open; (3) both dead escapeHtml functions removed.

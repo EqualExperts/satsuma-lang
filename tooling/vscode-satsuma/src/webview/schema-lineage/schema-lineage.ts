@@ -298,12 +298,6 @@ function buildArrowMarker(): SVGMarkerElement {
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
-function escapeHtml(s: string): string {
-  return s
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
-}
 
 // Minimal ELK type stubs for the @ts-nocheck context
 interface ElkNode {
