@@ -89,7 +89,7 @@ mapping crm_to_warehouse {}
 --------------------------------------------------------------------------------
 
 (source_file
-  (ERROR
+  (mapping_block
     (block_label
       (identifier))))
 
@@ -102,7 +102,7 @@ mapping {}
 --------------------------------------------------------------------------------
 
 (source_file
-  (ERROR))
+  (mapping_block))
 
 ================================================================================
 Metric schema block
@@ -399,7 +399,7 @@ mapping `CRM → Warehouse (v2)` {}
 --------------------------------------------------------------------------------
 
 (source_file
-  (ERROR
+  (mapping_block
     (block_label
       (backtick_name))))
 
@@ -411,6 +411,8 @@ Empty backtick identifier is rejected
 schema test { `` STRING }
 
 --------------------------------------------------------------------------------
+
+
 
 ================================================================================
 Keyword rejected as bare label (produces error node)
@@ -425,3 +427,24 @@ schema schema {}
     (block_label
       (identifier))))
 
+================================================================================
+Spread does not swallow the next field across CR-only line endings
+================================================================================
+
+schema s {  ...audit fields  extra STRING}
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (schema_block
+    (block_label
+      (identifier))
+    (schema_body
+      (fragment_spread
+        (spread_label
+          (identifier)
+          (continuation_word)))
+      (field_decl
+        (field_name
+          (identifier))
+        (type_expr)))))

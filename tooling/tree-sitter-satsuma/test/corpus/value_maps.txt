@@ -307,3 +307,40 @@ mapping {
             (pipe_text
               (identifier))))))))
 
+================================================================================
+Map key may contain a negative number comparison
+================================================================================
+
+mapping {
+  TEMP -> band {
+    map {
+      < -5: "freezing"
+      default: "ok"
+    }
+  }
+}
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (mapping_block
+    (mapping_body
+      (map_arrow
+        (src_path
+          (field_path
+            (identifier)))
+        (tgt_path
+          (field_path
+            (identifier)))
+        (pipe_chain
+          (pipe_step
+            (map_literal
+              (map_entry
+                (map_key
+                  (number_literal))
+                (map_value
+                  (nl_string)))
+              (map_entry
+                (map_key)
+                (map_value
+                  (nl_string))))))))))

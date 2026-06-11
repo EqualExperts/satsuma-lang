@@ -293,6 +293,8 @@ mapping <name> {
 
 The `source` and `target` sub-blocks reference previously declared schemas by name (optionally backtick-quoted when the name contains special characters). The mapping name is optional.
 
+An empty mapping body (`mapping m { }`) is valid — like an empty schema or transform, it is a legal skeleton while a spec is being authored.
+
 ### 4.2 Arrow Declarations
 
 An arrow maps one or more source fields to a target field:
@@ -511,7 +513,7 @@ mapping `customer migration` {
 
 ### 5.1 Fragments
 
-Fragments declare reusable field sets for schemas:
+Fragments declare reusable field sets for schemas. Like every definition block, a fragment (and a named transform, §5.2) accepts an optional `( )` metadata block between its label and body:
 
 ```
 fragment `audit fields` {

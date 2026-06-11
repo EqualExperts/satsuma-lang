@@ -290,6 +290,10 @@
           "named": true
         },
         {
+          "type": "metadata_block",
+          "named": true
+        },
+        {
           "type": "schema_body",
           "named": true
         }
@@ -485,7 +489,7 @@
     "fields": {},
     "children": {
       "multiple": true,
-      "required": true,
+      "required": false,
       "types": [
         {
           "type": "block_label",
@@ -1131,6 +1135,10 @@
       "types": [
         {
           "type": "block_label",
+          "named": true
+        },
+        {
+          "type": "metadata_block",
           "named": true
         },
         {

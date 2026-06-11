@@ -417,3 +417,48 @@ transform `clean and coerce` {
           (identifier)
           (identifier))))))
 
+================================================================================
+Transform accepts a metadata block like schema/mapping do
+================================================================================
+
+transform `to cents` (note "Money normalization") {
+  "Multiply by 100"
+}
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (transform_block
+    (block_label
+      (backtick_name))
+    (metadata_block
+      (note_tag
+        (nl_string)))
+    (pipe_chain
+      (pipe_step
+        (pipe_text
+          (nl_string))))))
+
+================================================================================
+Pipe text lexes percent and equals as plain NL operators
+================================================================================
+
+transform bucket {
+  value % 100 | rate = 0.5
+}
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (transform_block
+    (block_label
+      (identifier))
+    (pipe_chain
+      (pipe_step
+        (pipe_text
+          (identifier)
+          (number_literal)))
+      (pipe_step
+        (pipe_text
+          (identifier)
+          (number_literal))))))

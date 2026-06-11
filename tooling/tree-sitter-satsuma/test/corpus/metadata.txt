@@ -394,3 +394,36 @@ schema fact_sales (
       (note_tag
         (nl_string)))))
 
+================================================================================
+Lone comma in empty metadata block is rejected
+:error
+================================================================================
+
+schema s (,) { f STRING }
+
+--------------------------------------------------------------------------------
+
+
+
+================================================================================
+Trailing comma allowed after metadata entries
+================================================================================
+
+schema s (pk, required,) { f STRING }
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (schema_block
+    (block_label
+      (identifier))
+    (metadata_block
+      (tag_token
+        (identifier))
+      (tag_token
+        (identifier)))
+    (schema_body
+      (field_decl
+        (field_name
+          (identifier))
+        (type_expr)))))
