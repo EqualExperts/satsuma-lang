@@ -2,7 +2,7 @@
 id: sl-xf3f
 status: closed
 deps: []
-links: [sl-p256]
+links: [sl-p256, sl-kf1r]
 created: 2026-06-11T02:41:29Z
 type: bug
 priority: 0

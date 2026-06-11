@@ -589,6 +589,44 @@ describe("reference range precision (sl-xf3f)", () => {
     // A range including the @ deletes the sigil on rename, breaking the ref.
     assert.equal(textAt(source, refs[0].range), "customers");
   });
+
+  it("source ref range covers only the name, not its metadata block", () => {
+    // sl-kf1r: source_ref = name + optional metadata_block. A range spanning
+    // the whole source_ref deletes the metadata on rename.
+    const source = `mapping test {
+  source { customers (note "refreshed daily") }
+  target { dim }
+  id -> id
+}`;
+    const idx = buildIndex({ "file:///a.stm": source });
+    const refs = (idx.references.get("customers") || []).filter((r) => r.context === "source");
+    assert.equal(refs.length, 1);
+    assert.equal(textAt(source, refs[0].range), "customers");
+  });
+
+  it("fragment spread range covers only the label, not the ... sigil", () => {
+    // sl-kf1r: fragment_spread = "..." + spread_label. A range including the
+    // sigil deletes it on rename, leaving an invalid declaration. Covers both
+    // indexing sites: schema bodies and mapping arrow bodies.
+    const source = `fragment audit_fields {
+  ts TIMESTAMP
+}
+schema customers {
+  id UUID
+  ...audit_fields
+}
+mapping test {
+  source { customers }
+  target { dim }
+  id -> id { ...audit_fields }
+}`;
+    const idx = buildIndex({ "file:///a.stm": source });
+    const refs = (idx.references.get("audit_fields") || []).filter((r) => r.context === "spread");
+    assert.equal(refs.length, 2);
+    for (const ref of refs) {
+      assert.equal(textAt(source, ref.range), "audit_fields");
+    }
+  });
 });
 
 describe("NL string reference indexing", () => {

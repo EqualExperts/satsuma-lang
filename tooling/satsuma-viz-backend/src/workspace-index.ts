@@ -655,7 +655,7 @@ function indexMappingRefs(
         if (name) {
           addReference(index, name, {
             uri,
-            range: nodeRange(ref),
+            range: sourceRefNameRange(ref),
             name,
             context: "source",
           });
@@ -667,7 +667,7 @@ function indexMappingRefs(
         if (name) {
           addReference(index, name, {
             uri,
-            range: nodeRange(ref),
+            range: sourceRefNameRange(ref),
             name,
             context: "target",
           });
@@ -687,6 +687,24 @@ function indexMappingRefs(
   indexNlRefs(index, uri, body);
 }
 
+/**
+ * Range of the name node inside a source_ref — the qualified_name,
+ * backtick_name, or identifier that sourceRefStructuralText reads. A
+ * source_ref may also carry a metadata_block (`customers (note "...")`);
+ * rename replaces the stored range verbatim, so the range must cover only
+ * the name or the metadata is deleted along with it (sl-kf1r). Falls back
+ * to the whole node on unexpected shapes (error recovery).
+ */
+function sourceRefNameRange(ref: SyntaxNode): Range {
+  const nameNode = ref.namedChildren.find(
+    (c) =>
+      c.type === "qualified_name" ||
+      c.type === "backtick_name" ||
+      c.type === "identifier",
+  );
+  return nameNode ? nodeRange(nameNode) : nodeRange(ref);
+}
+
 function indexArrowSpreadRefs(
   index: WorkspaceIndex,
   uri: string,
@@ -697,10 +715,13 @@ function indexArrowSpreadRefs(
     if (n.type === "fragment_spread") {
       const sl = child(n, "spread_label");
       const name = sl ? spreadLabelText(sl) : null;
-      if (name) {
+      if (name && sl) {
         addReference(index, name, {
           uri,
-          range: nodeRange(n),
+          // Range covers the spread_label only — the "..." sigil is spread
+          // syntax, not part of the fragment name, and must survive a rename
+          // (sl-kf1r).
+          range: nodeRange(sl),
           name,
           context: "spread",
         });
@@ -965,10 +986,11 @@ function indexSpreadRefs(
   for (const spread of children(body, "fragment_spread")) {
     const sl = child(spread, "spread_label");
     const name = sl ? spreadLabelText(sl) : null;
-    if (name) {
+    if (name && sl) {
       addReference(index, name, {
         uri,
-        range: nodeRange(spread),
+        // Spread_label only — the "..." sigil must survive a rename (sl-kf1r).
+        range: nodeRange(sl),
         name,
         context: "spread",
       });

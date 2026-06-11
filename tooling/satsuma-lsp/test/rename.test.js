@@ -231,6 +231,54 @@ schema customers {
     );
   });
 
+  it("preserves a source ref's metadata block when renaming the referenced schema", () => {
+    // sl-kf1r: source/target refs were indexed with the range of the whole
+    // source_ref node, which includes the optional metadata block — renaming
+    // customers -> clients turned `customers (note "refreshed daily")` into
+    // `clients`, silently deleting the note.
+    const source =
+      'schema customers {\n  id UUID\n}\nmapping `m` {\n  source { customers (note "refreshed daily") }\n  target { dim }\n  id -> id\n}';
+    const { index, trees } = buildIndex({ "file:///a.stm": source });
+    const edit = computeRename(
+      trees["file:///a.stm"],
+      0,
+      8,
+      "file:///a.stm",
+      index,
+      "clients",
+    );
+    assert.ok(edit);
+    const renamed = applyEdits(source, edit.changes["file:///a.stm"]);
+    assert.ok(
+      renamed.includes('source { clients (note "refreshed daily") }'),
+      `expected the metadata block to survive the rename, got: ${renamed}`,
+    );
+  });
+
+  it("preserves the ... sigil when renaming a fragment used as a spread", () => {
+    // sl-kf1r: spread refs were indexed with the range of the whole
+    // fragment_spread node, which includes the "..." sigil — renaming the
+    // fragment turned "...audit_fields" into "tracking_fields", deleting the
+    // sigil and leaving an invalid declaration.
+    const source =
+      "fragment audit_fields {\n  ts TIMESTAMP\n}\nschema customers {\n  id UUID\n  ...audit_fields\n}";
+    const { index, trees } = buildIndex({ "file:///a.stm": source });
+    const edit = computeRename(
+      trees["file:///a.stm"],
+      0,
+      10,
+      "file:///a.stm",
+      index,
+      "tracking_fields",
+    );
+    assert.ok(edit);
+    const renamed = applyEdits(source, edit.changes["file:///a.stm"]);
+    assert.ok(
+      renamed.includes("...tracking_fields"),
+      `expected the spread sigil to survive the rename, got: ${renamed}`,
+    );
+  });
+
   it("renames from a reference site", () => {
     const { index, trees } = buildIndex({
       "file:///a.stm": "schema customers {\n  id UUID\n}",
