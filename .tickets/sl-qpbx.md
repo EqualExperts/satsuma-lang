@@ -1,6 +1,6 @@
 ---
 id: sl-qpbx
-status: open
+status: closed
 deps: []
 links: []
 created: 2026-06-10T23:18:25Z
@@ -17,3 +17,10 @@ The CI security workflow runs npm audit (--omit=dev --audit-level=high) over onl
 
 security.yml npm-audit job covers every package directory that has a package-lock.json (core, viz, viz-backend, viz-model, viz-harness, site) — or documents an explicit exclusion reason inline. .github/dependabot.yml has an npm entry for each of those directories. CI passes with the expanded matrix. SECURITY-REPORT.md 'Known Gaps' item 2 and the CI controls table updated to reflect the closed gap.
 
+
+## Notes
+
+**2026-06-11T21:16:52Z**
+
+Cause: The security.yml npm-audit loop hardcoded 5 directories and dependabot.yml only listed 5 npm dirs, leaving satsuma-core, the four viz packages, and site without continuous dependency monitoring.
+Fix: Audit loop now discovers every tracked package-lock.json via git ls-files (covers all 11 dirs, future-proof); dependabot.yml gained entries for the six missing dirs (and dropped the stale vscode-satsuma/server entry); SECURITY-REPORT.md gap 2 closed (commit 461552b)
