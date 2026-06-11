@@ -926,12 +926,17 @@ function extractArrowFieldName(pathNode: SyntaxNode): string | null {
 const NL_AT_REF_RE = createAtRefRegex();
 
 /**
- * Index every @ref inside NL strings under `node` as an "nl" reference.
+ * Index every @ref inside NL prose under `node` as an "nl" reference.
  *
  * Called once per file with the root node (sl-ellp): NL prose carrying refs
  * lives not only in arrow bodies but in `(note "...")` metadata tags, `note`
  * blocks at any level, and metadata value strings — all of which rename and
  * find-references must reach, or renames leave stale prose behind.
+ *
+ * Refs come in two CST shapes: regex matches inside quoted NL strings, and
+ * structural at_ref nodes that the grammar parses out of bare (unquoted)
+ * pipe text — `a -> b { derived from @b }` has no nl_string at all, so a
+ * string-only walk missed it entirely (bptar-l6n8).
  */
 function indexNlRefs(
   index: WorkspaceIndex,
@@ -939,6 +944,27 @@ function indexNlRefs(
   node: SyntaxNode,
 ): void {
   walkDescendants(node, (n) => {
+    if (n.type === "at_ref") {
+      // Strip the leading @ and any backtick delimiters, mirroring the
+      // regex path below.
+      const refName = n.text.slice(1).replace(/`([^`]+)`/g, "$1");
+
+      // As below, the @ sigil stays outside the stored range (sl-xf3f).
+      // An at_ref never spans lines, so a simple column bump is safe.
+      addReference(index, refName, {
+        uri,
+        range: Range.create(
+          n.startPosition.row,
+          n.startPosition.column + 1,
+          n.endPosition.row,
+          n.endPosition.column,
+        ),
+        name: refName,
+        context: "nl",
+      });
+      return;
+    }
+
     if (n.type !== "nl_string" && n.type !== "multiline_string") return;
 
     const text = n.text;

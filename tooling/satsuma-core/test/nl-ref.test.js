@@ -370,3 +370,64 @@ describe("extractNLRefData — map literal NL strings (sl-74m6)", () => {
     assert.deepEqual(nlRefItems(src), []);
   });
 });
+
+// ── extractNLRefData — bare pipe-text at_refs (bptar-l6n8) ────────────────────
+//
+// The grammar parses unquoted pipe text structurally, so `{ derived from @b }`
+// produces an at_ref node with no surrounding NL string. The walker previously
+// collected only nl_string/multiline_string nodes, making bare refs invisible
+// to nl-refs output, lineage, and validation while the quoted form worked.
+
+describe("extractNLRefData — bare pipe-text at_refs (bptar-l6n8)", () => {
+  before(async () => {
+    await initParser(WASM_PATH);
+  });
+
+  function nlRefItems(src) {
+    return extractNLRefData(getParser().parse(src).rootNode);
+  }
+
+  it("extracts a bare @ref from an arrow transform body", () => {
+    // The ticket repro: same prose as the quoted control below, minus quotes.
+    const items = nlRefItems("mapping m {\n  a -> b { derived from @src.col }\n}");
+    assert.equal(items.length, 1);
+    assert.equal(items[0].text, "@src.col");
+    assert.equal(items[0].mapping, "m");
+    assert.equal(items[0].targetField, "b");
+  });
+
+  it("extracts a bare @ref from a transform block body", () => {
+    // Transforms share the pipe-step walker — bare refs must surface there too.
+    const items = nlRefItems("transform t {\n  uppercase | take from @customers.id\n}");
+    assert.equal(items.length, 1);
+    assert.equal(items[0].text, "@customers.id");
+    assert.equal(items[0].mapping, "transform:t");
+  });
+
+  it("extracts every bare @ref when one pipe step holds several", () => {
+    // Each at_ref is its own CST node; all of them must become items, each
+    // anchored at its own position for diagnostics.
+    const items = nlRefItems("mapping m {\n  a -> b { @x plus @y }\n}");
+    assert.deepEqual(items.map((i) => i.text), ["@x", "@y"]);
+    assert.notEqual(items[0].column, items[1].column);
+  });
+
+  it("extracts a bare backtick-named @ref", () => {
+    // @`order id` is the backtick at_ref grammar branch; the item text keeps
+    // the raw form so downstream extractAtRefs/normalization applies once.
+    const items = nlRefItems("mapping m {\n  a -> b { lookup @`order id` }\n}");
+    assert.equal(items.length, 1);
+    assert.equal(items[0].text, "@`order id`");
+  });
+
+  it("anchors a bare @ref so position math matches the quoted form", () => {
+    // For quoted items, column points at the opening delimiter and
+    // computeNLRefPosition's +1 lands on the @. A bare item has no delimiter,
+    // so its column is the @ itself and the same +1 yields the 1-based column.
+    const src = "mapping m {\n  a -> b { from @z }\n}";
+    const [item] = nlRefItems(src);
+    const pos = computeNLRefPosition(item, item.text.indexOf("@"));
+    assert.equal(pos.line, 2); // 1-based line of the arrow
+    assert.equal(pos.column, src.split("\n")[1].indexOf("@") + 1); // 1-based @ column
+  });
+});

@@ -235,6 +235,33 @@ schema customers {
     );
   });
 
+  it("rewrites a bare @ref in unquoted pipe text without deleting the @ sigil", () => {
+    // bptar-l6n8: bare pipe text parses to a structural at_ref node, not an
+    // nl_string, so the rename pipeline never saw it — `{ derived from
+    // @customers }` kept the old name after a rename while the quoted form
+    // was rewritten.
+    const bSource =
+      'mapping `m` {\n  source { customers }\n  target { dim }\n  a -> b { derived from @customers }\n}';
+    const { index, trees } = buildIndex({
+      "file:///a.stm": "schema customers {\n  id UUID\n}",
+      "file:///b.stm": bSource,
+    });
+    const edit = computeRename(
+      trees["file:///a.stm"],
+      0,
+      8,
+      "file:///a.stm",
+      index,
+      "clients",
+    );
+    assert.ok(edit);
+    const renamed = applyEdits(bSource, edit.changes["file:///b.stm"]);
+    assert.ok(
+      renamed.includes("derived from @clients"),
+      `expected bare at_ref to be renamed with @ intact, got: ${renamed}`,
+    );
+  });
+
   it("preserves the dotted tail of an arrow path whose first segment matches the renamed name", () => {
     // sl-xf3f: arrow paths were indexed under their first segment but with the
     // range of the WHOLE path node, so renaming a schema named "address"

@@ -483,13 +483,18 @@ function extractMappingNLRefs(mappingNode: SyntaxNode, namespace: string | null,
   walkArrowsForNL(body, mappingName, namespace, null, results);
 }
 
-// Collect the NL string nodes carried by a single pipe step. A step is one of
-// three shapes: pipe_text (NL strings are direct children), a map literal
-// (NL strings live inside each entry's key and value — sl-74m6: refs in
-// `map { "x": "see @customers.id" }` must reach lineage and validation), or a
-// fragment spread (never carries NL text).
-function nlStringNodesInPipeStep(step: SyntaxNode): SyntaxNode[] {
-  const isNL = (n: SyntaxNode) => n.type === "nl_string" || n.type === "multiline_string";
+// Collect the ref-bearing nodes carried by a single pipe step. A step is one
+// of three shapes: pipe_text (NL strings and bare at_refs are direct
+// children), a map literal (NL strings live inside each entry's key and
+// value — sl-74m6: refs in `map { "x": "see @customers.id" }` must reach
+// lineage and validation), or a fragment spread (never carries NL text).
+//
+// Bare at_refs matter because the grammar parses unquoted pipe text
+// structurally: `a -> b { derived from @b }` yields an at_ref node with no
+// surrounding NL string, so a string-only walk never sees it (bptar-l6n8).
+function nlRefNodesInPipeStep(step: SyntaxNode): SyntaxNode[] {
+  const isNL = (n: SyntaxNode) =>
+    n.type === "nl_string" || n.type === "multiline_string" || n.type === "at_ref";
   const inner = step.namedChildren[0];
   if (!inner) return [];
   if (inner.type === "pipe_text") return inner.namedChildren.filter(isNL);
@@ -500,6 +505,18 @@ function nlStringNodesInPipeStep(step: SyntaxNode): SyntaxNode[] {
       .flatMap((part) => part.namedChildren.filter(isNL));
   }
   return [];
+}
+
+// The text payload of one ref-bearing node, or null when it cannot contain a
+// ref. Quoted NL strings are unwrapped from their delimiters; a bare at_ref
+// keeps its "@name" text verbatim so the downstream regex scan finds the ref
+// at offset zero, making position math identical to the quoted case.
+function nlRefText(node: SyntaxNode): string | null {
+  const text =
+    node.type === "multiline_string" ? node.text.slice(3, -3) :
+    node.type === "nl_string" ? node.text.slice(1, -1) :
+    node.text; // at_ref
+  return text.includes("`") || /@[a-zA-Z_`]/.test(text) ? text : null;
 }
 
 function extractTransformNLRefs(transformNode: SyntaxNode, namespace: string | null, results: NLRefDataItemNoFile[]): void {
@@ -513,11 +530,9 @@ function extractTransformNLRefs(transformNode: SyntaxNode, namespace: string | n
 
   for (const step of pipeChain.namedChildren) {
     if (step.type === "pipe_step") {
-      for (const nlNode of nlStringNodesInPipeStep(step)) {
-        const text = nlNode.type === "multiline_string"
-          ? nlNode.text.slice(3, -3)
-          : nlNode.text.slice(1, -1);
-        if (text.includes("`") || /@[a-zA-Z_`]/.test(text)) {
+      for (const nlNode of nlRefNodesInPipeStep(step)) {
+        const text = nlRefText(nlNode);
+        if (text !== null) {
           results.push({
             text,
             mapping: `transform:${transformName}`,
@@ -671,11 +686,9 @@ function walkArrowsForNL(
       if (pipeChain) {
         for (const step of pipeChain.namedChildren) {
           if (step.type === "pipe_step") {
-            for (const nlNode of nlStringNodesInPipeStep(step)) {
-              const text = nlNode.type === "multiline_string"
-                ? nlNode.text.slice(3, -3)
-                : nlNode.text.slice(1, -1);
-              if (text.includes("`") || /@[a-zA-Z_`]/.test(text)) {
+            for (const nlNode of nlRefNodesInPipeStep(step)) {
+              const text = nlRefText(nlNode);
+              if (text !== null) {
                 results.push({
                   text,
                   mapping: mappingName,
