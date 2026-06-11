@@ -99,4 +99,80 @@ describe("field-coverage helpers", () => {
     assert.equal(sourceSet.has("customer.email"), true);
     assert.equal(targetMapped.has("customer_email"), true);
   });
+
+  it("strips authored bare-id prefixes for namespaced schemas (sl-iqud)", () => {
+    // Bug sl-iqud: arrows keep authored text ("customers.id") while the
+    // backend qualifies schema ids ("crm::customers"). Matching only the
+    // qualified prefix made every prefixed ref in a namespaced mapping
+    // unresolvable, so the whole schema was reported unmapped.
+    const customers = schema("customers", [field("id")], "crm::customers");
+    assert.equal(
+      mod.resolveSchemaLocalFieldPath("customers.id", customers, ["crm::customers", "crm::orders"]),
+      "id",
+    );
+    // The qualified form must keep working too — cross-namespace refs are
+    // authored fully qualified.
+    assert.equal(
+      mod.resolveSchemaLocalFieldPath("crm::customers.id", customers, ["crm::customers", "crm::orders"]),
+      "id",
+    );
+  });
+
+  it("treats a bare-id prefix of a sibling source schema as not local (sl-iqud)", () => {
+    // A ref authored against the OTHER namespaced source schema must not fall
+    // through to the field-path check of this schema.
+    const customers = schema("customers", [field("orders", [field("id")])], "crm::customers");
+    assert.equal(
+      mod.resolveSchemaLocalFieldPath("orders.id", customers, ["crm::customers", "crm::orders"]),
+      null,
+    );
+  });
+
+  it("covers both schemas of a namespaced multi-source mapping (sl-iqud)", () => {
+    // End-to-end coverage repro from the ticket: a namespaced join mapping
+    // with bare-prefixed arrow refs left sourceMapped empty for both schemas.
+    const customers = schema("customers", [field("id"), field("email")], "crm::customers");
+    const orders = schema("orders", [field("customer_id"), field("total")], "crm::orders");
+    const target = schema("customer_orders", [field("email"), field("total")], "crm::customer_orders");
+    const mapping = {
+      id: "join_orders",
+      sourceRefs: ["crm::customers", "crm::orders"],
+      targetRef: "crm::customer_orders",
+      arrows: [
+        {
+          sourceFields: ["customers.email"],
+          targetField: "email",
+          transform: null,
+          metadata: [],
+          comments: [],
+          location: loc,
+        },
+        {
+          sourceFields: ["orders.total"],
+          targetField: "total",
+          transform: null,
+          metadata: [],
+          comments: [],
+          location: loc,
+        },
+      ],
+      eachBlocks: [],
+      flattenBlocks: [],
+      sourceBlock: null,
+      notes: [],
+      comments: [],
+      location: loc,
+    };
+
+    const { sourceMapped, targetMapped } = mod.buildMappingCoveredFields(
+      mapping,
+      [customers, orders],
+      target,
+    );
+
+    assert.deepEqual([...sourceMapped.get("crm::customers")], ["email"]);
+    assert.deepEqual([...sourceMapped.get("crm::orders")], ["total"]);
+    assert.equal(targetMapped.has("email"), true);
+    assert.equal(targetMapped.has("total"), true);
+  });
 });

@@ -23,11 +23,27 @@ export function schemaHasFieldPath(schema: SchemaCard, fieldPath: string): boole
 }
 
 /**
+ * Prefixes under which an arrow may reference fields of a schema: the
+ * qualified id and, for namespaced schemas, the authored bare id. Arrows keep
+ * authored text ("customers.id" inside namespace crm) while the backend
+ * resolves sourceRefs and qualifiedId to "crm::customers" — matching only the
+ * qualified form would miss every bare-prefixed ref in a namespaced mapping
+ * (sl-iqud).
+ */
+function schemaRefPrefixes(schemaId: string): string[] {
+  const namespaceEnd = schemaId.lastIndexOf("::");
+  if (namespaceEnd < 0) return [schemaId];
+  return [schemaId, schemaId.slice(namespaceEnd + 2)];
+}
+
+/**
  * Resolve an arrow field reference to the schema-local dotted field path for a
- * specific schema card.
+ * specific schema card. Schema prefixes match in both authored (bare) and
+ * namespace-qualified form.
  *
  * Examples:
  * - `customer_profiles.region` + schema `customer_profiles` -> `region`
+ * - `customers.id` + schema `crm::customers` -> `id`
  * - `customer.email` + schema `order_events` -> `customer.email`
  * - `other_schema.id` + schema `order_events` -> null
  */
@@ -36,12 +52,16 @@ export function resolveSchemaLocalFieldPath(
   schema: SchemaCard,
   sourceRefs: string[],
 ): string | null {
-  if (fieldRef.startsWith(`${schema.qualifiedId}.`)) {
-    return fieldRef.slice(schema.qualifiedId.length + 1);
+  for (const prefix of schemaRefPrefixes(schema.qualifiedId)) {
+    if (fieldRef.startsWith(`${prefix}.`)) {
+      return fieldRef.slice(prefix.length + 1);
+    }
   }
 
   const explicitOtherSchema = sourceRefs.some(
-    (sourceRef) => sourceRef !== schema.qualifiedId && fieldRef.startsWith(`${sourceRef}.`),
+    (sourceRef) =>
+      sourceRef !== schema.qualifiedId &&
+      schemaRefPrefixes(sourceRef).some((prefix) => fieldRef.startsWith(`${prefix}.`)),
   );
   if (explicitOtherSchema) return null;
 
