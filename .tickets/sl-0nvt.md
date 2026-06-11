@@ -1,6 +1,6 @@
 ---
 id: sl-0nvt
-status: open
+status: closed
 deps: []
 links: []
 created: 2026-06-11T02:43:01Z
