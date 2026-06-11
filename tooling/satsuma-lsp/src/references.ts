@@ -6,6 +6,7 @@ import {
   WorkspaceIndex,
   resolveDefinition,
   findReferences as indexFindReferences,
+  resolveReferenceKey,
 } from "./workspace-index";
 
 /**
@@ -26,9 +27,12 @@ export function computeReferences(
   const ctx = findNodeContext(node);
   if (!ctx) return [];
 
-  // Determine the canonical name to search for
+  // Determine the canonical name to search for. A bare name authored inside
+  // a namespace binds to the namespace-local definition when one exists, so
+  // the reference query must use that qualified key (sl-p256).
   const name = ctx.name;
   if (!name) return [];
+  const refKey = resolveReferenceKey(index, name, ctx.namespace ?? null);
 
   // Use a seen set so qualified + bare lookups never duplicate the same location.
   const seen = new Set<string>();
@@ -41,8 +45,8 @@ export function computeReferences(
     results.push(Location.create(uri, range));
   }
 
-  // Add bare-name references (always)
-  for (const ref of indexFindReferences(index, name)) {
+  // Add references binding to the canonical key (always)
+  for (const ref of indexFindReferences(index, refKey)) {
     addRef(ref.uri, ref.range);
   }
 

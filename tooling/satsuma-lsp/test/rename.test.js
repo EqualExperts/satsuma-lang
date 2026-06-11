@@ -108,6 +108,42 @@ function applyEdits(source, edits) {
 }
 
 describe("computeRename", () => {
+  it("renaming a::foo leaves same-named refs in namespace b untouched (sl-p256)", () => {
+    // Two namespaces each declare a schema foo; namespace b's mapping refs
+    // bind to b::foo. The namespace-blind findReferences fan-out previously
+    // pulled those bare refs into a rename of a::foo, rewriting another
+    // namespace's mapping.
+    const source = [
+      "namespace a {",
+      "  schema foo { id UUID }",
+      "  mapping m1 {",
+      "    source { foo }",
+      "    target { foo }",
+      "    id -> id",
+      "  }",
+      "}",
+      "namespace b {",
+      "  schema foo { id UUID }",
+      "  mapping m2 {",
+      "    source { foo }",
+      "    target { foo }",
+      "    id -> id",
+      "  }",
+      "}",
+    ].join("\n");
+    const { index, trees } = buildIndex({ "file:///a.stm": source });
+    // Cursor on namespace a's "foo" label (line 1, col 10)
+    const edit = computeRename(trees["file:///a.stm"], 1, 10, "file:///a.stm", index, "bar");
+    assert.ok(edit);
+    const result = applyEdits(source, edit.changes["file:///a.stm"]);
+    const aBlock = result.slice(0, result.indexOf("namespace b"));
+    const bBlock = result.slice(result.indexOf("namespace b"));
+    assert.ok(aBlock.includes("schema bar"), "a's definition is renamed");
+    assert.ok(aBlock.includes("source { bar }"), "a's own mapping refs are renamed");
+    assert.ok(!bBlock.includes("bar"), "namespace b must be untouched");
+    assert.ok(bBlock.includes("source { foo }"), "b's refs keep binding to b::foo");
+  });
+
   it("renames schema definition and all references", () => {
     const { index, trees } = buildIndex({
       "file:///a.stm": "schema customers {\n  id UUID\n}",
