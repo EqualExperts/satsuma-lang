@@ -8,8 +8,10 @@
 
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { dirname, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { existsSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { resolveInput } from "#src/workspace.js";
 import { loadWorkspace } from "#src/load-workspace.js";
 
@@ -78,6 +80,63 @@ describe("resolveInput", () => {
     }
 
     assert.match(stderr.join(""), /does-not-exist\.stm/);
+  });
+});
+
+describe("resolveInput physical-file deduplication (sl-8zyr)", () => {
+  // Two import spellings that reach the same physical file must load it once,
+  // otherwise validate reports false duplicate-definition errors for every
+  // schema the file defines. Fixtures are created in a temp dir because the
+  // scenarios depend on filesystem identity (casing, symlinks), not content.
+
+  /** Minimal schema so the imported file parses as a real definition. */
+  const LIB_SOURCE = "schema shared {\n  id: UUID\n}\n";
+
+  /** Build an entry file importing the given paths, in a fresh temp dir. */
+  function makeWorkspace(importPaths: string[]): { dir: string; entry: string } {
+    const dir = mkdtempSync(join(tmpdir(), "satsuma-ws-"));
+    const entry = join(dir, "entry.stm");
+    const imports = importPaths.map((p) => `import { shared } from "${p}"`).join("\n");
+    writeFileSync(join(dir, "lib.stm"), LIB_SOURCE);
+    writeFileSync(entry, `${imports}\n`);
+    return { dir, entry };
+  }
+
+  it("loads a file once when imported under two casings on a case-insensitive filesystem", async (t) => {
+    const { dir, entry } = makeWorkspace(["lib.stm", "LIB.stm"]);
+    try {
+      // Only meaningful where "LIB.stm" actually aliases "lib.stm" (macOS and
+      // Windows defaults); on case-sensitive filesystems it is a missing import.
+      if (!existsSync(join(dir, "LIB.stm"))) {
+        t.skip("filesystem is case-sensitive — no alias to deduplicate");
+        return;
+      }
+      const result = await resolveInput(entry);
+      assert.equal(result.length, 2, `expected entry + one lib, got: ${result.join(", ")}`);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("loads a file once when imported both directly and through a symlink", async (t) => {
+    const { dir, entry } = makeWorkspace(["lib.stm", "lib-link.stm"]);
+    try {
+      try {
+        symlinkSync(join(dir, "lib.stm"), join(dir, "lib-link.stm"));
+      } catch {
+        t.skip("symlinks not supported on this platform");
+        return;
+      }
+      const result = await resolveInput(entry);
+      assert.equal(result.length, 2, `expected entry + one lib, got: ${result.join(", ")}`);
+      // The surviving path must be the physical file, not the symlink spelling.
+      assert.ok(
+        result.includes(realpathSync.native(join(dir, "lib.stm"))),
+        "canonical lib.stm path missing from workspace",
+      );
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });
 
