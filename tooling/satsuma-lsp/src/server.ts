@@ -39,7 +39,8 @@ import { computeCodeLenses } from "./codelens";
 import { computeActionContext } from "./action-context";
 import { prepareRename, computeRename } from "./rename";
 import { computeFormatting, initFormatting } from "./formatting";
-import { buildVizModel, mergeVizModels } from "@satsuma/viz-backend";
+import { computeFullLineage } from "./full-lineage";
+import { buildVizModel } from "@satsuma/viz-backend";
 import { computeMappingCoverage } from "./coverage";
 
 // ---------- Connection setup ----------
@@ -163,19 +164,25 @@ documents.onDidClose((event) => {
  * corresponds to anything the user can navigate to.
  */
 function reindexFromDisk(uri: string): void {
-  let fsPath: string;
-  try {
-    fsPath = fileURLToPath(uri);
-  } catch {
+  const tree = parseTreeFromDisk(uri);
+  if (tree) {
+    indexFile(wsIndex, uri, tree);
+  } else {
     removeFile(wsIndex, uri);
-    return;
   }
+}
+
+/**
+ * Parse a file straight from disk; null for non-file URIs, unreadable files,
+ * or parser failures. Backs the loaders that must see files no editor has
+ * open — e.g. full-lineage traversal over closed imports (sl-mg63).
+ */
+function parseTreeFromDisk(uri: string): Tree | null {
   try {
-    const content = fs.readFileSync(fsPath, "utf-8");
-    const tree = getParser().parse(content);
-    if (tree) indexFile(wsIndex, uri, tree);
+    const content = fs.readFileSync(fileURLToPath(uri), "utf-8");
+    return getParser().parse(content) ?? null;
   } catch {
-    removeFile(wsIndex, uri);
+    return null;
   }
 }
 
@@ -373,23 +380,14 @@ connection.onRequest(
  * Return a merged VizModel spanning the full transitive lineage reachable from
  * the given file via import declarations. Each import-reachable file contributes
  * its schemas, mappings, metrics, and fragments — deduplicated so that stub
- * schemas are superseded by their full upstream definitions.
+ * schemas are superseded by their full upstream definitions. Files that are not
+ * open in any editor are parsed straight from disk, so the lineage really is
+ * the full import closure, not just the open tabs (sl-mg63).
  */
 connection.onRequest(
   "satsuma/vizFullLineage",
   (params: { uri: string }) => {
-    const primaryTree = trees.get(params.uri);
-    if (!primaryTree) return null;
-
-    const reachableUris = getImportReachableUris(params.uri, wsIndex);
-    const models = [];
-    for (const fileUri of reachableUris) {
-      const fileTree = trees.get(fileUri);
-      if (!fileTree) continue;
-      models.push(buildVizModel(fileUri, fileTree, scopeIndex(fileUri)));
-    }
-
-    return mergeVizModels(params.uri, models);
+    return computeFullLineage(params.uri, wsIndex, (uri) => trees.get(uri) ?? parseTreeFromDisk(uri));
   },
 );
 
