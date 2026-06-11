@@ -1,6 +1,6 @@
 ---
 id: sl-h5cx
-status: open
+status: closed
 deps: []
 links: []
 created: 2026-06-11T02:40:50Z
@@ -17,3 +17,10 @@ satsuma-cli/src/commands/lineage.ts:222-265 printUpstreamFlat picks roots as nod
 
 Text mode renders upstream paths in cyclic graphs (cycle-break or SCC handling); cyclic two-file regression test comparing text vs json node coverage.
 
+
+## Notes
+
+**2026-06-11T23:10:00Z**
+
+Cause: printUpstreamFlat found path roots as nodes with no incoming edges and walked forward; in a cyclic upstream graph no node qualifies, so text mode printed only the target while --json reported the full DAG.
+Fix: paths are now discovered by climbing reverse edges from the target, ending at a true source or where a cycle closes onto the current path; regression test pins text output covering every JSON node on the cyclic fixture (commit b79a454)
