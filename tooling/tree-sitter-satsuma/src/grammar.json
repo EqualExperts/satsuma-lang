@@ -1603,32 +1603,34 @@
       }
     },
     "_arithmetic_op": {
-      "type": "TOKEN",
-      "content": {
-        "type": "CHOICE",
-        "members": [
-          {
-            "type": "STRING",
-            "value": "*"
+      "type": "CHOICE",
+      "members": [
+        {
+          "type": "STRING",
+          "value": "*"
+        },
+        {
+          "type": "STRING",
+          "value": "/"
+        },
+        {
+          "type": "STRING",
+          "value": "+"
+        },
+        {
+          "type": "ALIAS",
+          "content": {
+            "type": "SYMBOL",
+            "name": "minus_op"
           },
-          {
-            "type": "STRING",
-            "value": "/"
-          },
-          {
-            "type": "STRING",
-            "value": "+"
-          },
-          {
-            "type": "STRING",
-            "value": "-"
-          },
-          {
-            "type": "STRING",
-            "value": "%"
-          }
-        ]
-      }
+          "named": false,
+          "value": "-"
+        },
+        {
+          "type": "STRING",
+          "value": "%"
+        }
+      ]
     },
     "map_value": {
       "type": "SEQ",
@@ -2341,6 +2343,10 @@
     {
       "type": "SYMBOL",
       "name": "map_value_word"
+    },
+    {
+      "type": "SYMBOL",
+      "name": "minus_op"
     }
   ],
   "inline": [],
