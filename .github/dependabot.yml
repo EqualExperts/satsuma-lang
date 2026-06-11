@@ -1,4 +1,9 @@
 version: 2
+
+# One npm entry per directory with its own package-lock.json. When adding a
+# new package, add a matching entry here — the CI audit loop in
+# .github/workflows/security.yml discovers lockfiles automatically, but
+# Dependabot requires an explicit entry per directory (sl-qpbx).
 updates:
   # Root package (devDependencies: eslint, typescript, etc.)
   - package-ecosystem: "npm"
@@ -8,9 +13,65 @@ updates:
     open-pull-requests-limit: 10
     labels: ["dependencies"]
 
+  # Project website
+  - package-ecosystem: "npm"
+    directory: "/site"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 10
+    labels: ["dependencies"]
+
   # satsuma-cli
   - package-ecosystem: "npm"
     directory: "/tooling/satsuma-cli"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 10
+    labels: ["dependencies"]
+
+  # satsuma-core (shared language utilities)
+  - package-ecosystem: "npm"
+    directory: "/tooling/satsuma-core"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 10
+    labels: ["dependencies"]
+
+  # satsuma-lsp (standalone language server)
+  - package-ecosystem: "npm"
+    directory: "/tooling/satsuma-lsp"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 10
+    labels: ["dependencies"]
+
+  # satsuma-viz (visualization components)
+  - package-ecosystem: "npm"
+    directory: "/tooling/satsuma-viz"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 10
+    labels: ["dependencies"]
+
+  # satsuma-viz-backend
+  - package-ecosystem: "npm"
+    directory: "/tooling/satsuma-viz-backend"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 10
+    labels: ["dependencies"]
+
+  # satsuma-viz-harness (Playwright test harness)
+  - package-ecosystem: "npm"
+    directory: "/tooling/satsuma-viz-harness"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 10
+    labels: ["dependencies"]
+
+  # satsuma-viz-model
+  - package-ecosystem: "npm"
+    directory: "/tooling/satsuma-viz-model"
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 10
@@ -30,14 +91,6 @@ updates:
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 10
-    labels: ["dependencies"]
-
-  # vscode-satsuma LSP server (nested package)
-  - package-ecosystem: "npm"
-    directory: "/tooling/vscode-satsuma/server"
-    schedule:
-      interval: "weekly"
-    open-pull-requests-limit: 5
     labels: ["dependencies"]
 
   # GitHub Actions versions

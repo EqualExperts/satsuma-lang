@@ -22,9 +22,6 @@ jobs:
         with:
           node-version: "22"
 
-      - name: Install dependencies
-        run: npm run ci:all
-
       - name: Parse allowlist
         id: allowlist
         run: |
@@ -32,10 +29,15 @@ jobs:
           echo "ids=$(cat /tmp/npm-allowlist.txt)" >> "$GITHUB_OUTPUT"
 
       - name: Audit all packages
+        # npm audit reads package-lock.json directly (no install needed), so the
+        # loop discovers every tracked lockfile instead of maintaining a
+        # hardcoded directory list — new packages are covered automatically
+        # without anyone remembering to edit this workflow (sl-qpbx).
         run: |
           set +e
           failed=0
-          for dir in . tooling/satsuma-cli tooling/tree-sitter-satsuma tooling/satsuma-lsp tooling/vscode-satsuma; do
+          for lockfile in $(git ls-files '*package-lock.json'); do
+            dir=$(dirname "$lockfile")
             echo "::group::npm audit — $dir"
             cd "$GITHUB_WORKSPACE/$dir"
             npm audit --omit=dev --audit-level=high 2>&1
