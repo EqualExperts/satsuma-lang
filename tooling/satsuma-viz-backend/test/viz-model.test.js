@@ -671,6 +671,50 @@ namespace src {
     assert.ok(names.includes("name"), "direct field name should be present");
   });
 
+  it("resolves bare spreads of a fragment in the same namespace (sl-22ym)", () => {
+    // A bare `...audit` inside `namespace crm` must resolve to crm::audit.
+    // Regression: expansion ran with currentNs=null so the namespace-qualified
+    // fragment key was never tried and the spread's fields were silently lost.
+    const src = `
+namespace crm {
+  fragment audit {
+    created_at  x
+  }
+  schema customers {
+    ...audit
+    id  x
+  }
+}
+`;
+    const model = vizModel(src);
+    const crmNs = model.namespaces.find((ns) => ns.name === "crm");
+    const schema = crmNs.schemas.find((s) => s.qualifiedId === "crm::customers");
+    const names = schema.fields.map((f) => f.name);
+    assert.ok(names.includes("created_at"), "same-namespace spread field should be resolved");
+    assert.ok(names.includes("id"), "direct field id should be present");
+    assert.deepEqual(schema.spreads, [], "resolved spread should be cleared");
+  });
+
+  it("preserves unresolvable spreads so the card still shows the reference", () => {
+    // A spread naming a fragment that doesn't exist cannot be expanded, but it
+    // must not be silently erased either — the schema card renders remaining
+    // `spreads` entries as a visible "… spreads X" indicator.
+    const src = `
+schema s1 {
+  ...does_not_exist
+  id  x
+}
+`;
+    const model = vizModel(src);
+    const schema = model.namespaces[0].schemas[0];
+    assert.deepEqual(schema.spreads, ["does_not_exist"], "unresolvable spread should be preserved");
+    assert.deepEqual(
+      schema.fields.map((f) => f.name),
+      ["id"],
+      "no phantom fields should be added",
+    );
+  });
+
   it("preserves direct fields alongside spread fields", () => {
     const src = `
 namespace common {
