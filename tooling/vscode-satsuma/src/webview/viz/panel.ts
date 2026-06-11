@@ -9,6 +9,7 @@ import {
   loadFullLineageModel,
   vizThemeForKind,
 } from "./integration";
+import { RefreshGate } from "./refresh-gate";
 
 export class VizPanel {
   static currentPanel: VizPanel | undefined;
@@ -19,6 +20,12 @@ export class VizPanel {
   private disposables: vscode.Disposable[] = [];
   /** URI of the last successfully loaded .stm file — used by Refresh to reload without requiring focus. */
   private _lastUri: string | undefined;
+  /**
+   * Latest-wins ordering for overlapping loads: save/editor watchers and
+   * manual refresh can race, and a slow earlier LSP response must not
+   * overwrite a newer model in the webview (sl-jar4).
+   */
+  private readonly refreshGate = new RefreshGate();
 
   static createOrShow(
     extensionUri: vscode.Uri,
@@ -121,12 +128,18 @@ export class VizPanel {
       return;
     }
 
+    // Stamp this load; any result (success or error) arriving after a newer
+    // load has started is stale and must be dropped, not rendered (sl-jar4).
+    const generation = this.refreshGate.begin();
+
     try {
       const modelEnvelope = await loadFullLineageModel(
         this.client,
         uri,
         vscode.window.activeColorTheme.kind,
       );
+      if (!this.refreshGate.isCurrent(generation)) return;
+
       if (!modelEnvelope) {
         this.panel.webview.postMessage({
           type: "error",
@@ -144,6 +157,7 @@ export class VizPanel {
         theme: modelEnvelope.theme,
       });
     } catch (err) {
+      if (!this.refreshGate.isCurrent(generation)) return;
       this.panel.webview.postMessage({
         type: "error",
         message: `Failed to load VizModel: ${err instanceof Error ? err.message : String(err)}`,
@@ -213,6 +227,11 @@ export class VizPanel {
         ? editor.document.uri.toString()
         : undefined) ?? this._lastUri ?? "";
 
+    // An expansion is computed against the model currently in the webview.
+    // If a refresh starts while the request is in flight, the expansion
+    // belongs to the replaced model and must be dropped (sl-jar4).
+    const baseGeneration = this.refreshGate.latest();
+
     try {
       const expandedEnvelope = await loadExpandedModels(
         this.client,
@@ -220,6 +239,7 @@ export class VizPanel {
         currentUri,
         vscode.window.activeColorTheme.kind,
       );
+      if (!this.refreshGate.isCurrent(baseGeneration)) return;
 
       if (expandedEnvelope.models.length === 0) {
         return;
@@ -233,6 +253,7 @@ export class VizPanel {
         theme: expandedEnvelope.theme,
       });
     } catch (err) {
+      if (!this.refreshGate.isCurrent(baseGeneration)) return;
       this.panel.webview.postMessage({
         type: "error",
         message: `Failed to expand lineage: ${err instanceof Error ? err.message : String(err)}`,
