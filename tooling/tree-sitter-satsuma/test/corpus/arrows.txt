@@ -381,3 +381,86 @@ mapping {
             (pipe_text
               (identifier))))))))
 
+================================================================================
+Arrow parses with no whitespace around the operator
+================================================================================
+
+mapping {
+  Id->opp_key
+}
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (mapping_block
+    (mapping_body
+      (map_arrow
+        (src_path
+          (field_path
+            (identifier)))
+        (tgt_path
+          (field_path
+            (identifier)))))))
+
+================================================================================
+Arrow parses with space only after the operator
+================================================================================
+
+mapping {
+  a-> b
+}
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (mapping_block
+    (mapping_body
+      (map_arrow
+        (src_path
+          (field_path
+            (identifier)))
+        (tgt_path
+          (field_path
+            (identifier)))))))
+
+================================================================================
+Arrow parses with space only before the operator
+================================================================================
+
+mapping {
+  c ->d
+}
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (mapping_block
+    (mapping_body
+      (map_arrow
+        (src_path
+          (field_path
+            (identifier)))
+        (tgt_path
+          (field_path
+            (identifier)))))))
+
+================================================================================
+Hyphenated identifiers still work around a no-space arrow
+================================================================================
+
+mapping {
+  src-field->tgt-field
+}
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (mapping_block
+    (mapping_body
+      (map_arrow
+        (src_path
+          (field_path
+            (identifier)))
+        (tgt_path
+          (field_path
+            (identifier)))))))

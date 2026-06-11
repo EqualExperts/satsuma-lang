@@ -333,7 +333,9 @@ module.exports = grammar({
     type_expr: (_) =>
       token(
         seq(
-          /[a-zA-Z_][a-zA-Z0-9_-]*/,
+          // Same shape as identifier: hyphens allowed inside, not at the end
+          // (sl-csd2).
+          /[a-zA-Z_]([a-zA-Z0-9_-]*[a-zA-Z0-9_])?/,
           optional(seq("(", /[^)]*/, ")")),
         ),
       ),
@@ -654,7 +656,11 @@ module.exports = grammar({
 
     // ── Lexical tokens ────────────────────────────────────────────────────
 
-    identifier: (_) => /[a-zA-Z_][a-zA-Z0-9_-]*/,
+    // Hyphens are allowed inside an identifier but not at its end. A trailing
+    // hyphen would let maximal munch lex `Id->tgt` as identifier "Id-" + ">",
+    // breaking no-space arrows (sl-csd2). With this shape, `a->b` lexes as
+    // "a", "->", "b" — whitespace around arrows is never required.
+    identifier: (_) => /[a-zA-Z_]([a-zA-Z0-9_-]*[a-zA-Z0-9_])?/,
 
     backtick_name: (_) => /`(?:[^`\\]|\\.)+`/,
 

@@ -65,13 +65,25 @@ bool tree_sitter_satsuma_external_scanner_scan(void *payload, TSLexer *lexer, co
     return false;
   }
 
-  /* Consume the full identifier: letters, digits, underscores, hyphens. */
+  /* Consume the full identifier: letters, digits, underscores, hyphens.
+   * Mirrors the grammar's identifier shape: hyphens are allowed inside the
+   * word but not at its end (sl-csd2), so `a->b` always lexes as an arrow.
+   * mark_end pins the token end after each non-hyphen character; a hyphen is
+   * only included once a following identifier character confirms it is
+   * interior. */
+  lexer->advance(lexer, false);
+  lexer->mark_end(lexer);
   while (!lexer->eof(lexer)) {
     c = lexer->lookahead;
     if ((c >= 'a' && c <= 'z') ||
         (c >= 'A' && c <= 'Z') ||
         (c >= '0' && c <= '9') ||
-        c == '_' || c == '-') {
+        c == '_') {
+      lexer->advance(lexer, false);
+      lexer->mark_end(lexer);
+    } else if (c == '-') {
+      /* Tentatively consume the hyphen run; only marked if followed by a
+       * non-hyphen identifier character. */
       lexer->advance(lexer, false);
     } else {
       break;
