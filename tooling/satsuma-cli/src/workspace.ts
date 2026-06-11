@@ -7,10 +7,32 @@
  */
 
 import { stat } from "fs/promises";
-import { readFileSync, statSync } from "fs";
+import { readFileSync, realpathSync, statSync } from "fs";
 import { dirname, resolve } from "path";
 import { extractImports } from "@satsuma/core";
 import { parseSource } from "./parser.js";
+
+/**
+ * Canonicalize a path to its physical identity on disk.
+ *
+ * `path.resolve` alone is not enough to deduplicate files: on the
+ * case-insensitive filesystems that macOS and Windows default to,
+ * "lib.stm" and "LIB.stm" resolve to different strings but the same
+ * physical file, and a symlink resolves to a different string than its
+ * target. `realpathSync.native` collapses both — it follows symlinks and
+ * returns the on-disk casing — so keying visited-sets on its result loads
+ * each physical file exactly once (sl-8zyr).
+ *
+ * Falls back to the input path when realpath fails (e.g. the file
+ * disappeared between stat and canonicalization).
+ */
+function canonicalPath(filePath: string): string {
+  try {
+    return realpathSync.native(filePath);
+  } catch {
+    return filePath;
+  }
+}
 
 /**
  * Error message shown when a directory is passed where a .stm file is expected.
@@ -22,13 +44,15 @@ const DIRECTORY_NOT_SUPPORTED =
 
 /**
  * Follow import declarations from a single .stm file, collecting all
- * transitively imported file paths. Uses a visited set for cycle safety.
+ * transitively imported file paths. Uses a visited set for cycle safety;
+ * paths are canonicalized first so case-aliased or symlinked imports of
+ * the same physical file are visited (and returned) only once.
  *
  * Missing import targets are warned on stderr but do not halt discovery.
  */
 function followImports(entryFile: string): string[] {
   const visited = new Set<string>();
-  const queue = [entryFile];
+  const queue = [canonicalPath(entryFile)];
   while (queue.length > 0) {
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- Safe: queue.length > 0 checked above
     const filePath = queue.pop()!;
@@ -59,8 +83,11 @@ function followImports(entryFile: string): string[] {
         continue;
       }
 
-      if (!visited.has(resolved)) {
-        queue.push(resolved);
+      // Canonicalize before the visited check so two spellings of the same
+      // physical file (case alias, symlink) cannot enqueue it twice.
+      const canonical = canonicalPath(resolved);
+      if (!visited.has(canonical)) {
+        queue.push(canonical);
       }
     }
   }
