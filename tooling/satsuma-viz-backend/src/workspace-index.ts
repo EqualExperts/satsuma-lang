@@ -71,8 +71,10 @@ export interface ReferenceEntry {
   range: Range;
   /** Canonical referenced name, qualified when authored that way. */
   name: string;
-  /** Semantic usage context for downstream queries. */
-  context: "source" | "target" | "spread" | "import" | "arrow" | "metric_source";
+  /** Semantic usage context for downstream queries. "arrow" marks structural
+   *  src/tgt path references; "nl" marks @refs found inside NL prose strings
+   *  (arrow bodies, note tags/blocks, metadata values — sl-ellp). */
+  context: "source" | "target" | "spread" | "import" | "arrow" | "nl" | "metric_source";
 }
 
 export interface ImportEntry {
@@ -352,6 +354,10 @@ export function indexFile(index: WorkspaceIndex, uri: string, tree: Tree): void 
   for (const node of root.namedChildren) {
     indexTopLevel(index, uri, node, null);
   }
+
+  // Index @refs inside NL prose once for the whole file — note tags, note
+  // blocks, metadata values, and arrow bodies alike (sl-ellp).
+  indexNlRefs(index, uri, root);
 }
 
 /** Remove all entries for a file URI from the index (canonicalized first —
@@ -680,11 +686,9 @@ function indexMappingRefs(
     indexArrowSpreadRefs(index, uri, ch);
   }
 
-  // Index field-level references from arrow src_path / tgt_path nodes
+  // Index field-level references from arrow src_path / tgt_path nodes.
+  // (@refs in NL strings are indexed file-wide by indexFile, not here.)
   indexArrowFieldRefs(index, uri, body);
-
-  // Index @refs and backtick refs inside NL strings in arrows
-  indexNlRefs(index, uri, body);
 }
 
 function indexArrowSpreadRefs(
@@ -882,12 +886,20 @@ function extractArrowFieldName(pathNode: SyntaxNode): string | null {
 
 const NL_AT_REF_RE = createAtRefRegex();
 
+/**
+ * Index every @ref inside NL strings under `node` as an "nl" reference.
+ *
+ * Called once per file with the root node (sl-ellp): NL prose carrying refs
+ * lives not only in arrow bodies but in `(note "...")` metadata tags, `note`
+ * blocks at any level, and metadata value strings — all of which rename and
+ * find-references must reach, or renames leave stale prose behind.
+ */
 function indexNlRefs(
   index: WorkspaceIndex,
   uri: string,
-  body: SyntaxNode,
+  node: SyntaxNode,
 ): void {
-  walkDescendants(body, (n) => {
+  walkDescendants(node, (n) => {
     if (n.type !== "nl_string" && n.type !== "multiline_string") return;
 
     const text = n.text;
@@ -911,7 +923,7 @@ function indexNlRefs(
         uri,
         range,
         name: refName,
-        context: "arrow",
+        context: "nl",
       });
     }
 

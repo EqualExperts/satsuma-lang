@@ -584,7 +584,7 @@ describe("reference range precision (sl-xf3f)", () => {
   -> name { "see @customers here" }
 }`;
     const idx = buildIndex({ "file:///a.stm": source });
-    const refs = (idx.references.get("customers") || []).filter((r) => r.context === "arrow");
+    const refs = (idx.references.get("customers") || []).filter((r) => r.context === "nl");
     assert.equal(refs.length, 1);
     // A range including the @ deletes the sigil on rename, breaking the ref.
     assert.equal(textAt(source, refs[0].range), "customers");
@@ -600,18 +600,18 @@ describe("NL string reference indexing", () => {
   -> display_name { "Use @FIRST_NM and @LAST_NM" }
 }`,
     });
-    const firstRefs = (idx.references.get("FIRST_NM") || []).filter((r) => r.context === "arrow");
-    assert.ok(firstRefs.length >= 1, "expected arrow ref for @FIRST_NM");
-    const lastRefs = (idx.references.get("LAST_NM") || []).filter((r) => r.context === "arrow");
-    assert.ok(lastRefs.length >= 1, "expected arrow ref for @LAST_NM");
+    const firstRefs = (idx.references.get("FIRST_NM") || []).filter((r) => r.context === "nl");
+    assert.ok(firstRefs.length >= 1, "expected nl ref for @FIRST_NM");
+    const lastRefs = (idx.references.get("LAST_NM") || []).filter((r) => r.context === "nl");
+    assert.ok(lastRefs.length >= 1, "expected nl ref for @LAST_NM");
   });
 
   it("indexes @refs with backtick-delimited names", () => {
     const idx = buildIndex({
       "file:///a.stm": "mapping test {\n  source { customers }\n  target { dim }\n  -> name { \"Use @`first name` here\" }\n}",
     });
-    const refs = (idx.references.get("first name") || []).filter((r) => r.context === "arrow");
-    assert.ok(refs.length >= 1, "expected arrow ref for @`first name`");
+    const refs = (idx.references.get("first name") || []).filter((r) => r.context === "nl");
+    assert.ok(refs.length >= 1, "expected nl ref for @`first name`");
   });
 
   it("indexes @refs in multiline NL strings", () => {
@@ -627,12 +627,75 @@ describe("NL string reference indexing", () => {
   }
 }`,
     });
-    const addrRefs = (idx.references.get("ADDR_LINE_1") || []).filter((r) => r.context === "arrow");
-    assert.ok(addrRefs.length >= 1, "expected arrow ref for @ADDR_LINE_1");
-    const stateRefs = (idx.references.get("STATE_PROV") || []).filter((r) => r.context === "arrow");
-    assert.ok(stateRefs.length >= 1, "expected arrow ref for @STATE_PROV");
+    const addrRefs = (idx.references.get("ADDR_LINE_1") || []).filter((r) => r.context === "nl");
+    assert.ok(addrRefs.length >= 1, "expected nl ref for @ADDR_LINE_1");
+    const stateRefs = (idx.references.get("STATE_PROV") || []).filter((r) => r.context === "nl");
+    assert.ok(stateRefs.length >= 1, "expected nl ref for @STATE_PROV");
   });
 
+  // sl-ellp: indexNlRefs used to walk only mapping bodies, so @refs in note
+  // tags, note blocks, and metadata values were invisible to find-references
+  // and rename — renames left stale prose behind. These cases pin the
+  // file-wide walk.
+
+  it("indexes @refs in a mapping-level (note ...) metadata tag", () => {
+    const idx = buildIndex({
+      "file:///a.stm": `mapping test (note "joins against @customers") {
+  source { customers }
+  target { dim }
+}`,
+    });
+    const refs = (idx.references.get("customers") || []).filter((r) => r.context === "nl");
+    assert.equal(refs.length, 1);
+  });
+
+  it("indexes @refs in a schema-level note block", () => {
+    const idx = buildIndex({
+      "file:///a.stm": `schema dim {
+  id UUID
+  note { "sourced from @customers nightly" }
+}`,
+    });
+    const refs = (idx.references.get("customers") || []).filter((r) => r.context === "nl");
+    assert.equal(refs.length, 1);
+  });
+
+  it("indexes @refs in a standalone top-level note block", () => {
+    const idx = buildIndex({
+      "file:///a.stm": 'note { "platform feeds @customers downstream" }',
+    });
+    const refs = (idx.references.get("customers") || []).filter((r) => r.context === "nl");
+    assert.equal(refs.length, 1);
+  });
+
+  it("indexes @refs in note blocks inside a namespace", () => {
+    // Namespaced content goes through a different dispatch path than global
+    // blocks; the file-wide NL walk must reach it regardless.
+    const idx = buildIndex({
+      "file:///a.stm": `namespace crm {
+  schema dim {
+    id UUID
+    note { "see @customers" }
+  }
+}`,
+    });
+    const refs = (idx.references.get("customers") || []).filter((r) => r.context === "nl");
+    assert.equal(refs.length, 1);
+  });
+
+  it("does not double-index @refs in arrow-body NL strings", () => {
+    // The file-wide walk replaced the per-mapping-body walk; if both ran, every
+    // arrow NL ref would appear twice and rename would produce overlapping edits.
+    const idx = buildIndex({
+      "file:///a.stm": `mapping test {
+  source { customers }
+  target { dim }
+  -> name { "see @customers here" }
+}`,
+    });
+    const refs = (idx.references.get("customers") || []).filter((r) => r.context === "nl");
+    assert.equal(refs.length, 1);
+  });
 });
 
 describe("transform spread indexing in arrows", () => {
