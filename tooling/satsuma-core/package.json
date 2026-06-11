@@ -50,6 +50,10 @@
       "types": "./dist/string-utils.d.ts",
       "default": "./dist/string-utils.js"
     },
+    "./source-files": {
+      "types": "./dist/source-files.d.ts",
+      "default": "./dist/source-files.js"
+    },
     "./parser": {
       "types": "./dist/parser.d.ts",
       "default": "./dist/parser.js"

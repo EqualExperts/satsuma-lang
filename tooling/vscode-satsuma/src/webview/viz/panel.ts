@@ -1,5 +1,6 @@
 import * as vscode from "vscode";
 import { join } from "path";
+import { isSatsumaFilePath } from "@satsuma/core/source-files";
 import type { LanguageClient } from "vscode-languageclient/node";
 import { FieldLineagePanel } from "../field-lineage/panel";
 import { resolveEntryFile } from "../../commands/entry-file";
@@ -68,7 +69,7 @@ export class VizPanel {
 
     // Refresh on save
     const saveWatcher = vscode.workspace.onDidSaveTextDocument((doc) => {
-      if (doc.fileName.endsWith(".stm") || doc.fileName.endsWith(".satsuma")) {
+      if (isSatsumaFilePath(doc.fileName)) {
         this.refresh();
       }
     });
