@@ -186,9 +186,12 @@ function searchTag(index: ExtractedWorkspace, parsedFiles: ParsedFile[], tag: st
 
 /**
  * Walk a schema_body node and collect field_decls whose metadata
- * contains the given tag (case-insensitive prefix match).
+ * contains the given tag (case-insensitive prefix match). `tag` must
+ * already be lowercased by the caller.
+ *
+ * Exported for unit tests; not part of the command's public surface.
  */
-function collectFieldMatches(bodyNode: SyntaxNode, blockType: string, blockName: string, file: string, tag: string, acc: Match[]): void {
+export function collectFieldMatches(bodyNode: SyntaxNode, blockType: string, blockName: string, file: string, tag: string, acc: Match[]): void {
   for (const c of bodyNode.namedChildren) {
     if (c.type === "field_decl") {
       const nameNode = c.namedChildren.find((x) => x.type === "field_name");
@@ -232,10 +235,12 @@ function collectFieldMatches(bodyNode: SyntaxNode, blockType: string, blockName:
 }
 
 /**
- * Check if a metadata_block contains a tag matching `tag`.
- * Returns the matched tag text or null.
+ * Check if a metadata_block contains a tag matching `tag` (which must
+ * already be lowercased). Returns the matched tag text or null.
+ *
+ * Exported for unit tests; not part of the command's public surface.
  */
-function findTagInMeta(metaNode: SyntaxNode, tag: string): string | null {
+export function findTagInMeta(metaNode: SyntaxNode, tag: string): string | null {
   for (const c of metaNode.namedChildren) {
     if (c.type === "tag_token" && c.text.toLowerCase() === tag) {
       return c.text;
