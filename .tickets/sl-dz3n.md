@@ -1,6 +1,6 @@
 ---
 id: sl-dz3n
-status: in_progress
+status: closed
 deps: []
 links: []
 created: 2026-06-10T23:21:30Z
@@ -17,3 +17,10 @@ satsuma-core/src/format.ts loses comments (confirmed by repro: comment present i
 
 Comments in all five positions survive formatting; idempotency preserved; fixtures cover each position.
 
+
+## Notes
+
+**2026-06-11T06:46:10Z**
+
+Cause: five formatter collector loops dispatched only on content node types — arrow/pipe-chain bodies, source/target blocks, metadata blocks, note blocks, and block opening-brace rows all silently dropped comment children, contradicting the module header promise of comment preservation.
+Fix: interleave comments in all five collectors (same-line comments append to their entry, own-line comments keep their line, brace-row comments stay on the header via new braceLineCommentSuffix helper) and force multi-line layout when comments are present; six regression tests proven failing pre-fix (commit ddffbe4)
