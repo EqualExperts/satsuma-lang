@@ -162,6 +162,11 @@ A field is declared as:
 - **Type** — a vocabulary token (interpreted by the LLM, not formally validated). Common types: `STRING`, `VARCHAR(n)`, `INT`, `DECIMAL(p,s)`, `BOOLEAN`, `DATE`, `TIMESTAMPTZ`, `UUID`, `JSON`, `TEXT`.
 - **Metadata** — optional `( )` block with flags and key-value pairs.
 
+**Type arguments vs metadata.** Parentheses attached *directly* to the type name (no whitespace) are type arguments and belong to the type: `DECIMAL(12,2)`, `VARCHAR(MAX)`. Parentheses separated from the type by whitespace are the field's metadata block: `UUID (pk)`. The two are easy to mix up:
+
+- `customer_id UUID(pk)` parses cleanly but means "a type called `UUID(pk)`" — the `pk` constraint is *not* metadata. Tooling flags known constraint tokens inside type arguments (`constraint-in-type-args` warning).
+- `amount DECIMAL (12,2)` is a parse error — numeric type arguments must attach to the type with no space.
+
 ### 3.3 Nested Structures: `record` and `list_of`
 
 Use `record` for a single nested structure and `list_of record` for a repeated nested structure. The unified field declaration pattern is:

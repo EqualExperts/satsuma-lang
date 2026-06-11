@@ -533,3 +533,59 @@ describe("validateSemanticWorkspace", () => {
     assert.equal(diags[0].message, "orders from file:///workspace/orders.stm");
   });
 });
+
+// ---------- Constraint flags inside type parentheses (sl-vryu) ----------
+
+describe("constraint-in-type-args", () => {
+  it("warns when a known constraint flag is absorbed into type arguments (UUID(pk))", () => {
+    // `customer_id UUID(pk)` parses cleanly with (pk) as part of the type
+    // token; without this diagnostic the pk constraint silently disappears.
+    const index = makeIndex({
+      schemas: [{
+        name: "customers",
+        fields: [{ name: "customer_id", type: "UUID(pk)", startRow: 3 }],
+      }],
+    });
+    const diags = collectSemanticDiagnostics(index).filter((d) => d.rule === "constraint-in-type-args");
+    assert.equal(diags.length, 1);
+    assert.equal(diags[0].severity, "warning");
+    assert.equal(diags[0].line, 4); // startRow 3 → 1-indexed line 4
+    assert.match(diags[0].message, /'pk'/);
+    assert.match(diags[0].message, /UUID \(pk\)/); // suggests the space form
+  });
+
+  it("does not warn for legitimate type arguments (DECIMAL(12,2), VARCHAR(MAX))", () => {
+    // Type vocabulary is open-ended (spec 3.2); numeric and vendor args are
+    // exactly what type parentheses are for.
+    const index = makeIndex({
+      schemas: [{
+        name: "orders",
+        fields: [
+          { name: "amount", type: "DECIMAL(12,2)" },
+          { name: "notes", type: "VARCHAR(MAX)" },
+        ],
+      }],
+    });
+    const diags = collectSemanticDiagnostics(index).filter((d) => d.rule === "constraint-in-type-args");
+    assert.deepEqual(diags, []);
+  });
+
+  it("recurses into record children and checks fragments too", () => {
+    const index = makeIndex({
+      schemas: [{
+        name: "order",
+        fields: [{
+          name: "customer", type: "record",
+          children: [{ name: "id", type: "STRING(required)", startRow: 5 }],
+        }],
+      }],
+      fragments: [{
+        name: "audit",
+        fields: [{ name: "created_by", type: "VARCHAR(100)" }],
+      }],
+    });
+    const diags = collectSemanticDiagnostics(index).filter((d) => d.rule === "constraint-in-type-args");
+    assert.equal(diags.length, 1);
+    assert.match(diags[0].message, /'required'/);
+  });
+});

@@ -290,7 +290,6 @@ schema order {
               (identifier))
             (type_expr)))))))
 
-
 ================================================================================
 Typeless field — name and metadata, no type
 ================================================================================
@@ -357,3 +356,41 @@ schema t {
       (fragment_spread
         (spread_label
           (identifier))))))
+
+================================================================================
+Parens attached to the type name are type arguments, not metadata
+================================================================================
+
+schema s {
+  customer_id UUID(pk)
+  notes VARCHAR(MAX)
+}
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (schema_block
+    (block_label
+      (identifier))
+    (schema_body
+      (field_decl
+        (field_name
+          (identifier))
+        (type_expr))
+      (field_decl
+        (field_name
+          (identifier))
+        (type_expr)))))
+
+================================================================================
+Numeric parens separated from the type by a space are not type arguments
+:error
+================================================================================
+
+schema s {
+  amount DECIMAL (12,2)
+}
+
+--------------------------------------------------------------------------------
+
+

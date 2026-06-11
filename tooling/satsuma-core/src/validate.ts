@@ -21,6 +21,7 @@
  *   7. Transform spread references — ...spread in arrow transforms
  *   8. Ref metadata targets — (ref @schema) annotations pointing to unknown schemas
  *   9. Import scope — symbols used but not reachable through the file's imports (ADR-022)
+ *  10. Constraint flags inside type parentheses — UUID(pk) silently absorbing metadata (sl-vryu)
  */
 
 import { capitalize } from "./string-utils.js";
@@ -259,6 +260,7 @@ function collectSemanticDiagnosticsWithOptions(
   if (options.reachability) {
     checkImportScope(index, options.reachability, diagnostics, options.importScopeDiagnostic);
   }
+  checkTypeParenConstraints(index, diagnostics);
 
   return diagnostics;
 }
@@ -848,6 +850,73 @@ function definitionFileFor(definition: unknown): string | null {
   if (!definition || typeof definition !== "object") return null;
   const file = (definition as { file?: unknown }).file;
   return typeof file === "string" ? file : null;
+}
+
+// ---------- Section 10: Constraint flags inside type parentheses (sl-vryu) ----------
+
+/**
+ * Field metadata flag tokens from spec §7.1 that mark constraints.
+ *
+ * Business rule: the grammar deliberately treats parentheses attached directly
+ * to a type name (`UUID(pk)`, `VARCHAR(MAX)`) as type *arguments*, because the
+ * type vocabulary is open-ended (spec §3.2). Constraints belong in a separate
+ * space-delimited metadata block (`UUID (pk)`). When one of these flag tokens
+ * shows up inside type arguments the author almost certainly forgot the space,
+ * and the constraint would otherwise silently vanish from extraction.
+ *
+ * Kept in sync with CONSTRAINT_TAGS in @satsuma/viz-model (badge rendering).
+ */
+const CONSTRAINT_FLAG_TOKENS = new Set([
+  "pk", "required", "unique", "indexed", "pii", "encrypt",
+]);
+
+/** Matches `NAME(args)` type text, capturing the bare name and the raw args. */
+const TYPE_WITH_ARGS = /^([A-Za-z_][A-Za-z0-9_-]*)\((.*)\)$/;
+
+/**
+ * Warn when a known constraint flag is lexed as a type argument —
+ * `customer_id UUID(pk)` parses cleanly with `(pk)` absorbed into the type
+ * text, so without this check the pk constraint disappears from all tooling.
+ */
+function checkTypeParenConstraints(index: SemanticIndex, diagnostics: SemanticDiagnostic[]): void {
+  for (const [name, schema] of index.schemas) {
+    checkFieldTypeParens(schema.fields, name, schema.file, schema.row, diagnostics);
+  }
+  for (const [name, frag] of index.fragments) {
+    checkFieldTypeParens(frag.fields, name, frag.file, frag.row, diagnostics);
+  }
+}
+
+function checkFieldTypeParens(
+  fields: FieldDecl[],
+  entityName: string,
+  file: string,
+  entityRow: number,
+  diagnostics: SemanticDiagnostic[],
+): void {
+  for (const field of fields) {
+    const match = field.type?.match(TYPE_WITH_ARGS);
+    if (match) {
+      const [, typeName, rawArgs] = match;
+      const flagged = rawArgs!
+        .split(/[,\s]+/)
+        .filter((arg) => CONSTRAINT_FLAG_TOKENS.has(arg));
+      if (flagged.length > 0) {
+        const constraints = flagged.map((f) => `'${f}'`).join(", ");
+        diagnostics.push({
+          file,
+          line: (field.startRow ?? entityRow) + 1,
+          column: 1,
+          severity: "warning",
+          rule: "constraint-in-type-args",
+          message: `Field '${field.name}' in '${entityName}' has constraint ${constraints} inside type arguments '${field.type}' — type parentheses attach to the type; write '${typeName} (${rawArgs})' (space before parens) to declare metadata`,
+        });
+      }
+    }
+    if (field.children) {
+      checkFieldTypeParens(field.children, entityName, file, entityRow, diagnostics);
+    }
+  }
 }
 
 // ---------- Helpers ----------
