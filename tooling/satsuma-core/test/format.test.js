@@ -329,6 +329,99 @@ schema m (metric, source s) {
     const out2 = fmt(out1);
     assert.equal(out1, out2, "transform with gap comments must be idempotent");
   });
+
+  // ── sl-dz3n: comments were silently deleted in five positions ──────────────
+  // Each case below reproduces one position from the ticket. The module header
+  // promises the formatter preserves comments, so loss anywhere is a bug.
+
+  it("preserves leading, in-chain, and trailing comments in arrow transform bodies (sl-dz3n)", () => {
+    const src = `mapping m {
+  source { s }
+  target { t }
+  a -> b {
+    // strip whitespace first
+    trim
+    // fold to lowercase next
+    | lowercase  // then case-fold
+  }
+}`;
+    const out = fmt(src);
+    assert.ok(out.includes("// strip whitespace first"), "comment between { and pipe chain must survive");
+    assert.ok(out.includes("// fold to lowercase next"), "comment between pipe steps must survive");
+    assert.ok(out.includes("// then case-fold"), "trailing inline comment on last step must survive");
+    assert.equal(out, fmt(out), "arrow body comments must be idempotent");
+  });
+
+  it("preserves comments between pipe steps in transform blocks (sl-dz3n)", () => {
+    // The transform-block leading/trailing positions are covered above (sl-17lk);
+    // this guards the in-chain position, which goes through formatPipeChainMultiLine.
+    const src = `transform t {
+  trim
+  // normalise case before comparing
+  | lowercase
+}`;
+    const out = fmt(src);
+    assert.ok(out.includes("// normalise case before comparing"), "comment between pipe steps must survive");
+    assert.equal(out, fmt(out), "in-chain transform comments must be idempotent");
+  });
+
+  it("preserves own-line and inline comments inside source blocks (sl-dz3n)", () => {
+    const src = `mapping m {
+  source {
+    // primary table
+    s_a,
+    s_b  // joined secondary
+  }
+  target { t }
+  a -> b
+}`;
+    const out = fmt(src);
+    assert.ok(out.includes("// primary table"), "own-line comment before a source ref must survive");
+    assert.ok(out.includes("// joined secondary"), "inline comment after a source ref must survive");
+    assert.equal(out, fmt(out), "source block comments must be idempotent");
+  });
+
+  it("preserves own-line and inline comments inside metadata blocks (sl-dz3n)", () => {
+    const src = `schema s (
+  format postgresql,  // physical store
+  // governance owner is data-eng
+  note "hello"
+) {
+  id INT
+}`;
+    const out = fmt(src);
+    assert.ok(out.includes("// physical store"), "inline comment after a metadata entry must survive");
+    assert.ok(out.includes("// governance owner is data-eng"), "own-line comment between entries must survive");
+    assert.equal(out, fmt(out), "metadata comments must be idempotent");
+  });
+
+  it("preserves own-line and inline comments inside note blocks (sl-dz3n)", () => {
+    const src = `note {
+  // reviewed 2026-06
+  "First line"
+  "Second line"  // trailing
+}`;
+    const out = fmt(src);
+    assert.ok(out.includes("// reviewed 2026-06"), "own-line comment before a note string must survive");
+    assert.ok(out.includes("// trailing"), "inline comment after a note string must survive");
+    assert.equal(out, fmt(out), "note block comments must be idempotent");
+  });
+
+  it("preserves inline comments on schema and mapping opening-brace lines (sl-dz3n)", () => {
+    const src = `schema s { // why this schema exists
+  id INT
+}
+
+mapping m { // why this mapping exists
+  source { s }
+  target { t }
+  id -> id
+}`;
+    const out = fmt(src);
+    assert.ok(out.includes("// why this schema exists"), "brace-line comment on schema must survive");
+    assert.ok(out.includes("// why this mapping exists"), "brace-line comment on mapping must survive");
+    assert.equal(out, fmt(out), "brace-line comments must be idempotent");
+  });
 });
 
 // ── Blank Lines ──────────────────────────────────────────────────────────────
