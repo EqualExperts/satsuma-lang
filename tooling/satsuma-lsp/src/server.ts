@@ -18,7 +18,7 @@ import { computeDocumentSymbols } from "./symbols";
 import { computeFoldingRanges } from "./folding";
 import { computeSemanticTokens, semanticTokensLegend } from "./semantic-tokens";
 import { computeHover } from "./hover";
-import { runValidate } from "./validate-diagnostics";
+import { runValidate, reconcileValidateCache } from "./validate-diagnostics";
 import {
   WorkspaceIndex,
   createWorkspaceIndex,
@@ -187,23 +187,25 @@ documents.onDidSave(async (event) => {
   try {
     const diagsByUri = await runValidate(event.document.uri, cliPath);
 
-    // Update cache: clear stale entries for files no longer reporting
-    validateDiagCache.delete(event.document.uri);
+    // The run covers the saved file's whole import closure, so any file in
+    // that closure with cached diagnostics the run no longer reports is
+    // stale and must be cleared — fixing in file A an error attributed to
+    // file B previously left B's diagnostic frozen until B itself was saved
+    // (sl-th5k). Files outside the closure keep their cache entries.
+    const scopeUris = getImportReachableUris(event.document.uri, wsIndex);
+    const clearedUris = reconcileValidateCache(validateDiagCache, scopeUris, diagsByUri);
 
-    for (const [uri, diags] of diagsByUri) {
-      validateDiagCache.set(uri, diags);
-
-      // For the currently open document, merge with parse diagnostics
+    // Republish every file the run touched: fresh results merged with parse
+    // diagnostics for open documents, an explicit empty publish for cleared
+    // files that are not open (nothing else would reach the client).
+    const toRefresh = new Set([...diagsByUri.keys(), ...clearedUris, event.document.uri]);
+    for (const uri of toRefresh) {
       const openTree = trees.get(uri);
       if (openTree) {
         sendMergedDiagnostics(uri, openTree);
+      } else if (clearedUris.includes(uri)) {
+        connection.sendDiagnostics({ uri, diagnostics: [] });
       }
-    }
-
-    // If saved file had validate diagnostics before but now has none, refresh
-    const savedTree = trees.get(event.document.uri);
-    if (savedTree && !diagsByUri.has(event.document.uri)) {
-      sendMergedDiagnostics(event.document.uri, savedTree);
     }
   } catch {
     // CLI not available or errored — parse diagnostics still work

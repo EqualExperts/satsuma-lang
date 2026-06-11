@@ -115,3 +115,35 @@ export async function runValidate(
 export function pathToFileUri(fsPath: string): string {
   return pathToFileURL(fsPath).toString();
 }
+
+/**
+ * Reconcile the validate-diagnostics cache after a save.
+ *
+ * `runValidate` reports diagnostics for every file in the saved file's import
+ * closure. A cached entry for an in-scope file the new run no longer reports
+ * is stale — the save fixed the underlying issue — and must be removed so the
+ * client stops showing it. Cached entries for files OUTSIDE the closure came
+ * from validating a different entry file; this run says nothing about them,
+ * so they are left alone (sl-th5k).
+ *
+ * Mutates `cache`: fresh results overwrite, stale in-scope entries are
+ * deleted. Returns the URIs whose entries were cleared so the caller can
+ * publish the now-empty diagnostics.
+ */
+export function reconcileValidateCache(
+  cache: Map<string, Diagnostic[]>,
+  scopeUris: Iterable<string>,
+  results: Map<string, Diagnostic[]>,
+): string[] {
+  const cleared: string[] = [];
+  for (const uri of scopeUris) {
+    if (!results.has(uri) && cache.has(uri)) {
+      cache.delete(uri);
+      cleared.push(uri);
+    }
+  }
+  for (const [uri, diags] of results) {
+    cache.set(uri, diags);
+  }
+  return cleared;
+}

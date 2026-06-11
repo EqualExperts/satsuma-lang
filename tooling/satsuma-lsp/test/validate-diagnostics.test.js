@@ -1,7 +1,55 @@
 const { describe, it } = require("node:test");
 const assert = require("node:assert/strict");
 const { fileURLToPath, pathToFileURL } = require("node:url");
-const { runValidate, pathToFileUri } = require("../dist/validate-diagnostics");
+const {
+  runValidate,
+  pathToFileUri,
+  reconcileValidateCache,
+} = require("../dist/validate-diagnostics");
+
+describe("reconcileValidateCache", () => {
+  // sl-th5k: on save, only the saved file's cache entry was deleted. A
+  // cross-file diagnostic (error in A attributed to B) stayed cached for B
+  // even after the fixing save removed it from the validate output — the
+  // client showed B's stale diagnostic until B itself was saved.
+
+  const diag = (msg) => [{ message: msg, range: {}, severity: 1 }];
+
+  it("clears cached entries for in-scope files the new run no longer reports (sl-th5k)", () => {
+    const cache = new Map([
+      ["file:///a.stm", diag("old A")],
+      ["file:///b.stm", diag("cross-file error in B")],
+    ]);
+    // The fixing save: the new run reports nothing for B any more.
+    const results = new Map([["file:///a.stm", diag("new A")]]);
+    const cleared = reconcileValidateCache(
+      cache,
+      ["file:///a.stm", "file:///b.stm"],
+      results,
+    );
+    assert.deepEqual(cleared, ["file:///b.stm"]);
+    assert.equal(cache.has("file:///b.stm"), false, "stale entry must be removed");
+    assert.deepEqual(cache.get("file:///a.stm"), diag("new A"), "fresh results replace old");
+  });
+
+  it("leaves cached entries outside the run's scope untouched", () => {
+    // C's diagnostics came from validating a different entry file; this run
+    // says nothing about C and must not wipe legitimate results.
+    const cache = new Map([["file:///c.stm", diag("error in other closure")]]);
+    const cleared = reconcileValidateCache(cache, ["file:///a.stm"], new Map());
+    assert.deepEqual(cleared, []);
+    assert.ok(cache.has("file:///c.stm"));
+  });
+
+  it("clears the saved file itself when it stops reporting", () => {
+    // The saved file is part of its own closure: fixing the last error in A
+    // must clear A without special-casing.
+    const cache = new Map([["file:///a.stm", diag("old A")]]);
+    const cleared = reconcileValidateCache(cache, ["file:///a.stm"], new Map());
+    assert.deepEqual(cleared, ["file:///a.stm"]);
+    assert.equal(cache.size, 0);
+  });
+});
 
 describe("pathToFileUri", () => {
   // The Windows symptom (a `C:\…` path becoming a malformed `file://C:\…`
