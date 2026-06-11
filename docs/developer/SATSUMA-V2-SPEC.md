@@ -45,7 +45,7 @@ All comma-separated list constructs follow one rule: **a trailing comma after th
 - **`@` prefix** — structural cross-references in NL text. `@customers.email` references a schema field. Required inside NL strings for tooling to detect refs; optional but allowed everywhere else.
 
 **Two quoting rules:**
-- Backticks for names: bare names work when matching `[a-zA-Z_][a-zA-Z0-9_-]*`. Everything else gets backticks.
+- Backticks for names: bare names work when matching `[a-zA-Z_][a-zA-Z0-9_-]*`, except that a bare name may not *end* with a hyphen (so `a->b` always reads as an arrow, never as the name `a-` followed by `>`). Everything else gets backticks.
 - Double quotes for prose: NL content uses `"..."` or `"""..."""`.
 
 ```
@@ -82,6 +82,8 @@ fragment `US Address` { ... }
 Comments run to end of line. There are no block comments.
 
 ### 2.5 Operators
+
+Whitespace around `->` is optional: `a->b`, `a-> b`, `a ->b`, and `a -> b` are all the same arrow.
 
 | Operator | Meaning |
 |----------|---------|
