@@ -1,6 +1,6 @@
 ---
 id: sl-l7u0
-status: open
+status: closed
 deps: []
 links: []
 created: 2026-06-11T02:42:20Z
@@ -17,3 +17,10 @@ satsuma-viz/src/layout/elk-layout.ts — buildFieldPorts (519-557) creates port 
 
 Edges render for prefixed and nested dotted paths; port ids unique per field path and parse-safe for namespaced ids; tests for each case.
 
+
+## Notes
+
+**2026-06-11T20:40:33Z**
+
+Cause: buildFieldPorts keyed ports by bare field name while addMappingEdges looked them up by the authored arrow ref (schema-prefixed or nested dotted path), so those edges were dropped by the missing-port guard; same-named fields at different nesting levels collided on one port id; extractLayout parsed port ids by splitting on ':', garbling namespaced node ids like crm::customers.
+Fix: ports are keyed by the field's full dotted path, authored refs resolve via resolveSchemaLocalFieldPath (param widened to a structural FieldPathCard so metric cards qualify), multi-source arrows attach to the source schema that declares the field, and extractLayout recovers field paths from a portInfo registry instead of string parsing (commit 181b3ac)

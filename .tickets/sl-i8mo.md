@@ -1,6 +1,6 @@
 ---
 id: sl-i8mo
-status: open
+status: closed
 deps: []
 links: []
 created: 2026-06-11T02:41:53Z
@@ -17,3 +17,10 @@ satsuma-viz/src/layout/elk-layout.ts:577-583 — edgeMetaMap is module-level and
 
 Edge metadata survives multi-namespace models; layout state is per-invocation (no module-level mutable maps); multi-namespace and concurrent-layout tests.
 
+
+## Notes
+
+**2026-06-11T20:40:33Z**
+
+Cause: elk-layout.ts kept edgeMetaMap and allPortIds as module-level mutable state; addMappingEdges cleared edgeMetaMap at the top and was called once per namespace, so any later namespace group erased earlier namespaces' edge metadata, and concurrent computeLayout calls raced on the shared maps between graph build and post-await extraction.
+Fix: all bookkeeping (edge metadata, port registry, per-node port maps, card views) moved into a per-invocation GraphContext created by buildElkGraph and threaded into extractLayout; module-level state deleted. Regression tests cover a trailing empty namespace and two concurrent layouts with colliding edge ids (commit 181b3ac)
