@@ -327,6 +327,25 @@ function hasFieldWithSpreads(schema: SchemaLike, fieldName: string, lookup: Defi
  *    Then tried as a schema/fragment/transform name (with namespace prefix if
  *    the mapping is inside a namespace block).
  */
+/**
+ * Resolve a mapping-context schema name to the key it is indexed under.
+ *
+ * Source/target lists come from extraction, which records names exactly as
+ * authored: a bare name inside a namespaced mapping ("customers") usually
+ * refers to a sibling schema indexed under "ns::customers". Looking it up
+ * raw made every bare @field ref against a namespaced source schema report
+ * as unresolved (sl-98cz). Try the namespace-qualified form first, then fall
+ * back to the raw name so global schemas referenced from inside a namespace
+ * still resolve.
+ */
+function contextSchemaKey(name: string, namespace: string | null, lookup: DefinitionLookup): string {
+  if (namespace && !name.includes("::")) {
+    const qualified = `${namespace}::${name}`;
+    if (lookup.hasSchema(qualified)) return qualified;
+  }
+  return name;
+}
+
 export function resolveRef(ref: string, mappingContext: MappingContext, lookup: DefinitionLookup): Resolution {
   const classification = classifyRef(ref);
 
@@ -355,14 +374,15 @@ export function resolveRef(ref: string, mappingContext: MappingContext, lookup: 
 
     const allSchemas = [...(mappingContext.sources ?? []), ...(mappingContext.targets ?? [])];
     for (const s of allSchemas) {
-      const schema = lookup.getSchema(s);
+      const key = contextSchemaKey(s, mappingContext.namespace, lookup);
+      const schema = lookup.getSchema(key);
       if (schema && hasNestedFieldPath(schema.fields, ref)) {
-        return { resolved: true, resolvedTo: { kind: "field", name: `${canonicalKey(s)}.${ref}` } };
+        return { resolved: true, resolvedTo: { kind: "field", name: `${canonicalKey(key)}.${ref}` } };
       }
       if (schema?.hasSpreads) {
         const expanded = getExpandedFields(schema, lookup);
         if (hasNestedFieldPath([...schema.fields, ...expanded], ref)) {
-          return { resolved: true, resolvedTo: { kind: "field", name: `${canonicalKey(s)}.${ref}` } };
+          return { resolved: true, resolvedTo: { kind: "field", name: `${canonicalKey(key)}.${ref}` } };
         }
       }
     }
@@ -371,9 +391,10 @@ export function resolveRef(ref: string, mappingContext: MappingContext, lookup: 
       const nsIdx = s.indexOf("::");
       const baseName = nsIdx !== -1 ? s.slice(nsIdx + 2) : s;
       if (baseName === schemaName || s === schemaName) {
-        const schema = lookup.getSchema(s);
+        const key = contextSchemaKey(s, mappingContext.namespace, lookup);
+        const schema = lookup.getSchema(key);
         if (schema && hasFieldWithSpreads(schema, fieldName, lookup)) {
-          return { resolved: true, resolvedTo: { kind: "field", name: `${canonicalKey(s)}.${fieldName}` } };
+          return { resolved: true, resolvedTo: { kind: "field", name: `${canonicalKey(key)}.${fieldName}` } };
         }
       }
     }
@@ -405,9 +426,10 @@ export function resolveRef(ref: string, mappingContext: MappingContext, lookup: 
   // Bare identifier
   const allSchemaNames = [...(mappingContext.sources ?? []), ...(mappingContext.targets ?? [])];
   for (const s of allSchemaNames) {
-    const schema = lookup.getSchema(s);
+    const key = contextSchemaKey(s, mappingContext.namespace, lookup);
+    const schema = lookup.getSchema(key);
     if (schema && hasFieldWithSpreads(schema, ref, lookup)) {
-      return { resolved: true, resolvedTo: { kind: "field", name: `${canonicalKey(s)}.${ref}` } };
+      return { resolved: true, resolvedTo: { kind: "field", name: `${canonicalKey(key)}.${ref}` } };
     }
   }
 

@@ -257,6 +257,50 @@ describe("resolveRef()", () => {
     assert.equal(r.resolved, true);
     assert.equal(r.resolvedTo.kind, "field");
   });
+
+  // sl-98cz: extraction records source/target lists exactly as authored, so a
+  // namespaced mapping's bare source name ("customers") arrives unqualified
+  // while the index keys the schema "crm::customers". resolveRef must try the
+  // namespace-qualified form before giving up, or every bare @field ref against
+  // a namespaced source schema becomes a false unresolved-nl-ref warning.
+
+  it("resolves a bare field against an unqualified source name inside a namespace (sl-98cz)", () => {
+    const lookup = makeLookup({
+      "crm::customers": { fields: [{ name: "account_id" }], hasSpreads: false },
+      "crm::tgt": { fields: [{ name: "id" }], hasSpreads: false },
+    });
+    // The ticket repro: sources raw, targets pre-qualified (extractMappings
+    // qualifies only targets), both fields must resolve symmetrically.
+    const ctx = { sources: ["customers"], targets: ["crm::tgt"], namespace: "crm" };
+    const src = resolveRef("account_id", ctx, lookup);
+    assert.equal(src.resolved, true);
+    assert.equal(src.resolvedTo.name, "crm::customers.account_id");
+    const tgt = resolveRef("id", ctx, lookup);
+    assert.equal(tgt.resolved, true);
+    assert.equal(tgt.resolvedTo.name, "crm::tgt.id");
+  });
+
+  it("resolves a dotted field against an unqualified source name inside a namespace (sl-98cz)", () => {
+    const lookup = makeLookup({
+      "crm::customers": { fields: [{ name: "account_id" }], hasSpreads: false },
+    });
+    const ctx = { sources: ["customers"], targets: [], namespace: "crm" };
+    const r = resolveRef("customers.account_id", ctx, lookup);
+    assert.equal(r.resolved, true);
+    assert.equal(r.resolvedTo.name, "crm::customers.account_id");
+  });
+
+  it("falls back to the global schema when the namespace-qualified name does not exist (sl-98cz)", () => {
+    // A namespaced mapping may legitimately source a global schema; namespace
+    // qualification must not shadow it when no sibling schema exists.
+    const lookup = makeLookup({
+      "::shared_ref": { fields: [{ name: "code" }], hasSpreads: false },
+    });
+    const ctx = { sources: ["::shared_ref"], targets: [], namespace: "crm" };
+    const r = resolveRef("code", ctx, lookup);
+    assert.equal(r.resolved, true);
+    assert.equal(r.resolvedTo.name, "::shared_ref.code");
+  });
 });
 
 // ── resolveAllNLRefs ──────────────────────────────────────────────────────────

@@ -422,6 +422,11 @@ export function extractMappings(rootNode: SyntaxNode): ExtractedMapping[] {
         allDescendants(body, "nested_arrow").length;
     }
 
+    // Targets are namespace-qualified here; sources are intentionally left as
+    // authored. Extraction has no workspace knowledge to decide whether a bare
+    // source name is namespace-local or global, so resolution-time consumers
+    // qualify them against the index instead (core resolveRef's
+    // contextSchemaKey, the CLI's resolveScopedEntityRef — sl-98cz).
     const qualifiedTargets = targets.map((t) =>
       namespace && !t.includes("::") ? `${namespace}::${t}` : t,
     );
