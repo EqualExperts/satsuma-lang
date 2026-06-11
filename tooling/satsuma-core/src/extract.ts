@@ -9,7 +9,7 @@
 import { canonicalRef } from "./canonical-ref.js";
 import { classifyTransform, classifyArrow } from "./classify.js";
 import { extractMetadata } from "./meta-extract.js";
-import { child, children, allDescendants, labelText, stringText, entryText, qualifiedNameText, sourceRefStructuralText } from "./cst-utils.js";
+import { child, children, allDescendants, labelText, stringText, entryText, qualifiedNameText, sourceRefStructuralText, isPresent } from "./cst-utils.js";
 import type { Classification, FieldDecl, MetaEntry, PipeStep, SyntaxNode } from "./types.js";
 
 // ── Internal field tree ────────────────────────────────────────────────────
@@ -692,12 +692,14 @@ export function extractImports(rootNode: SyntaxNode): ExtractedImport[] {
   return children(rootNode, "import_decl").map((node) => {
     const names = children(node, "import_name")
       .map((nm) => {
+        // isPresent guards against zero-width MISSING recovery nodes —
+        // `import { } from "x"` must yield no names, not [""] (sl-0nvt).
         const qn = child(nm, "qualified_name");
-        if (qn) return qualifiedNameText(qn);
+        if (isPresent(qn)) return qualifiedNameText(qn);
         const q = child(nm, "backtick_name");
-        if (q) return q.text.slice(1, -1);
+        if (isPresent(q)) return q.text.slice(1, -1);
         const id = child(nm, "identifier");
-        return id?.text ?? null;
+        return isPresent(id) ? id.text : null;
       })
       .filter((n): n is string => n != null);
 

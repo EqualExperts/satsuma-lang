@@ -370,3 +370,30 @@ describe("walkDescendants()", () => {
     assert.deepEqual(visited, ["x"]);
   });
 });
+
+// ── MISSING-node guards (sl-0nvt) ───────────────────────────────────────────
+// Tree-sitter error recovery inserts zero-width MISSING leaves (e.g. inside
+// `import { } from "x"` or `source { }`). Extraction must yield null/no names
+// for those shapes, never empty strings.
+
+describe("zero-width MISSING recovery guards (sl-0nvt)", () => {
+  /** A zero-width MISSING identifier as produced by tree-sitter recovery. */
+  function missingIdent() {
+    return { ...ident(""), isMissing: true };
+  }
+
+  it("sourceRefText returns null for a source_ref holding only a MISSING identifier", () => {
+    const ref = n("source_ref", [missingIdent()], "");
+    assert.equal(sourceRefText(ref), null);
+  });
+
+  it("sourceRefStructuralText returns null for a source_ref holding only a MISSING identifier", () => {
+    const ref = n("source_ref", [missingIdent()], "");
+    assert.equal(sourceRefStructuralText(ref), null);
+  });
+
+  it("qualifiedNameText returns null when either identifier is MISSING", () => {
+    const qn = n("qualified_name", [ident("crm"), missingIdent()], "crm::");
+    assert.equal(qualifiedNameText(qn), null);
+  });
+});

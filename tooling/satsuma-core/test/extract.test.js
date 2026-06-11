@@ -994,3 +994,23 @@ describe("extractImports — name forms and arity (sl-cvs2)", () => {
   });
 
 });
+
+// ── extractImports: MISSING-name recovery (sl-0nvt) ─────────────────────────
+
+describe("extractImports — zero-width MISSING recovery (sl-0nvt)", () => {
+  it("yields no names (not ['']) for an import_name holding a MISSING identifier", () => {
+    // `import { } from "x"` recovers as an import_name containing a
+    // zero-width MISSING identifier; the empty string must not leak out.
+    const missing = { ...n("identifier", [], ""), isMissing: true };
+    const root = n("source_file", [
+      n("import_decl", [
+        n("import_name", [missing], ""),
+        n("import_path", [n("nl_string", [], '"crm/pipeline.stm"')], '"crm/pipeline.stm"'),
+      ]),
+    ]);
+    const result = extractImports(root);
+    assert.equal(result.length, 1);
+    assert.deepEqual(result[0].names, []);
+    assert.equal(result[0].path, "crm/pipeline.stm");
+  });
+});

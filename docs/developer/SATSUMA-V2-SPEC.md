@@ -33,6 +33,10 @@ These roles are **mutually exclusive**. Metadata never appears in `{ }`. Structu
 
 Metadata blocks `( )` may span multiple lines for readability — especially when they contain long notes or many tokens.
 
+#### Comma policy
+
+All comma-separated list constructs follow one rule: **a trailing comma after the last entry is allowed; a comma with nothing before it is an error.** This applies uniformly to metadata entries, `enum { }` and `slice { }` bodies, `map { }` entries, `import { }` name lists, and `source`/`target` entries. So `(pk, required,)` and `import { a, b, } from "x"` are valid, while `(,)` and `import { } from "x"` are errors. `source` and `map` blocks additionally allow the separating commas to be omitted between entries (entries are newline-separated in practice); metadata, `enum`, `slice`, and `import` lists require them.
+
 ### 2.2 Strings and Quoting
 
 - **Double quotes** `" "` — natural language strings. Always double quotes. Escape inner double quotes with `\"`.

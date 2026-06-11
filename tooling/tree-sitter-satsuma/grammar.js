@@ -91,7 +91,10 @@ module.exports = grammar({
       seq(
         "import",
         "{",
+        // Trailing comma allowed, consistent with every other comma-separated
+        // list construct (see "Comma policy" in the spec, sl-0nvt).
         commaSep1($.import_name),
+        optional(","),
         "}",
         "from",
         $.import_path,
@@ -186,12 +189,14 @@ module.exports = grammar({
         optional($.metadata_block),
       ),
 
-    // target { ref }
+    // target { ref } — single entry; trailing comma allowed for consistency
+    // with source blocks (see "Comma policy" in the spec, sl-0nvt).
     target_block: ($) =>
       seq(
         "target",
         "{",
         $._source_entry,
+        optional(","),
         "}",
       ),
 
