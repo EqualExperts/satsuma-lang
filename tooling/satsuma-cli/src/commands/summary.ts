@@ -20,7 +20,7 @@ import { canonicalKey } from "../index-builder.js";
 import { expandEntityFields } from "../spread-expand.js";
 import { countNlDerivedEdgesByMapping } from "../nl-ref-extract.js";
 import { canonicalEntityName } from "@satsuma/core";
-import type { FieldDecl, ExtractedWorkspace } from "../types.js";
+import type { FieldDecl, ExtractedWorkspace, SchemaRecord } from "../types.js";
 
 function totalFieldCount(schema: { fields: FieldDecl[]; namespace?: string | null }, index: ExtractedWorkspace): number {
   const expanded = expandEntityFields(schema as Parameters<typeof expandEntityFields>[0], schema.namespace ?? null, index);
@@ -68,12 +68,23 @@ Examples:
 
 // ── Formatters ────────────────────────────────────────────────────────────────
 
+/**
+ * Schema entries excluding metric blocks.
+ *
+ * Metric schemas live in both index.schemas and index.metrics; every formatter
+ * must list them only under metrics, or the schema section double-reports them
+ * and its count disagrees with graph stats (sl-s2mh).
+ */
+function nonMetricSchemas(index: ExtractedWorkspace): Map<string, SchemaRecord> {
+  return new Map([...index.schemas].filter(([id]) => !index.metrics.has(id)));
+}
+
 function printJson(index: ExtractedWorkspace, fileCount: number, compact?: boolean): void {
   const displayName = canonicalEntityName;
   const nlDerivedCounts = countNlDerivedEdgesByMapping(index);
 
   const out: Record<string, unknown> = {
-    schemas: [...index.schemas.values()].map((s) => {
+    schemas: [...nonMetricSchemas(index).values()].map((s) => {
       const obj: Record<string, unknown> = { name: displayName(s), fieldCount: totalFieldCount(s, index) };
       if (!compact) { obj.note = s.note; obj.file = s.file; obj.line = s.row + 1; }
       return obj;
@@ -115,7 +126,7 @@ function printCompact(index: ExtractedWorkspace): void {
     for (const name of items) console.log(`  ${name}`);
   };
 
-  section("schemas", [...index.schemas.keys()].map(canonicalKey));
+  section("schemas", [...nonMetricSchemas(index).keys()].map(canonicalKey));
   section("metrics", [...index.metrics.keys()].map(canonicalKey));
   section("mappings", [...index.mappings.keys()].map(canonicalKey));
   section("fragments", [...index.fragments.keys()].map(canonicalKey));
@@ -127,7 +138,7 @@ function plural(n: number, word: string): string {
 }
 
 function printDefault(index: ExtractedWorkspace, fileCount: number): void {
-  const schemas = [...index.schemas.values()];
+  const schemas = [...nonMetricSchemas(index).values()];
   const metrics = [...index.metrics.values()];
   const mappings = [...index.mappings.values()];
   const fragments = [...index.fragments.values()];
