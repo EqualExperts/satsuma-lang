@@ -1,6 +1,6 @@
 ---
 id: sl-ku3c
-status: open
+status: closed
 deps: []
 links: [sl-vmqv]
 created: 2026-06-11T02:41:29Z
@@ -17,3 +17,10 @@ The sl-akz6/gh-274 fix canonicalized the workspace index but not the tree cache.
 
 trees keyed by canonical URI everywhere; unit test with percent-encoded drive-letter URI; linked Windows CI ticket covers e2e.
 
+
+## Notes
+
+**2026-06-11T13:14:50Z**
+
+Cause: server.ts trees and validateDiagCache were keyed by the raw client URI while the workspace index canonicalizes keys (sl-akz6) — on Windows the didOpen spelling (file:///c%3A/...) and the canonical spelling (file:///c:/...) addressed different entries, so canonical lookups missed open files.
+Fix: new CanonicalUriMap (src/canonical-uri-map.ts) canonicalizes every key on get/set/has/delete; trees and validateDiagCache use it, and runValidate canonicalizes its result URIs. Unit tests cover percent-encoded drive-letter spellings; e2e Windows coverage tracked by linked sl-vmqv.

@@ -19,6 +19,7 @@ import { computeFoldingRanges } from "./folding";
 import { computeSemanticTokens, semanticTokensLegend } from "./semantic-tokens";
 import { computeHover } from "./hover";
 import { runValidate, reconcileValidateCache } from "./validate-diagnostics";
+import { CanonicalUriMap } from "./canonical-uri-map";
 import {
   WorkspaceIndex,
   createWorkspaceIndex,
@@ -46,11 +47,13 @@ import { computeMappingCoverage } from "./coverage";
 const connection = createConnection(ProposedFeatures.all);
 const documents = new TextDocuments(TextDocument);
 
-// Per-document parse tree cache
-const trees = new Map<string, Tree>();
+// Per-document parse tree cache. Keyed by CANONICAL URI: the workspace index
+// canonicalizes its keys, and a raw-keyed cache missed open files whenever
+// the client's URI spelling differed (Windows drive letters, sl-ku3c).
+const trees = new CanonicalUriMap<Tree>();
 
-// Per-document validate diagnostics cache (keyed by URI)
-const validateDiagCache = new Map<string, import("vscode-languageserver").Diagnostic[]>();
+// Per-document validate diagnostics cache, canonical-keyed for the same reason.
+const validateDiagCache = new CanonicalUriMap<import("vscode-languageserver").Diagnostic[]>();
 
 // Workspace index for cross-file navigation
 const wsIndex: WorkspaceIndex = createWorkspaceIndex();

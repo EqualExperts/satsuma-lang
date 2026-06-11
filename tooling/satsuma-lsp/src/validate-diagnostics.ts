@@ -6,6 +6,7 @@ import {
 } from "vscode-languageserver";
 import { execFile } from "node:child_process";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { canonicalizeFileUri } from "./workspace-index";
 
 /** Shape of a single entry from `satsuma validate --json`. */
 interface ValidateEntry {
@@ -66,7 +67,9 @@ export async function runValidate(
           }
 
           for (const entry of entries) {
-            const uri = pathToFileUri(entry.file);
+            // Canonical so result keys line up with the workspace index and
+            // the server's canonical-keyed caches (sl-ku3c).
+            const uri = canonicalizeFileUri(pathToFileUri(entry.file));
             // validate lines are 1-based; LSP is 0-based
             const line = Math.max(0, entry.line - 1);
             const col = Math.max(0, entry.column - 1);
