@@ -1,6 +1,6 @@
 ---
 id: sl-kkao
-status: open
+status: closed
 deps: []
 links: []
 created: 2026-06-10T23:21:30Z
@@ -17,3 +17,10 @@ satsuma-core/src/validate.ts:547-553 (prefixed path collection) and :975-980 (re
 
 Schema-qualified spread-inherited fields validate clean; error message names the schema the path is qualified with; multi-source + spread test.
 
+
+## Notes
+
+**2026-06-11T12:51:00Z**
+
+Cause: checkArrowFieldRefs built schema-qualified path sets (multi-source prefix loop) and resolveFieldPath's qualified branch from declared fields only — fragment-spread expansion only fed the unqualified set, so s2.created_at warned while created_at validated clean. The message also always named the first source schema.
+Fix: per-source spread expansion now feeds the authored-prefix path set, resolveFieldPath expands the qualified schema's spreads (shared makeSpreadLookups helper), and blamedSourceSchema names the schema the path is qualified with. Verified end-to-end: the ticket repro validates clean via the CLI.
