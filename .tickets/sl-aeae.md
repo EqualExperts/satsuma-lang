@@ -1,6 +1,6 @@
 ---
 id: sl-aeae
-status: open
+status: closed
 deps: []
 links: []
 created: 2026-06-11T02:41:53Z
@@ -17,3 +17,10 @@ satsuma-viz-backend/src/viz-model.ts:1490-1492 — mappingKey = id@location.uri 
 
 Mapping dedup key includes namespace (or qualified id); both same-named mappings survive merge; test.
 
+
+## Notes
+
+**2026-06-11T11:25:00Z**
+
+Cause: mergeVizModels deduped mappings by `id@location.uri`; MappingBlock.id is unqualified, so same-named mappings in different namespaces of one file collided and the second was dropped.
+Fix: dedup key now includes the namespace group name (`ns::id@uri`); regression test merges a file with `load` in two namespaces.

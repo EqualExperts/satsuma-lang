@@ -55,6 +55,11 @@ export interface SchemaCard {
   location: SourceLocation;
   /** True when the schema is referenced as a source or target in an import block. */
   hasExternalLineage: boolean;
+  /** True for placeholder cards injected for imported schemas whose defining
+   *  file is not part of the model (no label, metadata, notes, or field
+   *  constraints). Multi-file merges replace stubs with the full definition
+   *  when the defining file is present (sl-ak00). Absent means false. */
+  isStub?: boolean;
   /** Names of fragments spread into this schema (resolved before sending to the client). */
   spreads: string[];
 }
