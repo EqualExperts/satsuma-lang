@@ -58,9 +58,11 @@ function checkHiddenSourceInNl(index: ExtractedWorkspace): LintDiagnostic[] {
       namespace: item.namespace,
     };
 
-    for (const { ref, offset } of refs) {
-      const classification = classifyRef(ref);
-      const resolution = resolveRef(ref, mappingContext, index);
+    for (const { ref, raw, offset } of refs) {
+      // raw keeps backtick quoting so literal names with "." / "::" classify
+      // and resolve correctly (sl-g6ga); ref is the flattened display form.
+      const classification = classifyRef(raw);
+      const resolution = resolveRef(raw, mappingContext, index);
 
       if (!resolution.resolved) continue;
 
@@ -402,7 +404,7 @@ function checkUnresolvedNlRef(index: ExtractedWorkspace): LintDiagnostic[] {
       scopeLabel = "transform";
     }
 
-    for (const { ref, offset } of refs) {
+    for (const { ref, raw, offset } of refs) {
       // Skip known pipeline function names — they appear in transform bodies and
       // are interpreted by the runtime, not resolved to workspace identifiers.
       if (KNOWN_PIPELINE_FUNCTIONS.has(ref)) continue;
@@ -416,7 +418,9 @@ function checkUnresolvedNlRef(index: ExtractedWorkspace): LintDiagnostic[] {
         if (metric && metric.fields.some((f) => f.name === ref)) continue;
       }
 
-      const resolution = resolveRef(ref, mappingContext, index);
+      // Resolve on the raw form — backticked literal names must not be
+      // re-split on "." or "::" (sl-g6ga).
+      const resolution = resolveRef(raw, mappingContext, index);
       if (!resolution.resolved) {
         const { line, column } = computeNLRefPosition(item, offset);
         diagnostics.push({

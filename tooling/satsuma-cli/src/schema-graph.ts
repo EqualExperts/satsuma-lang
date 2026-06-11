@@ -79,9 +79,11 @@ export function buildFullGraph(index: ExtractedWorkspace): FullGraph {
         namespace: item.namespace,
       };
 
-      for (const { ref } of refs) {
-        const classification = classifyRef(ref);
-        const resolution = resolveRef(ref, mappingContext, index);
+      for (const { raw } of refs) {
+        // raw keeps backtick quoting so literal names with "." / "::"
+        // classify and resolve correctly (sl-g6ga).
+        const classification = classifyRef(raw);
+        const resolution = resolveRef(raw, mappingContext, index);
         if (!resolution.resolved) continue;
 
         let canonicalSchema: string | null = null;

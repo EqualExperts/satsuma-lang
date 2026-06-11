@@ -735,10 +735,12 @@ function resolveTransformAtRefs(
   const lookup = makeVizLookup(wsIndex);
   const ctx = { sources, targets, namespace };
   return extractAtRefs(transform.text).map((br) => {
-    const resolution = resolveRef(br.ref, ctx, lookup);
+    // br.raw keeps backtick quoting so literal names with "." / "::"
+    // classify and resolve correctly (sl-g6ga); br.ref stays for display.
+    const resolution = resolveRef(br.raw, ctx, lookup);
     return {
       ref: br.ref,
-      classification: classifyRef(br.ref),
+      classification: classifyRef(br.raw),
       resolved: resolution.resolved,
       resolvedTo: resolution.resolvedTo ?? null,
     };
