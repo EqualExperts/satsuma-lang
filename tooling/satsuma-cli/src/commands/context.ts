@@ -186,7 +186,13 @@ function scoreAll(index: ExtractedWorkspace, terms: string[], parsedFiles: Parse
     }
   };
 
-  for (const [name, e] of index.schemas) scoreEntry(name, "schema", e);
+  for (const [name, e] of index.schemas) {
+    // Metric schemas appear in both index.schemas and index.metrics; score
+    // them only once, as metrics, or the same block is emitted twice and
+    // wastes the token budget this command exists to manage (sl-s2mh).
+    if (index.metrics.has(name)) continue;
+    scoreEntry(name, "schema", e);
+  }
   for (const [name, e] of index.metrics) scoreEntry(name, "metric", e);
   for (const [name, e] of index.mappings) scoreEntry(name, "mapping", e);
   for (const [name, e] of index.fragments) scoreEntry(name, "fragment", e);

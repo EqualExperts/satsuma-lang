@@ -15,6 +15,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const CLI = resolve(__dirname, "../dist/index.js");
 const PLATFORM = resolve(__dirname, "fixtures/platform.stm");
 const IMPORT_ENTRY = resolve(__dirname, "fixtures/import-entry.stm");
+const METRICS_EXAMPLE = resolve(__dirname, "../../../examples/metrics-platform/metrics.stm");
 
 const run = (...args: string[]) => runCli(CLI, ...args);
 
@@ -90,6 +91,21 @@ describe("satsuma summary", () => {
     assert.equal(code, 2);
     assert.match(stderr, /^Error resolving path/);
     assert.doesNotMatch(stderr, /Unhandled error:/);
+  });
+
+  it("lists metric blocks only under metrics, never double-counted as schemas (sl-s2mh)", async () => {
+    // Metric schemas live in both index.schemas and index.metrics; the summary
+    // sections must partition them or the schema count disagrees with graph
+    // stats and every metric is reported twice.
+    const { stdout, code } = await run("summary", "--json", METRICS_EXAMPLE);
+
+    assert.equal(code, 0);
+    const data = JSON.parse(stdout);
+    assert.ok(data.metrics.length > 0, "metrics-platform example should yield metric entries");
+    const schemaNames = new Set(data.schemas.map((s: { name: string }) => s.name));
+    for (const metric of data.metrics) {
+      assert.ok(!schemaNames.has(metric.name), `metric '${metric.name}' must not also be listed as a schema`);
+    }
   });
 });
 

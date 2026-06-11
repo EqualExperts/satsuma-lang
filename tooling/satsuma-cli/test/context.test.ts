@@ -144,3 +144,34 @@ describe("estimateTokens", () => {
     assert.equal(estimateTokens("12345"), 2);
   });
 });
+
+// ── CLI-level coverage (spawns the built command) ────────────────────────────
+
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import { run as runCli } from "./helpers.js";
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const CLI = resolve(__dirname, "../dist/index.js");
+const METRICS_EXAMPLE = resolve(__dirname, "../../../examples/metrics-platform/metrics.stm");
+
+describe("satsuma context metric deduplication (sl-s2mh)", () => {
+  it("scores each metric block once, as a metric, never additionally as a schema", async () => {
+    // Metric schemas live in both index.schemas and index.metrics; scoring
+    // both rendered the same block twice and wasted the token budget the
+    // command exists to manage.
+    const { stdout, code } = await runCli(CLI, "context", "monthly recurring revenue", "--json", METRICS_EXAMPLE);
+
+    assert.equal(code, 0);
+    const candidates = JSON.parse(stdout) as Array<{ name: string; type: string }>;
+    const seen = new Set<string>();
+    for (const candidate of candidates) {
+      assert.ok(!seen.has(candidate.name), `'${candidate.name}' emitted more than once`);
+      seen.add(candidate.name);
+    }
+    assert.ok(
+      candidates.some((candidate) => candidate.type === "metric"),
+      "an MRR query against the metrics example should surface metric candidates",
+    );
+  });
+});
