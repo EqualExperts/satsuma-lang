@@ -39,9 +39,19 @@ export function prepareRename(
 
   if (!renameable.has(ctx.kind)) return null;
 
+  // The placeholder must be exactly the text the range covers: clients
+  // prefill it and replace the range verbatim with whatever the user accepts.
+  // For block labels inside a namespace ctx.name is qualified ("a::foo") but
+  // ctx.node covers only the bare label — returning the qualified form wrote
+  // "a::foo2" INTO the label, yielding a doubly-qualified name (sl-kilo).
+  const placeholder =
+    ctx.namespace && ctx.name.startsWith(`${ctx.namespace}::`)
+      ? ctx.name.slice(ctx.namespace.length + 2)
+      : ctx.name;
+
   return {
     range: nodeRange(ctx.node),
-    placeholder: ctx.name,
+    placeholder,
   };
 }
 

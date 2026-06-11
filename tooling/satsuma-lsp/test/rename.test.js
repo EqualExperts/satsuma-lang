@@ -49,6 +49,25 @@ describe("prepareRename", () => {
     assert.equal(result.placeholder, "customers");
   });
 
+  it("placeholder matches exactly the text the edit range covers for a namespaced block (sl-kilo)", () => {
+    // For a block inside a namespace the context name is qualified ("a::foo")
+    // but the rename range covers only the bare label. A qualified placeholder
+    // makes the client prefill "a::foo"; accepting it writes the qualified
+    // name INTO the label, producing namespace a { schema a::foo2 }.
+    const source = "namespace a {\n  schema foo {\n    id UUID\n  }\n}";
+    const { index, trees } = buildIndex({ "file:///a.stm": source });
+    // Cursor on "foo" (line 1, col 10)
+    const result = prepareRename(trees["file:///a.stm"], 1, 10, "file:///a.stm", index);
+    assert.ok(result);
+    const lines = source.split("\n");
+    const covered = lines[result.range.start.line].slice(
+      result.range.start.character,
+      result.range.end.character,
+    );
+    assert.equal(result.placeholder, covered);
+    assert.equal(result.placeholder, "foo");
+  });
+
   it("returns null for non-renameable positions", () => {
     const { index, trees } = buildIndex({
       "file:///a.stm": "schema customers {\n  id UUID\n}",

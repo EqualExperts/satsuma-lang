@@ -1,6 +1,6 @@
 ---
 id: sl-kilo
-status: open
+status: closed
 deps: []
 links: []
 created: 2026-06-11T02:41:29Z
@@ -17,3 +17,10 @@ satsuma-lsp/src/rename.ts:45-48 — for a block inside a namespace the placehold
 
 Placeholder matches the exact text the edit range covers (bare label), or the range covers the qualified form; rename-in-namespace test.
 
+
+## Notes
+
+**2026-06-11T13:03:33Z**
+
+Cause: prepareRename returned ctx.name as the placeholder, which findNodeContext qualifies with the namespace for block labels, while the edit range covers only the bare label node — accepting the prefilled name wrote the qualified form into the label.
+Fix: prepareRename strips the namespace prefix so the placeholder is exactly the text the range covers; rename-in-namespace regression test asserts placeholder === covered text.
