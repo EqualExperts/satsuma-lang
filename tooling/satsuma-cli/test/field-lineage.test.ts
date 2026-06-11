@@ -134,3 +134,21 @@ describe("field-lineage with typeless fields", () => {
     assert.ok(stdout.includes("branch"), "spread field should appear after typeless field");
   });
 });
+
+// ---------------------------------------------------------------------------
+// sl-201z: same-line arrows sharing a target must not be collapsed
+// ---------------------------------------------------------------------------
+describe("field-lineage same-line arrows sharing a target (sl-201z)", () => {
+  it("reports upstream connections from both arrows on one line", async () => {
+    // Bug sl-201z: the field-edge graph deduplicated arrow records by
+    // file:line:target, dropping the second of two same-line arrows that
+    // target the same field — lineage showed 1 of 2 upstream connections.
+    const fixture = resolve(FIXTURES, "same-line-arrows.stm");
+    const { stdout, code } = await run("field-lineage", "t.x", fixture, "--json", "--upstream");
+    assert.equal(code, 0);
+    const data = JSON.parse(stdout);
+    const upstreamFields = (data.upstream as any[]).map((e) => e.field).sort();
+    assert.deepEqual(upstreamFields, ["::s.a", "::s.b"],
+      "both same-line arrows should contribute an upstream connection");
+  });
+});

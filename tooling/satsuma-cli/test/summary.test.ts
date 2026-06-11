@@ -92,3 +92,24 @@ describe("satsuma summary", () => {
     assert.doesNotMatch(stderr, /Unhandled error:/);
   });
 });
+
+// ---------------------------------------------------------------------------
+// sl-201z: declared-arrow coverage must see both same-line arrows
+// ---------------------------------------------------------------------------
+describe("summary nl-derived coverage with same-line arrows (sl-201z)", () => {
+  it("suppresses an nl ref covered by the second of two same-line declared arrows", async () => {
+    // Bug sl-201z: declared-coverage collection deduplicated arrow records by
+    // file:line:target, dropping `b -> x` when it shares a line and target
+    // with `a -> x`. The @b ref annotating its own declared source was then
+    // wrongly counted as an extra nl-derived arrow.
+    const fixture = resolve(__dirname, "fixtures/same-line-arrows.stm");
+    const { stdout, code } = await run("summary", "--json", fixture);
+    assert.equal(code, 0);
+    const data = JSON.parse(stdout);
+    const mapping = (data.mappings as any[]).find((m) => m.name === "::m");
+    assert.ok(mapping, "mapping ::m should be reported");
+    assert.equal(mapping.arrowCount, 2, "only the two declared arrows should be counted");
+    assert.equal(mapping.nlDerivedArrowCount, undefined,
+      "@b annotates its own declared arrow and must not count as nl-derived");
+  });
+});

@@ -520,6 +520,29 @@ function buildFieldArrows(arrowRecords: ArrowRecord[], mappings: Map<string, Map
 }
 
 /**
+ * Iterate the distinct arrow records in a `fieldArrows` index.
+ *
+ * `buildFieldArrows` registers the *same* record object under several key
+ * forms (canonical, schema-prefixed, bare path, leaf name), so any consumer
+ * walking the whole index must deduplicate. Records are shared by reference
+ * across keys — never cloned — so identity comparison is the exact dedup
+ * criterion. Content-derived keys are NOT safe here: two distinct arrows can
+ * share file, line, and target (e.g. `a -> x { trim } b -> x { upper }` on
+ * one line), and a positional key silently drops the second arrow from
+ * graph/lineage output (sl-201z).
+ */
+export function* distinctArrowRecords(fieldArrows: Map<string, ArrowRecord[]>): Generator<ArrowRecord> {
+  const seen = new Set<ArrowRecord>();
+  for (const records of fieldArrows.values()) {
+    for (const record of records) {
+      if (seen.has(record)) continue;
+      seen.add(record);
+      yield record;
+    }
+  }
+}
+
+/**
  * Build a reference graph from the extracted items.
  */
 function buildReferenceGraph({ schemas, metrics, mappings }: {

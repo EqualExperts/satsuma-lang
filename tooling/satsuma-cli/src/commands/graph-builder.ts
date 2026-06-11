@@ -11,7 +11,7 @@
  */
 
 import { resolve } from "node:path";
-import { canonicalKey, qualifyField } from "../index-builder.js";
+import { canonicalKey, distinctArrowRecords, qualifyField } from "../index-builder.js";
 import { expandEntityFields, expandNestedSpreads } from "../spread-expand.js";
 import { extractAtRefs, classifyRef, resolveRef, resolveAllNLRefs } from "../nl-ref-extract.js";
 import type { ExtractedWorkspace, FieldDecl } from "../types.js";
@@ -408,44 +408,37 @@ function buildFieldEdges(index: ExtractedWorkspace, includedNodeIds: Set<string>
   const edges: FieldEdge[] = [];
   const unresolvedNl: Array<{ scope: string; arrow: string; text: string; file: string; line: number }> = [];
 
-  // Iterate all arrow records via the fieldArrows index.
-  // fieldArrows duplicates records under multiple keys, so deduplicate here.
-  const seen = new Set<string>();
+  // Iterate all arrow records via the fieldArrows index. distinctArrowRecords
+  // deduplicates the multi-key registrations by reference — see its doc-comment
+  // for why a positional key is not a safe identity here.
+  for (const record of distinctArrowRecords(index.fieldArrows)) {
+    const mappingKey = record.namespace
+      ? `${record.namespace}::${record.mapping}`
+      : (record.mapping ?? "");
 
-  for (const [_key, records] of index.fieldArrows) {
-    for (const record of records) {
-      // Deduplicate — same arrow record may appear under multiple keys
-      const dedupKey = `${record.file}:${record.line}:${record.target}`;
-      if (seen.has(dedupKey)) continue;
-      seen.add(dedupKey);
-
-      const mappingKey = record.namespace
-        ? `${record.namespace}::${record.mapping}`
-        : (record.mapping ?? "");
-
-      if (nsFilter) {
-        const mapping = index.mappings.get(mappingKey);
-        if (mapping?.namespace !== nsFilter) {
-          // Still include if the mapping touches schemas in the namespace
-          const touchesNs = (mapping?.sources ?? []).some((s) => includedNodeIds.has(s)) ||
-            (mapping?.targets ?? []).some((t) => includedNodeIds.has(t));
-          if (!touchesNs) continue;
-        }
-      }
-
-      // Resolve source and target schema names
+    if (nsFilter) {
       const mapping = index.mappings.get(mappingKey);
-      const sourceSchemas = mapping?.sources ?? [];
-      const targetSchemas = mapping?.targets ?? [];
+      if (mapping?.namespace !== nsFilter) {
+        // Still include if the mapping touches schemas in the namespace
+        const touchesNs = (mapping?.sources ?? []).some((s) => includedNodeIds.has(s)) ||
+          (mapping?.targets ?? []).some((t) => includedNodeIds.has(t));
+        if (!touchesNs) continue;
+      }
+    }
 
-      const fromFields = record.sources.length > 0
-        ? record.sources.map((s) => canonicalKey(qualifyField(s, sourceSchemas)))
-        : [null];
-      const toField = record.target
-        ? canonicalKey(qualifyField(record.target, targetSchemas))
-        : null;
+    // Resolve source and target schema names
+    const mapping = index.mappings.get(mappingKey);
+    const sourceSchemas = mapping?.sources ?? [];
+    const targetSchemas = mapping?.targets ?? [];
 
-      for (const fromField of fromFields) {
+    const fromFields = record.sources.length > 0
+      ? record.sources.map((s) => canonicalKey(qualifyField(s, sourceSchemas)))
+      : [null];
+    const toField = record.target
+      ? canonicalKey(qualifyField(record.target, targetSchemas))
+      : null;
+
+    for (const fromField of fromFields) {
       const edge: FieldEdge = {
         from: fromField,
         to: toField,
@@ -468,18 +461,17 @@ function buildFieldEdges(index: ExtractedWorkspace, includedNodeIds: Set<string>
       }
 
       edges.push(edge);
-      } // end for fromFields
+    }
 
-      // Track unresolved NL for the output section — all transforms are NL
-      if (record.classification === "nl" && record.steps.length > 0) {
-        unresolvedNl.push({
-          scope: `mapping ${mappingKey}`,
-          arrow: `-> ${record.target ?? "?"}`,
-          text: record.steps.map((s) => s.text).join(" "),
-          file: record.file,
-          line: record.line + 1,
-        });
-      }
+    // Track unresolved NL for the output section — all transforms are NL
+    if (record.classification === "nl" && record.steps.length > 0) {
+      unresolvedNl.push({
+        scope: `mapping ${mappingKey}`,
+        arrow: `-> ${record.target ?? "?"}`,
+        text: record.steps.map((s) => s.text).join(" "),
+        file: record.file,
+        line: record.line + 1,
+      });
     }
   }
 
