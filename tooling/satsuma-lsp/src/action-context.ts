@@ -1,5 +1,5 @@
 import type { SyntaxNode, Tree } from "./parser-utils";
-import { child, children, labelText } from "./parser-utils";
+import { child, children, labelText, nodeAtPosition } from "./parser-utils";
 import { findNodeContext, type NodeContext } from "./definition";
 import type { WorkspaceIndex } from "./workspace-index";
 import { sourceRefText } from "@satsuma/core";
@@ -18,10 +18,7 @@ export function computeActionContext(
   _uri: string,
   _index: WorkspaceIndex,
 ): ActionContext {
-  const node = tree.rootNode.descendantForPosition({
-    row: line,
-    column: character,
-  });
+  const node = nodeAtPosition(tree, line, character);
   if (!node) {
     return { schemaName: null, fieldPath: null, mappingName: null, targetSchema: null };
   }

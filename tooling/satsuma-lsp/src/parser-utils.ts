@@ -76,6 +76,48 @@ export function parseSource(source: string): Tree {
   return tree;
 }
 
+// ---------- Cursor-position node resolution ----------
+
+// A node is "word-like" if it is a leaf token whose text contains at least
+// one word character — identifiers, field names, labels, string tokens.
+// Punctuation tokens ("." "{" "->") are not word-like, so the end-of-word
+// retry in nodeAtPosition never hijacks a cursor that legitimately sits on
+// punctuation or in open space.
+const WORD_CHAR = /\w/;
+
+function isWordToken(node: Node): boolean {
+  return node.childCount === 0 && WORD_CHAR.test(node.text);
+}
+
+/**
+ * Resolve the CST node the user means when their cursor is at the given
+ * LSP position.
+ *
+ * tree-sitter node ranges are half-open, so `descendantForPosition` with
+ * the raw position resolves a cursor sitting immediately *after* the last
+ * character of an identifier to the *following* node — which made
+ * go-to-definition, hover, references, rename, completion, and code
+ * actions fail at word end while working mid-word (sl-ogd5). Like
+ * standard LSP servers, when the node at the raw position is not itself
+ * a word token we retry one column to the left and prefer a word token
+ * found there. Mid-word and word-start cursors are unaffected: the raw
+ * position already resolves to the word token. Cursors separated from
+ * the previous word by whitespace are also unaffected: the left retry
+ * lands on the whitespace, which resolves to a non-leaf parent.
+ *
+ * All position-based handlers must resolve their start node through this
+ * helper rather than calling `descendantForPosition` directly.
+ */
+export function nodeAtPosition(tree: Tree, line: number, character: number): Node | null {
+  const exact = tree.rootNode.descendantForPosition({ row: line, column: character });
+  if (exact && isWordToken(exact)) return exact;
+  if (character > 0) {
+    const left = tree.rootNode.descendantForPosition({ row: line, column: character - 1 });
+    if (left && isWordToken(left)) return left;
+  }
+  return exact ?? null;
+}
+
 // ---------- CST → LSP helpers ----------
 
 /** Convert a tree-sitter node span to an LSP Range. */

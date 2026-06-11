@@ -1,6 +1,6 @@
 ---
 id: sl-ogd5
-status: in_progress
+status: closed
 deps: []
 links: []
 created: 2026-06-11T02:41:30Z
@@ -17,3 +17,10 @@ definition.ts:22, hover.ts:22, references.ts:22, completion.ts:25, rename.ts:25/
 
 All position handlers resolve the identifier when the cursor sits at its end; shared position-adjust helper with tests.
 
+
+## Notes
+
+**2026-06-11T06:24:47Z**
+
+Cause: all seven position-based handlers (definition, hover, references, completion, rename x2, action-context) passed the raw LSP position to descendantForPosition; tree-sitter ranges are half-open, so a cursor immediately after an identifier's last character resolved to the following node and every feature failed at word end.
+Fix: added nodeAtPosition to satsuma-lsp parser-utils — returns the node at the raw position when it is a word token, otherwise retries one column left and prefers a word token there (whitespace-separated and punctuation cursors unaffected). All seven call sites now resolve through it. Unit tests pin the resolver's boundary behaviour; definition and hover gain end-of-identifier regression cases.

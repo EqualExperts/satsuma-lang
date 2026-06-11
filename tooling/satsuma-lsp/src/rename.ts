@@ -4,7 +4,7 @@ import {
   TextEdit,
 } from "vscode-languageserver";
 import type { Tree } from "./parser-utils";
-import { nodeRange } from "./parser-utils";
+import { nodeRange, nodeAtPosition } from "./parser-utils";
 import { findNodeContext, NodeContext } from "./definition";
 import {
   WorkspaceIndex,
@@ -22,10 +22,7 @@ export function prepareRename(
   _uri: string,
   _index: WorkspaceIndex,
 ): { range: Range; placeholder: string } | null {
-  const node = tree.rootNode.descendantForPosition({
-    row: line,
-    column: character,
-  });
+  const node = nodeAtPosition(tree, line, character);
   if (!node) return null;
 
   const ctx = findNodeContext(node);
@@ -59,10 +56,7 @@ export function computeRename(
   index: WorkspaceIndex,
   newName: string,
 ): WorkspaceEdit | null {
-  const node = tree.rootNode.descendantForPosition({
-    row: line,
-    column: character,
-  });
+  const node = nodeAtPosition(tree, line, character);
   if (!node) return null;
 
   const ctx = findNodeContext(node);
