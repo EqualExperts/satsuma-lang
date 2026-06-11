@@ -49,6 +49,13 @@ module.exports = grammar({
     // into one field_decl with the second name as the type (sl-hjx1).
     // Aliased to $.type_expr at the use sites so the CST shape is unchanged.
     $.inline_type,
+    // VALUE_WORD is a bare word inside a metadata tag value (value_text),
+    // restricted to the SAME LINE as the tag and excluding structural
+    // metadata keywords and spec-7.1 constraint flags. Without it, a missing
+    // comma between metadata entries let value_text silently swallow the
+    // following flags (`(pk note "x")`, `(owner finance\npk)`) — sl-vnty.
+    // Aliased to $.identifier at the use site so the CST shape is unchanged.
+    $.value_word,
   ],
 
   conflicts: (_) => [],
@@ -609,6 +616,13 @@ module.exports = grammar({
 
     // value_text: greedy repeat of basic token types.
     // Commas and ) naturally terminate it (not in the choice set).
+    //
+    // Bare words use the external value_word token (aliased to identifier):
+    // same line as the tag, and never a structural metadata keyword or a
+    // spec-7.1 constraint flag. A missing comma before a flag or note entry
+    // is therefore a loud parse error instead of silent absorption into the
+    // previous entry's value (sl-vnty). Dotted/qualified refs still lex via
+    // the internal rules — the scanner defers when '.' or ':' follows.
     value_text: ($) =>
       repeat1(
         choice(
@@ -621,7 +635,7 @@ module.exports = grammar({
           $.qualified_name,
           $.number_literal,
           $.boolean_literal,
-          $.identifier,
+          alias($.value_word, $.identifier),
           $._comparison_op,
           seq(
             "{",

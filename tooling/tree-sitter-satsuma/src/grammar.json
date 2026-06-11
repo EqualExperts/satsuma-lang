@@ -1974,8 +1974,13 @@
             "name": "boolean_literal"
           },
           {
-            "type": "SYMBOL",
-            "name": "identifier"
+            "type": "ALIAS",
+            "content": {
+              "type": "SYMBOL",
+              "name": "value_word"
+            },
+            "named": true,
+            "value": "identifier"
           },
           {
             "type": "SYMBOL",
@@ -2318,6 +2323,10 @@
     {
       "type": "SYMBOL",
       "name": "inline_type"
+    },
+    {
+      "type": "SYMBOL",
+      "name": "value_word"
     }
   ],
   "inline": [],

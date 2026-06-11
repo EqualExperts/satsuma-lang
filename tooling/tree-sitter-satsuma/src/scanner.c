@@ -28,6 +28,16 @@
  *     forms), and neither is `note` (better recovery when a bare field name
  *     precedes a note block).
  *
+ *   VALUE_WORD
+ *     A bare word inside a metadata tag value (value_text), on the SAME LINE
+ *     as the tag. Refuses structural metadata keywords (note/enum/slice) and
+ *     the spec-7.1 constraint flags (pk/required/unique/indexed/pii/encrypt)
+ *     so that a missing comma between metadata entries errors loudly instead
+ *     of silently absorbing the next entry into the value (sl-vnty). Defers
+ *     to the internal lexer when '.' or ':' follows the word, so dotted and
+ *     namespace-qualified refs (`ref addresses.id`, `crm::orders`) keep
+ *     lexing through the internal dotted_name/qualified_name rules.
+ *
  * All word tokens share the identifier shape enforced by the grammar: hyphens
  * allowed inside a word, never at its end (sl-csd2), so `a->b` always lexes
  * as an arrow.
@@ -39,7 +49,33 @@
 enum TokenType {
   CONTINUATION_WORD,
   INLINE_TYPE,
+  VALUE_WORD,
 };
+
+/* ── Keyword tables ─────────────────────────────────────────────────────── */
+
+/* Structural field forms that must reach the internal lexer from a type
+ * position (sl-hjx1); `note` is included for better recovery when a bare
+ * field name precedes a note block. */
+static const char *const TYPE_BLOCKLIST[] = { "record", "list_of", "note", NULL };
+
+/* Words that terminate a metadata tag value (sl-vnty): structural metadata
+ * entry keywords plus the spec-7.1 constraint flag tokens. A bare flag after
+ * a value almost always means a missing comma; absorbing it silently made
+ * extraction misreport constraints. Constraint flags used as a tag's value
+ * must be quoted instead (spec 7.1). */
+static const char *const VALUE_BLOCKLIST[] = {
+  "note", "enum", "slice",
+  "pk", "required", "unique", "indexed", "pii", "encrypt",
+  NULL,
+};
+
+static bool in_word_list(const char *word, const char *const *list) {
+  for (; *list; list++) {
+    if (strcmp(word, *list) == 0) return true;
+  }
+  return false;
+}
 
 void *tree_sitter_satsuma_external_scanner_create() { return NULL; }
 
@@ -128,7 +164,9 @@ static unsigned scan_word(TSLexer *lexer, char *buf, bool *comparable) {
 bool tree_sitter_satsuma_external_scanner_scan(void *payload, TSLexer *lexer, const bool *valid_symbols) {
   (void)payload;
 
-  if (!valid_symbols[CONTINUATION_WORD] && !valid_symbols[INLINE_TYPE]) return false;
+  if (!valid_symbols[CONTINUATION_WORD] &&
+      !valid_symbols[INLINE_TYPE] &&
+      !valid_symbols[VALUE_WORD]) return false;
 
   /* Skip horizontal whitespace only (space, tab, form-feed). */
   while (!lexer->eof(lexer) &&
@@ -154,38 +192,56 @@ bool tree_sitter_satsuma_external_scanner_scan(void *payload, TSLexer *lexer, co
   scan_word(lexer, word, &comparable);
 
   /* CONTINUATION_WORD accepts any word — spread labels are free vocabulary.
-   * Checked first: spread continuation and type positions never overlap, and
-   * an open spread must keep extending (existing behaviour). */
+   * Checked first: spread continuation never overlaps the other word-token
+   * positions, and an open spread must keep extending (existing behaviour). */
   if (valid_symbols[CONTINUATION_WORD]) {
     lexer->result_symbol = CONTINUATION_WORD;
     return true;
   }
 
-  /* INLINE_TYPE: reject structural keywords that introduce non-scalar field
-   * forms; the internal lexer must see them. */
+  if (valid_symbols[INLINE_TYPE]) {
+    /* Reject structural keywords that introduce non-scalar field forms; the
+     * internal lexer must see them. */
+    if (comparable && in_word_list(word, TYPE_BLOCKLIST)) return false;
+
+    /* Optional immediately-attached parenthesized arguments: `DECIMAL(12,2)`.
+     * Mirrors the previous internal token's `[^)]*` content rule (newlines
+     * allowed inside the parens). A space before `(` means the parens are a
+     * metadata block, not type arguments (spec 3.2, sl-vryu). */
+    if (lexer->lookahead == '(') {
+      lexer->advance(lexer, false);
+      while (!lexer->eof(lexer) && lexer->lookahead != ')') {
+        lexer->advance(lexer, false);
+      }
+      if (!lexer->eof(lexer)) {
+        lexer->advance(lexer, false); /* consume ')' */
+        lexer->mark_end(lexer);
+      }
+      /* EOF before ')': unterminated args — token ends after the bare word. */
+    }
+
+    lexer->result_symbol = INLINE_TYPE;
+    return true;
+  }
+
+  /* VALUE_WORD: bare word continuing a metadata tag value. */
+
+  /* Defer dotted and namespace-qualified refs to the internal
+   * dotted_name/qualified_name rules. Nothing has been marked beyond the
+   * word, so returning false re-lexes from the token start. */
+  if (lexer->lookahead == '.' || lexer->lookahead == ':') return false;
+
+  /* Defer booleans to the internal lexer so `(default false)` keeps its
+   * boolean_literal node — value_text consumers rely on the distinction. */
   if (comparable &&
-      (strcmp(word, "record") == 0 ||
-       strcmp(word, "list_of") == 0 ||
-       strcmp(word, "note") == 0)) {
+      (strcmp(word, "true") == 0 || strcmp(word, "false") == 0)) {
     return false;
   }
 
-  /* Optional immediately-attached parenthesized arguments: `DECIMAL(12,2)`.
-   * Mirrors the previous internal token's `[^)]*` content rule (newlines
-   * allowed inside the parens). A space before `(` means the parens are a
-   * metadata block, not type arguments (spec 3.2, sl-vryu). */
-  if (lexer->lookahead == '(') {
-    lexer->advance(lexer, false);
-    while (!lexer->eof(lexer) && lexer->lookahead != ')') {
-      lexer->advance(lexer, false);
-    }
-    if (!lexer->eof(lexer)) {
-      lexer->advance(lexer, false); /* consume ')' */
-      lexer->mark_end(lexer);
-    }
-    /* EOF before ')': unterminated args — token ends after the bare word. */
-  }
+  /* A structural keyword or constraint flag here means the previous entry's
+   * value ended and a comma is missing — fail so the parse errors loudly. */
+  if (comparable && in_word_list(word, VALUE_BLOCKLIST)) return false;
 
-  lexer->result_symbol = INLINE_TYPE;
+  lexer->result_symbol = VALUE_WORD;
   return true;
 }

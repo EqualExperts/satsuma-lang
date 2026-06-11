@@ -427,3 +427,71 @@ schema s (pk, required,) { f STRING }
         (field_name
           (identifier))
         (type_expr)))))
+
+================================================================================
+Missing comma before a flag is an error, not silent value absorption
+:error
+================================================================================
+
+schema s {
+  a STRING (required pii)
+}
+
+--------------------------------------------------------------------------------
+
+
+
+================================================================================
+Missing comma before a note entry is an error, not part of the value
+:error
+================================================================================
+
+schema s {
+  b STRING (pk note "primary key")
+}
+
+--------------------------------------------------------------------------------
+
+
+
+================================================================================
+A metadata entry on the next line without a comma is an error
+:error
+================================================================================
+
+schema s {
+  c STRING ( owner finance
+    pk, required )
+}
+
+--------------------------------------------------------------------------------
+
+
+
+================================================================================
+Multi-word tag value on one line still parses
+================================================================================
+
+schema s {
+  d STRING (owner finance team, pk)
+}
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (schema_block
+    (block_label
+      (identifier))
+    (schema_body
+      (field_decl
+        (field_name
+          (identifier))
+        (type_expr)
+        (metadata_block
+          (tag_with_value
+            (identifier)
+            (value_text
+              (identifier)
+              (identifier)))
+          (tag_token
+            (identifier)))))))

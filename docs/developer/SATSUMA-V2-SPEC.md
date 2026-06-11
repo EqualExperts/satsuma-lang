@@ -743,6 +743,8 @@ Vocabulary tokens are **not keywords** — they are interpreted by the LLM based
 | `filter` | Row-level filter condition | `(filter QUAL == "ON")` |
 | `note` | Persistent documentation | `(note "Converted at daily spot rate")` |
 
+**Tag value boundaries.** A bare (unquoted) tag value extends along the tag's line only, and never includes the structural entry keywords (`note`, `enum`, `slice`) or the constraint flag tokens (`pk`, `required`, `unique`, `indexed`, `pii`, `encrypt`). This makes a forgotten comma a parse error rather than a silent misread: `(pk note "x")`, `(required pii)`, and a flag starting the next line all fail loudly instead of folding the flag into the previous value. To use a constraint flag word *as* a value, quote it: `(classification "pii")`.
+
 ### 7.2 Vocabulary Conventions (pipe step shorthand)
 
 All pipe step content — bare tokens, quoted strings, and map literals — is natural language interpreted by a human or LLM. The following table lists **vocabulary conventions**: commonly used bare tokens that teams adopt as shorthand for well-understood operations. They are not keywords or reserved words; the parser treats them identically to any other bare token. Their meaning is defined by convention and by the implementing system, not by the Satsuma grammar.
