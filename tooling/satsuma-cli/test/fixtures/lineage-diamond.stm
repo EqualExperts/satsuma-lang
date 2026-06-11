@@ -1,0 +1,39 @@
+schema s0 {
+  id INTEGER
+}
+
+schema s1 {
+  id INTEGER
+}
+
+schema s2 {
+  id INTEGER
+}
+
+schema s3 {
+  id INTEGER
+}
+
+mapping `m_0_to_1` {
+  source { s0 }
+  target { s1 }
+  id -> id
+}
+
+mapping `m_1_to_2` {
+  source { s1 }
+  target { s2 }
+  id -> id
+}
+
+mapping `m_2_to_3` {
+  source { s2 }
+  target { s3 }
+  id -> id
+}
+
+mapping `m_0_to_2` {
+  source { s0 }
+  target { s2 }
+  id -> id
+}
