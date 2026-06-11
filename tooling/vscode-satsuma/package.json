@@ -79,6 +79,10 @@
         "title": "Satsuma: Show Mapping Coverage"
       },
       {
+        "command": "satsuma.clearCoverage",
+        "title": "Satsuma: Clear Mapping Coverage"
+      },
+      {
         "command": "satsuma.showViz",
         "title": "Satsuma: Overview Visualization",
         "icon": "$(eye)"
