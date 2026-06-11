@@ -484,6 +484,30 @@ describe("comments", () => {
     ];
     assert.ok(allComments.some((c) => c.kind === "question"));
   });
+
+  it("attaches a standalone comment between top-level blocks to the preceding block", () => {
+    // Control case for the namespaced fix below: standalone //! siblings of
+    // global blocks attach to the nearest preceding schema.
+    const model = vizModel(
+      "schema s {\n  id INT\n}\n//! needs review\nschema t {\n  id INT\n}",
+    );
+    const s = model.namespaces[0].schemas.find((x) => x.id === "s");
+    assert.equal(s.comments.length, 1);
+    assert.equal(s.comments[0].kind, "warning");
+  });
+
+  it("attaches standalone comments inside a namespace to the preceding block (sl-ebs9)", () => {
+    // collectTopLevelComments walked only root children and resolved blocks
+    // against the global group, so //! and //? between blocks inside a
+    // namespace vanished from the model and the warnings pane undercounted.
+    const model = vizModel(
+      "namespace crm {\n  schema s {\n    id INT\n  }\n  //! stale source\n  //? still needed?\n  schema t {\n    id INT\n  }\n}",
+    );
+    const ns = model.namespaces.find((n) => n.name === "crm");
+    const s = ns.schemas.find((x) => x.id === "s");
+    assert.equal(s.comments.length, 2);
+    assert.deepEqual(s.comments.map((c) => c.kind).sort(), ["question", "warning"]);
+  });
 });
 
 // ---------- External lineage ----------

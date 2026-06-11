@@ -385,17 +385,39 @@ function processTopLevelBlock(
 
 /**
  * Collect warning_comment and question_comment nodes that appear as siblings
- * of top-level blocks. Attach them to the preceding schema/mapping/etc.
+ * of blocks — at the file root and inside namespace blocks (sl-ebs9) — and
+ * attach each to the nearest preceding schema/mapping/metric/fragment of the
+ * same scope. Comments inside a namespace must resolve against that
+ * namespace's group, not the global one, or they vanish from the model and
+ * the warnings/questions pane undercounts.
  */
 function collectTopLevelComments(
   uri: string,
   root: SyntaxNode,
   globalNs: NamespaceGroup,
-  _namespaceMap: Map<string, NamespaceGroup>,
+  namespaceMap: Map<string, NamespaceGroup>,
 ): void {
-  const allNodes = root.children;
-  for (let i = 0; i < allNodes.length; i++) {
-    const node = allNodes[i]!;
+  collectSiblingComments(uri, root.children, globalNs);
+
+  for (const node of root.namedChildren) {
+    if (node.type !== "namespace_block") continue;
+    const nsName = node.childForFieldName?.("name")?.text ?? null;
+    const group = nsName ? namespaceMap.get(nsName) : undefined;
+    if (group) {
+      collectSiblingComments(uri, node.children, group);
+    }
+  }
+}
+
+/** Attach each standalone //! and //? among `siblings` to the nearest
+ *  preceding block found in `group`. */
+function collectSiblingComments(
+  uri: string,
+  siblings: SyntaxNode[],
+  group: NamespaceGroup,
+): void {
+  for (let i = 0; i < siblings.length; i++) {
+    const node = siblings[i]!;
     if (node.type !== "warning_comment" && node.type !== "question_comment") {
       continue;
     }
@@ -406,7 +428,7 @@ function collectTopLevelComments(
     };
 
     // Attach to the nearest preceding schema/mapping/metric/fragment
-    const target = findPrecedingBlock(allNodes, i, globalNs);
+    const target = findPrecedingBlock(siblings, i, group);
     if (target) {
       target.push(entry);
     }
@@ -416,29 +438,29 @@ function collectTopLevelComments(
 function findPrecedingBlock(
   allNodes: SyntaxNode[],
   commentIndex: number,
-  globalNs: NamespaceGroup,
+  group: NamespaceGroup,
 ): CommentEntry[] | null {
   // Walk backwards from the comment to find the preceding block
   for (let j = commentIndex - 1; j >= 0; j--) {
     const prev = allNodes[j]!;
     if (prev.type === "schema_block") {
       const name = labelText(prev);
-      const schema = globalNs.schemas.find((s) => s.id === name);
+      const schema = group.schemas.find((s) => s.id === name);
       if (schema) return schema.comments;
     }
     if (prev.type === "mapping_block") {
       const name = labelText(prev);
-      const mapping = globalNs.mappings.find((m) => m.id === name);
+      const mapping = group.mappings.find((m) => m.id === name);
       if (mapping) return mapping.comments;
     }
     if (prev.type === "schema_block" && isMetricSchema(child(prev, "metadata_block"))) {
       const name = labelText(prev);
-      const metric = globalNs.metrics.find((m) => m.id === name);
+      const metric = group.metrics.find((m) => m.id === name);
       if (metric) return metric.comments;
     }
     if (prev.type === "fragment_block") {
       const name = labelText(prev);
-      const frag = globalNs.fragments.find((f) => f.id === name);
+      const frag = group.fragments.find((f) => f.id === name);
       if (frag) return frag.comments;
     }
   }
