@@ -811,7 +811,8 @@ function formatEachFlattenBlock(
 
   line += " {";
 
-  // Inner arrows
+  // Inner items: arrow declarations plus nested each/flatten sub-blocks
+  // (grammar rule _nested_block_item allows iteration blocks to nest).
   const innerLines: string[] = [];
   let prev: SyntaxNode | null = null;
 
@@ -840,6 +841,10 @@ function formatEachFlattenBlock(
       innerLines.push(formatComputedArrow(child, source, indent + 1));
     } else if (child.type === "nested_arrow") {
       innerLines.push(formatNestedArrow(child, source, indent + 1));
+    } else if (child.type === "each_block") {
+      innerLines.push(formatEachFlattenBlock(child, source, indent + 1, "each"));
+    } else if (child.type === "flatten_block") {
+      innerLines.push(formatEachFlattenBlock(child, source, indent + 1, "flatten"));
     }
     prev = child;
   }

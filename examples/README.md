@@ -17,6 +17,7 @@ The CLI requires a `.stm` file entry point (not a directory). The workspace is d
 | [`metrics-platform/`](metrics-platform/) | `metrics.stm` | Business metrics (MRR, CLV, churn, conversion) as schema blocks with `(metric, ...)` metadata |
 | [`multi-source/`](multi-source/) | `multi-source-hub.stm` | Multi-source arrows, data hub, and three-way join patterns |
 | [`namespaces/`](namespaces/) | `ns-platform.stm` | Namespace blocks, cross-namespace references, and namespace merging |
+| [`nested-iteration/`](nested-iteration/) | `pipeline.stm` | Nested `each`/`flatten` sub-blocks mapping hierarchical dispatch events to a courier manifest |
 | [`protobuf-to-parquet/`](protobuf-to-parquet/) | `pipeline.stm` | Protobuf Kafka commerce events to session-level Parquet |
 | [`reports-and-models/`](reports-and-models/) | `pipeline.stm` | Reports, dashboards, and ML models as first-class pipeline consumers |
 | [`sap-po-to-mfcs/`](sap-po-to-mfcs/) | `pipeline.stm` | SAP ERP purchase order to Oracle MFCS ingestion contract |
