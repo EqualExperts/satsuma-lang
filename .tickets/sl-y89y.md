@@ -1,6 +1,6 @@
 ---
 id: sl-y89y
-status: open
+status: closed
 deps: []
 links: []
 created: 2026-06-11T02:40:29Z
@@ -17,3 +17,10 @@ satsuma-cli/src/commands/lineage.ts:145-164 buildDownstream (and buildUpstream :
 
 Depth-limited traversal expands nodes again when revisited at shallower depth (or tracks min-depth); diamond-graph regression test.
 
+
+## Notes
+
+**2026-06-11T22:55:00Z**
+
+Cause: buildDownstream/buildUpstream used a first-visit-wins visited set, so a node first reached at deep depth was never re-expanded when a shorter path reached it later with depth budget remaining, truncating its subtree.
+Fix: both walks now share a DepthAwareTraversal recording the shallowest visit per node, re-expanding on strictly shallower revisits, and deduplicating rediscovered edges; diamond-graph regression test added (commit e3c8046)
