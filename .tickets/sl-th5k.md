@@ -1,6 +1,6 @@
 ---
 id: sl-th5k
-status: open
+status: closed
 deps: []
 links: []
 created: 2026-06-11T02:41:29Z
@@ -17,3 +17,10 @@ satsuma-lsp/src/server.ts:163-176 — on save only validateDiagCache.delete(even
 
 After a save, files no longer reporting diagnostics get them cleared (publish empty); cross-file fix test.
 
+
+## Notes
+
+**2026-06-11T13:11:30Z**
+
+Cause: onDidSave deleted only the saved file's validateDiagCache entry; cross-file diagnostics cached for other files in the validated closure were never removed when a new run stopped reporting them, freezing them client-side until that file was saved.
+Fix: new pure reconcileValidateCache() in validate-diagnostics.ts clears cached entries for in-scope (import-reachable) files absent from the new run and returns them; the save handler republishes every touched file, with an explicit empty publish for cleared files that are not open. Entries outside the closure stay.
