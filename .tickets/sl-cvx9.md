@@ -1,6 +1,6 @@
 ---
 id: sl-cvx9
-status: open
+status: closed
 deps: []
 links: []
 created: 2026-06-10T23:21:30Z
@@ -17,3 +17,10 @@ satsuma-core/src/meta-extract.ts:26-31 — when any nl_string child exists in a 
 
 Mixed value_text round-trips fully (quoted strings plus surrounding tokens); tests for default "x" if null and multi-string values.
 
+
+## Notes
+
+**2026-06-11T12:26:18Z**
+
+Cause: normalizeMetadataValue returned only the first nl_string/backtick child of a value_text, discarding every other token in legally mixed values like (default "unknown" if null).
+Fix: unwrap delimiters only when a single child spans the entire value_text; mixed values now return the verbatim source text (quotes preserved). The whole-text quote-strip fallback no longer fires on multi-token values. (commit pending on fix/core-bug-batch)

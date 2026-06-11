@@ -54,6 +54,40 @@ describe("extractMetadata()", () => {
     assert.deepEqual(extractMetadata(meta), [{ kind: "kv", key: "classification", value: "INTERNAL" }]);
   });
 
+  // sl-cvx9: value_text legally mixes quoted strings with surrounding tokens
+  // (e.g. `default "unknown" if null`). The extractor previously discarded
+  // everything except the first nl_string child, silently losing data in all
+  // extraction JSON and hover output. Mixed values must round-trip verbatim.
+
+  it("preserves tokens around a quoted string in a mixed value (sl-cvx9)", () => {
+    // CST shape of `(default "unknown" if null)`: value_text with an nl_string
+    // child followed by two identifier children.
+    const key = n("identifier", [], "default");
+    const val = n(
+      "value_text",
+      [n("nl_string", [], '"unknown"'), n("identifier", [], "if"), n("identifier", [], "null")],
+      '"unknown" if null',
+    );
+    const kv = n("tag_with_value", [key, val]);
+    const meta = metaBlock([kv]);
+    assert.deepEqual(extractMetadata(meta), [{ kind: "kv", key: "default", value: '"unknown" if null' }]);
+  });
+
+  it("preserves all strings in a multi-string value (sl-cvx9)", () => {
+    // `(default "a" or "b")` — two nl_strings with an identifier between them.
+    // The old code returned just "a"; the outer-quote fallback must also not
+    // fire here (it would mangle the value to `a" or "b`).
+    const key = n("identifier", [], "default");
+    const val = n(
+      "value_text",
+      [n("nl_string", [], '"a"'), n("identifier", [], "or"), n("nl_string", [], '"b"')],
+      '"a" or "b"',
+    );
+    const kv = n("tag_with_value", [key, val]);
+    const meta = metaBlock([kv]);
+    assert.deepEqual(extractMetadata(meta), [{ kind: "kv", key: "default", value: '"a" or "b"' }]);
+  });
+
   it("extracts enum_body entries", () => {
     const id1 = n("identifier", [], "open");
     const id2 = n("identifier", [], "closed");
