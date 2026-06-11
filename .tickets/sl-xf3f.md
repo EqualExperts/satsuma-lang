@@ -1,6 +1,6 @@
 ---
 id: sl-xf3f
-status: in_progress
+status: closed
 deps: []
 links: [sl-p256]
 created: 2026-06-11T02:41:29Z
@@ -17,3 +17,10 @@ Two reference-index entries store ranges wider than the name they are keyed unde
 
 Reference ranges cover exactly the identifier being renamed (@ preserved, path segments preserved); rename round-trip tests for NL refs and dotted arrow paths; find-references no longer reports field-path false positives.
 
+
+## Notes
+
+**2026-06-11T06:22:37Z**
+
+Cause: Two reference-index entry kinds in the shared workspace index (satsuma-viz-backend/src/workspace-index.ts) stored ranges wider than the name they were keyed under — NL @refs kept the @ sigil in the range, and arrow first-segment entries used the whole src_path/tgt_path node range — and rename.ts replaces the stored range verbatim.
+Fix: Ranges now cover exactly the keyed identifier, derived from CST path-segment nodes: bare entries span only the first segment, full-path entries exclude the leading dot / ns:: prefix, and NL @ref ranges start one character past the @. Round-trip rename tests and exact-range index tests added. (commit a7a7fc6)
