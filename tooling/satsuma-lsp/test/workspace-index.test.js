@@ -517,6 +517,80 @@ describe("arrow field path indexing", () => {
   });
 });
 
+describe("reference range precision (sl-xf3f)", () => {
+  // Rename replaces a reference's stored range verbatim, so every range must
+  // cover exactly the text keyed under the reference name — a wider range
+  // makes rename destroy neighbouring text. These tests pin the exact spans.
+
+  /** Slice the source text covered by a single-line range. */
+  function textAt(source, range) {
+    assert.equal(range.start.line, range.end.line, "expected single-line range");
+    const line = source.split("\n")[range.start.line];
+    return line.slice(range.start.character, range.end.character);
+  }
+
+  it("bare first-segment reference covers only the first path segment, not the dotted tail", () => {
+    const source = `mapping test {
+  source { customers }
+  target { dim }
+  address.street -> s
+}`;
+    const idx = buildIndex({ "file:///a.stm": source });
+    const refs = (idx.references.get("address") || []).filter((r) => r.context === "arrow");
+    assert.equal(refs.length, 1);
+    // A whole-path range here would turn "address.street" into "<newName>"
+    // on rename, silently deleting ".street".
+    assert.equal(textAt(source, refs[0].range), "address");
+  });
+
+  it("full-path reference covers the dotted path without the ns:: prefix", () => {
+    const source = `mapping test {
+  source { customers }
+  target { dim }
+  crm::address.street -> s
+}`;
+    const idx = buildIndex({ "file:///a.stm": source });
+    // First-segment entry skips the namespace qualifier entirely
+    const bareRefs = (idx.references.get("address") || []).filter((r) => r.context === "arrow");
+    assert.equal(bareRefs.length, 1);
+    assert.equal(textAt(source, bareRefs[0].range), "address");
+    // Full-path entry is keyed without the ns:: prefix, so its range must
+    // exclude the prefix too.
+    const pathRefs = (idx.references.get("address.street") || []).filter((r) => r.context === "arrow");
+    assert.equal(pathRefs.length, 1);
+    assert.equal(textAt(source, pathRefs[0].range), "address.street");
+  });
+
+  it("relative-path reference excludes the leading dot from the stored range", () => {
+    const source = `mapping test {
+  source { orders }
+  target { dim }
+  items -> line_items {
+    .sku -> product_sku
+  }
+}`;
+    const idx = buildIndex({ "file:///a.stm": source });
+    const refs = (idx.references.get("sku") || []).filter((r) => r.context === "arrow");
+    assert.equal(refs.length, 1);
+    // The dot is path syntax, not part of the field name — a range including
+    // it would leave "<newName>" glued to the arrow with no dot after rename.
+    assert.equal(textAt(source, refs[0].range), "sku");
+  });
+
+  it("NL @ref reference range excludes the @ sigil", () => {
+    const source = `mapping test {
+  source { customers }
+  target { dim }
+  -> name { "see @customers here" }
+}`;
+    const idx = buildIndex({ "file:///a.stm": source });
+    const refs = (idx.references.get("customers") || []).filter((r) => r.context === "arrow");
+    assert.equal(refs.length, 1);
+    // A range including the @ deletes the sigil on rename, breaking the ref.
+    assert.equal(textAt(source, refs[0].range), "customers");
+  });
+});
+
 describe("NL string reference indexing", () => {
   it("indexes @refs in NL strings", () => {
     const idx = buildIndex({

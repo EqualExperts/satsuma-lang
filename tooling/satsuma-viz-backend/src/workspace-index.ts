@@ -727,10 +727,19 @@ function indexArrowFieldRefs(
 
     if (!fieldName) return;
 
-    // Bare field name — existing behaviour
+    // Rename replaces a reference's stored range verbatim, so each range must
+    // cover exactly the text keyed under the entry's name. Storing the whole
+    // path node here clobbered everything around the name: renaming a schema
+    // "address" rewrote the arrow "address.street -> s" to "<new> -> s",
+    // silently deleting ".street" (sl-xf3f). It also made find-references
+    // highlight whole dotted paths for a bare-name query.
+    const firstSegmentRange = arrowFirstSegmentRange(n) ?? nodeRange(n);
+    const fullPathRange = arrowFullPathRange(n) ?? nodeRange(n);
+
+    // Bare field name — range covers the first path segment only
     addReference(index, fieldName, {
       uri,
-      range: nodeRange(n),
+      range: firstSegmentRange,
       name: fieldName,
       context: "arrow",
     });
@@ -741,7 +750,7 @@ function indexArrowFieldRefs(
         const qualKey = `${schema}.${fullPath}`;
         addReference(index, qualKey, {
           uri,
-          range: nodeRange(n),
+          range: fullPathRange,
           name: qualKey,
           context: "arrow",
         });
@@ -751,13 +760,57 @@ function indexArrowFieldRefs(
       if (fullPath !== fieldName) {
         addReference(index, fullPath, {
           uri,
-          range: nodeRange(n),
+          range: fullPathRange,
           name: fullPath,
           context: "arrow",
         });
       }
     }
   });
+}
+
+/**
+ * The CST node for the first field segment of a src_path/tgt_path — the
+ * `identifier` or `backtick_name` whose text extractArrowFieldName returns.
+ * Skips the namespace qualifier of a namespaced_path and the leading dot of a
+ * relative_field_path. Returns null on unexpected shapes (error recovery).
+ */
+function arrowFirstSegmentNode(pathNode: SyntaxNode): SyntaxNode | null {
+  const inner = pathNode.namedChildren[0];
+  if (!inner) return null;
+  // namespaced_path = identifier "::" seg ("." seg)* — its first named child
+  // is the namespace, so the field's first segment is the second. Every other
+  // path form (field_path, backtick_path, relative_field_path) starts
+  // directly with its first segment.
+  const seg =
+    inner.type === "namespaced_path"
+      ? inner.namedChildren[1]
+      : inner.namedChildren[0];
+  return seg ?? null;
+}
+
+/** Range of exactly the first path segment of a src_path/tgt_path node. */
+function arrowFirstSegmentRange(pathNode: SyntaxNode): Range | null {
+  const seg = arrowFirstSegmentNode(pathNode);
+  return seg ? nodeRange(seg) : null;
+}
+
+/**
+ * Range of the dotted field path as keyed by extractArrowFullPath: from the
+ * first field segment to the end of the path. The leading dot of relative
+ * paths and the `ns::` prefix of namespaced paths are not part of the keyed
+ * name, so they must stay outside the range a rename rewrites (sl-xf3f).
+ */
+function arrowFullPathRange(pathNode: SyntaxNode): Range | null {
+  const inner = pathNode.namedChildren[0];
+  const seg = arrowFirstSegmentNode(pathNode);
+  if (!inner || !seg) return null;
+  return Range.create(
+    seg.startPosition.row,
+    seg.startPosition.column,
+    inner.endPosition.row,
+    inner.endPosition.column,
+  );
 }
 
 /** Extract the schemas named in a source_block or target_block within a mapping body. */
@@ -849,7 +902,11 @@ function indexNlRefs(
       const rawRef = match[0].slice(1);
       const refName = rawRef.replace(/`([^`]+)`/g, "$1");
 
-      const range = offsetToRange(text, match.index, match[0].length, startRow, startCol);
+      // The @ sigil is not part of the keyed name, so it must stay outside
+      // the stored range — rename replaces the range verbatim, and including
+      // the sigil turned "@customers" into "clients", breaking the ref
+      // (sl-xf3f). Skip one character past the @.
+      const range = offsetToRange(text, match.index + 1, match[0].length - 1, startRow, startCol);
       addReference(index, refName, {
         uri,
         range,
