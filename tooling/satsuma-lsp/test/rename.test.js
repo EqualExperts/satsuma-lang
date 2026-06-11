@@ -205,6 +205,36 @@ schema customers {
     );
   });
 
+  it("rewrites @refs inside note tags and note blocks", () => {
+    // sl-ellp: NL refs in note metadata and note blocks were never indexed, so
+    // renaming a schema left its name stale in prose documentation. Both note
+    // shapes must be rewritten alongside structural references.
+    const bSource =
+      'schema dim (note "fed by @customers") {\n  id UUID\n  note { "joins against @customers" }\n}';
+    const { index, trees } = buildIndex({
+      "file:///a.stm": "schema customers {\n  id UUID\n}",
+      "file:///b.stm": bSource,
+    });
+    const edit = computeRename(
+      trees["file:///a.stm"],
+      0,
+      8,
+      "file:///a.stm",
+      index,
+      "clients",
+    );
+    assert.ok(edit);
+    const renamed = applyEdits(bSource, edit.changes["file:///b.stm"]);
+    assert.ok(
+      renamed.includes('"fed by @clients"'),
+      `expected note tag ref to be renamed, got: ${renamed}`,
+    );
+    assert.ok(
+      renamed.includes('"joins against @clients"'),
+      `expected note block ref to be renamed, got: ${renamed}`,
+    );
+  });
+
   it("preserves the dotted tail of an arrow path whose first segment matches the renamed name", () => {
     // sl-xf3f: arrow paths were indexed under their first segment but with the
     // range of the WHOLE path node, so renaming a schema named "address"
