@@ -1,6 +1,6 @@
 ---
 id: sl-iqud
-status: open
+status: closed
 deps: []
 links: []
 created: 2026-06-11T02:41:53Z
@@ -17,3 +17,10 @@ satsuma-viz/src/field-coverage.ts:34-49 — resolveSchemaLocalFieldPath only str
 
 Prefixed paths match against both authored and qualified schema ids; namespaced multi-source coverage test.
 
+
+## Notes
+
+**2026-06-11T11:40:00Z**
+
+Cause: resolveSchemaLocalFieldPath only stripped the namespace-qualified schema.qualifiedId prefix, but arrows keep authored bare-id text ("customers.id") while the backend qualifies sourceRefs ("crm::customers") — the prefix never matched, so every prefixed source field in a namespaced multi-source mapping was reported unmapped.
+Fix: schemaRefPrefixes() matches both the qualified and authored bare form for the owning schema AND for the sibling-schema exclusion check in satsuma-viz field-coverage.ts. Tests cover bare/qualified resolution, sibling exclusion, and a namespaced multi-source coverage repro.
