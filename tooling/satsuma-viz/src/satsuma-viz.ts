@@ -230,11 +230,14 @@ export interface MinimapModel {
 
 /**
  * Objects drawn in the mapping-detail minimap: every source/target schema
- * card plus the mapping header and arrow table — the blocks a user pans
- * between in the detail view. Queried inside <sz-mapping-detail>'s shadow
- * root, so the selectors are a contract with that component's render().
+ * card plus the mapping column's two cards — the blocks a user pans between
+ * in the detail view. Both mapping-column cards (the title/meta card and the
+ * arrow-table wrapper) share the .mapping-header class, so that one class
+ * covers the whole column without double-counting the nested table. Queried
+ * inside <sz-mapping-detail>'s shadow root, so the selectors are a contract
+ * with that component's render().
  */
-const DETAIL_MINIMAP_OBJECTS_SELECTOR = "sz-schema-card, .mapping-header, .arrow-table";
+const DETAIL_MINIMAP_OBJECTS_SELECTOR = "sz-schema-card, .mapping-header";
 
 @customElement("satsuma-viz")
 export class SatsumaViz extends LitElement {

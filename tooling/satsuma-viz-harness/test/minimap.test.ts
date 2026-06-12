@@ -101,10 +101,10 @@ test.describe("Minimap visibility and contents", () => {
     await expect(minimap).toBeVisible({ timeout: 10_000 });
     await expect(minimap).toBeInViewport();
 
-    // The detail view renders one source schema card, the mapping header,
-    // the arrow table, and one target schema card → exactly 4 minimap rects.
-    // The old bug drew the full-canvas layout instead: 2 rects (one per
-    // schema in the file), mirroring the overview.
+    // The detail view renders one source schema card, the mapping column's
+    // two cards (title/meta and arrow table), and one target schema card →
+    // exactly 4 minimap rects. The old bug drew the full-canvas layout
+    // instead: 2 rects (one per schema in the file), mirroring the overview.
     await expect(minimap.locator("rect")).toHaveCount(4, { timeout: 10_000 });
   });
 });
