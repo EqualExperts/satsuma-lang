@@ -211,6 +211,31 @@ export function describeVizAutomationState(args: {
   };
 }
 
+/**
+ * Everything the minimap needs to draw itself: the content extents and one
+ * rectangle per object on the canvas, all in canvas coordinates (before the
+ * pan/zoom transform). Each view mode builds this from its own source of
+ * truth — ELK layout nodes for the positioned and overview canvases, measured
+ * DOM boxes for the mapping detail view, which is CSS-laid-out and has no
+ * ELK coordinates (fmo-fghl).
+ */
+export interface MinimapModel {
+  /** Content width in canvas px. */
+  width: number;
+  /** Content height in canvas px. */
+  height: number;
+  /** One rectangle per canvas object, in canvas coordinates. */
+  rects: Array<{ x: number; y: number; width: number; height: number }>;
+}
+
+/**
+ * Objects drawn in the mapping-detail minimap: every source/target schema
+ * card plus the mapping header and arrow table — the blocks a user pans
+ * between in the detail view. Queried inside <sz-mapping-detail>'s shadow
+ * root, so the selectors are a contract with that component's render().
+ */
+const DETAIL_MINIMAP_OBJECTS_SELECTOR = "sz-schema-card, .mapping-header, .arrow-table";
+
 @customElement("satsuma-viz")
 export class SatsumaViz extends LitElement {
   static override styles = css`
@@ -224,6 +249,25 @@ export class SatsumaViz extends LitElement {
       font-family: var(--sz-font-sans);
       height: 100%;
       min-height: 100%;
+      overflow: hidden;
+    }
+
+    /*
+     * The shell, not :host, owns the column layout. Consumer pages style the
+     * host element directly (the VS Code webview and the playground both set
+     * "satsuma-viz { display: block }"), and outer-document rules beat :host
+     * rules in the cascade — that override silently collapsed the flex chain
+     * that clamps .viewport to the visible panel, growing the viewport to its
+     * content height and pushing the bottom-anchored minimap below the
+     * clipped fold (fmo-fghl). Shadow-internal nodes are out of reach of
+     * consumer stylesheets, so the sizing contract is safe here. The :host
+     * flex rules above are kept as the sizing default for consumers that do
+     * not restyle the host.
+     */
+    .viz-shell {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
       overflow: hidden;
     }
 
@@ -887,6 +931,15 @@ export class SatsumaViz extends LitElement {
   @state()
   private _renderedNamespaceBoxes: Array<{ name: string; x: number; y: number; w: number; h: number }> = [];
 
+  /**
+   * Minimap input for the mapping detail view, measured from the rendered
+   * DOM after each detail render (see _measureDetailMinimap). Null until the
+   * first measurement lands, so the detail minimap appears one frame after
+   * the content — never with stale boxes from another view (fmo-fghl).
+   */
+  @state()
+  private _detailMinimap: MinimapModel | null = null;
+
   private static readonly MIN_ZOOM = 0.2;
   private static readonly MAX_ZOOM = 3;
 
@@ -963,8 +1016,12 @@ export class SatsumaViz extends LitElement {
       || changed.has("_nsFilter")
       || changed.has("_fileFilter")
       || changed.has("_showNotes")
+      || changed.has("_selectedMapping")
     ) {
-      requestAnimationFrame(() => this._measureNamespaceBoxes());
+      requestAnimationFrame(() => {
+        this._measureNamespaceBoxes();
+        this._measureDetailMinimap();
+      });
     }
 
     if (
@@ -1129,6 +1186,13 @@ export class SatsumaViz extends LitElement {
   }
 
   override render() {
+    // All content renders inside .viz-shell so the component's column layout
+    // survives consumer CSS that restyles the host element — see the
+    // .viz-shell style comment for the full story (fmo-fghl).
+    return html`<div class="viz-shell">${this._renderContent()}</div>`;
+  }
+
+  private _renderContent() {
     const automationState = describeVizAutomationState({
       hasModel: Boolean(this.model),
       hasOverviewLayout: Boolean(this._overviewLayout),
@@ -1193,7 +1257,7 @@ export class SatsumaViz extends LitElement {
               <div class="zoom-indicator ${this._zoomIndicatorVisible ? "visible" : ""}">
                 ${Math.round(this._zoom * 100)}%
               </div>
-              ${this._renderMinimap(this._layout)}
+              ${this._detailMinimap ? this._renderMinimap(this._detailMinimap) : ""}
             </div>
           </div>
         </div>
@@ -1224,7 +1288,7 @@ export class SatsumaViz extends LitElement {
               <div class="zoom-indicator ${this._zoomIndicatorVisible ? "visible" : ""}">
                 ${Math.round(this._zoom * 100)}%
               </div>
-              ${this._renderMinimap(this._overviewLayoutAsDetail())}
+              ${this._renderMinimap(this._overviewMinimap(this._overviewLayout))}
             </div>
           </div>
         </div>
@@ -1259,7 +1323,7 @@ export class SatsumaViz extends LitElement {
             <div class="zoom-indicator ${this._zoomIndicatorVisible ? "visible" : ""}">
               ${Math.round(this._zoom * 100)}%
             </div>
-            ${this._renderMinimap(this._layout!)}
+            ${this._renderMinimap(this._layoutMinimap(this._layout!))}
           </div>
           ${showPane ? this._renderNotesPane(allComments) : ""}
         </div>
@@ -1684,14 +1748,14 @@ export class SatsumaViz extends LitElement {
     return boxes;
   }
 
-  /** Adapt overview layout to LayoutResult shape for minimap reuse. */
-  private _overviewLayoutAsDetail(): LayoutResult {
-    const ov = this._overviewLayout!;
-    const nodes = new Map<string, import("./layout/elk-layout.js").LayoutNode>();
-    for (const n of ov.nodes) {
-      nodes.set(n.id, n);
-    }
-    return { nodes, edges: [], sourceBlocks: [], width: ov.width, height: ov.height };
+  /** Minimap input for the full positioned canvas (ELK detail layout). */
+  private _layoutMinimap(layout: LayoutResult): MinimapModel {
+    return { width: layout.width, height: layout.height, rects: [...layout.nodes.values()] };
+  }
+
+  /** Minimap input for the overview canvas (one rect per compact card). */
+  private _overviewMinimap(ov: OverviewLayoutResult): MinimapModel {
+    return { width: ov.width, height: ov.height, rects: ov.nodes };
   }
 
   private _overviewMappingNodeId(namespaceName: string | null, mappingId: string): string {
@@ -1890,10 +1954,10 @@ export class SatsumaViz extends LitElement {
     `;
   }
 
-  private _renderMinimap(layout: LayoutResult) {
+  private _renderMinimap(map: MinimapModel) {
     const mmW = 160;
     const mmH = 100;
-    const scale = Math.min(mmW / (layout.width + 48), mmH / (layout.height + 48));
+    const scale = Math.min(mmW / (map.width + 48), mmH / (map.height + 48));
 
     // Viewport rectangle (inverse of pan/zoom transform)
     const host = this.renderRoot?.querySelector?.(".viewport") as HTMLElement | null;
@@ -1905,9 +1969,9 @@ export class SatsumaViz extends LitElement {
     const vh = (vpH / this._zoom) * scale;
 
     return html`
-      <div class="minimap" @click=${(e: MouseEvent) => this._onMinimapClick(e, layout, scale)}>
+      <div class="minimap" data-testid="viz-minimap" @click=${(e: MouseEvent) => this._onMinimapClick(e, scale)}>
         <svg width=${mmW} height=${mmH} viewBox="0 0 ${mmW} ${mmH}">
-          ${[...layout.nodes.values()].map(
+          ${map.rects.map(
             (n) => svg`
               <rect
                 x=${n.x * scale} y=${n.y * scale}
@@ -1925,7 +1989,7 @@ export class SatsumaViz extends LitElement {
     `;
   }
 
-  private _onMinimapClick(e: MouseEvent, layout: LayoutResult, scale: number) {
+  private _onMinimapClick(e: MouseEvent, scale: number) {
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
     const mx = e.clientX - rect.left;
     const my = e.clientY - rect.top;
@@ -2303,6 +2367,54 @@ export class SatsumaViz extends LitElement {
     const next = JSON.stringify(boxes);
     if (prev !== next) {
       this._renderedNamespaceBoxes = boxes;
+    }
+  }
+
+  /**
+   * Measure the rendered mapping-detail DOM into a MinimapModel (fmo-fghl).
+   *
+   * The detail view is CSS-laid-out (a grid inside <sz-mapping-detail>), so
+   * unlike the ELK-backed canvases there are no layout coordinates to feed
+   * the minimap. Instead the schema cards, mapping header, and arrow table
+   * are measured with getBoundingClientRect() and mapped back to canvas
+   * coordinates by undoing the pan/zoom transform: positions are taken
+   * relative to the .detail-inner canvas origin and divided by the current
+   * zoom, so the resulting boxes are pan/zoom-invariant.
+   */
+  private _measureDetailMinimap() {
+    if (this._viewMode !== "detail") {
+      if (this._detailMinimap) this._detailMinimap = null;
+      return;
+    }
+    const canvas = this.renderRoot?.querySelector?.(".detail-inner") as HTMLElement | null;
+    const detail = this.renderRoot?.querySelector?.("sz-mapping-detail");
+    const shadow = detail?.shadowRoot ?? null;
+    if (!canvas || !shadow || typeof canvas.getBoundingClientRect !== "function") {
+      if (this._detailMinimap) this._detailMinimap = null;
+      return;
+    }
+
+    const origin = canvas.getBoundingClientRect();
+    const zoom = this._zoom || 1;
+    const rects = [...shadow.querySelectorAll(DETAIL_MINIMAP_OBJECTS_SELECTOR)].map((el) => {
+      const r = el.getBoundingClientRect();
+      return {
+        x: (r.left - origin.left) / zoom,
+        y: (r.top - origin.top) / zoom,
+        width: r.width / zoom,
+        height: r.height / zoom,
+      };
+    });
+    const next: MinimapModel = {
+      width: origin.width / zoom,
+      height: origin.height / zoom,
+      rects,
+    };
+
+    // Re-assign only on real change: this runs after every detail render and
+    // assigning state unconditionally would schedule an endless update loop.
+    if (JSON.stringify(next) !== JSON.stringify(this._detailMinimap)) {
+      this._detailMinimap = next;
     }
   }
 

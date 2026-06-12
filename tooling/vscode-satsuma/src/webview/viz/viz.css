@@ -9,16 +9,24 @@ html, body {
   font-family: system-ui, -apple-system, sans-serif;
 }
 
+/*
+ * The component owns all scrolling (it pans/zooms its own canvas), so the
+ * shell must give it a definite height and never scroll around it. A
+ * `min-height` here used to let the host grow to its content height, which
+ * pushed the component's bottom-anchored minimap below the panel fold
+ * (fmo-fghl). Note: rules in this file target the host element and override
+ * the component's own :host styles, so they must stay layout-neutral.
+ */
 #viz-root {
   width: 100%;
   height: 100%;
-  overflow: auto;
+  overflow: hidden;
 }
 
 satsuma-viz {
-  display: block;
+  display: block; /* pre-upgrade default; the component lays out its own internals */
   width: 100%;
-  min-height: 100%;
+  height: 100%;
 }
 
 .error-message {
