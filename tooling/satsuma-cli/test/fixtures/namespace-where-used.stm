@@ -1,0 +1,68 @@
+// Fixture for sl-l3m8: where-used must find references to transforms and
+// fragments defined inside a namespace, whether referenced bare (from inside
+// the namespace) or qualified (from outside it).
+
+namespace crm {
+  fragment audit_fields {
+    created_at TIMESTAMP
+  }
+
+  schema customers {
+    id STRING
+    ...audit_fields            // bare spread inside the namespace
+  }
+
+  schema customers_clean {
+    id STRING
+  }
+
+  transform tidy {
+    trim | lowercase
+  }
+
+  mapping clean_customers {
+    source { customers }
+    target { customers_clean }
+    id -> id { ...tidy }       // bare spread invocation inside the namespace
+  }
+
+  mapping clean_customers_again {
+    source { customers }
+    target { customers_clean }
+    id -> id { tidy }          // bare pipe invocation inside the namespace
+  }
+}
+
+// A global transform with the same bare name as the namespaced one: bare
+// references inside crm must bind to crm::tidy, not to this.
+transform tidy {
+  uppercase
+}
+
+// Multi-word backticked fragment name — regression coverage for spread-label
+// text extraction alongside the namespace resolution.
+fragment `common keys` {
+  tenant_id STRING
+}
+
+schema global_users {
+  id STRING
+  ...crm::audit_fields         // qualified spread from outside the namespace
+  ...`common keys`             // unnamespaced multi-word spread
+}
+
+schema global_users_clean {
+  id STRING
+}
+
+mapping clean_global_users {
+  source { global_users }
+  target { global_users_clean }
+  id -> id { ...crm::tidy }    // qualified spread invocation from outside
+}
+
+mapping shout_global_users {
+  source { global_users }
+  target { global_users_clean }
+  id -> id { tidy }            // bare invocation outside crm binds to global tidy
+}
