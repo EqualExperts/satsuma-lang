@@ -5,7 +5,12 @@
  *
  * Schema references:   via referenceGraph.usedByMappings + metricsReferences
  * Fragment references: via CST fragment_spread nodes across all files
- * Transform refs:      not currently cross-referenced in CST (reported as such)
+ * Transform refs:      via CST pipe_step nodes (bare invocations and spreads)
+ *
+ * Reference text is resolved against the namespace it is authored in
+ * (core's resolveScopedEntityRef), matching the binding rule the LSP uses:
+ * a bare name inside a namespace binds to the namespace-local definition
+ * when one exists, else to the global one (sl-l3m8).
  *
  * Output is grouped by usage type (mapping, metric, schema).
  *
@@ -18,7 +23,7 @@ import { loadWorkspace } from "../load-workspace.js";
 import { runCommand, CommandError, EXIT_NOT_FOUND } from "../command-runner.js";
 import { resolveIndexKey, canonicalKey } from "../index-builder.js";
 import { resolveAllNLRefs } from "../nl-ref-extract.js";
-import { stripNLRefScopePrefix } from "@satsuma/core";
+import { stripNLRefScopePrefix, resolveScopedEntityRef } from "@satsuma/core";
 import type { SyntaxNode, ExtractedWorkspace, ParsedFile } from "../types.js";
 
 interface Ref {
@@ -126,7 +131,7 @@ function gatherRefs(name: string, index: ExtractedWorkspace, parsedFiles: Parsed
   if (isFragment) {
     // Find fragment_spread nodes across all files
     for (const { filePath, tree } of parsedFiles) {
-      const spreads = findFragmentSpreads(tree.rootNode, name);
+      const spreads = findFragmentSpreads(tree.rootNode, name, index.fragments);
       for (const { block, row } of spreads) {
         refs.push({ kind: "fragment_spread", name: block, file: filePath, line: row + 1 });
       }
@@ -136,7 +141,7 @@ function gatherRefs(name: string, index: ExtractedWorkspace, parsedFiles: Parsed
   if (isTransform) {
     // Find transform invocations in arrow pipe chains
     for (const { filePath, tree } of parsedFiles) {
-      const transformRefs = findTransformRefs(tree.rootNode, name);
+      const transformRefs = findTransformRefs(tree.rootNode, name, index.transforms);
       for (const { mapping, row } of transformRefs) {
         refs.push({ kind: "transform_call", name: mapping, file: filePath, line: row + 1 });
       }
@@ -201,10 +206,22 @@ function matchesEntityOrField(resolvedName: string, internalName: string, canoni
 }
 
 /**
- * Find all fragment_spread usages of `fragmentName` in the CST.
+ * Find all fragment_spread usages binding to the fragment keyed by
+ * `fragmentKey` (a resolved index key, e.g. "audit_fields" or
+ * "crm::audit_fields") in the CST.
+ *
+ * Each spread's authored text is resolved against the namespace it appears
+ * in — a bare `...audit_fields` inside `namespace crm` binds to
+ * crm::audit_fields when that exists — so raw-text comparison against the
+ * qualified key no longer drops namespace-local spreads (sl-l3m8).
+ *
  * Returns [{block, row}] where block is the containing schema/fragment name.
  */
-function findFragmentSpreads(rootNode: SyntaxNode, fragmentName: string): Array<{ block: string; row: number }> {
+function findFragmentSpreads(
+  rootNode: SyntaxNode,
+  fragmentKey: string,
+  fragments: Map<string, unknown>,
+): Array<{ block: string; row: number }> {
   const results: Array<{ block: string; row: number }> = [];
   function checkBlock(topLevel: SyntaxNode, namespace: string | null): void {
     if (topLevel.type !== "schema_block" && topLevel.type !== "fragment_block") return;
@@ -216,7 +233,7 @@ function findFragmentSpreads(rootNode: SyntaxNode, fragmentName: string): Array<
 
     const body = topLevel.namedChildren.find((c) => c.type === "schema_body");
     if (body) {
-      walkForSpreads(body, fragmentName, blockName, results);
+      walkForSpreads(body, fragmentKey, fragments, namespace, blockName, results);
     }
   }
   for (const topLevel of rootNode.namedChildren) {
@@ -232,7 +249,14 @@ function findFragmentSpreads(rootNode: SyntaxNode, fragmentName: string): Array<
   return results;
 }
 
-function walkForSpreads(bodyNode: SyntaxNode, fragmentName: string, blockName: string, results: Array<{ block: string; row: number }>): void {
+function walkForSpreads(
+  bodyNode: SyntaxNode,
+  fragmentKey: string,
+  fragments: Map<string, unknown>,
+  namespace: string | null,
+  blockName: string,
+  results: Array<{ block: string; row: number }>,
+): void {
   for (const c of bodyNode.namedChildren) {
     if (c.type === "fragment_spread") {
       // fragment_spread children use spread_label, not block_label
@@ -249,22 +273,34 @@ function walkForSpreads(bodyNode: SyntaxNode, fragmentName: string, blockName: s
             .join(" ");
         }
       }
-      if (sname === fragmentName) {
+      if (sname && resolveScopedEntityRef(sname, namespace, fragments) === fragmentKey) {
         results.push({ block: blockName, row: c.startPosition.row });
       }
     } else if (c.type === "field_decl") {
       // Recurse into nested record/list_of fields for spreads
       const nested = c.namedChildren.find((x) => x.type === "schema_body");
-      if (nested) walkForSpreads(nested, fragmentName, blockName, results);
+      if (nested) walkForSpreads(nested, fragmentKey, fragments, namespace, blockName, results);
     }
   }
 }
 
 /**
- * Find all transform invocations (token_call) matching `transformName` in mapping arrows.
+ * Find all transform invocations binding to the transform keyed by
+ * `transformKey` (a resolved index key, e.g. "tidy" or "crm::tidy") in
+ * mapping arrow pipe chains.
+ *
+ * As with fragment spreads, each invocation's authored text is resolved
+ * against its enclosing namespace before comparing, so a bare `tidy` (pipe
+ * step or `...tidy` spread) inside `namespace crm` binds to crm::tidy when
+ * that exists (sl-l3m8).
+ *
  * Returns [{mapping, row}] where mapping is the qualified mapping name.
  */
-function findTransformRefs(rootNode: SyntaxNode, transformName: string): Array<{ mapping: string; row: number }> {
+function findTransformRefs(
+  rootNode: SyntaxNode,
+  transformKey: string,
+  transforms: Map<string, unknown>,
+): Array<{ mapping: string; row: number }> {
   const results: Array<{ mapping: string; row: number }> = [];
 
   function scanMappings(node: SyntaxNode, namespace: string | null): void {
@@ -283,7 +319,7 @@ function findTransformRefs(rootNode: SyntaxNode, transformName: string): Array<{
       if (namespace) mappingName = `${namespace}::${mappingName}`;
 
       // Walk all pipe_step/token_call descendants
-      walkForTransformCalls(c, transformName, mappingName, results);
+      walkForTransformCalls(c, transformKey, transforms, namespace, mappingName, results);
     }
   }
 
@@ -291,25 +327,34 @@ function findTransformRefs(rootNode: SyntaxNode, transformName: string): Array<{
   return results;
 }
 
-function walkForTransformCalls(node: SyntaxNode, transformName: string, mappingName: string, results: Array<{ mapping: string; row: number }>): void {
+function walkForTransformCalls(
+  node: SyntaxNode,
+  transformKey: string,
+  transforms: Map<string, unknown>,
+  namespace: string | null,
+  mappingName: string,
+  results: Array<{ mapping: string; row: number }>,
+): void {
+  const bindsToTarget = (refText: string): boolean =>
+    refText !== "" && resolveScopedEntityRef(refText, namespace, transforms) === transformKey;
+
   for (const c of node.namedChildren) {
     if (c.type === "pipe_step") {
       const inner = c.namedChildren[0];
-      if (inner?.type === "pipe_text" && inner.text === transformName) {
+      if (inner?.type === "pipe_text" && bindsToTarget(inner.text)) {
         results.push({ mapping: mappingName, row: c.startPosition.row });
       }
       // Check for fragment_spread inside pipe_step (transform spread: ...name)
       if (inner?.type === "fragment_spread") {
         const lbl = inner.namedChildren.find((x) => x.type === "spread_label");
-        const spreadName = getSpreadName(lbl);
-        if (spreadName === transformName) {
+        if (bindsToTarget(getSpreadName(lbl))) {
           results.push({ mapping: mappingName, row: c.startPosition.row });
         }
       }
       // Don't recurse into pipe_step — already checked its children above
       continue;
     }
-    walkForTransformCalls(c, transformName, mappingName, results);
+    walkForTransformCalls(c, transformKey, transforms, namespace, mappingName, results);
   }
 }
 

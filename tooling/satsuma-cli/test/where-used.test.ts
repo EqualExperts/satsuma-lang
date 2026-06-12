@@ -1,148 +1,90 @@
 /**
- * where-used.test.js — Unit tests for where-used command helpers.
+ * where-used.test.ts — End-to-end tests for `satsuma where-used`.
+ *
+ * Runs the built CLI as a subprocess against fixtures (the same pattern as
+ * namespace-bugs.test.ts). The previous version of this file tested an
+ * inline *copy* of the walker implementation, which kept passing while the
+ * real command silently found nothing for namespaced transforms and
+ * fragments (sl-l3m8) — these tests exercise the actual command.
  */
 
-import assert from "node:assert/strict";
+import { fileURLToPath } from "node:url";
+import { dirname, resolve } from "node:path";
 import { describe, it } from "node:test";
+import assert from "node:assert/strict";
+import { run as _run } from "./helpers.js";
 
-// ── Mock CST helpers ──────────────────────────────────────────────────────────
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const CLI = resolve(__dirname, "../dist/index.js");
+// Fixture defining crm::tidy / crm::audit_fields plus a global `tidy` that
+// shares the bare name, exercising every bare/qualified × inside/outside
+// namespace combination (sl-l3m8).
+const FIXTURE = resolve(__dirname, "fixtures/namespace-where-used.stm");
+// Canonical example: a GLOBAL fragment spread bare into namespaced schemas.
+const NS_PLATFORM = resolve(__dirname, "../../../examples/namespaces/ns-platform.stm");
 
-function n(type: string, namedChildren: any[] = [], text = "", row = 0): any {
-  return { type, text, startPosition: { row, column: 0 }, namedChildren };
-}
-function ident(t: string) { return n("identifier", [], t); }
-function quoted(t: string) { return n("backtick_name", [], `'${t}'`); }
-function blockLabel(name: string) {
-  const inner = name.startsWith("'") ? quoted(name.slice(1, -1)) : ident(name);
-  return n("block_label", [inner]);
-}
-function spreadLabel(name: string) {
-  if (name.startsWith("'")) return n("spread_label", [quoted(name.slice(1, -1))]);
-  return n("spread_label", name.split(" ").map(ident));
-}
+const run = (...args: string[]) => _run(CLI, ...args);
 
-// ── Inline findFragmentSpreads + walkForSpreads ───────────────────────────────
-
-function walkForSpreads(bodyNode: any, fragmentName: string, blockName: string, results: any[]) {
-  for (const c of bodyNode.namedChildren) {
-    if (c.type === "fragment_spread") {
-      const lbl = c.namedChildren.find((x: any) => x.type === "spread_label" || x.type === "block_label");
-      let sname = "";
-      if (lbl) {
-        const q = lbl.namedChildren.find((x: any) => x.type === "backtick_name");
-        if (q) {
-          sname = q.text.slice(1, -1);
-        } else {
-          sname = lbl.namedChildren
-            .filter((x: any) => x.type === "identifier" || x.type === "qualified_name")
-            .map((x: any) => x.text)
-            .join(" ");
-        }
-      }
-      if (sname === fragmentName) results.push({ block: blockName, row: c.startPosition.row });
-    } else if (c.type === "record_block" || c.type === "list_block") {
-      const nested = c.namedChildren.find((x: any) => x.type === "schema_body");
-      if (nested) walkForSpreads(nested, fragmentName, blockName, results);
-    }
-  }
+/** Parse `--json` stdout and return the refs of the given kind. */
+function refsOfKind(stdout: string, kind: string): Array<{ name: string; line: number }> {
+  return JSON.parse(stdout).refs.filter((r: { kind: string }) => r.kind === kind);
 }
 
-function findFragmentSpreads(rootNode: any, fragmentName: string) {
-  const results: any[] = [];
-  for (const topLevel of rootNode.namedChildren) {
-    if (topLevel.type !== "schema_block" && topLevel.type !== "fragment_block") continue;
-    const lbl = topLevel.namedChildren.find((c: any) => c.type === "block_label");
-    const inner = lbl?.namedChildren[0];
-    let blockName = inner?.text ?? "";
-    if (inner?.type === "backtick_name") blockName = blockName.slice(1, -1);
-
-    const body = topLevel.namedChildren.find((c: any) => c.type === "schema_body");
-    if (body) walkForSpreads(body, fragmentName, blockName, results);
-  }
-  return results;
-}
-
-// ── Tests ─────────────────────────────────────────────────────────────────────
-
-describe("findFragmentSpreads", () => {
-  it("finds a quoted fragment spread in a schema", () => {
-    const spread = n("fragment_spread", [spreadLabel("'address fields'")], "", 5);
-    const body = n("schema_body", [spread]);
-    const schemaBlock = n("schema_block", [blockLabel("orders"), body]);
-    const root = n("source_file", [schemaBlock]);
-
-    const results = findFragmentSpreads(root, "address fields");
-    assert.equal(results.length, 1);
-    assert.equal(results[0].block, "orders");
-    assert.equal(results[0].row, 5);
+describe("where-used: transforms defined inside a namespace (sl-l3m8)", () => {
+  it("finds bare invocations, bare spreads, and qualified spreads of a namespaced transform", async () => {
+    const { stdout, code } = await run("where-used", "crm::tidy", FIXTURE, "--json");
+    assert.equal(code, 0);
+    const calls = refsOfKind(stdout, "transform_call");
+    const byMapping = new Map(calls.map((r) => [r.name, r.line]));
+    // `...tidy` spread inside the namespace binds to crm::tidy
+    assert.ok(byMapping.has("crm::clean_customers"), "bare ...spread inside namespace must be found");
+    // bare `tidy` pipe step inside the namespace binds to crm::tidy
+    assert.ok(byMapping.has("crm::clean_customers_again"), "bare pipe invocation inside namespace must be found");
+    // `...crm::tidy` from outside the namespace binds to crm::tidy
+    assert.ok(byMapping.has("clean_global_users"), "qualified ...spread from outside namespace must be found");
+    assert.equal(calls.length, 3, "exactly the three crm::tidy call sites — no fan-out to the global tidy");
   });
 
-  it("returns empty when fragment not spread anywhere", () => {
-    const body = n("schema_body", []);
-    const schemaBlock = n("schema_block", [blockLabel("orders"), body]);
-    const root = n("source_file", [schemaBlock]);
-
-    assert.deepEqual(findFragmentSpreads(root, "address fields"), []);
-  });
-
-  it("finds fragment spread in multiple schemas", () => {
-    const spread1 = n("fragment_spread", [spreadLabel("'audit columns'")]);
-    const spread2 = n("fragment_spread", [spreadLabel("'audit columns'")]);
-    const body1 = n("schema_body", [spread1]);
-    const body2 = n("schema_body", [spread2]);
-    const s1 = n("schema_block", [blockLabel("orders"), body1]);
-    const s2 = n("schema_block", [blockLabel("customers"), body2]);
-    const root = n("source_file", [s1, s2]);
-
-    const results = findFragmentSpreads(root, "audit columns");
-    assert.equal(results.length, 2);
-    assert.ok(results.some((r) => r.block === "orders"));
-    assert.ok(results.some((r) => r.block === "customers"));
-  });
-
-  it("does not match different fragment names", () => {
-    const spread = n("fragment_spread", [spreadLabel("'other frag'")]);
-    const body = n("schema_body", [spread]);
-    const block = n("schema_block", [blockLabel("t"), body]);
-    const root = n("source_file", [block]);
-
-    assert.deepEqual(findFragmentSpreads(root, "address fields"), []);
-  });
-
-  it("finds spreads in record_block nested bodies", () => {
-    const spread = n("fragment_spread", [spreadLabel("'audit columns'")], "", 10);
-    const innerBody = n("schema_body", [spread]);
-    const recBlock = n("record_block", [blockLabel("audit"), innerBody]);
-    const outerBody = n("schema_body", [recBlock]);
-    const schemaBlock = n("schema_block", [blockLabel("orders"), outerBody]);
-    const root = n("source_file", [schemaBlock]);
-
-    const results = findFragmentSpreads(root, "audit columns");
-    assert.equal(results.length, 1);
-    assert.equal(results[0].block, "orders");
-  });
-
-  it("finds unquoted multi-word fragment spreads", () => {
-    const spread = n("fragment_spread", [spreadLabel("audit columns")], "", 3);
-    const body = n("schema_body", [spread]);
-    const schemaBlock = n("schema_block", [blockLabel("orders"), body]);
-    const root = n("source_file", [schemaBlock]);
-
-    const results = findFragmentSpreads(root, "audit columns");
-    assert.equal(results.length, 1);
-    assert.equal(results[0].block, "orders");
+  it("does not attribute bare references inside the namespace to a same-named global transform", async () => {
+    // The fixture's global `tidy` shadows nothing inside crm: a bare `tidy`
+    // authored in crm binds to crm::tidy, so the global transform's
+    // references are only those authored outside the namespace.
+    const { stdout, code } = await run("where-used", "tidy", FIXTURE, "--json");
+    assert.equal(code, 0);
+    const data = JSON.parse(stdout);
+    assert.equal(data.name, "::tidy", "bare query resolves to the global transform");
+    const calls = refsOfKind(stdout, "transform_call");
+    assert.deepEqual(calls.map((r) => r.name), ["shout_global_users"]);
   });
 });
 
-describe("referenceGraph usedByMappings", () => {
-  it("collects schemas referenced by mappings", () => {
-    const usedByMappings = new Map([
-      ["legacy_sqlserver", ["customer migration"]],
-      ["postgres_db", ["customer migration"]],
-    ]);
+describe("where-used: fragments defined inside a namespace (sl-l3m8)", () => {
+  it("finds bare spreads from inside and qualified spreads from outside the namespace", async () => {
+    const { stdout, code } = await run("where-used", "crm::audit_fields", FIXTURE, "--json");
+    assert.equal(code, 0);
+    const spreads = refsOfKind(stdout, "fragment_spread");
+    const blocks = spreads.map((r) => r.name).sort();
+    assert.deepEqual(blocks, ["crm::customers", "global_users"]);
+  });
 
-    const refs = usedByMappings.get("legacy_sqlserver") ?? [];
-    assert.deepEqual(refs, ["customer migration"]);
-    assert.equal((usedByMappings.get("postgres_db") ?? []).length, 1);
+  it("still finds bare spreads of a GLOBAL fragment authored inside namespaces (corpus)", async () => {
+    // ns-platform.stm spreads the global standard_metadata fragment into
+    // schemas across several namespace blocks — the pre-fix raw-text match
+    // happened to work here, so this pins against regression in the other
+    // direction (bare ref in a namespace falling back to the global def).
+    const { stdout, code } = await run("where-used", "standard_metadata", NS_PLATFORM, "--json");
+    assert.equal(code, 0);
+    const spreads = refsOfKind(stdout, "fragment_spread");
+    assert.ok(spreads.length >= 5, `expected the corpus's many spreads, got ${spreads.length}`);
+    assert.ok(spreads.some((r) => r.name.includes("::")), "spread targets include namespaced schemas");
+  });
+
+  it("finds spreads of multi-word backticked fragment names", async () => {
+    // Spread-label text extraction joins identifier parts with spaces and
+    // strips backticks; this guards that path alongside namespace resolution.
+    const { stdout, code } = await run("where-used", "common keys", FIXTURE, "--json");
+    assert.equal(code, 0);
+    const spreads = refsOfKind(stdout, "fragment_spread");
+    assert.deepEqual(spreads.map((r) => r.name), ["global_users"]);
   });
 });
