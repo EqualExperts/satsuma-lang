@@ -1,6 +1,6 @@
 ---
 id: sl-dxjh
-status: open
+status: closed
 deps: []
 links: []
 created: 2026-06-12T09:31:12Z
@@ -21,3 +21,10 @@ Note: NL strings are delivered verbatim by design, so verbatim comparison of quo
 
 satsuma diff old new reports no changes when new is exactly satsuma-fmt(old); pipe chains and map entries compare on parsed structure, not raw body text; quoted NL strings still compare verbatim; tests cover fmt-roundtrip diff emptiness for the example corpus
 
+
+## Notes
+
+**2026-06-12T12:05:30Z**
+
+Cause: diffTransform compared raw pipe-chain text and arrows compared transform_raw built from raw step text, so fmt's layout changes (steps one-per-line, map entries newline-separated) registered as structural changes.
+Fix: Added canonicalPipeChainText to core extract (steps joined ' | ', map entries rebuilt single-line, leaf tokens verbatim); ExtractedTransform gains canonicalBody, transform_raw is now canonical, diff compares canonical forms. Corpus-wide fmt-roundtrip test asserts diff(file, fmt(file)) is empty for all 25 examples (commit e9e35b2)
