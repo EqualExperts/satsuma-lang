@@ -160,7 +160,10 @@ jobs:
           ```
 
           **Install VS Code Extension:**
-          Download `vscode-satsuma-latest.vsix`, then in VS Code open the Extensions view, choose **Install from VSIX…** from the `···` menu (or run **Extensions: Install from VSIX…** from the Command Palette), and select the downloaded file. Or from the command line:
+          Download `vscode-satsuma-latest.vsix`, then in VS Code open the Extensions view,
+          choose **Install from VSIX…** from the `···` menu (or run
+          **Extensions: Install from VSIX…** from the Command Palette), and select the
+          downloaded file. Or from the command line:
           ```bash
           code --install-extension vscode-satsuma-latest.vsix
           ```
