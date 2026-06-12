@@ -1,6 +1,6 @@
 ---
 id: sl-l3m8
-status: open
+status: closed
 deps: []
 links: []
 created: 2026-06-12T09:31:06Z
@@ -32,3 +32,10 @@ Fragment case: a fragment in a namespace spread via ...audit_fields into two sch
 
 where-used <transform> finds bare invocations and ...spreads of a transform defined in a namespace, both from inside and outside that namespace; where-used <fragment> finds ...spreads of a namespaced fragment; tests cover bare/spread x namespaced/unnamespaced; assess whether the resolution lives in satsuma-core and fix it there so the LSP find-references gets the same fix
 
+
+## Notes
+
+**2026-06-12T11:54:25Z**
+
+Cause: where-used resolved the queried definition through the namespace-aware index (key e.g. crm::tidy) but compared CST reference text raw, so bare invocations/spreads authored inside the namespace never matched the qualified key.
+Fix: Threaded the enclosing namespace through findTransformRefs/findFragmentSpreads and resolved each reference via core's resolveScopedEntityRef (same binding rule as the LSP's sl-p256 fix); LSP unaffected since viz-backend already re-resolves refs by authoring namespace. Subprocess tests now cover bare/spread x namespaced/unnamespaced plus shadowing (commit 86db538)
