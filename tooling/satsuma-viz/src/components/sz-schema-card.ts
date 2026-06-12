@@ -721,17 +721,20 @@ export class SzSchemaCard extends LitElement {
 
   /**
    * Metadata entries to render as pills on a field row: everything the author
-   * wrote except bare tags already shown as constraint badges (sl-6x1o).
+   * wrote except entries already rendered elsewhere on the row (sl-6x1o).
    * Key-value entries always render — `sensitivity internal` and
    * `access_group property_facilities` must be visible, and a kv whose key is
    * also a constraint tag (e.g. `encrypt aes`) carries a value the badge
-   * alone would hide.
+   * alone would hide. Excluded:
+   *   - bare tags already shown as constraint badges
+   *   - `note` entries, which render as the shaded field-note row below the
+   *     field (sl-1gqw) — same dedupe the schema-level pills apply
    */
   private _fieldMetaPills(f: FieldEntry) {
     // Tolerate models serialized before FieldEntry carried metadata (older
     // LSP servers, cached webview payloads) — render no pills, don't crash.
     return (f.metadata ?? []).filter(
-      (m) => !(m.value === "" && f.constraints.includes(m.key)),
+      (m) => m.key !== "note" && !(m.value === "" && f.constraints.includes(m.key)),
     );
   }
 
