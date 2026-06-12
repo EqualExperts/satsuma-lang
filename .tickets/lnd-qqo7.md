@@ -1,6 +1,6 @@
 ---
 id: lnd-qqo7
-status: open
+status: closed
 deps: []
 links: []
 created: 2026-06-12T08:58:24Z
@@ -23,3 +23,10 @@ Acceptance criteria:
 - A mapping targeting a qualified metric name defined in the same closure resolves in the LSP semantic diagnostics path.
 - Regression test in tooling/satsuma-lsp/test/semantic-diagnostics.test.js.
 
+
+## Notes
+
+**2026-06-12T12:40:00+01:00**
+
+Cause: The LSP semantic-index adapter routed metric-kind definition entries only into the metrics map, but core resolves mapping source/target refs against schemas+fragments; the CLI index-builder records metric-decorated schemas in both maps, so the false undefined-ref was LSP-only.
+Fix: buildSemanticIndex now adds metric entries to both the metrics and schemas maps, matching CLI semantics; regression test covers a mapping targeting a qualified metric in the same namespace (commit 7512785)
