@@ -26,6 +26,40 @@ const SEVERITY_MAP: Record<string, DiagnosticSeverity> = {
 };
 
 /**
+ * Extract the findings array from raw `satsuma validate --json` stdout.
+ *
+ * The CLI emits two shapes (sl-rngq):
+ *  - `{findings: [...], summary: {...}}` — the normal envelope, matching
+ *    `lint --json`, for every run that gets as far as validating files.
+ *  - a bare array — still live (not just legacy) for path-resolve failures,
+ *    where the CLI emits `[{severity, message}]` with no file/line so jq
+ *    pipelines keep parsing (see satsuma-cli validate.ts).
+ *
+ * Returns an empty array for unparseable or unrecognised input. Entries
+ * without a `file` (the resolve-failure shape) are kept here and filtered
+ * by the caller, which needs a file to attach a diagnostic to.
+ */
+export function parseValidateFindings(raw: string): ValidateEntry[] {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return [];
+  }
+  if (Array.isArray(parsed)) {
+    return parsed as ValidateEntry[];
+  }
+  if (
+    parsed !== null &&
+    typeof parsed === "object" &&
+    Array.isArray((parsed as { findings?: unknown }).findings)
+  ) {
+    return (parsed as { findings: ValidateEntry[] }).findings;
+  }
+  return [];
+}
+
+/**
  * Run `satsuma validate --json` on the directory containing the given file
  * and return LSP diagnostics grouped by file URI.
  *
@@ -53,20 +87,14 @@ export async function runValidate(
             return;
           }
 
-          let entries: ValidateEntry[];
-          try {
-            entries = JSON.parse(raw);
-          } catch {
-            resolve(result);
-            return;
-          }
-
-          if (!Array.isArray(entries)) {
-            resolve(result);
-            return;
-          }
+          const entries = parseValidateFindings(raw);
 
           for (const entry of entries) {
+            // Resolve-failure entries carry no file/position — there is no
+            // document to attach them to, so they cannot become diagnostics.
+            if (!entry.file) {
+              continue;
+            }
             // Canonical so result keys line up with the workspace index and
             // the server's canonical-keyed caches (sl-ku3c).
             const uri = canonicalizeFileUri(pathToFileUri(entry.file));

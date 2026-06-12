@@ -1,11 +1,19 @@
 const { describe, it } = require("node:test");
 const assert = require("node:assert/strict");
+const path = require("node:path");
 const { fileURLToPath, pathToFileURL } = require("node:url");
 const {
   runValidate,
+  parseValidateFindings,
   pathToFileUri,
   reconcileValidateCache,
 } = require("../dist/validate-diagnostics");
+
+// The locally built CLI, invoked directly (it has a `#!/usr/bin/env node`
+// shebang). Tests must NOT use a bare "satsuma" from PATH: a missing global
+// install silently yields zero diagnostics, which is exactly how the
+// sl-rngq regression passed the old soft-guarded tests unnoticed.
+const CLI_PATH = path.resolve(__dirname, "../../satsuma-cli/dist/index.js");
 
 describe("reconcileValidateCache", () => {
   // sl-th5k: on save, only the saved file's cache entry was deleted. A
@@ -74,6 +82,42 @@ describe("pathToFileUri", () => {
   });
 });
 
+describe("parseValidateFindings", () => {
+  // sl-rngq: the CLI switched `validate --json` from a bare array to a
+  // `{findings, summary}` envelope (commit 8758118) and the LSP's
+  // Array.isArray guard silently rejected it — every validate diagnostic
+  // vanished from the editor for months. These cases pin both accepted
+  // shapes and the rejection behaviour.
+
+  it("extracts findings from the {findings, summary} envelope the CLI emits today", () => {
+    const raw = JSON.stringify({
+      findings: [{ file: "/a.stm", line: 3, column: 1, severity: "warning", rule: "r", message: "m", fixable: false }],
+      summary: { files: 1, errors: 0, warnings: 1 },
+    });
+    const entries = parseValidateFindings(raw);
+    assert.equal(entries.length, 1);
+    assert.equal(entries[0].rule, "r");
+  });
+
+  it("accepts the bare-array shape still emitted for path-resolve failures", () => {
+    // Not legacy tolerance: satsuma-cli validate.ts emits
+    // `[{severity, message}]` (no file) when input resolution fails.
+    const entries = parseValidateFindings(
+      JSON.stringify([{ severity: "error", message: "Error resolving path: nope" }]),
+    );
+    assert.equal(entries.length, 1);
+    assert.equal(entries[0].file, undefined);
+  });
+
+  it("returns no findings for unparseable or unrecognised JSON", () => {
+    assert.deepEqual(parseValidateFindings("not json"), []);
+    // An object without a findings array (e.g. a future shape change) must
+    // degrade to empty, not throw inside the execFile callback.
+    assert.deepEqual(parseValidateFindings(JSON.stringify({ summary: {} })), []);
+    assert.deepEqual(parseValidateFindings(JSON.stringify({ findings: "oops" })), []);
+  });
+});
+
 describe("runValidate", () => {
   it("returns empty map when CLI produces no output", async () => {
     // Use a non-existent CLI to exercise the error/empty path
@@ -95,100 +139,40 @@ describe("runValidate", () => {
     assert.equal(result.size, 0);
   });
 
-  it("parses valid satsuma validate --json output", async () => {
-    // Use the real satsuma CLI against a fixture with known warnings
-    const fixtureDir = require("path").resolve(
+  // Contract test against the real built CLI (sl-rngq acceptance criterion 3):
+  // if the CLI's --json shape and the LSP parser ever drift again, this fails
+  // loudly instead of degrading to zero diagnostics. The namespaces example
+  // ships four known field-not-in-schema warnings (bogus source fields on
+  // warehouse::conformed_store in the 'daily sales pipeline' mapping), so a
+  // non-empty result is a hard requirement, not an if-guarded hope.
+  it("surfaces the namespaces example's four field-not-in-schema warnings from the real CLI", async () => {
+    const fixturePath = path.resolve(
       __dirname,
-      "../../../examples/db-to-db/pipeline.stm",
+      "../../../examples/namespaces/namespaces.stm",
     );
-    const fixtureUri = "file://" + encodeURI(fixtureDir);
+    const fixtureUri = pathToFileURL(fixturePath).toString();
 
-    const result = await runValidate(fixtureUri, "satsuma");
+    const result = await runValidate(fixtureUri, CLI_PATH);
 
-    // db-to-db.stm should have warnings (missing-import, undefined-ref, etc.)
-    // If satsuma CLI is not available, this effectively tests graceful fallback
-    if (result.size > 0) {
-      for (const [uri, diags] of result) {
-        assert.ok(uri.startsWith("file://"), `URI should be file:// got ${uri}`);
-        assert.ok(diags.length > 0, "Should have diagnostics");
-        for (const d of diags) {
-          assert.equal(d.source, "satsuma-validate");
-          assert.ok(d.message, "Diagnostic should have a message");
-          assert.ok(d.code, "Diagnostic should have a rule code");
-          assert.ok(d.range, "Diagnostic should have a range");
-          // Lines should be 0-based (converted from 1-based)
-          assert.ok(
-            d.range.start.line >= 0,
-            "Line should be non-negative",
-          );
-        }
-      }
+    assert.ok(result.size > 0, "real CLI output must produce diagnostics — empty means the JSON shapes have drifted (sl-rngq)");
+
+    const all = [...result.values()].flat();
+    const fieldWarnings = all.filter((d) => d.code === "field-not-in-schema");
+    assert.equal(fieldWarnings.length, 4, "the four bogus source fields must each surface as a diagnostic");
+    for (const d of fieldWarnings) {
+      assert.equal(d.source, "satsuma-validate");
+      // DiagnosticSeverity.Warning === 2
+      assert.equal(d.severity, 2, "field-not-in-schema is warning severity");
+      assert.match(d.message, /not declared in schema 'warehouse::conformed_store'/);
+      // CLI reports lines 105-108 (1-based); LSP must convert to 0-based.
+      assert.ok(d.range.start.line >= 104 && d.range.start.line <= 107,
+        `expected 0-based line in [104,107], got ${d.range.start.line}`);
     }
-  });
 
-  it("returns diagnostics with correct severity mapping", async () => {
-    const fixtureDir = require("path").resolve(
-      __dirname,
-      "../../../examples/db-to-db/pipeline.stm",
-    );
-    const fixtureUri = "file://" + encodeURI(fixtureDir);
-
-    const result = await runValidate(fixtureUri, "satsuma");
-
-    if (result.size > 0) {
-      for (const [, diags] of result) {
-        for (const d of diags) {
-          // DiagnosticSeverity: Error=1, Warning=2, Information=3, Hint=4
-          assert.ok(
-            [1, 2, 3, 4].includes(d.severity),
-            `Severity should be a valid LSP value, got ${d.severity}`,
-          );
-        }
-      }
-    }
-  });
-
-  it("groups diagnostics by file URI", async () => {
-    // Validate the examples directory — should have multiple files
-    const examplesDir = require("path").resolve(
-      __dirname,
-      "../../../examples",
-    );
-    // Pick a file that imports from another file
-    const fixtureUri = "file://" + encodeURI(
-      require("path").join(examplesDir, "db-to-db/pipeline.stm"),
-    );
-
-    const result = await runValidate(fixtureUri, "satsuma");
-
-    if (result.size > 0) {
-      // All URIs should be properly formatted
-      for (const [uri] of result) {
-        assert.ok(
-          uri.startsWith("file://"),
-          `URI should start with file://, got: ${uri}`,
-        );
-      }
-    }
-  });
-
-  it("converts 1-based line/column to 0-based", async () => {
-    const fixtureDir = require("path").resolve(
-      __dirname,
-      "../../../examples/db-to-db/pipeline.stm",
-    );
-    const fixtureUri = "file://" + encodeURI(fixtureDir);
-
-    const result = await runValidate(fixtureUri, "satsuma");
-
-    if (result.size > 0) {
-      for (const [, diags] of result) {
-        for (const d of diags) {
-          // 0-based lines: line 3 in CLI output → line 2 in LSP
-          assert.ok(d.range.start.line >= 0, "Line must be 0-based");
-          assert.ok(d.range.start.character >= 0, "Character must be 0-based");
-        }
-      }
+    // Diagnostics must be keyed by canonical file:// URIs so they attach to
+    // the open editor document.
+    for (const [uri] of result) {
+      assert.ok(uri.startsWith("file://"), `URI should start with file://, got: ${uri}`);
     }
   });
 });
