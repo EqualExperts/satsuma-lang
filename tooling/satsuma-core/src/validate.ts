@@ -271,6 +271,13 @@ function collectSemanticDiagnosticsWithOptions(
  * Report every entry in the duplicates log. Two sub-cases:
  *   - namespace-metadata-conflict: conflicting @label values in the same namespace
  *   - duplicate-definition: same name used for two entities (possibly of different kinds)
+ *
+ * Scoping contract: this check trusts the consumer's index. Per ADR-022 a
+ * name clash is only an error within one import closure, so consumers must
+ * build `index.duplicates` from a closure-scoped file set — two independent
+ * entry-point files in the same folder may legitimately reuse a name. The
+ * CLI satisfies this by construction (its workspace is the entry file's
+ * import graph); the LSP scopes its folder-wide index first (sl-rw3e).
  */
 function checkDuplicates(index: SemanticIndex, diagnostics: SemanticDiagnostic[]): void {
   for (const dup of index.duplicates ?? []) {

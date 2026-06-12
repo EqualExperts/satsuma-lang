@@ -23,6 +23,8 @@ import type { WorkspaceIndex, DefinitionEntry } from "./workspace-index";
 import {
   buildImportSuggestion,
   canonicalizeFileUri,
+  createScopedIndex,
+  getImportReachableUris,
 } from "./workspace-index";
 import {
   validateSemanticWorkspace,
@@ -37,6 +39,43 @@ import type {
   ResolvedFileImport,
   ImportScopeViolation,
 } from "@satsuma/core";
+
+/**
+ * Rule id under which core's import-scope violations are reported. Shared by
+ * the filters below that split diagnostics into the two scoping families.
+ */
+const MISSING_IMPORT_RULE = "missing-import";
+
+// ---------- Scoped diagnostics entry point ----------
+
+/**
+ * Compute all semantic diagnostics the server should publish for an open
+ * file, applying ADR-022 workspace scoping per rule family:
+ *
+ * - Core rules (duplicate definitions, undefined refs, …) run against the
+ *   import-scoped index. An open file's workspace is the file plus its
+ *   transitive imports — never the surrounding folder. Running these rules
+ *   against the folder-wide index reported false duplicate-definition errors
+ *   whenever two unrelated entry-point files shared a schema name (sl-rw3e).
+ * - The missing-import rule runs against the folder-wide index. It is the one
+ *   check that must see definitions OUTSIDE the closure: its job is to
+ *   suggest the import that would bring an out-of-scope symbol into scope.
+ *
+ * `wsIndex` is the folder-wide index; the import-scoped view is derived here
+ * so callers cannot pair mismatched indexes.
+ */
+export function computeScopedSemanticDiagnostics(
+  uri: string,
+  wsIndex: WorkspaceIndex,
+): Diagnostic[] {
+  const scoped = createScopedIndex(wsIndex, getImportReachableUris(uri, wsIndex));
+  return [
+    ...computeCoreSemanticDiagnostics(uri, scoped),
+    ...computeSemanticValidationDiagnostics(uri, wsIndex).filter(
+      (d) => d.code === MISSING_IMPORT_RULE,
+    ),
+  ];
+}
 
 // ---------- Missing-import diagnostics (LSP-specific) ----------
 
@@ -61,7 +100,7 @@ export function computeMissingImportDiagnostics(
   wsIndex: WorkspaceIndex,
 ): Diagnostic[] {
   return computeSemanticValidationDiagnostics(uri, wsIndex)
-    .filter((d) => d.code === "missing-import");
+    .filter((d) => d.code === MISSING_IMPORT_RULE);
 }
 
 // ---------- Core semantic diagnostics (adapter) ----------
@@ -83,7 +122,7 @@ export function computeSemanticValidationDiagnostics(
   const coreDiags = validateSemanticWorkspace(semanticIndex, {
     fileImports,
     importScopeDiagnostic: {
-      rule: "missing-import",
+      rule: MISSING_IMPORT_RULE,
       message: (violation) => missingImportMessage(uri, violation),
     },
   });
@@ -103,7 +142,7 @@ export function computeCoreSemanticDiagnostics(
   wsIndex: WorkspaceIndex,
 ): Diagnostic[] {
   return computeSemanticValidationDiagnostics(uri, wsIndex)
-    .filter((d) => d.code !== "missing-import");
+    .filter((d) => d.code !== MISSING_IMPORT_RULE);
 }
 
 function missingImportMessage(uri: string, violation: ImportScopeViolation): string {
@@ -191,7 +230,13 @@ function buildSemanticIndex(wsIndex: WorkspaceIndex): SemanticIndex {
   for (const [name, entries] of wsIndex.definitions) {
     for (let i = 0; i < entries.length; i++) {
       const entry = entries[i]!;
-      // Track duplicates: if same name has multiple definitions
+      // Track duplicates: if same name has multiple definitions. Each
+      // conflict is recorded in BOTH directions, attributing a diagnostic to
+      // each definition site: published diagnostics are filtered to the open
+      // file, and under import-closure scoping (sl-rw3e) either site may be
+      // the open one — e.g. when the open file's definition was indexed first
+      // and a file it imports redefines the name, the one-directional record
+      // pointed at the imported file and the conflict never surfaced.
       if (i > 0) {
         const prev = entries[0]!;
         duplicates.push({
@@ -202,6 +247,15 @@ function buildSemanticIndex(wsIndex: WorkspaceIndex): SemanticIndex {
           previousKind: prev.kind,
           previousFile: prev.uri,
           previousRow: prev.range.start.line,
+        });
+        duplicates.push({
+          kind: prev.kind,
+          name,
+          file: prev.uri,
+          row: prev.range.start.line,
+          previousKind: entry.kind,
+          previousFile: entry.uri,
+          previousRow: entry.range.start.line,
         });
       }
 
