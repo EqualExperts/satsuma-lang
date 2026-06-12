@@ -469,7 +469,15 @@ export function extractFragments(rootNode: SyntaxNode): ExtractedFragment[] {
 
 export interface ExtractedTransform {
   name: string | null;
+  /** Raw pipe-chain source text, preserving the author's layout. */
   body: string | null;
+  /**
+   * Layout-independent serialization of the pipe chain (see
+   * canonicalPipeChainText). Two transforms with the same canonicalBody are
+   * structurally identical even if the author or formatter laid the steps
+   * out differently — diff compares this, not `body` (sl-dxjh).
+   */
+  canonicalBody: string | null;
   namespace: string | null;
   /** 0-indexed row from CST startPosition. */
   row: number;
@@ -483,9 +491,11 @@ export interface ExtractedTransform {
 export function extractTransforms(rootNode: SyntaxNode): ExtractedTransform[] {
   return collectFromNamespaces(rootNode, "transform_block").map(({ node, namespace }) => {
     const pipeChain = child(node, "pipe_chain");
+    const pipeSteps = pipeChain ? children(pipeChain, "pipe_step") : [];
     return {
       name: labelText(node),
       body: pipeChain ? pipeChain.text : null,
+      canonicalBody: pipeChain ? canonicalPipeChainText(pipeSteps) : null,
       namespace,
       row: node.startPosition.row,
       startColumn: node.startPosition.column,
@@ -747,6 +757,51 @@ function decomposePipeSteps(steps: SyntaxNode[]): PipeStep[] {
   });
 }
 
+// ── Canonical pipe-chain serialization ──────────────────────────────────────
+//
+// The formatter is free to re-lay a pipe chain (steps one-per-line, map
+// entries newline-separated) without changing meaning, so structural
+// comparisons must not use raw chain text. The canonical form normalizes
+// exactly the layout the formatter owns — separators between steps and
+// between map entries — while every leaf token (pipe text, map keys, map
+// values, spread names) is the verbatim source text: NL strings are
+// human-interpreted and must never be normalized (sl-dxjh).
+
+/**
+ * Serialize one pipe step's inner node into its canonical text.
+ *
+ * `map { ... }` literals are rebuilt as a single-line entry list; all other
+ * step kinds (pipe_text, fragment_spread) are single tokens whose text is
+ * already layout-free, so they pass through verbatim.
+ */
+function canonicalPipeStepText(inner: SyntaxNode | undefined, fallback: string): string {
+  if (!inner) return fallback;
+  if (inner.type !== "map_literal") return inner.text;
+
+  const entries = children(inner, "map_entry");
+  if (entries.length === 0) return "map { }";
+  const entryTexts = entries.map((e) => {
+    const key = child(e, "map_key");
+    const value = child(e, "map_value");
+    // Key and value text stay verbatim — quoted strings are NL content.
+    return key && value ? `${key.text}: ${value.text}` : e.text;
+  });
+  return `map { ${entryTexts.join(", ")} }`;
+}
+
+/**
+ * Serialize a pipe chain (list of pipe_step nodes) into a single
+ * layout-independent line: canonical step texts joined with " | ".
+ *
+ * Invariant: a chain and its formatter output produce the same canonical
+ * text, so fmt-only changes never register as structural differences.
+ */
+export function canonicalPipeChainText(pipeSteps: SyntaxNode[]): string {
+  return pipeSteps
+    .map((s) => canonicalPipeStepText(s.namedChildren[0], s.text))
+    .join(" | ");
+}
+
 export interface ExtractedArrow {
   mapping: string | null;
   namespace: string | null;
@@ -865,9 +920,10 @@ function extractSingleArrow(
     target = `${parentTgt}.${cleanTgt}`;
   }
 
-  const transformRaw = pipeSteps.length > 0
-    ? pipeSteps.map((s) => s.namedChildren[0]?.text ?? s.text).join(" | ")
-    : "";
+  // Canonical (layout-independent) so two arrows that differ only in how
+  // the formatter laid out the chain or a map literal compare equal — diff
+  // matches arrows on this text (sl-dxjh).
+  const transformRaw = pipeSteps.length > 0 ? canonicalPipeChainText(pipeSteps) : "";
 
   const metaNode = child(arrow, "metadata_block");
   const metadata = metaNode ? extractMetadata(metaNode) : undefined;

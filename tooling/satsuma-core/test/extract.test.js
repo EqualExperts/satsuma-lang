@@ -424,13 +424,47 @@ describe("extractMetrics()", () => {
 
 describe("extractTransforms()", () => {
   it("extracts a transform block with its name", () => {
-    const pipeChain = n("pipe_chain", [], "lookup(dim)");
+    const step = n("pipe_step", [n("pipe_text", [], "lookup(dim)")], "lookup(dim)");
+    const pipeChain = n("pipe_chain", [step], "lookup(dim)");
     const transformBlock = n("transform_block", [blockLabel("enrich"), pipeChain]);
     const root = n("program", [transformBlock]);
 
     assert.deepStrictEqual(extractTransforms(root), [
-      { name: "enrich", body: "lookup(dim)", namespace: null, row: 0, startColumn: 0 },
+      { name: "enrich", body: "lookup(dim)", canonicalBody: "lookup(dim)", namespace: null, row: 0, startColumn: 0 },
     ]);
+  });
+
+  it("canonicalBody normalizes step layout while body preserves it (sl-dxjh)", () => {
+    // A formatter is free to put each pipe step on its own line; the raw
+    // body keeps that layout but canonicalBody must be identical to the
+    // single-line spelling so diff sees no structural change.
+    const steps = [
+      n("pipe_step", [n("pipe_text", [], "trim")], "trim"),
+      n("pipe_step", [n("pipe_text", [], "uppercase")], "uppercase"),
+    ];
+    const pipeChain = n("pipe_chain", steps, "trim\n  | uppercase");
+    const transformBlock = n("transform_block", [blockLabel("tidy"), pipeChain]);
+    const root = n("program", [transformBlock]);
+
+    const [t] = extractTransforms(root);
+    assert.equal(t.body, "trim\n  | uppercase");
+    assert.equal(t.canonicalBody, "trim | uppercase");
+  });
+
+  it("canonicalBody rebuilds map literals as a single-line entry list with verbatim keys/values (sl-dxjh)", () => {
+    // Map entries may be authored comma-separated on one line or
+    // newline-separated by the formatter — both canonicalize to the same
+    // text. The quoted key and the value are NL content and must pass
+    // through verbatim, including casing and inner whitespace.
+    const entry = (k, v) => n("map_entry", [n("map_key", [], k), n("map_value", [], v)]);
+    const mapLit = n("map_literal", [entry('"A B"', "first class"), entry("_", "other")],
+      'map {\n  "A B": first class\n  _: other\n}');
+    const pipeChain = n("pipe_chain", [n("pipe_step", [mapLit], mapLit.text)], mapLit.text);
+    const transformBlock = n("transform_block", [blockLabel("classify"), pipeChain]);
+    const root = n("program", [transformBlock]);
+
+    const [t] = extractTransforms(root);
+    assert.equal(t.canonicalBody, 'map { "A B": first class, _: other }');
   });
 
   it("extracts transform inside namespace", () => {

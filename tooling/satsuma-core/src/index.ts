@@ -50,6 +50,7 @@ export {
   extractQuestions,
   extractImports,
   extractArrowRecords,
+  canonicalPipeChainText,
 } from "./extract.js";
 export {
   collectFieldPaths,
