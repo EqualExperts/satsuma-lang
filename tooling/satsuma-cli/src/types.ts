@@ -90,7 +90,10 @@ export interface FragmentRecord {
 
 export interface TransformRecord {
   name: string;
+  /** Raw pipe-chain source text, preserving the author's layout. */
   body: string | null;
+  /** Layout-independent chain serialization — what diff compares (sl-dxjh). */
+  canonicalBody: string | null;
   file: string;
   row: number;
   namespace?: string;

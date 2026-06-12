@@ -292,15 +292,20 @@ function diffFragment(a: FragmentRecord, b: FragmentRecord): SchemaChange[] {
 /**
  * Compute the change set for a named transform.
  *
- * Transform bodies are NL strings (Feature 28 made everything inside a pipe
- * step human-interpreted), so we cannot meaningfully diff them structurally.
- * We compare body text verbatim and emit a single `body-changed` event with
- * the before/after text — the reviewer reads the diff themselves.
+ * Step content is NL (Feature 28 made everything inside a pipe step
+ * human-interpreted), so each step's text is compared verbatim — but the
+ * chain's *layout* belongs to the formatter, so we compare the canonical
+ * serialization (steps joined " | ", map entries joined ", ") rather than
+ * raw body text. fmt re-laying a chain one-step-per-line is not a
+ * structural change (sl-dxjh). A single `body-changed` event carries the
+ * canonical before/after — the reviewer reads the NL diff themselves.
  */
 function diffTransform(a: TransformRecord, b: TransformRecord): TransformChange[] {
   const changes: TransformChange[] = [];
-  if ((a.body ?? "") !== (b.body ?? "")) {
-    changes.push({ kind: "body-changed", from: a.body || "(empty)", to: b.body || "(empty)" });
+  const aBody = a.canonicalBody ?? a.body ?? "";
+  const bBody = b.canonicalBody ?? b.body ?? "";
+  if (aBody !== bBody) {
+    changes.push({ kind: "body-changed", from: aBody || "(empty)", to: bBody || "(empty)" });
   }
   return changes;
 }

@@ -8,6 +8,9 @@
 
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
+import { readdirSync, readFileSync } from "node:fs";
+import { dirname, join, relative, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { diffIndex } from "#src/diff-engine.js";
 
 function makeIndex(schemas: any = {}, mappings: any = {}, { metrics = {}, fragments = {}, transforms = {}, notes = [] as any[], fieldArrows = {} }: any = {}) {
@@ -480,4 +483,65 @@ describe("diffIndex anonymous mappings (sl-ndtz)", () => {
     assert.equal(delta.mappings.changed.length, 1);
     assert.equal(delta.mappings.changed[0].name, "crm::<anonymous s -> t>");
   });
+});
+
+// ── fmt-roundtrip structural identity (sl-dxjh) ──────────────────────────────
+
+describe("fmt-roundtrip structural identity (sl-dxjh)", () => {
+  // fmt guarantees it does not change meaning, and diff claims to be
+  // structural — so diffing any file against its own formatted output must
+  // be empty. fmt re-lays pipe chains (steps one-per-line) and map literals
+  // (entries newline-separated), which a raw-text body comparison reports
+  // as changes; these cases pin that pipe chains and map entries compare on
+  // parsed structure while everything else still diffs as before. The whole
+  // example corpus is swept so any future formatter layout rule that the
+  // canonical serialization does not normalize fails here immediately.
+
+  /** Recursively collect every .stm file under a directory. */
+  function collectStmFiles(dir: string): string[] {
+    const out: string[] = [];
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const full = join(dir, entry.name);
+      if (entry.isDirectory()) out.push(...collectStmFiles(full));
+      else if (entry.name.endsWith(".stm")) out.push(full);
+    }
+    return out.sort();
+  }
+
+  /** Flatten a Delta into human-readable "section: detail" strings. */
+  function describeDelta(delta: any): string[] {
+    const lines: string[] = [];
+    for (const section of ["schemas", "mappings", "metrics", "fragments", "transforms"]) {
+      const s = delta[section];
+      for (const name of s.added) lines.push(`${section} added: ${name}`);
+      for (const name of s.removed) lines.push(`${section} removed: ${name}`);
+      for (const c of s.changed) lines.push(`${section} changed: ${c.name} (${c.changes.map((ch: any) => ch.kind).join(", ")})`);
+    }
+    for (const t of delta.notes.added) lines.push(`note added: ${t.slice(0, 40)}`);
+    for (const t of delta.notes.removed) lines.push(`note removed: ${t.slice(0, 40)}`);
+    return lines;
+  }
+
+  const EXAMPLES_DIR = resolve(dirname(fileURLToPath(import.meta.url)), "../../../examples");
+
+  for (const file of collectStmFiles(EXAMPLES_DIR)) {
+    const rel = relative(EXAMPLES_DIR, file);
+    it(`reports no structural differences between ${rel} and its fmt output`, async () => {
+      const { parseSource } = await import("#src/parser.js");
+      const { buildIndex } = await import("#src/index-builder.js");
+      const { format } = await import("@satsuma/core");
+
+      const src = readFileSync(file, "utf8");
+      const parsedOriginal = parseSource(src);
+      const formatted = format(parsedOriginal.tree, src);
+      // Trees are invalidated by subsequent parses (single parser buffer),
+      // so index the original before parsing the formatted text.
+      const indexA = buildIndex([{ filePath: file, ...parseSource(src) } as any]);
+      const indexB = buildIndex([{ filePath: file, ...parseSource(formatted) } as any]);
+
+      const delta = diffIndex(indexA, indexB);
+      const differences = describeDelta(delta);
+      assert.deepEqual(differences, [], `fmt-only changes reported as structural:\n  ${differences.join("\n  ")}`);
+    });
+  }
 });
