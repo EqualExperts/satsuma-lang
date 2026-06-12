@@ -1,6 +1,6 @@
 ---
 id: sl-rw3e
-status: in_progress
+status: closed
 deps: []
 links: []
 created: 2026-06-12T06:41:50Z
@@ -35,3 +35,10 @@ The split already exists as computeCoreSemanticDiagnostics / computeMissingImpor
 4. Regression tests added in satsuma-lsp covering these cases.
 5. Full satsuma-lsp test suite passes.
 
+
+## Notes
+
+**2026-06-12T08:20:55Z**
+
+Cause: sendMergedDiagnostics passed the folder-wide wsIndex into the core semantic validation adapter, so duplicate detection ran across every definition in the VS Code folder instead of the open file's import closure (ADR-022). Every other LSP feature already used scopeIndex(uri).
+Fix: added computeScopedSemanticDiagnostics, which runs core rules against the import-scoped index and only the missing-import rule against the folder-wide index (it needs out-of-closure definitions to suggest imports); duplicate records are mirrored to both definition sites so the conflict shows on whichever side is open. Documented the closure-scoping contract on core's checkDuplicates. (commit 8c642fd)
