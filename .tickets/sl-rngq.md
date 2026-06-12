@@ -1,6 +1,6 @@
 ---
 id: sl-rngq
-status: open
+status: closed
 deps: []
 links: []
 created: 2026-06-12T09:24:18Z
@@ -17,3 +17,10 @@ The LSP's on-save validate fallback (tooling/satsuma-lsp/src/validate-diagnostic
 
 1. runValidate parses the {findings, summary} envelope (tolerating the legacy bare-array shape is optional but document the choice). 2. Saving examples/namespaces/namespaces.stm surfaces the four field-not-in-schema warnings as editor diagnostics with source 'satsuma-validate'. 3. LSP tests cover the envelope shape; a regression test fails if the CLI JSON shape and LSP parser drift again (e.g. shared fixture or contract test against actual CLI output).
 
+
+## Notes
+
+**2026-06-12T11:46:47Z**
+
+Cause: The LSP's runValidate parsed `satsuma validate --json` expecting a bare array, but commit 8758118 (2026-03-25) wrapped the output in a {findings, summary} envelope; the Array.isArray guard rejected it and silently resolved an empty diagnostics map.
+Fix: Extracted parseValidateFindings handling both the envelope and the still-live bare-array resolve-failure shape; added a contract test running the locally built CLI against examples/namespaces/namespaces.stm that hard-asserts the four field-not-in-schema warnings (commit 35b3a86)
