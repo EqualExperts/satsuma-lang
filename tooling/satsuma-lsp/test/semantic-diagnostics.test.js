@@ -396,6 +396,71 @@ schema fact_orders { id UUID }`,
     );
   });
 
+  // Regression for sl-padl: duplicate namespace blocks are NOT an error —
+  // they are the mechanism for spreading a namespace across files (Feature
+  // 15). Here the open file imports from a file that reopens the same
+  // namespace, so both blocks are genuinely in scope at once, and the
+  // duplicate-definition rule must still stay silent about the namespace.
+  it("does not report a duplicate when an imported file reopens the open file's namespace", () => {
+    const idx = buildIndex({
+      "file:///entry.stm": `import { analytics::pipeline_value } from "lib.stm"
+namespace analytics (note "Business metrics layer") {
+  schema fact_revenue { id UUID }
+}`,
+      "file:///lib.stm": `namespace analytics (note "Business metrics layer") {
+  schema pipeline_value { id UUID }
+}`,
+    });
+    const diags = computeScopedSemanticDiagnostics("file:///entry.stm", idx);
+    assert.equal(
+      diags.find((d) => d.code === "duplicate-definition"),
+      undefined,
+      "reopening a namespace across files merges it — it is not a duplicate",
+    );
+  });
+
+  // Same invariant within a single file: a namespace block may be reopened
+  // to group related definitions, and each block adds to the shared
+  // namespace rather than colliding with the earlier one (sl-padl).
+  it("does not report a duplicate when one file reopens its own namespace", () => {
+    const idx = buildIndex({
+      "file:///a.stm": `namespace crm (note "CRM layer") {
+  schema customers { id UUID }
+}
+namespace crm (note "CRM layer") {
+  schema orders { id UUID }
+}`,
+    });
+    const diags = computeScopedSemanticDiagnostics("file:///a.stm", idx);
+    assert.equal(
+      diags.find((d) => d.code === "duplicate-definition"),
+      undefined,
+      "reopening a namespace in the same file is legal merging, not a duplicate",
+    );
+  });
+
+  // Reopened namespace blocks merge, but the names INSIDE the merged
+  // namespace still share one scope: two schemas with the same qualified
+  // name across the reopened blocks remain a genuine conflict (sl-padl).
+  it("still reports a duplicate for the same schema name defined in two blocks of one namespace", () => {
+    const idx = buildIndex({
+      "file:///entry.stm": `import { analytics::pipeline_value } from "lib.stm"
+namespace analytics (note "Business metrics layer") {
+  schema pipeline_value { id UUID }
+}`,
+      "file:///lib.stm": `namespace analytics (note "Business metrics layer") {
+  schema pipeline_value { id UUID }
+}`,
+    });
+    const diags = computeScopedSemanticDiagnostics("file:///entry.stm", idx);
+    const dup = diags.find((d) => d.code === "duplicate-definition");
+    assert.ok(dup, "same qualified schema name in one merged namespace is a real conflict");
+    assert.ok(
+      dup.message.includes("pipeline_value"),
+      "diagnostic should name the conflicting schema, not the namespace",
+    );
+  });
+
   // The missing-import rule must keep its folder-wide view: a symbol defined
   // only OUTSIDE the closure should still produce the actionable "Add:
   // import ..." suggestion, not silently disappear with the scoping change.

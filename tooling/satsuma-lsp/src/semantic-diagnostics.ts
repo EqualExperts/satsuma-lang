@@ -228,37 +228,46 @@ function buildSemanticIndex(wsIndex: WorkspaceIndex): SemanticIndex {
   }> = [];
 
   for (const [name, entries] of wsIndex.definitions) {
-    for (let i = 0; i < entries.length; i++) {
-      const entry = entries[i]!;
-      // Track duplicates: if same name has multiple definitions. Each
-      // conflict is recorded in BOTH directions, attributing a diagnostic to
-      // each definition site: published diagnostics are filtered to the open
-      // file, and under import-closure scoping (sl-rw3e) either site may be
-      // the open one — e.g. when the open file's definition was indexed first
-      // and a file it imports redefines the name, the one-directional record
-      // pointed at the imported file and the conflict never surfaced.
-      if (i > 0) {
-        const prev = entries[0]!;
-        duplicates.push({
-          kind: entry.kind,
-          name,
-          file: entry.uri,
-          row: entry.range.start.line,
-          previousKind: prev.kind,
-          previousFile: prev.uri,
-          previousRow: prev.range.start.line,
-        });
-        duplicates.push({
-          kind: prev.kind,
-          name,
-          file: prev.uri,
-          row: prev.range.start.line,
-          previousKind: entry.kind,
-          previousFile: entry.uri,
-          previousRow: entry.range.start.line,
-        });
-      }
+    // Track duplicates: if same name has multiple definitions. Each
+    // conflict is recorded in BOTH directions, attributing a diagnostic to
+    // each definition site: published diagnostics are filtered to the open
+    // file, and under import-closure scoping (sl-rw3e) either site may be
+    // the open one — e.g. when the open file's definition was indexed first
+    // and a file it imports redefines the name, the one-directional record
+    // pointed at the imported file and the conflict never surfaced.
+    //
+    // Namespace blocks are exempt: reopening a namespace — the same name in
+    // multiple blocks or files — is the language's mechanism for spreading a
+    // namespace across files (Feature 15), never a collision. The index
+    // registers every block as a definition entry so navigation works, but
+    // only non-namespace entries can collide (sl-padl). Conflicting
+    // namespace METADATA is a separate rule (namespace-metadata-conflict)
+    // surfaced by the CLI on-save validate fallback.
+    const collidable = entries.filter((e) => e.kind !== "namespace");
+    for (let i = 1; i < collidable.length; i++) {
+      const entry = collidable[i]!;
+      const prev = collidable[0]!;
+      duplicates.push({
+        kind: entry.kind,
+        name,
+        file: entry.uri,
+        row: entry.range.start.line,
+        previousKind: prev.kind,
+        previousFile: prev.uri,
+        previousRow: prev.range.start.line,
+      });
+      duplicates.push({
+        kind: prev.kind,
+        name,
+        file: prev.uri,
+        row: prev.range.start.line,
+        previousKind: entry.kind,
+        previousFile: entry.uri,
+        previousRow: entry.range.start.line,
+      });
+    }
 
+    for (const entry of entries) {
       switch (entry.kind) {
         case "schema":
           if (!schemas.has(name)) {
