@@ -1,6 +1,6 @@
 ---
 id: sl-padl
-status: open
+status: closed
 deps: []
 links: []
 created: 2026-06-12T08:53:17Z
@@ -23,3 +23,10 @@ Acceptance criteria:
 - Duplicate detection for schemas/fragments/mappings/metrics/transforms is unchanged (existing tests stay green).
 - Regression test added in tooling/satsuma-lsp/test/semantic-diagnostics.test.js covering a reopened namespace across two files in the same closure.
 
+
+## Notes
+
+**2026-06-12T12:00:00+01:00**
+
+Cause: The LSP semantic-index adapter (buildSemanticIndex in tooling/satsuma-lsp/src/semantic-diagnostics.ts) derived duplicate-definition records from any definition name with multiple workspace-index entries, but namespace blocks are registered as definition entries per block and reopening a namespace is legal merging (Feature 15), never a collision.
+Fix: Excluded namespace-kind entries from the duplicate derivation while keeping collisions for definitions inside merged namespaces; added three regression tests covering cross-file reopening, same-file reopening, and a genuine intra-namespace schema collision (commit 1730228)
