@@ -101,6 +101,46 @@ describe("viz automation helpers", () => {
     assert.match(serialized, /src-legacy-field-amount/);
   });
 
+  it("renders a field note only as the field-note row, never as a meta pill (sl-1gqw)", async () => {
+    // A field's (note "...") tag reaches the model twice: as a NoteBlock in
+    // f.notes and as a MetadataEntry in f.metadata. Only the shaded field-note
+    // row should render it — a duplicate "note ..." pill is visual noise.
+    // Other kv metadata on the same field must still render as pills.
+    const mod = await import("../dist/satsuma-viz.js");
+    const card = new mod.SzSchemaCard();
+    card.testIdPrefix = "src-orders";
+    card.mappedFields = new Set();
+    const field = {
+      name: "order_key",
+      type: "VARCHAR",
+      constraints: [],
+      metadata: [
+        { key: "note", value: "Unique key across ORDERS tables" },
+        { key: "sensitivity", value: "internal" },
+      ],
+      notes: [{ text: "Unique key across ORDERS tables", isMultiline: false,
+        location: { uri: "file:///t.stm", line: 1, character: 0 } }],
+      comments: [],
+      children: [],
+      location: { uri: "file:///t.stm", line: 1, character: 0 },
+    };
+    const pills = card._fieldMetaPills(field);
+    assert.deepEqual(pills.map((p) => p.key), ["sensitivity"]);
+
+    // The note text must still reach the rendered output via the field-note row.
+    const serialize = (t) => {
+      if (t == null || typeof t !== "object") return String(t ?? "");
+      if (Array.isArray(t)) return t.map(serialize).join(" ");
+      if (t.strings && t.values) {
+        return [...t.strings, ...t.values.map(serialize)].join(" ");
+      }
+      return "";
+    };
+    const serialized = serialize(card._renderField(field, 0));
+    assert.match(serialized, /field-note/);
+    assert.match(serialized, /Unique key across ORDERS tables/);
+  });
+
   it("gives mapping-detail source and target schema cards distinct testIdPrefix values", async () => {
     // Source and target schema cards in the mapping detail must be addressable
     // separately even when the same schema id appears on both sides (sl-eikr).
