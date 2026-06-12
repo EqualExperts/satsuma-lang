@@ -1,6 +1,6 @@
 ---
 id: sl-xpyj
-status: in_progress
+status: closed
 deps: []
 links: []
 created: 2026-06-12T08:21:58Z
