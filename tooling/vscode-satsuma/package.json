@@ -3,7 +3,7 @@
   "displayName": "Satsuma Language Support",
   "description": "VS Code language support for the Satsuma data mapping language",
   "license": "MIT",
-  "version": "0.9.0",
+  "version": "0.10.0",
   "publisher": "satsuma",
   "icon": "icon.png",
   "repository": {

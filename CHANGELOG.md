@@ -1,5 +1,158 @@
 # Changelog
 
+## v0.10.0 — 2026-06-12
+
+A hardening release. A systematic bug hunt across the whole toolchain closed
+over fifty tickets: the grammar now fails loudly where it previously
+mis-parsed silently, the LSP scopes diagnostics to each file's import closure
+and gains namespace-accurate references and rename, and the CLI, formatter,
+visualization, and VS Code extension each get a batch of correctness fixes.
+`.satsuma` joins `.stm` as a first-class file extension. No new language
+constructs — but see the stricter-parsing note below.
+
+### Grammar: silent mis-parses now error loudly (ADR-031)
+
+A family of constructs used to parse "successfully" by quietly misreading the
+author's intent. They now produce errors at the offending construct:
+
+- **A missing comma between metadata entries errors** instead of silently
+  swallowing every flag after the gap (`sl-vnty`).
+- **A field's type must share the field name's line**; bare typeless fields
+  error loudly instead of pairing with whatever the next line holds
+  (`sl-hjx1`).
+- **Arrows (`->`) in unquoted pipe-text positions error loudly** instead of
+  degrading to NL text. Arrows inside quoted NL strings are still carried
+  verbatim (`sl-w5st`).
+- **Bare multi-word map values end at their line** instead of garbling the
+  next entry (`sl-zzaj`).
+- **Multiline string content may end with one or two quote characters**
+  (`sl-xb85`).
+- **Arrows parse with any whitespace around `->`**, including none
+  (`sl-csd2`).
+- **Consistent trailing-comma policy** across delimited lists, and structural
+  extraction now guards against MISSING recovery nodes (`sl-0nvt`).
+- **Corner-case batch**: empty mapping bodies, metadata on fragments and
+  transforms, and lexical edge cases (`sl-2gle`).
+- **New `constraint-in-type-args` warning**: `UUID(pk)` flags that `pk` was
+  absorbed into the type arguments and suggests `UUID (pk)` — space before
+  the parens — to declare metadata (`sl-vryu`).
+- **ADR-031** records the technique: line-aware external scanner tokens make
+  silent mis-parses loud.
+
+**Stricter parsing note:** files that previously "parsed" by silently
+misreading one of these constructs now produce parse errors pointing at the
+exact spot. The fix is always to write what you meant.
+
+### Language server
+
+- **Semantic diagnostics are scoped to the open file's import closure** —
+  symbols from unrelated workspace files no longer leak into validation
+  (`sl-rw3e`).
+- **Find-references and rename are namespace-accurate** (`sl-p256`); rename
+  no longer clobbers `@` sigils, dotted arrow paths, `source_ref` metadata,
+  or spread sigils (`sl-xf3f`, `sl-kf1r`), and the prepareRename placeholder
+  matches the edit range for namespaced blocks (`sl-kilo`).
+- **Reopened namespace blocks are no longer flagged as duplicate
+  definitions** (`sl-padl`), and mapping targets resolve against
+  metric-decorated schemas (`lnd-qqo7`).
+- **Caches and the workspace index key by canonical file URI**, fixing
+  case-aliased and symlinked paths (`sl-akz6`/gh-274, `sl-ku3c`); closed
+  documents re-index from disk (`sl-0tgo`); stale cross-file validate
+  diagnostics clear on save (`sl-th5k`).
+- **NL `@refs` are indexed in note tags, note blocks, metadata values, and
+  bare pipe text** (`sl-ellp`, `bptar-l6n8`), and identifiers resolve at
+  end-of-word cursor positions in all handlers (`sl-ogd5`).
+- Diagnostics with empty messages are never published (`sl-sme1`, gh-273);
+  mapping/metric source refs are attributed by container rather than per
+  file (`sl-ei1e`); full-lineage viz includes files not open in the editor
+  (`sl-mg63`).
+- **The standalone `satsuma-lsp` tarball ships its WASM parser and
+  `highlights.scm`**, and CI now smoke-tests a real initialize round-trip
+  over stdio (`sl-vwpr`). Migrated to vscode-languageserver 10 (`sl-w9zz`).
+
+### Core extraction (shared by CLI, LSP, and viz)
+
+- NL ref extraction finds refs after quote/`=`/`:` prefixes and inside map
+  literals (`sl-74m6`), accounts for string delimiter width on first-line
+  positions (`sl-o3ea`), treats backtick-quoted names as literal regardless
+  of embedded `.` or `::` (`sl-g6ga`), resolves bare `@field` refs against
+  namespaced source schemas (`sl-98cz`), and recognises note contexts inside
+  namespaces (`sl-1don`).
+- Arrow records extract at arbitrary nesting depth (`sl-zl55`), mixed
+  metadata values are preserved instead of truncated to the first string
+  (`sl-cvx9`), and schema-qualified spread-inherited fields validate in
+  multi-source mappings (`sl-kkao`).
+
+### CLI
+
+- **Lineage**: nodes reached first at a shallower depth re-expand
+  (`sl-y89y`), upstream text paths render in cyclic graphs (`sl-h5cx`), and
+  non-positive `--depth`/`--budget` values are usage errors (`sl-bvd0`).
+- Imports dedupe case-aliased and symlinked paths to one physical file
+  (`sl-8zyr`).
+- Metric blocks are no longer double-reported as schemas (`sl-s2mh`), and
+  `find --in metric` searches metric blocks (`sl-xav4`).
+- Same-line arrows sharing a target are no longer dropped (`sl-201z`), and
+  `field-lineage` stops double-prefixing namespaces on NL refs (`sl-njej`).
+- `diff` compares anonymous mappings structurally (`sl-ndtz`); `summary`
+  errors follow the CommandError contract (`sl-00rw`); `nl-refs` is
+  documented and a doc-drift check keeps command counts honest (`sl-w1dr`).
+
+### Formatter
+
+- Preserves nested `each`/`flatten` blocks instead of deleting them
+  (`sl-7236`), preserves comments in five positions where they were dropped
+  (`sl-dz3n`), and keeps commas between refs in multi-line source blocks
+  (`sl-q9oj`).
+
+### Visualization
+
+- **Minimap fixes**: no longer clipped off-screen in overview, shows the
+  right objects in mapping detail, and counts mapping-column cards once
+  (`fmo-fghl`); ADR-032 records that the shadow-internal shell owns
+  component layout.
+- Arrow visibility toggles without navigating, and all mapping/field
+  metadata is shown (`sl-tw0r`, `sl-6x1o`); field notes render once as the
+  note row, not also as a meta pill (`sl-1gqw`).
+- Per-invocation layout state and path-keyed field ports (`sl-i8mo`,
+  `sl-l7u0`); metric card collapse is separate from navigation (`sl-37f3`);
+  nested-`each` arrows appear in hover lookups and arrow counts
+  (`sl-fm0q`); click-to-open restored on overview edges (`sl-sewl`);
+  authored names are XML-escaped in SVG export (`sl-6m5k`).
+- **Viz backend**: namespaced fragment spreads resolve (`sl-22ym`),
+  namespaced standalone `//!`/`//?` comments attach to their blocks
+  (`sl-ebs9`), and lineage merge dedups mappings namespace-aware
+  (`sl-aeae`, `sl-ak00`).
+
+### VS Code extension
+
+- Every CLI invocation resolves a real `.stm` entry file (`sl-1ycv`).
+- Coverage gutter icons clear per run and the extension stops yanking
+  editor focus (`sl-89id`); stale viz loads that complete after a newer
+  refresh are dropped (`sl-jar4`).
+- A friendly CLI-not-found message replaces the NaN exit code, and the SVG
+  save dialog roots at the workspace (`sl-wlta`); the viz command is titled
+  for what it opens — the Overview (`sl-e40u`).
+
+### `.satsuma` extension support
+
+- `.satsuma` is now first-class alongside `.stm` everywhere it is
+  registered — CLI, LSP, VS Code extension, and core source-file discovery
+  (`sl-v215`).
+
+### Security & dependencies
+
+- Threat model re-run and `SECURITY-REPORT.md` rewritten (`sl-qpbx`);
+  `npm audit` and Dependabot coverage extended to every package directory.
+- Dependency bumps across packages: web-tree-sitter, lit 3.3.3,
+  vscode-languageserver 10, and esbuild/typescript dev-dependency updates.
+
+### Docs & site
+
+- Install instructions fixed for the actual release-asset filenames, plus a
+  GUI install route for the `.vsix` (`sl-xpyj`); site stat counts refreshed
+  to verified values.
+
 ## v0.9.0 — 2026-06-10
 
 A visualization-and-playground release: the mapping visualization gains a
