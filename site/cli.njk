@@ -1,9 +1,9 @@
 ---
 layout: default.njk
 title: "Satsuma CLI &mdash; Agent Tooling for Structural Extraction"
-description: "The Satsuma CLI gives AI agents 21 deterministic, parser-backed commands to slice, query, and validate Satsuma workspaces. Humans use it for formatting, validation, and linting."
+description: "The Satsuma CLI gives AI agents 22 deterministic, parser-backed commands to slice, query, and validate Satsuma workspaces. Humans use it for formatting, validation, and linting."
 og_title: "Satsuma CLI &mdash; Agent Tooling for Structural Extraction"
-og_description: "Give your AI agent 21 commands to extract structure, trace lineage, and validate Satsuma workspaces. Humans get formatting, linting, and validation."
+og_description: "Give your AI agent 22 commands to extract structure, trace lineage, and validate Satsuma workspaces. Humans get formatting, linting, and validation."
 nav_id: cli
 permalink: cli.html
 ---
@@ -14,13 +14,13 @@ permalink: cli.html
         <div>
           <div class="inline-flex items-center gap-2 px-3 py-1.5 bg-orange/10 text-orange-dark text-sm font-medium rounded-full mb-6">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-            21 commands &middot; 824 tests
+            22 commands &middot; 879 tests
           </div>
           <h1 class="text-4xl sm:text-5xl font-extrabold text-charcoal leading-tight mb-6">
             The agent's <span class="text-orange">toolkit</span> for Satsuma
           </h1>
           <p class="text-lg text-warm-gray leading-relaxed mb-4">
-            The Satsuma CLI is built for AI agents. 21 parser-backed commands let your agent slice workspaces, trace lineage, extract metadata, and pull NL intent &mdash; all from the parse tree, with 100% deterministic results.
+            The Satsuma CLI is built for AI agents. 22 parser-backed commands let your agent slice workspaces, trace lineage, extract metadata, and pull NL intent &mdash; all from the parse tree, with 100% deterministic results.
           </p>
           <p class="text-warm-gray leading-relaxed mb-4">
             Humans use it too &mdash; <code class="font-mono text-sm text-orange-dark bg-orange/10 px-1.5 py-0.5 rounded">validate</code>, <code class="font-mono text-sm text-orange-dark bg-orange/10 px-1.5 py-0.5 rounded">fmt</code>, and <code class="font-mono text-sm text-orange-dark bg-orange/10 px-1.5 py-0.5 rounded">lint</code> are your day-to-day workflow commands. But the CLI's real power is as the structural backbone your agent reasons on top of.
@@ -121,7 +121,7 @@ permalink: cli.html
             </div>
             <div class="flex items-start gap-2">
               <svg class="w-4 h-4 text-green flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-              <span class="text-sm text-warm-gray">All 21 CLI commands with usage patterns</span>
+              <span class="text-sm text-warm-gray">All 22 CLI commands with usage patterns</span>
             </div>
             <div class="flex items-start gap-2">
               <svg class="w-4 h-4 text-green flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
@@ -606,7 +606,7 @@ permalink: cli.html
 
 <span class="prompt">$</span> satsuma <span class="flag">--help</span>
 <span class="output">satsuma &lt;command&gt; [options]</span>
-<span class="output">21 commands available</span></pre>
+<span class="output">22 commands available</span></pre>
         </div>
         <details class="mt-4 text-sm">
           <summary class="cursor-pointer text-warm-gray hover:text-charcoal transition-colors font-medium">Latest unstable build (from main)</summary>
@@ -636,7 +636,7 @@ permalink: cli.html
   <section id="command-reference" class="py-16 lg:py-24">
     <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
       <div class="text-center mb-12 reveal">
-        <h2 class="text-3xl font-bold text-charcoal mb-3">All 21 commands</h2>
+        <h2 class="text-3xl font-bold text-charcoal mb-3">All 22 commands</h2>
         <p class="text-warm-gray max-w-2xl mx-auto">Complete reference for every command in the CLI. See the <a href="https://github.com/EqualExperts/satsuma-lang/blob/main/SATSUMA-CLI.md" target="_blank" class="text-orange hover:underline">full reference on GitHub</a> for detailed usage and examples.</p>
       </div>
 
@@ -675,6 +675,10 @@ permalink: cli.html
             <p class="text-xs text-warm-gray">Schema-level graph traversal, forward or backward.</p>
           </div>
           <div class="bg-white rounded-xl p-4 border border-charcoal/5">
+            <h4 class="font-bold text-charcoal mb-1 font-mono text-sm">field-lineage</h4>
+            <p class="text-xs text-warm-gray">Full upstream and downstream lineage of a single field.</p>
+          </div>
+          <div class="bg-white rounded-xl p-4 border border-charcoal/5">
             <h4 class="font-bold text-charcoal mb-1 font-mono text-sm">where-used</h4>
             <p class="text-xs text-warm-gray">All references to a schema, fragment, or transform.</p>
           </div>
@@ -706,6 +710,10 @@ permalink: cli.html
           <div class="bg-cream rounded-xl p-4 border border-charcoal/5">
             <h4 class="font-bold text-charcoal mb-1 font-mono text-sm">nl</h4>
             <p class="text-xs text-warm-gray">NL content &mdash; notes, transforms, comments &mdash; extracted verbatim.</p>
+          </div>
+          <div class="bg-cream rounded-xl p-4 border border-charcoal/5">
+            <h4 class="font-bold text-charcoal mb-1 font-mono text-sm">nl-refs</h4>
+            <p class="text-xs text-warm-gray">All <code class="font-mono text-xs">@ref</code> references inside NL transform bodies.</p>
           </div>
           <div class="bg-cream rounded-xl p-4 border border-charcoal/5">
             <h4 class="font-bold text-charcoal mb-1 font-mono text-sm">meta</h4>

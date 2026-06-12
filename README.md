@@ -287,8 +287,8 @@ Start with Lesson 01 or jump to a [suggested reading path](lessons/README.md#sug
 What exists today:
 
 - the Satsuma v2 language specification
-- a canonical example corpus (20 `.stm` files covering major integration patterns)
-- a tree-sitter parser (245 corpus tests, all examples parse clean)
+- a canonical example corpus (25 `.stm` files covering major integration patterns)
+- a tree-sitter parser (315 corpus tests, all examples parse clean)
 - a TypeScript CLI (`satsuma`) with commands for structural extraction, analysis, validation, formatting, and diff — see [SATSUMA-CLI.md](SATSUMA-CLI.md)
 - `satsuma fmt` — opinionated, zero-config formatter (CLI + VS Code Format Document)
 - a VS Code extension with an LSP server (go-to-definition, find-references, completions, hover, rename, code lens, semantic tokens, diagnostics, folding, document symbols, formatting) and TextMate grammar

@@ -21,8 +21,8 @@ All tooling is parser-backed. Downstream tools should be built on the tree-sitte
 - `useful-prompts/`: self-contained system prompts for web LLMs (Excel-to-Satsuma, Satsuma-to-Excel)
 - `skills/`: Agent Skills following the [agentskills.io](https://agentskills.io) standard (Excel-to-Satsuma conversion skill, Satsuma-to-Excel export skill)
 - `scripts/`: utility scripts used during development
-- `tooling/tree-sitter-satsuma/`: tree-sitter grammar (482 corpus tests), generated parser artifacts, and queries
-- `tooling/satsuma-cli/`: TypeScript CLI tool for workspace extraction, validation, and structural analysis (637 tests)
+- `tooling/tree-sitter-satsuma/`: tree-sitter grammar (315 corpus tests), generated parser artifacts, and queries
+- `tooling/satsuma-cli/`: TypeScript CLI tool for workspace extraction, validation, and structural analysis (879 tests)
 - `tooling/satsuma-lsp/`: editor-agnostic Language Server (semantic tokens, diagnostics, go-to-definition, find-references, completions, hover, rename, code lens, folding, document symbols); runnable standalone via `npx satsuma-lsp --stdio`
 - `tooling/vscode-satsuma/`: VS Code extension (LSP client, commands, webview panels) and TextMate grammar; delegates language intelligence to `satsuma-lsp`
 
