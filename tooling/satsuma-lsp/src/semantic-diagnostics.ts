@@ -285,8 +285,17 @@ function buildSemanticIndex(wsIndex: WorkspaceIndex): SemanticIndex {
           }
           break;
         case "metric":
+          // A v2 metric is a schema_block decorated with the (metric) tag,
+          // so it is BOTH a metric and a schema: mappings may target it like
+          // any other schema, and core resolves mapping refs against the
+          // schemas map. The CLI index-builder records metric schemas in
+          // both maps; the adapter must match or qualified metric targets
+          // report false undefined-refs (lnd-qqo7).
           if (!metrics.has(name)) {
             metrics.set(name, defEntryToMetric(name, entry, wsIndex));
+          }
+          if (!schemas.has(name)) {
+            schemas.set(name, defEntryToSchema(name, entry));
           }
           break;
         case "transform":

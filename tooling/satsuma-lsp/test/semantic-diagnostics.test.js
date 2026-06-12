@@ -234,6 +234,33 @@ schema bad_metric (metric, source missing_fact) {
     assert.equal(undef[0].range.start.line, 4);
   });
 
+  // Regression for lnd-qqo7: a v2 metric is a schema_block decorated with
+  // the (metric) tag, so a mapping may target it like any other schema —
+  // the CLI index-builder records it in both the schemas and metrics maps.
+  // The LSP adapter routed metric entries only into the metrics map, so
+  // core's target resolution (schemas + fragments) missed them and reported
+  // a false undefined-ref for e.g. examples/namespaces/namespaces.stm.
+  it("does not report undefined-ref for a mapping targeting a metric in the same namespace", () => {
+    const src = `namespace analytics (note "Business metrics layer") {
+  schema staging_sales { order_date DATE }
+  schema daily_sales (metric, grain daily) {
+    sale_date DATE
+  }
+  mapping pipeline {
+    source { staging_sales }
+    target { analytics::daily_sales }
+    order_date -> sale_date
+  }
+}`;
+    const idx = buildIndex({ "file:///a.stm": src });
+    const diags = computeCoreSemanticDiagnostics("file:///a.stm", idx);
+    assert.equal(
+      diags.filter((d) => d.code === "undefined-ref").length,
+      0,
+      "a qualified metric target in the same namespace must resolve",
+    );
+  });
+
   it("does not report quoted join descriptions as undefined mapping sources", () => {
     const src = `schema a { id INT }
 schema b { id INT }
