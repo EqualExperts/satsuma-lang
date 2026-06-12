@@ -31,7 +31,7 @@ import {
   getImportReachableUris,
   createScopedIndex,
 } from "./workspace-index";
-import { computeSemanticValidationDiagnostics } from "./semantic-diagnostics";
+import { computeScopedSemanticDiagnostics } from "./semantic-diagnostics";
 import { computeDefinition } from "./definition";
 import { computeReferences } from "./references";
 import { computeCompletions } from "./completion";
@@ -482,14 +482,17 @@ function scopeIndex(uri: string): WorkspaceIndex {
  * core semantic validation adapter.
  *
  * Core semantic diagnostics run directly against the workspace index (no
- * subprocess). The CLI subprocess (validate-diagnostics.ts) provides
- * additional arrow-level and NL @ref checks that require full arrow
- * extraction not available from the LSP workspace index.
+ * subprocess), with ADR-022 scoping applied per rule family by
+ * computeScopedSemanticDiagnostics — passing the folder-wide index unscoped
+ * here reported false duplicates between unrelated entry-point files
+ * (sl-rw3e). The CLI subprocess (validate-diagnostics.ts) provides additional
+ * arrow-level and NL @ref checks that require full arrow extraction not
+ * available from the LSP workspace index.
  */
 function sendMergedDiagnostics(uri: string, tree: Tree): void {
   const parseDiags = computeDiagnostics(tree);
   const validateDiags = validateDiagCache.get(uri) ?? [];
-  const semanticDiags = computeSemanticValidationDiagnostics(uri, wsIndex);
+  const semanticDiags = computeScopedSemanticDiagnostics(uri, wsIndex);
 
   // Deduplicate: core semantic diagnostics may overlap with CLI validate
   // diagnostics. Use rule + line as the dedup key, preferring CLI results

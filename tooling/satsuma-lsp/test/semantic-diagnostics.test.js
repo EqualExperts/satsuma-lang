@@ -7,7 +7,11 @@ const {
   createScopedIndex,
   getImportReachableUris,
 } = require("../dist/workspace-index");
-const { computeMissingImportDiagnostics, computeCoreSemanticDiagnostics } = require("../dist/semantic-diagnostics");
+const {
+  computeMissingImportDiagnostics,
+  computeCoreSemanticDiagnostics,
+  computeScopedSemanticDiagnostics,
+} = require("../dist/semantic-diagnostics");
 
 before(async () => { await initTestParser(); });
 
@@ -328,5 +332,88 @@ mapping m {
       // LSP lines are 0-indexed
       assert.ok(diags[0].range.start.line >= 0, "line should be 0-indexed");
     }
+  });
+});
+
+// computeScopedSemanticDiagnostics is the entry point the LSP server publishes
+// from. These tests pin the ADR-022 scoping contract at that boundary: core
+// rules see only the open file's import closure, while the missing-import rule
+// keeps the folder-wide view it needs to suggest imports (sl-rw3e).
+describe("computeScopedSemanticDiagnostics", () => {
+  // Regression for sl-rw3e: two independent entry-point files in the same
+  // VS Code folder that define the same schema name are NOT duplicates —
+  // neither is in the other's import closure, so opening one must not
+  // surface the other's definitions.
+  it("does not report a duplicate when an unrelated workspace file defines the same schema name", () => {
+    const idx = buildIndex({
+      "file:///pipeline.stm": `schema fact_orders { id UUID }`,
+      "file:///metric_sources.stm": `schema fact_orders { id UUID }`,
+    });
+    const diags = computeScopedSemanticDiagnostics("file:///pipeline.stm", idx);
+    assert.equal(
+      diags.find((d) => d.code === "duplicate-definition"),
+      undefined,
+      "independent entry points must not collide on schema names",
+    );
+  });
+
+  // Duplicates WITHIN the closure are real errors and must survive the
+  // scoping change: the open file defines a schema and imports a file that
+  // defines the same name, so both definitions are genuinely in scope at
+  // once. The open file's definition was indexed FIRST here, which is the
+  // direction the one-way duplicate record missed — it attributed the
+  // conflict only to the imported file, so the open file showed nothing.
+  it("reports a duplicate on the open file when a file it imports redefines its schema", () => {
+    const idx = buildIndex({
+      "file:///entry.stm": `import { dim_customer } from "lib.stm"
+schema fact_orders { id UUID }`,
+      "file:///lib.stm": `schema dim_customer { id UUID }
+schema fact_orders { name STRING }`,
+    });
+    const diags = computeScopedSemanticDiagnostics("file:///entry.stm", idx);
+    const dup = diags.find((d) => d.code === "duplicate-definition");
+    assert.ok(dup, "duplicates inside one import closure are genuine conflicts");
+    assert.ok(
+      dup.message.includes("lib.stm"),
+      "diagnostic should point at the conflicting definition site",
+    );
+  });
+
+  // The mirrored conflict record must not leak across closure boundaries:
+  // the importing file's closure contains the conflict, but the imported
+  // file alone is self-consistent — opening IT must stay clean.
+  it("does not report a duplicate on the imported file when only the importer redefines the name", () => {
+    const idx = buildIndex({
+      "file:///entry.stm": `import { fact_orders } from "lib.stm"
+schema fact_orders { id UUID }`,
+      "file:///lib.stm": `schema fact_orders { name STRING }`,
+    });
+    const diags = computeScopedSemanticDiagnostics("file:///lib.stm", idx);
+    assert.equal(
+      diags.find((d) => d.code === "duplicate-definition"),
+      undefined,
+      "lib.stm does not import entry.stm, so entry's definition is out of its scope",
+    );
+  });
+
+  // The missing-import rule must keep its folder-wide view: a symbol defined
+  // only OUTSIDE the closure should still produce the actionable "Add:
+  // import ..." suggestion, not silently disappear with the scoping change.
+  it("still suggests an import for a symbol defined only outside the import closure", () => {
+    const idx = buildIndex({
+      "file:///a.stm": `mapping m {
+  source { orders }
+  target { orders }
+  id -> id
+}`,
+      "file:///b.stm": `schema orders { id UUID }`,
+    });
+    const diags = computeScopedSemanticDiagnostics("file:///a.stm", idx);
+    const missing = diags.find((d) => d.code === "missing-import");
+    assert.ok(missing, "expected a missing-import diagnostic");
+    assert.ok(
+      missing.message.includes("import { orders }"),
+      "suggestion must name the symbol to import",
+    );
   });
 });
