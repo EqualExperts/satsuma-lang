@@ -1,6 +1,6 @@
 {
-  "last_covered_date": "2026-06-10",
-  "last_entry_file": "satsuma-diaries/2026/06/2026-06-10.md",
-  "rolled_up_days": ["2026-06-08", "2026-06-09"],
-  "note": "Last entry written: 2026-06-10 (Features 32/33/34 — viz light mode, 'Try it Live!' playground, UX polish; first external bug report gh-265). 2026-06-05..07 had no commits; 2026-06-08 (1 commit) and 2026-06-09 (26 commits, Feature 32 + Windows fix) were absorbed into the 06-10 entry rather than written standalone. Next run will cover from 2026-06-11."
+  "last_covered_date": "2026-06-12",
+  "last_entry_file": "satsuma-diaries/2026/06/2026-06-12.md",
+  "rolled_up_days": ["2026-06-11"],
+  "note": "Last entry written: 2026-06-12, covering 2026-06-11 (88 commits, bug-hunt fix batches) and 2026-06-12 (grammar loud-error batch, v0.10.0 release) as a two-day entry. Next run will cover from 2026-06-13."
 }
