@@ -201,12 +201,20 @@ Downloads both artifacts and creates a GitHub release:
 
 ### Release artifacts
 
-Both release types attach:
+Both release types attach the same three artifacts, renamed with the release
+tag as a suffix (`<tag>` is `latest` for the pre-release, or the version tag
+such as `v0.9.0` for tagged releases):
 
 | Artifact | Install method |
 |---|---|
-| `satsuma-cli.tgz` | `npm install -g <url>` |
-| `vscode-satsuma.vsix` | `code --install-extension vscode-satsuma.vsix` |
+| `satsuma-cli-<tag>.tgz` | `npm install -g <url>` |
+| `satsuma-lsp-<tag>.tgz` | `npm install -g <url>` |
+| `vscode-satsuma-<tag>.vsix` | `code --install-extension vscode-satsuma-<tag>.vsix` |
+
+The unsuffixed names (`satsuma-cli.tgz`, `vscode-satsuma.vsix`) exist only as
+local pack outputs and CI workflow artifacts — they are never the download
+filenames on a GitHub release. Install instructions must use the suffixed
+names.
 
 ### Creating a tagged release
 

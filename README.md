@@ -168,7 +168,7 @@ A universal pre-built package is published on every merge to `main`. It uses
 WASM internally, so the same package works on macOS, Linux, and Windows:
 
 ```bash
-npm install -g https://github.com/EqualExperts/satsuma-lang/releases/download/latest/satsuma-cli.tgz
+npm install -g https://github.com/EqualExperts/satsuma-lang/releases/download/latest/satsuma-cli-latest.tgz
 ```
 
 This gives you the `satsuma` command on your PATH. Run `satsuma --help` to see

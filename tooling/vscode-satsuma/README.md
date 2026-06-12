@@ -6,10 +6,10 @@ Full language support for the Satsuma data mapping language: syntax highlighting
 
 ### From GitHub Release (recommended)
 
-Download `vscode-satsuma.vsix` from the [latest release](https://github.com/EqualExperts/satsuma-lang/releases/tag/latest) and install:
+Download `vscode-satsuma-latest.vsix` from the [latest release](https://github.com/EqualExperts/satsuma-lang/releases/tag/latest) and install:
 
 ```bash
-code --install-extension vscode-satsuma.vsix
+code --install-extension vscode-satsuma-latest.vsix
 ```
 
 ### From Source
