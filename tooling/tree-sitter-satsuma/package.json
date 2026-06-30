@@ -13,6 +13,6 @@
     "smoke": "node scripts/smoke-check.js"
   },
   "devDependencies": {
-    "tree-sitter-cli": "^0.26.9"
+    "tree-sitter-cli": "^0.26.10"
   }
 }
