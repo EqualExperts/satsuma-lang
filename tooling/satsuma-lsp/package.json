@@ -22,7 +22,7 @@
     "@satsuma/core": "file:../satsuma-core",
     "@satsuma/viz-backend": "file:../satsuma-viz-backend",
     "@satsuma/viz-model": "file:../satsuma-viz-model",
-    "vscode-languageserver": "^10.0.0",
+    "vscode-languageserver": "^10.1.0",
     "vscode-languageserver-textdocument": "^1.0.12",
     "web-tree-sitter": "^0.26.7"
   },
