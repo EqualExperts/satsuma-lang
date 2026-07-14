@@ -4,6 +4,7 @@
 
 import "@satsuma/viz";
 import { buildFieldLineagePath } from "./integration";
+import { isExtensionHostMessage } from "../message-guard";
 
 const vscode = acquireVsCodeApi();
 
@@ -58,6 +59,7 @@ vizEl.addEventListener("field-lineage", (ev: CustomEvent) => {
 
 // Receive messages from the extension host
 window.addEventListener("message", (event) => {
+  if (!isExtensionHostMessage(event, window.parent)) return;
   const msg = event.data;
 
   if (msg.type === "vizModel") {

@@ -5,6 +5,8 @@
 
 // @ts-nocheck — runs in webview context
 
+import { isExtensionHostMessage } from "../message-guard";
+
 const vscode = acquireVsCodeApi();
 
 interface ArrowEntry {
@@ -17,6 +19,7 @@ interface ArrowEntry {
 }
 
 window.addEventListener("message", (event) => {
+  if (!isExtensionHostMessage(event, window.parent)) return;
   const msg = event.data;
   if (msg.type === "lineageData") {
     render(msg.payload);

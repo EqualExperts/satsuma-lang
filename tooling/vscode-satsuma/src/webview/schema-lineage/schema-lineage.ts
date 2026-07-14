@@ -11,6 +11,8 @@
 
 import ELK from "elkjs/lib/elk.bundled.js";
 
+import { isExtensionHostMessage } from "../message-guard";
+
 const vscode = acquireVsCodeApi();
 const elk = new ELK();
 
@@ -51,6 +53,7 @@ interface NodePos {
 // ── Entry point ────────────────────────────────────────────────────────────
 
 window.addEventListener("message", (event: MessageEvent) => {
+  if (!isExtensionHostMessage(event, window.parent)) return;
   const msg = event.data as { type: string; payload?: Payload; message?: string };
   if (msg.type === "schemaLineageData" && msg.payload) {
     render(msg.payload);
