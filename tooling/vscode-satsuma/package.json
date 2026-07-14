@@ -11,7 +11,7 @@
     "url": "https://github.com/EqualExperts/satsuma-lang"
   },
   "engines": {
-    "vscode": "^1.91.0"
+    "vscode": "^1.125.0"
   },
   "categories": [
     "Programming Languages"
