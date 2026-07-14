@@ -1,6 +1,6 @@
 ---
 id: sl-xcqm
-status: in_progress
+status: closed
 deps: []
 links: []
 created: 2026-07-13T16:24:35Z
