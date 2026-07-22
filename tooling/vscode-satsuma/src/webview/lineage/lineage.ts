@@ -19,7 +19,7 @@ interface ArrowEntry {
 }
 
 window.addEventListener("message", (event) => {
-  if (!isExtensionHostMessage(event, window.parent)) return;
+  if (!isExtensionHostMessage(event, window.origin)) return;
   const msg = event.data;
   if (msg.type === "lineageData") {
     render(msg.payload);

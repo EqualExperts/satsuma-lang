@@ -2,7 +2,7 @@
 id: sl-mrn3
 status: closed
 deps: []
-links: []
+links: [sl-b90g]
 created: 2026-07-14T08:09:03Z
 type: task
 priority: 2

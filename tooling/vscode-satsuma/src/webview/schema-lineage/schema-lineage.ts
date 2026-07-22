@@ -53,7 +53,7 @@ interface NodePos {
 // ── Entry point ────────────────────────────────────────────────────────────
 
 window.addEventListener("message", (event: MessageEvent) => {
-  if (!isExtensionHostMessage(event, window.parent)) return;
+  if (!isExtensionHostMessage(event, window.origin)) return;
   const msg = event.data as { type: string; payload?: Payload; message?: string };
   if (msg.type === "schemaLineageData" && msg.payload) {
     render(msg.payload);
