@@ -37,3 +37,5 @@ site/playground/
 **/.vscode-test-explorer
 **/.vscode-test-insiders-explorer
 **/.vscode-test-explorer-insiders       
+
+tmp/
