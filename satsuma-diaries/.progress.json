@@ -1,6 +1,6 @@
 {
-  "last_covered_date": "2026-06-12",
-  "last_entry_file": "satsuma-diaries/2026/06/2026-06-12.md",
-  "rolled_up_days": ["2026-06-11"],
-  "note": "Last entry written: 2026-06-12, covering 2026-06-11 (88 commits, bug-hunt fix batches) and 2026-06-12 (grammar loud-error batch, v0.10.0 release) as a two-day entry. Next run will cover from 2026-06-13."
+  "last_covered_date": "2026-07-22",
+  "last_entry_file": "satsuma-diaries/2026/07/2026-07-22.md",
+  "rolled_up_days": ["2026-06-13", "2026-07-13", "2026-07-14"],
+  "note": "Last entry written: 2026-07-22, a catch-up after a ~6-week gap. Covers the quiet mid-June LSP fixes (PR #323), the mid-July dependency wave + security hardening (SHA-pinning #368, webview/harness lockdown #369), and today's work: webview restore (#386), the 16-PR Dependabot clear-out (brace-expansion/js-yaml/c8/elkjs DoS + version bumps), and the site js-yaml DoS fix (#387). Next run will cover from 2026-07-23."
 }
