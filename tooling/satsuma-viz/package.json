@@ -16,7 +16,7 @@
   "dependencies": {
     "@satsuma/core": "file:../satsuma-core",
     "@satsuma/viz-model": "file:../satsuma-viz-model",
-    "elkjs": "^0.11.1",
+    "elkjs": "^0.12.0",
     "lit": "^3.3.3"
   },
   "devDependencies": {
