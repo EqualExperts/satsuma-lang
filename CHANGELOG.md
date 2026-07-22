@@ -1,5 +1,44 @@
 # Changelog
 
+## v0.11.0 — 2026-07-22
+
+A maintenance and security-hardening release. No new language constructs and
+no grammar changes — this release surfaces editor diagnostics that were being
+dropped, closes a batch of dependency and supply-chain security findings, and
+moves the toolchain forward.
+
+### Editor and CLI fixes (`sl-rngq`, `sl-l3m8`, `sl-dxjh`)
+
+- **`satsuma validate` diagnostics now appear in the editor.** The LSP's
+  validate fallback parsed `validate --json` as a bare array, but the CLI has
+  emitted a `{ findings, summary }` envelope since 2026-03 — so every
+  validation diagnostic was being silently dropped in-editor. The LSP now reads
+  the envelope (`sl-rngq`).
+- **Namespace-accurate references.** "Find where-used" returned zero results
+  for transforms and fragments defined inside a namespace (both bare and
+  `...spread` forms); it now resolves them (`sl-l3m8`).
+- **`satsuma diff` no longer reports formatting-only noise.** Differences that
+  were purely formatting in pipe/map bodies were being reported as structural
+  changes; the diff is now taken against a formatter-normalized round-trip
+  (`sl-dxjh`).
+
+### Security hardening
+
+- **VS Code webviews validate message origin**, and a static-file-serving hole
+  in the visualization test harness was closed (`sl-mrn3`).
+- **All GitHub Actions are pinned to full commit SHAs** rather than mutable
+  version tags, closing a supply-chain vector flagged by Semgrep (`sl-xcqm`).
+- **`brace-expansion` and `js-yaml` denial-of-service advisories are patched**
+  across every package, including the documentation site's build chain
+  (`sl-4wo3`).
+
+### Toolchain
+
+- Tree-sitter CLI and `web-tree-sitter` updated to 0.26.11;
+  `vscode-languageclient` / `vscode-languageserver` to 10.1.0.
+- **Minimum supported VS Code raised to 1.125** to match `@types/vscode`.
+- Roughly forty dependency updates merged across the workspace.
+
 ## v0.10.0 — 2026-06-12
 
 A hardening release. A systematic bug hunt across the whole toolchain closed

@@ -1,6 +1,6 @@
 {
   "name": "@satsuma/lsp",
-  "version": "0.10.0",
+  "version": "0.11.0",
   "private": true,
   "description": "Satsuma Language Server — standalone LSP for the Satsuma data mapping language",
   "type": "commonjs",
