@@ -1,6 +1,6 @@
 ---
 id: sl-b90g
-status: in_progress
+status: closed
 deps: []
 links: [sl-mrn3]
 created: 2026-07-22T15:18:15Z
@@ -26,3 +26,9 @@ The security fix in e8c638c (sl-mrn3) added a webview message guard that checks 
 
 Cause: The webview message guard added in e8c638c (sl-mrn3) checked event.source === window.parent. That invariant does not hold in the VS Code webview runtime — host messages posted via webview.postMessage() do not arrive with source === window.parent — so the guard dropped every host message and all four webviews (viz, lineage, schema-lineage, field-lineage) stopped receiving data; viz showed a permanent 'No mapping file loaded'.
 Fix: Switched the guard to the VS Code-sanctioned check event.origin === window.origin (isExtensionHostMessage now takes selfOrigin), updated all four call sites to pass window.origin, and rewrote message-guard.test.js for origin semantics. Guard still rejects foreign-origin messages, preserving the sl-mrn3 Semgrep fix.
+
+**2026-07-22T15:25:59Z**
+
+**2026-07-22T15:25:59Z**
+
+Verified: user installed the locally-built vsix (0.10.0) and confirmed the viz preview renders again (fix commit d5245d7).
