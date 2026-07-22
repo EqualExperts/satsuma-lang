@@ -59,7 +59,7 @@ vizEl.addEventListener("field-lineage", (ev: CustomEvent) => {
 
 // Receive messages from the extension host
 window.addEventListener("message", (event) => {
-  if (!isExtensionHostMessage(event, window.parent)) return;
+  if (!isExtensionHostMessage(event, window.origin)) return;
   const msg = event.data;
 
   if (msg.type === "vizModel") {

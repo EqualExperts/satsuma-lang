@@ -58,7 +58,7 @@ let lastPayload: Payload | null = null;
 // ── Entry point ────────────────────────────────────────────────────────────
 
 window.addEventListener("message", (event: MessageEvent) => {
-  if (!isExtensionHostMessage(event, window.parent)) return;
+  if (!isExtensionHostMessage(event, window.origin)) return;
   const msg = event.data as { type: string; payload?: Payload; message?: string };
   if (msg.type === "fieldLineageData" && msg.payload) {
     lastPayload = msg.payload;
