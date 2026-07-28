@@ -83,7 +83,7 @@
     "web-tree-sitter": "^0.26.11"
   },
   "devDependencies": {
-    "@types/node": "^26.1.1",
+    "@types/node": "^26.1.2",
     "c8": "^12.0.0",
     "typescript": "^6.0.3"
   }
