@@ -179,6 +179,21 @@ describe("schemaLocalFieldPath()", () => {
     );
   });
 
+  it("returns null for a bare reference that is just the schema's name", () => {
+    // Spec §4.6's top-level flatten targets the target *schema*
+    // (`flatten contacts -> tgt`), and extraction reports that target verbatim.
+    // Without this rule `tgt` would enter the covered set as though a field of
+    // that name had been written (sl-vu22).
+    assert.equal(schemaLocalFieldPath("tgt", ["tgt"], []), null);
+    assert.equal(schemaLocalFieldPath("customers", ["crm::customers"], []), null);
+  });
+
+  it("keeps a bare reference that names a declared field, not the schema", () => {
+    // A single-source mapping's `id -> id` is a field reference even when the
+    // schema is called `id`; the declaration settles it.
+    assert.equal(schemaLocalFieldPath("id", ["id"], [], (n) => n === "id"), "id");
+  });
+
   it("prefers a declared field over a schema prefix of the same name", () => {
     // A schema and one of its own top-level fields can collide. The declared
     // field is concrete evidence, so the path is read as-is rather than stripped.

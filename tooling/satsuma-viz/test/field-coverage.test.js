@@ -180,34 +180,45 @@ describe("field-coverage helpers", () => {
 // ---------------------------------------------------------------------------
 // Nested-each arrow visibility (sl-fm0q)
 //
-// Arrows can nest arbitrarily deep: each_block → nestedEach → nestedEach.
-// Surfaces that sum only the top-level collections (mapping.arrows +
-// eachBlocks[].arrows + flattenBlocks[].arrows) silently lose every arrow
-// below the first nesting level.
+// Arrows can nest arbitrarily deep, and `each` and `flatten` interleave in any
+// combination. Surfaces that sum only the top-level collections (mapping.arrows
+// + eachBlocks[].arrows + flattenBlocks[].arrows) silently lose every arrow
+// below the first nesting level; walking only `nestedEach` loses every arrow
+// under a flatten nested in an each (sl-vu22).
 // ---------------------------------------------------------------------------
+
+/** One arrow, for building nesting fixtures compactly. */
+const arrow = (src, tgt) => ({
+  sourceFields: [src], targetField: tgt, transform: null, metadata: [], comments: [], location: loc,
+});
 
 /** A mapping with one arrow at each level: top, each, nested-each, flatten. */
 const arrowAtEveryLevel = () => ({
   id: "m1",
   sourceRefs: ["order"],
   targetRef: "invoice",
-  arrows: [{ sourceFields: ["id"], targetField: "id", transform: null, metadata: [], comments: [], location: loc }],
+  arrows: [arrow("id", "id")],
   eachBlocks: [{
     sourceField: "items",
     targetField: "lines",
-    arrows: [{ sourceFields: ["items.sku"], targetField: "lines.sku", transform: null, metadata: [], comments: [], location: loc }],
+    arrows: [arrow("items.sku", "lines.sku")],
     nestedEach: [{
       sourceField: "items.discounts",
       targetField: "lines.discounts",
-      arrows: [{ sourceFields: ["items.discounts.code"], targetField: "lines.discounts.code", transform: null, metadata: [], comments: [], location: loc }],
+      arrows: [arrow("items.discounts.code", "lines.discounts.code")],
       nestedEach: [],
+      nestedFlatten: [],
       location: loc,
     }],
+    nestedFlatten: [],
     location: loc,
   }],
   flattenBlocks: [{
     sourceField: "tags",
-    arrows: [{ sourceFields: ["tags.label"], targetField: "tag_label", transform: null, metadata: [], comments: [], location: loc }],
+    targetField: "invoice",
+    arrows: [arrow("tags.label", "tag_label")],
+    nestedEach: [],
+    nestedFlatten: [],
     location: loc,
   }],
   sourceBlock: null,
@@ -222,6 +233,35 @@ describe("countMappingArrows (sl-fm0q)", () => {
     // reported 3 for this mapping; the nested-each arrow makes it 4.
     const { countMappingArrows } = await import("../dist/satsuma-viz.js");
     assert.equal(countMappingArrows(arrowAtEveryLevel()), 4);
+  });
+
+  it("counts arrows inside a flatten nested in an each (sl-vu22)", async () => {
+    // The shape of examples/nested-iteration/pipeline.stm:100. `each` carried
+    // only nestedEach, so a `flatten` inside it had nowhere to live in the model
+    // and every arrow under it was invisible to the count, the hover lookups and
+    // the coverage overlay alike. Two arrows here: the each's and the flatten's.
+    const { countMappingArrows } = await import("../dist/satsuma-viz.js");
+    const mapping = {
+      ...arrowAtEveryLevel(),
+      arrows: [],
+      flattenBlocks: [],
+      eachBlocks: [{
+        sourceField: "orders",
+        targetField: "orders",
+        arrows: [arrow("orders.id", "orders.id")],
+        nestedEach: [],
+        nestedFlatten: [{
+          sourceField: "orders.parcels.contents",
+          targetField: "orders.packed_items",
+          arrows: [arrow("orders.parcels.contents.sku", "orders.packed_items.sku")],
+          nestedEach: [],
+          nestedFlatten: [],
+          location: loc,
+        }],
+        location: loc,
+      }],
+    };
+    assert.equal(countMappingArrows(mapping), 2);
   });
 });
 

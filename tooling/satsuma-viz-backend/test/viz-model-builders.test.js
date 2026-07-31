@@ -627,6 +627,56 @@ describe("extractFlattenBlock (direct)", () => {
     assert.equal(flat.arrows[0].sourceFields[0], ".sku");
     assert.equal(flat.arrows[0].targetField, "sku");
   });
+
+  it("carries the flatten's own target", () => {
+    // FlattenBlock had no targetField at all, so `-> t` was dropped from the
+    // model and the detail view could only show a flatten's source (sl-vu22).
+    // Both readings spec §4.6 gives the target must survive: the schema name
+    // here, and the relative `.packed_items` form in the nesting test below.
+    const src =
+      "schema s { items list_of record { sku STRING } }\n" +
+      "schema t { sku STRING }\n" +
+      "mapping m {\n  source { s }\n  target { t }\n" +
+      "  flatten items -> t {\n    .sku -> sku\n  }\n}";
+    const flat = extractFlattenBlock(URI, findNode(root(src), "flatten_block"));
+    assert.equal(flat.targetField, "t");
+  });
+});
+
+describe("each and flatten nesting (sl-vu22)", () => {
+  // The grammar routes both block types through one `_nested_block_item`
+  // production, so either may contain either. Each extractor used to enumerate
+  // the children it accepted — `each` took only `each`, `flatten` took none — so
+  // a flatten inside an each (examples/nested-iteration/pipeline.stm:100) was
+  // dropped from the model entirely, taking its arrows with it.
+
+  const NESTED = "schema s { orders list_of record {\n" +
+    "  parcels list_of record { contents list_of record { sku STRING } }\n" +
+    "} }\n" +
+    "schema t { orders list_of record { packed_items list_of record { sku STRING } } }\n" +
+    "mapping m {\n  source { s }\n  target { t }\n" +
+    "  each orders -> orders {\n" +
+    "    flatten parcels.contents -> .packed_items {\n      .sku -> .sku\n    }\n" +
+    "  }\n}";
+
+  it("carries a flatten nested inside an each, with its arrows", () => {
+    const each = extractEachBlock(URI, findNode(root(NESTED), "each_block"));
+    assert.equal(each.nestedFlatten.length, 1, "the nested flatten must be present");
+    const flat = each.nestedFlatten[0];
+    assert.equal(flat.sourceField, "parcels.contents");
+    assert.equal(flat.targetField, ".packed_items");
+    assert.equal(flat.arrows.length, 1);
+    assert.equal(flat.arrows[0].targetField, ".sku");
+  });
+
+  it("defaults both nesting collections to empty rather than omitting them", () => {
+    // Consumers walk `[...nestedEach, ...nestedFlatten]` unconditionally; a
+    // missing collection is a TypeError at render time, not a quiet no-op.
+    const each = extractEachBlock(URI, findNode(root(NESTED), "each_block"));
+    assert.deepStrictEqual(each.nestedEach, []);
+    assert.deepStrictEqual(each.nestedFlatten[0].nestedEach, []);
+    assert.deepStrictEqual(each.nestedFlatten[0].nestedFlatten, []);
+  });
 });
 
 // ==================================================================

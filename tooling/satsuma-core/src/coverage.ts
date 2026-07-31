@@ -2,10 +2,9 @@
  * coverage.ts — Mapping field coverage: which declared fields does a mapping touch?
  *
  * Owns the single definition of coverage semantics for the whole toolchain.
- * Given a parsed file and a mapping name, {@link computeMappingCoverage} walks
- * the mapping body, collects every source and target path the arrows reference,
- * and reports covered/uncovered status for every field of every participating
- * schema.
+ * Given a parsed file and a mapping name, {@link computeMappingCoverage} reads
+ * every source and target path the mapping's arrows reference and reports
+ * covered/uncovered status for every field of every participating schema.
  *
  * "Covered" means:
  *   - source field: its qualified path from the schema root — or a path that
@@ -19,27 +18,34 @@
  * an arrow's schema prefix has to be resolved away before matching, which is
  * what {@link coverageForSchema} does.
  *
- * Nested record fields are handled recursively. Arrows nest inside three
- * container blocks — `each`, `flatten` and a braced `src -> tgt` (`nested_arrow`)
- * — which the grammar allows to interleave to any depth, so the walk recurses
- * uniformly over all three rather than enumerating what each may contain
- * (sl-qzy3). A container's own src/tgt count as touched and become the prefixes
- * for the arrows inside it.
+ * **This module does not walk the CST for arrows.** It asks extract.ts, via
+ * `extractMappingArrowRecords()`, and resolves what comes back. It used to keep
+ * its own walk, and that duplication produced four defects — relative dots
+ * unstripped (sc-xnxp), `flatten` inside `each` and `nested_arrow` never visited
+ * (sl-qzy3), and schema prefixes never resolved (sl-joeq) — every one of them a
+ * rule extraction already applied, every one found by inspection rather than by
+ * a test. Coverage owns *what counts as covered*; extraction owns *what the
+ * arrows say* — ADR-020's principle applied inside core, and the decision
+ * recorded under PRD 38 R4. Adding a construct to the grammar or a new source of
+ * references (spec §5's resolved NL @refs, ADR-036) is then one change, in
+ * extract.ts, rather than two that can disagree.
  *
  * Coverage is deliberately *structural only*: a field a note block describes in
  * prose is uncovered by definition. NL interpretation belongs to nl-refs, and
  * policy judgements ("optional fields shouldn't count") belong to lint.
  *
- * This module does not own an index. Callers supply a {@link CoverageSchemaResolver}
- * that adapts their own workspace model — the LSP's `WorkspaceIndex`, the CLI's
- * `ExtractedWorkspace`, or a browser-side viz model — to the minimal field-tree
- * shape the walk needs. That keeps the semantics here and the plumbing there.
+ * This module does not own an index either. Callers supply a
+ * {@link CoverageSchemaResolver} that adapts their own workspace model — the
+ * LSP's `WorkspaceIndex`, the CLI's `ExtractedWorkspace`, or a browser-side viz
+ * model — to the minimal field-tree shape the walk needs. That keeps the
+ * semantics here and the plumbing there.
  *
- * Path-set expansion rules live in coverage-paths.ts.
+ * Path-set expansion and schema-prefix rules live in coverage-paths.ts.
  */
 
 import { child, children, labelText, sourceRefStructuralText } from "./cst-utils.js";
 import { buildCoveredFieldSet, isCoveredFieldPath, schemaLocalFieldPath } from "./coverage-paths.js";
+import { extractMappingArrowRecords } from "./extract.js";
 import type { SyntaxNode, Tree } from "./types.js";
 
 // ── Resolver input contract ─────────────────────────────────────────────────
@@ -163,12 +169,17 @@ export function computeMappingCoverage(
   const sourceIds = getSchemaIdsFromBlock(body, "source_block");
   const targetIds = getSchemaIdsFromBlock(body, "target_block");
 
-  // Arrow references as authored, container-qualified but still carrying any
-  // schema prefix — that prefix can only be stripped once we know which schema
-  // we are reporting on, so resolution happens per schema below.
-  const srcRefs: string[] = [];
-  const tgtRefs: string[] = [];
-  collectBodyPaths(body, srcRefs, tgtRefs);
+  // Arrow references as authored: absolute (extraction has already applied every
+  // enclosing container's prefix and stripped element-relative dots) but still
+  // carrying any schema prefix, which can only be stripped once we know which
+  // schema we are reporting on. Resolution therefore happens per schema below.
+  //
+  // The `each`/`flatten`/`nested_arrow` container itself yields a record too, so
+  // a container's own source and target are registered as touched: iterating a
+  // list consumes it, and writing into one populates it.
+  const arrows = extractMappingArrowRecords(mappingNode);
+  const srcRefs = arrows.flatMap((a) => a.sources);
+  const tgtRefs = arrows.map((a) => a.target).filter((t): t is string => t !== null);
 
   const schemas: SchemaCoverageResult[] = [];
 
@@ -218,133 +229,6 @@ function coverageForSchema(
     role,
     fields: buildFieldCoverage(def.fields, def.uri, "", buildCoveredFieldSet(localPaths)),
   };
-}
-
-// ── Path collection ─────────────────────────────────────────────────────────
-
-/**
- * Path prefixes established by the enclosing container, or null at mapping-body
- * level. A container's own — already qualified — source and target become the
- * bases for its children, accumulating across arbitrary depth.
- */
-interface PathBases {
-  /** Absolute source path of the enclosing container, null at body level. */
-  src: string | null;
-  /** Absolute target path of the enclosing container, null at body level. */
-  tgt: string | null;
-}
-
-/**
- * Block types that declare one src/tgt pair plus a body of further block items.
- *
- * All three are walked through one shared branch rather than each parent
- * enumerating the children it permits. That enumeration is what caused
- * `flatten` inside `each` and `nested_arrow` anywhere to be silently dropped
- * from coverage (sl-qzy3): the grammar's `_nested_block_item` allows any of
- * these inside any of them, so a walk that lists cases per parent falls out of
- * step with the grammar the moment a construct is added.
- */
-const CONTAINER_BLOCK_TYPES = new Set(["each_block", "flatten_block", "nested_arrow"]);
-
-/**
- * Walk every arrow in the mapping body — including those nested inside
- * containers to arbitrary depth — and collect the src/tgt references it makes.
- *
- * References come out container-qualified but otherwise as authored: any schema
- * prefix is left on, because which prefix is strippable depends on the schema
- * being reported. {@link coverageForSchema} resolves that per schema.
- */
-function collectBodyPaths(
-  body: SyntaxNode,
-  srcRefs: string[],
-  tgtRefs: string[],
-): void {
-  collectBlockItemPaths(body.namedChildren, srcRefs, tgtRefs, { src: null, tgt: null });
-}
-
-/**
- * Collect references from a list of sibling block items, qualifying each against
- * the bases its enclosing container established.
- */
-function collectBlockItemPaths(
-  nodes: SyntaxNode[],
-  srcRefs: string[],
-  tgtRefs: string[],
-  bases: PathBases,
-): void {
-  for (const node of nodes) {
-    if (node.type === "map_arrow") {
-      for (const sp of children(node, "src_path")) {
-        srcRefs.push(qualify(bases.src, pathText(sp)));
-      }
-      const tp = child(node, "tgt_path");
-      if (tp) tgtRefs.push(qualify(bases.tgt, pathText(tp)));
-    } else if (node.type === "computed_arrow") {
-      // Source-less arrow: the target is still populated by this mapping.
-      const tp = child(node, "tgt_path");
-      if (tp) tgtRefs.push(qualify(bases.tgt, pathText(tp)));
-    } else if (CONTAINER_BLOCK_TYPES.has(node.type)) {
-      collectContainerPaths(node, srcRefs, tgtRefs, bases);
-    }
-  }
-}
-
-/**
- * Record a container's own source and target, then recurse into its body with
- * those as the bases for the level below.
- */
-function collectContainerPaths(
-  node: SyntaxNode,
-  srcRefs: string[],
-  tgtRefs: string[],
-  outer: PathBases,
-): void {
-  const rawSrc = child(node, "src_path");
-  const rawTgt = child(node, "tgt_path");
-
-  const src = rawSrc ? qualify(outer.src, pathText(rawSrc)) : outer.src;
-  const tgt = containerTargetBase(node, rawTgt, outer.tgt);
-
-  // The container's own paths count as touched: iterating a list consumes it,
-  // and writing into one populates it.
-  if (src) srcRefs.push(src);
-  if (tgt) tgtRefs.push(tgt);
-
-  collectBlockItemPaths(node.namedChildren, srcRefs, tgtRefs, { src, tgt });
-}
-
-/**
- * Resolve the target base a container establishes for its children.
- *
- * `each` and `nested_arrow` always establish one: their target names a field,
- * and the arrows inside are written against it.
- *
- * `flatten` is the exception, and the grammar says which case applies. In
- * spec §4.6's top-level form the target names the target *schema*
- * (`flatten contacts -> tgt`) and the block unnests into flat schema-root
- * fields, so there is no base and the named schema is not a field to register.
- * Written relative — `flatten parcels.contents -> .packed_items` inside an
- * `each` (examples/nested-iteration/pipeline.stm:100) — it names a list field
- * on the current element, and its arrows are relative to that. A
- * `relative_field_path` node is the authored signal separating the two.
- */
-function containerTargetBase(
-  node: SyntaxNode,
-  rawTgt: SyntaxNode | null,
-  outerTgt: string | null,
-): string | null {
-  if (!rawTgt) return outerTgt;
-  if (node.type === "flatten_block" && !isRelativePath(rawTgt)) return outerTgt;
-  return qualify(outerTgt, pathText(rawTgt));
-}
-
-/** True when a src_path/tgt_path was authored relative to the current element (`.field`). */
-function isRelativePath(pathNode: SyntaxNode): boolean {
-  return child(pathNode, "relative_field_path") !== null;
-}
-
-function qualify(base: string | null, leaf: string): string {
-  return base ? `${base}.${leaf}` : leaf;
 }
 
 // ── Field coverage building ─────────────────────────────────────────────────
@@ -407,25 +291,4 @@ function getSchemaIdsFromBlock(body: SyntaxNode, blockType: "source_block" | "ta
     }
   }
   return [];
-}
-
-/**
- * Normalise a src_path / tgt_path node to a plain dotted path.
- *
- * Two normalisations, both required before the path can be qualified or
- * matched against a declared field path:
- *
- *  1. Backtick quoting is stripped (`` `order id` `` → `order id`).
- *  2. A leading `.` is stripped. Inside `each`/`flatten` blocks the spec writes
- *     element-relative paths as `.SKU` (spec §4.6), which the grammar parses as
- *     `relative_field_path`. Keeping the dot would make qualify() produce
- *     `items..SKU`, whose declared counterpart `items.SKU` then never matches —
- *     so every nested field inside an each/flatten block would be reported
- *     uncovered despite an explicit arrow (sc-xnxp). The CLI's arrow index
- *     already applies the same `^\.` strip in buildFieldArrows().
- */
-function pathText(node: SyntaxNode): string {
-  const text = node.text;
-  const unquoted = text.startsWith("`") && text.endsWith("`") ? text.slice(1, -1) : text;
-  return unquoted.startsWith(".") ? unquoted.slice(1) : unquoted;
 }

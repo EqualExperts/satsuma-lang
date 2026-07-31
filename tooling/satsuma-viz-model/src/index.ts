@@ -158,7 +158,15 @@ export interface ResolvedAtRef {
   resolvedTo: { kind: string; name: string } | null;
 }
 
-/** An each_block — iterates over a list field and maps its children. */
+/**
+ * An each_block — iterates over a list field and maps its children.
+ *
+ * `each` and `flatten` may interleave to any depth: the grammar's
+ * `_nested_block_item` permits either inside either, and
+ * `examples/nested-iteration/pipeline.stm:100` puts a `flatten` inside an
+ * `each`. Both nesting collections must therefore be walked by any consumer
+ * counting or resolving arrows (sl-vu22).
+ */
 export interface EachBlock {
   /** Source list field being iterated. */
   sourceField: string;
@@ -167,14 +175,34 @@ export interface EachBlock {
   arrows: ArrowEntry[];
   /** Nested each_blocks declared inside this one. */
   nestedEach: EachBlock[];
+  /** Nested flatten_blocks declared inside this one. */
+  nestedFlatten: FlattenBlock[];
   location: SourceLocation;
 }
 
-/** A flatten_block — iterates a source list and emits flat target arrows. */
+/**
+ * A flatten_block — iterates a source list and emits flat target arrows.
+ *
+ * Nests exactly as `each` does; see {@link EachBlock}.
+ */
 export interface FlattenBlock {
   /** Source list field being flattened. */
   sourceField: string;
+  /**
+   * Target the block writes into, as authored.
+   *
+   * Spec §4.6 gives this two readings and the authored text distinguishes them:
+   * written plainly (`flatten contacts -> tgt`) it names the target *schema* and
+   * the block unnests into schema-root fields; written relative
+   * (`flatten parcels.contents -> .packed_items` inside an `each`) it names a
+   * list field on the current element. Empty when the block declares no target.
+   */
+  targetField: string;
   arrows: ArrowEntry[];
+  /** Nested each_blocks declared inside this one. */
+  nestedEach: EachBlock[];
+  /** Nested flatten_blocks declared inside this one. */
+  nestedFlatten: FlattenBlock[];
   location: SourceLocation;
 }
 

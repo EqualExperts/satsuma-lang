@@ -6,7 +6,15 @@
  */
 
 import { buildCoveredFieldSet, schemaLocalFieldPath } from "@satsuma/core/coverage-paths";
-import type { ArrowEntry, FieldEntry, MappingBlock, SchemaCard, VizModel } from "./model.js";
+import type {
+  ArrowEntry,
+  EachBlock,
+  FieldEntry,
+  FlattenBlock,
+  MappingBlock,
+  SchemaCard,
+  VizModel,
+} from "./model.js";
 
 /**
  * The subset of SchemaCard that field-path resolution needs. Metric cards
@@ -71,24 +79,28 @@ export function resolveSchemaLocalFieldPath(
 }
 
 /**
- * Walk all arrows in a mapping, including nested each_blocks and flatten_blocks.
+ * Walk every arrow in a mapping, including those nested arbitrarily deep inside
+ * `each` and `flatten` blocks in any combination.
+ *
+ * `each` and `flatten` accept the same children and may interleave to any depth,
+ * so one recursion handles both rather than each block type getting its own
+ * traversal. Walking only `nestedEach` missed every arrow under a `flatten`
+ * inside an `each` — the shape of `examples/nested-iteration/pipeline.stm:100`
+ * (sl-vu22).
  */
 export function forEachMappingArrow(
   mapping: MappingBlock,
   visit: (arrow: ArrowEntry) => void,
 ): void {
-  const visitEach = (eachBlocks: MappingBlock["eachBlocks"]): void => {
-    for (const each of eachBlocks) {
-      for (const arrow of each.arrows) visit(arrow);
-      visitEach(each.nestedEach);
+  const visitBlocks = (blocks: Array<EachBlock | FlattenBlock>): void => {
+    for (const block of blocks) {
+      for (const arrow of block.arrows) visit(arrow);
+      visitBlocks([...block.nestedEach, ...block.nestedFlatten]);
     }
   };
 
   for (const arrow of mapping.arrows) visit(arrow);
-  visitEach(mapping.eachBlocks);
-  for (const flatten of mapping.flattenBlocks) {
-    for (const arrow of flatten.arrows) visit(arrow);
-  }
+  visitBlocks([...mapping.eachBlocks, ...mapping.flattenBlocks]);
 }
 
 /**

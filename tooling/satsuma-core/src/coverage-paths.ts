@@ -103,13 +103,19 @@ export function schemaRefPrefixes(schemaRef: string): string[] {
  * qualified form only matched by accident, via bare-segment registration.
  *
  * The rules, in order:
- *  1. The reference names *this* schema → strip the prefix and return the rest.
- *     Skipped when the schema itself declares a top-level field of that name, so
- *     a schema and field sharing a name resolves to the concrete field rather
- *     than to a prefix that only looks like one.
- *  2. The reference names a *different* schema in the same block → null; that
+ *  1. The reference *is* a schema name with no field part → null. It names the
+ *     schema, not a field in it. Spec §4.6's top-level flatten writes exactly
+ *     this — `flatten contacts -> tgt` targets the target *schema* — so without
+ *     this rule `tgt` would enter the covered set as if it were a field.
+ *  2. The reference names *this* schema and continues into a path → strip the
+ *     prefix and return the rest.
+ *  3. The reference names a *different* schema in the same block → null; that
  *     schema's own pass will claim it.
- *  3. Otherwise the reference is already schema-local → return it unchanged.
+ *  4. Otherwise the reference is already schema-local → return it unchanged.
+ *
+ * Rules 1 and 2 are both skipped when the schema declares a top-level field of
+ * that name: a schema and a field sharing a name resolves to the concrete field
+ * rather than to a prefix that only looks like one.
  *
  * @param fieldRef         Path as authored on the arrow, already container-qualified.
  * @param schemaRefs       Every form this schema may be named by — the reference
@@ -117,7 +123,7 @@ export function schemaRefPrefixes(schemaRef: string): string[] {
  *                         resolved canonical id.
  * @param otherSchemaRefs  The other schemas referenced on this side of the mapping.
  * @param declaresTopLevel True when this schema declares a top-level field of the
- *                         given name. Supply it to disambiguate rule 1.
+ *                         given name. Supply it to disambiguate rules 1 and 2.
  */
 export function schemaLocalFieldPath(
   fieldRef: string,
@@ -130,13 +136,14 @@ export function schemaLocalFieldPath(
 
   if (!shadowedByOwnField) {
     for (const prefix of schemaRefs.flatMap(schemaRefPrefixes)) {
+      if (fieldRef === prefix) return null;
       if (fieldRef.startsWith(`${prefix}.`)) return fieldRef.slice(prefix.length + 1);
     }
   }
 
   const namesAnotherSchema = otherSchemaRefs
     .flatMap(schemaRefPrefixes)
-    .some((prefix) => fieldRef.startsWith(`${prefix}.`));
+    .some((prefix) => fieldRef === prefix || fieldRef.startsWith(`${prefix}.`));
   if (namesAnotherSchema) return null;
 
   return fieldRef;
