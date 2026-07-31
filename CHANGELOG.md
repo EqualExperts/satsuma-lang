@@ -1,5 +1,32 @@
 # Changelog
 
+## Unreleased
+
+### Coverage figures will change (`sl-joeq`)
+
+**Recorded coverage percentages will move after this release — in both
+directions.** Anyone tracking a coverage number, or gating CI with
+`coverage --fail-under`, should re-baseline it.
+
+Field coverage resolved by field *name* rather than by *path*. Every segment of
+a covered path was registered as a standalone name, so a field whose own path
+matched a segment of any other covered path in the same schema read as mapped.
+Coverage now matches whole paths only:
+
+- **Figures generally drop.** A top-level `city` no longer counts as mapped
+  because `home_address.city` is; a joined-but-unread source schema that happens
+  to share field names with the schema being read no longer inherits its
+  coverage. Fields that were reported mapped and are now reported unmapped were
+  never mapped — this is the correction, not a regression.
+- **Some figures rise.** Schema-qualified arrows in multi-source mappings
+  (`crm.consent.email_marketing -> consent_email`) previously matched only the
+  trailing leaf name, so they never matched a *nested* declared path and were
+  under-counted. The prefix is now resolved against the schema it names.
+
+Affects `satsuma coverage` (including `--fail-under`), `satsuma fields
+--unmapped-by`, the VS Code coverage gutter and status bar, and the viz coverage
+overlay — all four share one computation, so all four move together.
+
 ## v0.11.0 — 2026-07-22
 
 A maintenance and security-hardening release. No new language constructs and

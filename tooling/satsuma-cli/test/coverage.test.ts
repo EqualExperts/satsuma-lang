@@ -28,6 +28,10 @@ const NESTED = resolve(__dirname, "fixtures/unmapped-nested.stm");
 // which makes it the reference case for nested container coverage (sl-qzy3).
 const NESTED_ITERATION = resolve(__dirname, "../../../examples/nested-iteration/pipeline.stm");
 const NESTED_ARROW = resolve(__dirname, "fixtures/nested-arrow-lookup.stm");
+// Two source schemas declaring the same field names, arrows qualified by schema
+// and written inside a namespace — the pairing that exercises prefix resolution
+// against the canonical index key (sl-joeq).
+const MULTI_SOURCE = resolve(__dirname, "fixtures/coverage-multi-source.stm");
 
 const run = (...args: string[]) => _run(CLI, ...args);
 
@@ -142,6 +146,39 @@ describe("satsuma coverage — resolving the workspace index", () => {
       ["crm::annotate contacts", "target"],
       ["crm::load contacts", "target"],
     ]);
+  });
+
+  it("resolves a bare schema prefix on an arrow against the canonical namespaced key", async () => {
+    // Multi-source mappings qualify their arrows by schema, and inside a
+    // namespace they write the bare name (`crm.email`) while the index reports
+    // `warehouse::crm`. The CLI owns that canonicalisation, so this pairing can
+    // only break here — and it must resolve onto nested declared paths too
+    // (`crm.consent.email_marketing` -> `consent.email_marketing`), which the
+    // qualified form silently failed to do before sl-joeq.
+    const { stdout, code } = await run("coverage", MULTI_SOURCE, "--json");
+    assert.equal(code, 0);
+    const crm = schemaEntry(parseJson(stdout), "warehouse::assemble", "source", "warehouse::crm");
+    assert.deepEqual(
+      crm.fields.map((f: any) => [f.path, f.mapped]),
+      [
+        ["customer_id", true],
+        ["email", true],
+        ["consent.email_marketing", true],
+        ["consent.sms_marketing", false],
+      ],
+    );
+  });
+
+  it("does not credit a joined-but-unread source schema that shares field names", async () => {
+    // `ledger` declares customer_id and email exactly as `crm` does but no arrow
+    // reads it. Matching by leaf name reported it as fully mapped — a silent
+    // over-count that makes a source nobody reads look consumed (sl-joeq).
+    const { stdout } = await run("coverage", MULTI_SOURCE, "--json");
+    const ledger = schemaEntry(parseJson(stdout), "warehouse::assemble", "source", "warehouse::ledger");
+    assert.deepEqual(
+      { covered: ledger.covered, total: ledger.total, pct: ledger.pct },
+      { covered: 0, total: 2, pct: 0 },
+    );
   });
 });
 

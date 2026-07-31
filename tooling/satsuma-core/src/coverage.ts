@@ -8,9 +8,16 @@
  * schema.
  *
  * "Covered" means:
- *   - source field: its name (or a path that starts with it) appears as a
- *     src_path in at least one arrow anywhere in the mapping.
+ *   - source field: its qualified path from the schema root — or a path that
+ *     starts with it — appears as a src_path in at least one arrow anywhere in
+ *     the mapping.
  *   - target field: the same, as a tgt_path.
+ *
+ * Matching is by path, never by local field name: two records under one schema
+ * routinely declare the same leaf name, and treating a name match as coverage
+ * silently reported unmapped fields as mapped (sl-joeq). The corollary is that
+ * an arrow's schema prefix has to be resolved away before matching, which is
+ * what {@link coverageForSchema} does.
  *
  * Nested record fields are handled recursively. Arrows nest inside three
  * container blocks — `each`, `flatten` and a braced `src -> tgt` (`nested_arrow`)
@@ -32,7 +39,7 @@
  */
 
 import { child, children, labelText, sourceRefStructuralText } from "./cst-utils.js";
-import { addPathAndPrefixes, isCoveredFieldPath } from "./coverage-paths.js";
+import { buildCoveredFieldSet, isCoveredFieldPath, schemaLocalFieldPath } from "./coverage-paths.js";
 import type { SyntaxNode, Tree } from "./types.js";
 
 // ── Resolver input contract ─────────────────────────────────────────────────
@@ -156,34 +163,61 @@ export function computeMappingCoverage(
   const sourceIds = getSchemaIdsFromBlock(body, "source_block");
   const targetIds = getSchemaIdsFromBlock(body, "target_block");
 
-  // Collect all explicit arrow source paths and target paths from the mapping.
-  const coveredSrcPaths = new Set<string>();
-  const coveredTgtPaths = new Set<string>();
-  collectBodyPaths(body, coveredSrcPaths, coveredTgtPaths);
+  // Arrow references as authored, container-qualified but still carrying any
+  // schema prefix — that prefix can only be stripped once we know which schema
+  // we are reporting on, so resolution happens per schema below.
+  const srcRefs: string[] = [];
+  const tgtRefs: string[] = [];
+  collectBodyPaths(body, srcRefs, tgtRefs);
 
   const schemas: SchemaCoverageResult[] = [];
 
   for (const schemaId of sourceIds) {
     const def = resolveSchema(schemaId);
     if (!def) continue;
-    schemas.push({
-      schemaId: def.schemaId ?? schemaId,
-      role: "source",
-      fields: buildFieldCoverage(def.fields, def.uri, "", coveredSrcPaths),
-    });
+    schemas.push(coverageForSchema(def, schemaId, "source", srcRefs, sourceIds));
   }
 
   for (const schemaId of targetIds) {
     const def = resolveSchema(schemaId);
     if (!def) continue;
-    schemas.push({
-      schemaId: def.schemaId ?? schemaId,
-      role: "target",
-      fields: buildFieldCoverage(def.fields, def.uri, "", coveredTgtPaths),
-    });
+    schemas.push(coverageForSchema(def, schemaId, "target", tgtRefs, targetIds));
   }
 
   return { schemas };
+}
+
+/**
+ * Report one schema, resolving the mapping's authored arrow references into
+ * paths local to it before matching them against its declared fields.
+ */
+function coverageForSchema(
+  def: CoverageSchemaDefinition,
+  writtenRef: string,
+  role: "source" | "target",
+  arrowRefs: readonly string[],
+  participatingRefs: readonly string[],
+): SchemaCoverageResult {
+  // An arrow may name this schema by the reference as written in the mapping or
+  // by the id the resolver canonicalised it to, so both forms must resolve.
+  const canonicalRef = def.schemaId ?? writtenRef;
+  const ownRefs = canonicalRef === writtenRef ? [writtenRef] : [writtenRef, canonicalRef];
+  const otherRefs = participatingRefs.filter((ref) => ref !== writtenRef);
+
+  const topLevelNames = new Set(def.fields.map((f) => f.name));
+  const declaresTopLevel = (name: string): boolean => topLevelNames.has(name);
+
+  const localPaths: string[] = [];
+  for (const ref of arrowRefs) {
+    const local = schemaLocalFieldPath(ref, ownRefs, otherRefs, declaresTopLevel);
+    if (local !== null) localPaths.push(local);
+  }
+
+  return {
+    schemaId: canonicalRef,
+    role,
+    fields: buildFieldCoverage(def.fields, def.uri, "", buildCoveredFieldSet(localPaths)),
+  };
 }
 
 // ── Path collection ─────────────────────────────────────────────────────────
@@ -214,51 +248,55 @@ const CONTAINER_BLOCK_TYPES = new Set(["each_block", "flatten_block", "nested_ar
 
 /**
  * Walk every arrow in the mapping body — including those nested inside
- * containers to arbitrary depth — and populate the covered src/tgt path sets.
+ * containers to arbitrary depth — and collect the src/tgt references it makes.
+ *
+ * References come out container-qualified but otherwise as authored: any schema
+ * prefix is left on, because which prefix is strippable depends on the schema
+ * being reported. {@link coverageForSchema} resolves that per schema.
  */
 function collectBodyPaths(
   body: SyntaxNode,
-  srcPaths: Set<string>,
-  tgtPaths: Set<string>,
+  srcRefs: string[],
+  tgtRefs: string[],
 ): void {
-  collectBlockItemPaths(body.namedChildren, srcPaths, tgtPaths, { src: null, tgt: null });
+  collectBlockItemPaths(body.namedChildren, srcRefs, tgtRefs, { src: null, tgt: null });
 }
 
 /**
- * Collect paths from a list of sibling block items, qualifying each against the
- * bases its enclosing container established.
+ * Collect references from a list of sibling block items, qualifying each against
+ * the bases its enclosing container established.
  */
 function collectBlockItemPaths(
   nodes: SyntaxNode[],
-  srcPaths: Set<string>,
-  tgtPaths: Set<string>,
+  srcRefs: string[],
+  tgtRefs: string[],
   bases: PathBases,
 ): void {
   for (const node of nodes) {
     if (node.type === "map_arrow") {
       for (const sp of children(node, "src_path")) {
-        addPathAndPrefixes(srcPaths, qualify(bases.src, pathText(sp)));
+        srcRefs.push(qualify(bases.src, pathText(sp)));
       }
       const tp = child(node, "tgt_path");
-      if (tp) addPathAndPrefixes(tgtPaths, qualify(bases.tgt, pathText(tp)));
+      if (tp) tgtRefs.push(qualify(bases.tgt, pathText(tp)));
     } else if (node.type === "computed_arrow") {
       // Source-less arrow: the target is still populated by this mapping.
       const tp = child(node, "tgt_path");
-      if (tp) addPathAndPrefixes(tgtPaths, qualify(bases.tgt, pathText(tp)));
+      if (tp) tgtRefs.push(qualify(bases.tgt, pathText(tp)));
     } else if (CONTAINER_BLOCK_TYPES.has(node.type)) {
-      collectContainerPaths(node, srcPaths, tgtPaths, bases);
+      collectContainerPaths(node, srcRefs, tgtRefs, bases);
     }
   }
 }
 
 /**
- * Register a container's own source and target, then recurse into its body with
+ * Record a container's own source and target, then recurse into its body with
  * those as the bases for the level below.
  */
 function collectContainerPaths(
   node: SyntaxNode,
-  srcPaths: Set<string>,
-  tgtPaths: Set<string>,
+  srcRefs: string[],
+  tgtRefs: string[],
   outer: PathBases,
 ): void {
   const rawSrc = child(node, "src_path");
@@ -269,10 +307,10 @@ function collectContainerPaths(
 
   // The container's own paths count as touched: iterating a list consumes it,
   // and writing into one populates it.
-  if (src) addPathAndPrefixes(srcPaths, src);
-  if (tgt) addPathAndPrefixes(tgtPaths, tgt);
+  if (src) srcRefs.push(src);
+  if (tgt) tgtRefs.push(tgt);
 
-  collectBlockItemPaths(node.namedChildren, srcPaths, tgtPaths, { src, tgt });
+  collectBlockItemPaths(node.namedChildren, srcRefs, tgtRefs, { src, tgt });
 }
 
 /**

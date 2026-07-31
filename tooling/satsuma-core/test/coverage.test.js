@@ -552,3 +552,182 @@ mapping load {
     assertMapped(t, "orders.packed.sku", true);
   });
 });
+
+// ── Coverage is by path, never by local field name (sl-joeq) ─────────────────
+
+describe("computeMappingCoverage — path identity, not name identity", () => {
+  // The covered set used to register each segment of a covered path as a
+  // standalone bare name, so any field whose own path equalled a segment of some
+  // other covered path read as mapped. Leaf-name reuse across depths (id, sku,
+  // code, city, BIC) is normal in nested schemas, so the collision rate rose
+  // with exactly the specs coverage analysis exists to check — and it failed
+  // toward reporting an incomplete spec as complete.
+
+  it("leaves a top-level field uncovered when only a nested field shares its name", () => {
+    // The bare-segment leak's most direct form: a top-level field's path IS its
+    // name, so it collided with the leaf of every nested path.
+    const src = `
+schema src { city STRING home_address record { city STRING } }
+schema tgt { out STRING }
+mapping load {
+  source { src }
+  target { tgt }
+  home_address.city -> out
+}`;
+    const s = forRole(coverage(src, "load"), "source");
+    assertMapped(s, "home_address.city", true);
+    assertMapped(s, "city", false);
+  });
+
+  it("leaves intermediate segments of a deep path uncovered as top-level fields", () => {
+    // Middle segments leaked too, not just leaves: with only a.b.c.d covered,
+    // top-level fields named b, c and d all read as mapped.
+    const src = `
+schema src { b STRING c STRING d STRING a record { b record { c record { d STRING } } } }
+schema tgt { out STRING }
+mapping load {
+  source { src }
+  target { tgt }
+  a.b.c.d -> out
+}`;
+    const s = forRole(coverage(src, "load"), "source");
+    assertMapped(s, "a", true);
+    assertMapped(s, "a.b.c.d", true);
+    for (const path of ["b", "c", "d"]) assertMapped(s, path, false);
+  });
+
+  it("judges sibling records sharing a leaf name independently", () => {
+    // The fragment-spread shape: one fragment spread into two sibling records
+    // (examples/lib/sfdc_fragments.stm puts the same leaves under both
+    // BillingAddress and ShippingAddress) means every leaf name exists twice.
+    const src = `
+schema src {
+  BillingAddress record { Street STRING }
+  ShippingAddress record { Street STRING }
+}
+schema tgt { out STRING }
+mapping load {
+  source { src }
+  target { tgt }
+  BillingAddress.Street -> out
+}`;
+    const s = forRole(coverage(src, "load"), "source");
+    assertMapped(s, "BillingAddress.Street", true);
+    assertMapped(s, "ShippingAddress.Street", false);
+  });
+
+  it("judges sibling list containers sharing leaf names independently", () => {
+    // An untouched sibling list read as half-mapped purely because the list next
+    // to it declares the same element field names.
+    const src = `
+schema src { orders record {
+  lines list_of record { sku STRING qty INT }
+  packed list_of record { sku STRING units INT }
+} }
+schema tgt { lines list_of record { sku STRING qty INT } }
+mapping load {
+  source { src }
+  target { lines }
+  each orders.lines -> lines {
+    .sku -> .sku
+    .qty -> .qty
+  }
+}`;
+    const s = forRole(coverage(src, "load"), "source");
+    assertMapped(s, "orders.lines.sku", true);
+    assertMapped(s, "orders.packed.sku", false);
+    assertMapped(s, "orders.packed.units", false);
+  });
+
+  it("distinguishes repeated leaf names at equal depth under different parents", () => {
+    // The ISO-20022 case from tooling/satsuma-cli/test/fixtures/deep-nested-bugs.stm:
+    // four agent records each declare BIC and only three are mapped. Confusing
+    // the instructing with the instructed agent is precisely the error coverage
+    // exists to surface in payment messaging.
+    const src = `
+schema pacs008 { GrpHdr record {
+  InstgAgt record { BIC STRING }
+  InstdAgt record { BIC STRING }
+} }
+schema iso_target { instructing_bic STRING }
+mapping load {
+  source { pacs008 }
+  target { iso_target }
+  GrpHdr.InstgAgt.BIC -> instructing_bic
+}`;
+    const s = forRole(coverage(src, "load"), "source");
+    assertMapped(s, "GrpHdr.InstgAgt.BIC", true);
+    assertMapped(s, "GrpHdr.InstdAgt.BIC", false);
+  });
+});
+
+// ── Schema-qualified arrow references ───────────────────────────────────────
+
+describe("computeMappingCoverage — schema-qualified arrow paths", () => {
+  // Multi-source mappings qualify their arrows by schema
+  // (`crm_customers.email -> email`). Coverage matches against paths declared
+  // *within* a schema, so the prefix has to be resolved away first. Before
+  // sl-joeq that only worked by accident — via bare-segment registration, which
+  // matched the trailing leaf name and therefore also matched every same-named
+  // field in every other source schema.
+
+  const SRC = `
+schema orders { amount DECIMAL tax DECIMAL }
+schema billing { amount DECIMAL contact_email STRING }
+schema summary { net_total DECIMAL }
+mapping load {
+  source { orders, billing }
+  target { summary }
+  orders.amount, orders.tax -> net_total
+}`;
+
+  it("strips the schema prefix so the qualified path matches the declared field", () => {
+    const orders = coverage(SRC, "load").schemas.find((s) => s.schemaId === "orders");
+    assertMapped(orders, "amount", true);
+    assertMapped(orders, "tax", true);
+  });
+
+  it("does not credit a sibling source schema that declares the same field name", () => {
+    // `billing` is joined but never read: its identically-named `amount` must
+    // stay uncovered, and its own fields must not inherit orders' coverage.
+    const billing = coverage(SRC, "load").schemas.find((s) => s.schemaId === "billing");
+    assertMapped(billing, "amount", false);
+    assertMapped(billing, "contact_email", false);
+  });
+
+  it("resolves a qualified path onto a nested field of the named schema", () => {
+    // The governance.stm shape: `crm_customers.consent.email_marketing` must
+    // resolve to the declared path `consent.email_marketing`. This case was
+    // silently *under*-counted before — the qualified form matched only the bare
+    // leaf, never the nested declared path.
+    const src = `
+schema crm { consent record { email_marketing BOOLEAN sms_marketing BOOLEAN } }
+schema tgt { consent_email BOOLEAN }
+mapping load {
+  source { crm }
+  target { tgt }
+  crm.consent.email_marketing -> consent_email
+}`;
+    const s = forRole(coverage(src, "load"), "source");
+    assertMapped(s, "consent", true);
+    assertMapped(s, "consent.email_marketing", true);
+    assertMapped(s, "consent.sms_marketing", false);
+  });
+
+  it("prefers a declared field over a schema prefix when the two share a name", () => {
+    // A schema and one of its own top-level fields can collide. The declared
+    // field is concrete evidence, so `orders.amount` reads as the nested path
+    // rather than as a prefix that merely looks like one.
+    const src = `
+schema orders { orders record { amount DECIMAL } amount DECIMAL }
+schema tgt { out DECIMAL }
+mapping load {
+  source { orders }
+  target { tgt }
+  orders.amount -> out
+}`;
+    const s = forRole(coverage(src, "load"), "source");
+    assertMapped(s, "orders.amount", true);
+    assertMapped(s, "amount", false);
+  });
+});
