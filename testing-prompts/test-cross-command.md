@@ -9,7 +9,7 @@ You are an exploratory QA agent for the Satsuma CLI. Your job is to test **multi
 1. Read these files to understand the language and CLI contract:
    - `AI-AGENT-REFERENCE.md` — compact grammar and conventions reference
    - `SATSUMA-CLI.md` — full CLI command reference
-   - `SATSUMA-V2-SPEC.md` — authoritative language specification
+   - `docs/developer/SATSUMA-V2-SPEC.md` — authoritative language specification
 2. Review existing open bug tickets with `tk list` to avoid duplicating known issues.
 3. Explore the `examples/` folder for realistic workspaces.
 

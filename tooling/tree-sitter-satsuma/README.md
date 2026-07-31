@@ -13,7 +13,7 @@ Downstream tooling that depends on this CST:
 
 ## Source of Truth
 
-- Language spec: `docs/developer/SATSUMA-V2-SPEC.md` (repo root)
+- Language spec: `docs/developer/SATSUMA-V2-SPEC.md`
 - Grammar PRD: `features/08-treesitter-parser-v2/PRD.md`
 - CST node reference: `docs/cst-reference.md`
 - Example files: `examples/`

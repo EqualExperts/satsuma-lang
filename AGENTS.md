@@ -8,16 +8,16 @@ All tooling is parser-backed. Downstream tools should be built on the tree-sitte
 
 ## Repository Layout
 
-- `SATSUMA-V2-SPEC.md`: authoritative language specification (v2)
-- `PROJECT-OVERVIEW.md`: product vision, motivation, and roadmap
+- `docs/developer/SATSUMA-V2-SPEC.md`: authoritative language specification (v2)
+- `docs/product-owner/PROJECT-OVERVIEW.md`: product vision, motivation, and roadmap
 - `SATSUMA-CLI.md`: CLI command reference
 - `AI-AGENT-REFERENCE.md`: compact grammar and agent-oriented Satsuma guidance (v2) — also available via `satsuma agent-reference`
 - `HOW-DO-I.md`: question-based index to all guides and conventions
-- `ROADMAP.md`: deferred work items, ideas, and convention docs still to write
+- `docs/product-owner/ROADMAP.md`: deferred work items, ideas, and convention docs still to write
 - `examples/`: canonical `.stm` examples and fixtures (v2 syntax)
 - `archive/v1/`: archived v1 specification and examples — for historical reference only, not for new work
-- `archive/features/`: completed feature specs (29 feature directories) — for historical reference only
-- `features/`: active feature plans (1 feature with open work)
+- `archive/features/`: completed feature specs (30 feature directories) — for historical reference only
+- `features/`: active feature plans (features 30–37; 35–37 are proposed and not yet started)
 - `useful-prompts/`: self-contained system prompts for web LLMs (Excel-to-Satsuma, Satsuma-to-Excel)
 - `skills/`: Agent Skills following the [agentskills.io](https://agentskills.io) standard (Excel-to-Satsuma conversion skill, Satsuma-to-Excel export skill)
 - `scripts/`: utility scripts used during development
@@ -37,13 +37,13 @@ import { billing::invoices } from "billing/pipeline.stm"
 import { warehouse::inventory } from "warehouse/ingest.stm"
 ```
 
-Use `satsuma lineage --from <schema> platform.stm` to trace data flow through the platform. See `features/15-namespaces/PRD.md` for the full namespace specification.
+Use `satsuma lineage --from <schema> platform.stm` to trace data flow through the platform. See `archive/features/15-namespaces/PRD.md` for the full namespace specification.
 
 ## Source of Truth
 
 When making changes or answering questions about syntax, semantics, or supported constructs:
 
-1. Treat `SATSUMA-V2-SPEC.md` as the primary authority. The v1 spec is archived at `archive/v1/STM-SPEC.md` — do not use it for new work.
+1. Treat `docs/developer/SATSUMA-V2-SPEC.md` as the primary authority. The v1 spec is archived at `archive/v1/STM-SPEC.md` — do not use it for new work.
 2. Use `examples/` as the executable corpus of valid language patterns (v2 syntax).
 3. Use feature docs in `features/` to guide tooling order and architecture.
 4. If docs conflict, prefer the spec and call out the mismatch explicitly.
@@ -289,7 +289,7 @@ Expected workflow:
    criteria, and acceptance tests before writing any code.
 2. Write failing tests first (TDD) where practical.
 3. Implement the smallest change that makes the tests pass. Always do the RIGHT thing, not the FAST thing, so never hack tests or add lint ignore rules because that's easier than fixing the underlying issue.
-6. Update `PROJECT_OVERVIEW.md` if the architecture changes.
+6. Update `docs/product-owner/PROJECT-OVERVIEW.md` if the architecture changes.
 
 ## Ralph Loops
 When you are implementing a whole feature in a Ralph Loop, and have finished all related tk (ticket) tasks such that there are no remaining ready tasks, emit <PROMISE>DONE</PROMISE> to signal completion of the feature.
