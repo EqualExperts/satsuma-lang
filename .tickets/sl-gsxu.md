@@ -1,6 +1,6 @@
 ---
 id: sl-gsxu
-status: open
+status: in_progress
 deps: []
 links: []
 created: 2026-07-31T13:13:05Z
@@ -24,3 +24,12 @@ Define a minimal core-level resolver interface (parse tree + schema-id -> field 
 
 computeMappingCoverage and private helpers live in @satsuma/core; coverage semantics tests moved to core (LSP-side tests reduced to adapter wiring only); VS Code gutter/code-lens behaviour identical before and after (existing LSP+extension tests pass unchanged); stale core header comment corrected; all core, lsp and cli test suites pass locally.
 
+
+## Notes
+
+**2026-07-31T13:52:57Z**
+
+Cause: computeMappingCoverage lived in tooling/satsuma-lsp/src/coverage.ts, unreachable from the CLI (feature 35) and the browser viz bundle (feature 36), and core's coverage.ts header still claimed it lived in vscode-satsuma/server citing LSP-only types as the reason.
+Fix: moved the computation and its private helpers into satsuma-core/src/coverage.ts behind a CoverageSchemaResolver input contract (CoverageField/CoverageSchemaDefinition), so no consumer index type leaks into core; addPathAndPrefixes moved to coverage-paths.ts alongside the other path helpers to keep the dependency acyclic; the LSP retains a thin FieldInfo->CoverageField adapter with its original (uri, tree, mappingName, wsIndex) signature so server.ts is unchanged. Semantics tests moved to core (450 pass), LSP tests reduced to adapter wiring (292 pass), CLI 902 pass, vscode 33 unit + golden pass.
+
+Scope note: relocation surfaced sc-xnxp, a pre-existing defect where .-prefixed element-relative paths inside each/flatten produced 'items..id' and reported explicitly-mapped nested fields as uncovered. Fixed here rather than carried forward, since feature 35 ships a coverage report built on it. This means the acceptance criterion 'VS Code gutter behaviour identical before and after' is deliberately not met: the gutter changes, in the correcting direction.

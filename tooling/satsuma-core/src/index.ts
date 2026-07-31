@@ -27,9 +27,16 @@ export { initParser, getParser, getLanguage, createQuery } from "./parser.js";
 export type { ParserInitOptions } from "./parser.js";
 export { collectParseErrors } from "./parse-errors.js";
 export type { ParseErrorEntry } from "./parse-errors.js";
-export { addPathAndPrefixes } from "./coverage.js";
-export type { FieldCoverageEntry, SchemaCoverageResult, MappingCoverageResult } from "./coverage.js";
-export { buildCoveredFieldSet, isCoveredFieldPath } from "./coverage-paths.js";
+export { computeMappingCoverage } from "./coverage.js";
+export type {
+  FieldCoverageEntry,
+  SchemaCoverageResult,
+  MappingCoverageResult,
+  CoverageField,
+  CoverageSchemaDefinition,
+  CoverageSchemaResolver,
+} from "./coverage.js";
+export { addPathAndPrefixes, buildCoveredFieldSet, isCoveredFieldPath } from "./coverage-paths.js";
 export { format } from "./format.js";
 export type { SyntaxNode, Tree, Classification, PipeStep, MetaEntry, MetaEntryTag, MetaEntryKV, MetaEntryEnum, MetaEntryNote, MetaEntrySlice, FieldDecl } from "./types.js";
 export { child, children, allDescendants, labelText, stringText, entryText, qualifiedNameText, sourceRefText, sourceRefStructuralText, fieldNameText, walkDescendants } from "./cst-utils.js";
