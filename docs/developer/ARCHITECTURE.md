@@ -141,7 +141,7 @@ graph LR
   STR["string-utils.ts\ncapitalize · truncate\nformatList · …"]
   PAR["parser.ts\ninitParser() singleton\nparseSource()"]
   PE["parse-errors.ts\ncollectParseErrors()\nParseError"]
-  COV["coverage.ts\nFieldCoverageEntry\nSchemaCoverageResult\naddPathAndPrefixes()"]
+  COV["coverage.ts · coverage-paths.ts\nFieldCoverageEntry\nSchemaCoverageResult\naddPathAndPrefixes()\nschemaLocalFieldPath()"]
   VAL["validate.ts\nSemanticIndex · SemanticDiagnostic\ncollectSemanticDiagnostics()"]
 
   IDX --> TYPES & CST & CLS & CAN & META & EXT & SPR & NL & FMT & STR & PAR & PE & COV & VAL
