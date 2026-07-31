@@ -1,17 +1,30 @@
 # Feature 38 — Hierarchical Field Coverage
 
-> **Status: PROPOSED** (2026-07-31) — blocks publication of Feature 35's
-> `--json` contract. Raised after reading the coverage implementation and
-> reproducing its behaviour: nested-field coverage has three live defects
-> (one producing false positives, two producing false negatives), three
-> different percentage conventions ship today, and the container semantics the
-> CLI and LSP each rely on are mutually contradictory.
+> **Status: PROPOSED** (2026-07-31) — raised after reading the coverage
+> implementation and reproducing its behaviour. Six defects were found: coverage
+> resolves field names rather than paths and so reports unmapped fields as
+> mapped, two nesting constructs were not walked at all, three different
+> percentage conventions ship, two independent walkers derive the same paths, and
+> the container semantics the CLI and LSP each rely on are mutually
+> contradictory. The two unwalked constructs are fixed (`sl-qzy3`); the rest are
+> open, and share one root cause.
 >
-> **State this PRD is written against:** branch `feat/35-coverage-command`
-> at **`47438ac`** — Feature 35, open as **PR #405**, not `main`. Feature 35 is
-> now fully implemented there (`sl-gsxu`, `sl-5sjp`, `sl-4qvp`, `sl-oqsj`,
-> `sl-3ms0`, `sl-268g`, `sl-tdfx`) plus **ADR-034**, so `main` is well behind.
-> Every claim below was re-verified against `47438ac`.
+> **State this PRD was written against:** branch `feat/35-coverage-command` at
+> `47438ac`, since merged to `main` as **PR #405** (Feature 35 complete —
+> `sl-gsxu`, `sl-5sjp`, `sl-4qvp`, `sl-oqsj`, `sl-3ms0`, `sl-268g`, `sl-tdfx`,
+> plus **ADR-034**). Every claim below was verified against that commit.
+>
+> **Defects 2 and 3 have since been fixed** by `sl-qzy3`, which landed in
+> PR #405 before it merged: the walk now recurses uniformly over all three
+> container blocks, so `nested_arrow` and `flatten`-inside-`each` contribute
+> coverage. They are kept below, with their pre-fix figures, because they are
+> the evidence for R4 — three defects of that class were found by inspection
+> and none by a test, which is the case for removing the duplicate walker
+> rather than patching it a fourth time.
+>
+> **Defects 1, 4, 5 and 6 remain open.** Defect 5's *symptom* is gone — the two
+> walkers agree again on the nested corpus — but the duplication that caused it
+> is still there, which is what `sl-vu22` addresses. R1–R7 are unchanged.
 >
 > **Relationship to ADR-034 (Accepted).** This feature is not in tension with
 > it — ADR-034 reaches the same conclusion from the same evidence and names the
@@ -365,13 +378,11 @@ containers so LSP output is byte-identical.
 
 ### R4 — Walk every nesting construct the grammar permits (fixes P2)
 
-The **immediate** fix is `sl-qzy3`, outside this feature because it is a
-regression in PR #405's own work and should not wait: handle `nested_arrow` in
-`collectBodyPaths` with the same parent-prefix qualification as `each`, and
-handle `flatten_block` inside `each_block` plus both block types inside
-`flatten_block`. Recurse on the shared `_nested_block_item` production rather
-than enumerating permitted children per parent, so a future grammar addition
-cannot silently fall through a third time.
+The immediate fix **has landed** — `sl-qzy3`, in PR #405 before it merged. It
+handles `nested_arrow` in the body walk and recurses on the shared
+`_nested_block_item` production rather than enumerating permitted children per
+parent, so a future grammar addition cannot silently fall through a fourth
+time. Defects 2 and 3 are closed.
 
 What remains here:
 
@@ -589,17 +600,18 @@ fixture is the point. Cases 1–9 must **fail** against `fc3d5a5`.
 
    - R2's tri-state is **additive** — a new field alongside `mapped`, which
      keeps its meaning. Safe.
-   - R1, R5 and `sl-qzy3` change **values, not shape**: the same fields report
+   - R1 and R5 change **values, not shape**: the same fields report
      different coverage, and percentages move in both directions (up where
      false negatives are fixed, down where false positives are). Every one of
      those movements is a correction, but a consumer that has recorded a number
      will see it change.
 
-   Proposed: land `sl-qzy3` inside PR #405 if that PR is still open, since it is
-   a regression in that PR's own work; treat the rest as a documented contract
-   revision with a `CHANGELOG.md` entry, and land it before Feature 36's
-   overlay ships so the two do not disagree in public. `sl-joeq` need not wait
-   for anything.
+   `sl-qzy3` took this route already: it landed inside PR #405, since it was a
+   regression in that PR's own work, and its value changes shipped with the
+   contract rather than after it. Proposed for the rest: treat it as a
+   documented contract revision with a `CHANGELOG.md` entry, and land it before
+   Feature 36's overlay ships so the two do not disagree in public. `sl-joeq`
+   need not wait for anything.
 4. **Is `partial` the right shape?** (`sl-0pun`) Proposed: three named states,
    leaves never `partial`. The alternative — `coveredLeaves`/`totalLeaves`
    counts on every node and no named states — is more data but pushes the "is
@@ -614,22 +626,23 @@ fixture is the point. Cases 1–9 must **fail** against `fc3d5a5`.
 | Requirement | Ticket | Depends on |
 |---|---|---|
 | **Prerequisite bug** — bare-segment leak (false positives) | `sl-joeq` (P1) | — |
-| **Prerequisite bug** — unwalked nesting + `--unmapped-by` regression | `sl-qzy3` (P1, `gh-405`) | — |
+| ~~Prerequisite bug — unwalked nesting + `--unmapped-by` regression~~ | `sl-qzy3` — **done**, merged in #405 | — |
 | Epic | `sl-j6g9` | `sl-joeq` |
 | R1 direct vs derived coverage | `sl-fmx0` | `sl-joeq` |
 | R2 container tri-state | `sl-0pun` | `sl-fmx0` |
 | R3 percentage — viz card | `sl-hcan` | `sl-0pun` |
-| R3 percentage — VS Code status bar | `3cc-t6uo` *(raised on PR #405)* | — |
-| R4 remove the duplicate walker | `sl-vu22` | `sl-qzy3` (settles OQ1) |
+| R3 percentage — VS Code status bar | `3cc-t6uo` *(from #405, now on `main`)* | — |
+| R4 remove the duplicate walker | `sl-vu22` | `sl-qzy3` ✓ (settles OQ1) |
 | R5 whole-subtree arrows (closes `3cc-iedv`) | `sl-r6b0` | `sl-fmx0` |
 | R6 cross-consumer parity + spreads | `sl-5nsv` | `sl-0pun`, `sl-hcan`, `sl-vu22` |
 | R7 `[]` hygiene | `sl-8o1n` | — |
 | Corpus fixture gaps (case 30) | `sl-2nxu` | — |
 
-Two tickets pre-exist on PR #405 and are **not** duplicated here: `3cc-iedv`
+Two tickets came from PR #405 and are **not** duplicated here: `3cc-iedv`
 (whole-record arrows — closed by `sl-r6b0`) and `3cc-t6uo` (the status-bar
-denominator — the other half of R3). Both arrive on `main` when #405 merges.
+denominator — the other half of R3). Both are now on `main`.
 
-`sl-joeq`, `sl-qzy3`, `sl-8o1n` and `sl-2nxu` are ready immediately. Schedule
-`sl-qzy3` first: it is a regression in an open PR's own work, and fixing it
-settles what `sl-vu22` still has to do.
+`sl-joeq`, `sl-8o1n`, `sl-2nxu` and `sl-vu22` are ready immediately.
+`sl-joeq` is the one to schedule first — a silent over-count in shipped
+commands — and `sl-vu22`'s open question should be answered before R1 starts,
+since it decides whether there is one derivation path or two.
