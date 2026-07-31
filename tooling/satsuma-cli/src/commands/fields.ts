@@ -15,8 +15,8 @@ import { loadWorkspace } from "../load-workspace.js";
 import { runCommand, CommandError, EXIT_NOT_FOUND } from "../command-runner.js";
 import { resolveIndexKey } from "../index-builder.js";
 import { expandEntityFields, expandNestedSpreads } from "../spread-expand.js";
-import { addPathAndPrefixes } from "@satsuma/core";
-import type { ExtractedWorkspace, FieldDecl, ParsedFile, SchemaRecord, FragmentRecord, MetricRecord } from "../types.js";
+import { coverageForMapping, coveredFieldPaths } from "../coverage-workspace.js";
+import type { FieldDecl, ParsedFile, SchemaRecord, FragmentRecord, MetricRecord } from "../types.js";
 
 interface FieldWithTags extends FieldDecl {
   tags?: string[];
@@ -98,8 +98,12 @@ Examples:
           throw new CommandError(lines.join("\n"), EXIT_NOT_FOUND);
         }
 
-        const mappedFields = getMappedFieldNames(resolvedMapping.key, resolvedSchemaName, index);
-        fields = filterUnmappedFields(fields, mappedFields, "");
+        const coverage = coverageForMapping(resolvedMapping.key, index, parsedFiles);
+        // No coverage result means the mapping does not reference this entity at
+        // all (or is anonymous, which --unmapped-by cannot name) — every field is
+        // then unmapped by it, which is what an empty covered set produces.
+        const covered = coverage ? coveredFieldPaths(coverage, resolvedSchemaName) : new Set<string>();
+        fields = filterUnmappedFields(fields, covered, "");
       }
 
       if (opts.json) {
@@ -134,65 +138,29 @@ function deepCopyFields(fields: FieldDecl[]): FieldWithTags[] {
 }
 
 /**
- * Get the set of field names from the given schema that participate in arrows
- * for the specified mapping — checking both source and target sides.
+ * Prune a field tree to only the fields the mapping leaves unmapped.
+ *
+ * `covered` holds the schema-root-relative paths the mapping touches, taken
+ * straight from the shared coverage computation — this command derives no
+ * coverage of its own, so `fields --unmapped-by X` and
+ * `coverage --uncovered --mapping X --schema Y` cannot disagree (sl-oqsj).
+ *
+ * A record is kept only when it still has unmapped children, and is never
+ * judged on its own path: a record's path is registered merely by being an
+ * ancestor of a covered child, so treating it as covered would hide its
+ * remaining gaps.
  */
-function getMappedFieldNames(mappingName: string, schemaName: string, index: ExtractedWorkspace): Set<string> {
-  const mapped = new Set<string>();
-  const mapping = index.mappings.get(mappingName);
-  if (!mapping) return mapped;
-
-  const isSource = mapping.sources.includes(schemaName);
-  const isTarget = mapping.targets.includes(schemaName);
-
-  // Arrow records use bare mapping names; qualified key uses "ns::name"
-  const nsIdx = mappingName.indexOf("::");
-  const bareMappingName = nsIdx !== -1 ? mappingName.slice(nsIdx + 2) : mappingName;
-
-  for (const [_key, arrows] of index.fieldArrows) {
-    for (const arrow of arrows) {
-      // Match arrow by bare mapping name and namespace
-      const arrowQualified = arrow.namespace ? `${arrow.namespace}::${arrow.mapping}` : arrow.mapping;
-      if (arrowQualified !== mappingName && arrow.mapping !== bareMappingName) continue;
-      if (isSource) {
-        for (const source of arrow.sources) {
-          // addPathAndPrefixes strips [] and registers all ancestor prefixes —
-          // matches the same logic used by the VS Code coverage gutter.
-          addPathAndPrefixes(mapped, source);
-        }
-      }
-      if (isTarget && arrow.target) {
-        addPathAndPrefixes(mapped, arrow.target);
-      }
-    }
-  }
-  return mapped;
-}
-
-/**
- * Filter fields to only unmapped ones, recursing into record/list children.
- * A record/list is excluded entirely if all children are mapped; if some
- * children are mapped, the record is kept with only unmapped children.
- */
-function filterUnmappedFields(fields: FieldWithTags[], mapped: Set<string>, prefix: string): FieldWithTags[] {
+function filterUnmappedFields(fields: FieldWithTags[], covered: Set<string>, prefix: string): FieldWithTags[] {
   const result: FieldWithTags[] = [];
   for (const f of fields) {
     const path = prefix ? `${prefix}.${f.name}` : f.name;
     if (f.children && f.children.length > 0) {
-      // Record/list field: always recurse to evaluate children individually.
-      // Do NOT skip based on mapped.has(f.name) — a parent path appearing in
-      // 'mapped' only means it was registered as a prefix of a child arrow
-      // (via addPathAndPrefixes), not that the record itself was directly targeted.
-      // A record is excluded only when all its children are covered.
-      const unmappedChildren = filterUnmappedFields(f.children, mapped, path);
+      const unmappedChildren = filterUnmappedFields(f.children, covered, path);
       if (unmappedChildren.length > 0) {
         result.push({ ...f, children: unmappedChildren });
       }
-    } else {
-      // Leaf field: skip if directly covered by an arrow path.
-      if (!mapped.has(f.name) && !mapped.has(path)) {
-        result.push(f);
-      }
+    } else if (!covered.has(path)) {
+      result.push(f);
     }
   }
   return result;

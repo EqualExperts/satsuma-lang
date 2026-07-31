@@ -127,16 +127,23 @@ export interface AggregateCoverage {
  * its descendants', and paths are dotted from the schema root.
  */
 export function summarizeFieldCoverage(fields: FieldCoverageEntry[]): CoverageTotals {
-  const paths = new Set(fields.map((f) => f.path));
+  const leaves = leafFieldEntries(fields);
+  const covered = leaves.filter((f) => f.mapped).length;
+  return { covered, total: leaves.length, pct: percentage(covered, leaves.length) };
+}
 
-  let covered = 0;
-  let total = 0;
-  for (const field of fields) {
-    if (hasDescendant(field.path, paths)) continue; // a record, not a leaf
-    total += 1;
-    if (field.mapped) covered += 1;
-  }
-  return { covered, total, pct: percentage(covered, total) };
+/**
+ * The leaf entries of a schema's coverage list — the fields that carry data,
+ * and the unit every count and percentage is expressed in.
+ *
+ * Exported so that a rendered "uncovered fields" list and the `covered/total`
+ * figure beside it are derived from the same definition of leaf. If they used
+ * different ones, a report could show three uncovered paths next to a count
+ * of two.
+ */
+export function leafFieldEntries(fields: FieldCoverageEntry[]): FieldCoverageEntry[] {
+  const paths = new Set(fields.map((f) => f.path));
+  return fields.filter((f) => !hasDescendant(f.path, paths));
 }
 
 /** True when any entry's path sits below `path`, i.e. `path` is a record. */
