@@ -40,7 +40,8 @@ export interface MappingCoverageInput {
 /**
  * Covered/total counts and the percentage derived from them.
  *
- * **Counting rule: only leaf fields count, on their own coverage flag.** A
+ * **Counting rule (ADR-034): only leaf fields count, on their own coverage
+ * flag.** A
  * `record` field is structure, not data — counting it alongside its children
  * would count the same data twice and let a schema's nesting depth move the
  * percentage on its own. `total` is therefore the number of leaves.

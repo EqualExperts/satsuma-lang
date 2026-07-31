@@ -2,7 +2,7 @@
 id: sl-4qvp
 status: closed
 deps: [sl-gsxu]
-links: []
+links: [3cc-t6uo]
 created: 2026-07-31T13:33:31Z
 type: task
 priority: 1
