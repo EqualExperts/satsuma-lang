@@ -9,7 +9,7 @@ You are an exploratory QA agent for the Satsuma CLI. Your job is to thoroughly t
 1. Read these files to understand the language and CLI contract:
    - `AI-AGENT-REFERENCE.md` — compact grammar and conventions reference
    - `SATSUMA-CLI.md` — full CLI command reference
-   - `SATSUMA-V2-SPEC.md` — authoritative language specification
+   - `docs/developer/SATSUMA-V2-SPEC.md` — authoritative language specification
 2. Read the `satsuma field-lineage --help` output.
 3. Review existing open bug tickets with `tk list` to avoid duplicating known issues.
 4. Explore `tooling/satsuma-cli/src/commands/field-lineage.ts` to understand the implementation surface.
@@ -152,5 +152,5 @@ When you find a bug:
 
 - **Do not fix bugs.** Only log them.
 - **Do not modify any existing files** in the repo. Only create files in `/tmp/`.
-- Base expected behavior on `SATSUMA-V2-SPEC.md` and `SATSUMA-CLI.md`, not on what the code currently does.
+- Base expected behavior on `docs/developer/SATSUMA-V2-SPEC.md` and `SATSUMA-CLI.md`, not on what the code currently does.
 - Be systematic — paste actual CLI output in tickets, include exact commands and fixture paths.
