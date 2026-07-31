@@ -8,7 +8,6 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
-
 PACKAGE_ROOT = Path(__file__).resolve().parents[1]
 REPO_ROOT = PACKAGE_ROOT.parents[1]
 FIXTURE_ROOT = PACKAGE_ROOT / "test" / "fixtures"
@@ -195,15 +194,15 @@ def main() -> int:
             failures.append(message)
             print(f"FAIL  {fixture.name}")
 
-    print("")
+    print()
     print(f"Results: {passed} passed, {len(failures)} failed")
 
     if failures:
-        print("")
+        print()
         print("Failures:")
         for failure in failures:
             print(failure)
-            print("")
+            print()
         return 1
 
     return 0

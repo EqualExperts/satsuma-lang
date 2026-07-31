@@ -7,7 +7,6 @@ tests so each fixture JSON becomes its own test case.
 from __future__ import annotations
 
 import pytest
-
 from test_fixtures import (
     load_fixtures,
     validate_example_coverage,
@@ -15,7 +14,7 @@ from test_fixtures import (
 )
 
 
-def pytest_configure(config: pytest.Config) -> None:  # noqa: ARG001
+def pytest_configure(config: pytest.Config) -> None:
     """Validate fixture coverage before any tests run."""
     fixtures = load_fixtures()
     validate_example_coverage(fixtures)

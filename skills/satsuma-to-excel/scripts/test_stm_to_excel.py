@@ -20,9 +20,9 @@ REPO_ROOT = SCRIPT_DIR.parent.parent.parent
 # The sys import and stm_to_excel import must follow the path manipulation,
 # so E402 (module-level import not at top) is expected here.
 import sys  # noqa: E402
+
 sys.path.insert(0, str(SCRIPT_DIR))
 import stm_to_excel  # noqa: E402
-
 
 # ── Transform translation unit tests ────────────────────────────────────
 
@@ -122,13 +122,13 @@ class TestParseMapBlock:
 
     def test_null_key(self):
         raw = 'map {\n      null: "retail"\n    }'
-        inline, entries, is_cond = stm_to_excel._parse_map_block(raw)
+        inline, _entries, is_cond = stm_to_excel._parse_map_block(raw)
         assert not is_cond
         assert '(empty) = "retail"' in inline
 
     def test_default_key_in_simple(self):
         raw = 'map {\n      _: "unknown"\n    }'
-        inline, entries, is_cond = stm_to_excel._parse_map_block(raw)
+        inline, _entries, is_cond = stm_to_excel._parse_map_block(raw)
         assert not is_cond
         assert '(other) = "unknown"' in inline
 
@@ -145,7 +145,7 @@ class TestTranslateTransform:
         assert not cond
 
     def test_structural_chain(self):
-        human, entries, cond = stm_to_excel.translate_transform(
+        human, _entries, cond = stm_to_excel.translate_transform(
             ["trim", "lowercase", "validate_email", "null_if_invalid"],
             None, "structural",
         )
@@ -153,7 +153,7 @@ class TestTranslateTransform:
         assert not cond
 
     def test_mixed(self):
-        human, entries, cond = stm_to_excel.translate_transform(
+        human, _entries, _cond = stm_to_excel.translate_transform(
             ["warn_if_invalid"],
             '"Extract all digits. Format as E.164."',
             "mixed",
@@ -163,14 +163,14 @@ class TestTranslateTransform:
         assert "\u2192" in human
 
     def test_no_transform(self):
-        human, entries, cond = stm_to_excel.translate_transform(
+        human, _entries, _cond = stm_to_excel.translate_transform(
             None, None, "none",
         )
         assert human == ""
 
     def test_map_simple(self):
         raw = 'map {\n      A: "active"\n      S: "suspended"\n    }'
-        human, entries, cond = stm_to_excel.translate_transform(
+        human, _entries, cond = stm_to_excel.translate_transform(
             [raw], None, "structural",
         )
         assert 'A = "active"' in human
@@ -193,7 +193,7 @@ def _skip_if_no_cli():
     try:
         result = subprocess.run(
             ["satsuma", "--version"],
-            capture_output=True, text=True, timeout=10,
+            capture_output=True, text=True, timeout=10, check=False,
         )
         if result.returncode != 0:
             pytest.skip("satsuma CLI not available")
@@ -210,7 +210,7 @@ def _run_stm_to_excel(stm_files: list[str], output: str, extra_args: list[str] |
     ]
     if extra_args:
         cmd.extend(extra_args)
-    result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
+    result = subprocess.run(cmd, capture_output=True, text=True, timeout=60, check=False)
     if result.returncode != 0:
         pytest.fail(f"stm_to_excel failed: {result.stderr}")
     return result.stdout
@@ -379,7 +379,7 @@ class TestIntegrationOptions:
         _run_stm_to_excel([self.stm], output, ["--no-schemas"])
         import openpyxl
         wb = openpyxl.load_workbook(output)
-        assert not any(n.startswith("Src") or n.startswith("Tgt") for n in wb.sheetnames)
+        assert not any(n.startswith(("Src", "Tgt")) for n in wb.sheetnames)
 
     def test_title_override(self, tmp_path):
         output = str(tmp_path / "titled.xlsx")
@@ -425,7 +425,7 @@ class TestIntegrationFragments:
     def test_fragment_notes_in_schema(self):
         """Schema tabs should mention fragment origins in notes."""
         for name in self.wb.sheetnames:
-            if name.startswith("Src") or name.startswith("Tgt"):
+            if name.startswith(("Src", "Tgt")):
                 ws = self.wb[name]
                 for r in range(1, ws.max_row + 1):
                     val = ws.cell(r, 9).value or ""  # Notes column

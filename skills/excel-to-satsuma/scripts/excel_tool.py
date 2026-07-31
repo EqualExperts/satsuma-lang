@@ -21,7 +21,7 @@ from pathlib import Path
 
 import openpyxl
 from openpyxl.cell.cell import Cell
-from openpyxl.utils import get_column_letter, column_index_from_string
+from openpyxl.utils import column_index_from_string, get_column_letter
 from openpyxl.worksheet.worksheet import Worksheet
 
 # Maximum output size in characters before truncation.
@@ -40,7 +40,10 @@ def open_workbook(path: str) -> openpyxl.Workbook:
         sys.exit(1)
     try:
         return openpyxl.load_workbook(path, read_only=False, data_only=True)
-    except Exception as e:
+    # CLI error boundary: openpyxl raises a wide, undocumented mix of exception
+    # types for corrupt/locked/mis-typed files, so a broad catch is the only way
+    # to guarantee users get this friendly message instead of a traceback.
+    except Exception as e:  # noqa: BLE001
         print(f"Error: cannot open workbook: {e}", file=sys.stderr)
         sys.exit(1)
 
@@ -102,9 +105,7 @@ def truncate_output(text: str) -> str:
     if len(text) <= MAX_OUTPUT_CHARS:
         return text
     truncated = text[:MAX_OUTPUT_CHARS]
-    return truncated + "\n\n**WARNING**: Output truncated at {:,} characters.\n".format(
-        MAX_OUTPUT_CHARS
-    )
+    return truncated + f"\n\n**WARNING**: Output truncated at {MAX_OUTPUT_CHARS:,} characters.\n"
 
 
 # ── Subcommands ──────────────────────────────────────────────────────
@@ -214,7 +215,7 @@ def cmd_headers(args: argparse.Namespace) -> str:
     sample_start = header_row + 1
     sample_end = min(sample_start + 4, rows)
     if sample_start <= rows:
-        lines.append(f"**Sample rows** ({sample_start}–{sample_end}):\n")
+        lines.append(f"**Sample rows** ({sample_start}-{sample_end}):\n")
         headers = [cell_value(ws.cell(row=header_row, column=c)) or get_column_letter(c)
                     for c in range(1, cols + 1)]
         table_rows = []

@@ -16,9 +16,10 @@ HEALTH = DATA / "test-03-healthcare-hl7-to-fhir.xlsx"
 
 def run(args: list[str]) -> subprocess.CompletedProcess:
     return subprocess.run(
-        [sys.executable, str(TOOL)] + args,
+        [sys.executable, str(TOOL), *args],
         capture_output=True,
         text=True,
+        check=False,
     )
 
 

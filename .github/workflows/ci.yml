@@ -103,8 +103,10 @@ jobs:
         with:
           python-version: "3.12"
 
+      # Versions pinned in requirements-dev.txt (Dependabot-managed) so a
+      # new ruff release can't change the enforced rules outside a PR (sl-5kvp).
       - name: Install Python lint tools
-        run: pip install yamllint ruff
+        run: pip install -r requirements-dev.txt
 
       - run: npm run lint
 

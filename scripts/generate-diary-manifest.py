@@ -7,8 +7,8 @@
 #
 # Run from the repo root after the diary files have been copied into site/.
 
-import os
 import json
+import os
 
 content_dir = "site/satsuma-diaries/content"
 os.makedirs(content_dir, exist_ok=True)

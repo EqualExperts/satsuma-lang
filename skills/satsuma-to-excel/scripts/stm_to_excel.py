@@ -19,7 +19,7 @@ import re
 import subprocess
 import sys
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import openpyxl
@@ -260,8 +260,8 @@ def _parse_map_block(raw: str) -> tuple[str, list[MapEntry], bool]:
     entries: list[MapEntry] = []
     is_conditional = False
 
-    for line in body.split("\n"):
-        line = line.strip()
+    for raw_line in body.split("\n"):
+        line = raw_line.strip()
         if not line:
             continue
         # Match key: value patterns
@@ -318,8 +318,8 @@ def translate_transform(
     is_conditional = False
 
     if transforms:
-        for t in transforms:
-            t = t.strip()
+        for raw_transform in transforms:
+            t = raw_transform.strip()
             if not t:
                 continue
             # map { ... } block
@@ -353,12 +353,13 @@ def _run_satsuma(args: list[str]) -> str:
     stdout contains usable output.  We only fail if there is *no*
     stdout at all and the exit code is non-zero.
     """
-    cmd = ["satsuma"] + args
+    cmd = ["satsuma", *args]
     result = subprocess.run(
         cmd,
         capture_output=True,
         text=True,
         timeout=30,
+        check=False,
     )
     if result.returncode != 0 and not result.stdout.strip():
         print(f"Error running: {' '.join(cmd)}", file=sys.stderr)
@@ -414,8 +415,8 @@ def collect_data(
     title = title_override
     if not title and integration_note:
         # Extract first heading
-        for line in integration_note.split("\n"):
-            line = line.strip()
+        for raw_line in integration_note.split("\n"):
+            line = raw_line.strip()
             if line.startswith("# "):
                 title = line[2:].strip()
                 break
@@ -649,7 +650,7 @@ def collect_data(
             arrows=arrows,
         ))
 
-    ts = timestamp or datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    ts = timestamp or datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
     return WorkbookData(
         title=title,
@@ -1067,10 +1068,7 @@ def create_schema_tab(ws: Worksheet, schema: SchemaInfo) -> None:
         ws.cell(row=row, column=9).alignment = ALIGN_WRAP
 
         # Row fill
-        if f.is_pk:
-            fill = FILL_PK
-        else:
-            fill = _alt_fill(idx)
+        fill = FILL_PK if f.is_pk else _alt_fill(idx)
         for c in range(1, 10):
             ws.cell(row=row, column=c).fill = fill
 
