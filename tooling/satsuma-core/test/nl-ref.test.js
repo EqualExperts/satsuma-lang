@@ -636,3 +636,147 @@ describe("NL ref positions account for string delimiters (sl-o3ea)", () => {
     assert.deepEqual(positionOfRef(src), atPositionIn(src));
   });
 });
+
+// ── Nested field resolution (sl-ez36) ─────────────────────────────────────────
+//
+// A ref may omit leading path components, so resolution must report where the
+// field actually is. Reporting the name as written names a field that is not
+// declared, and consumers turn resolvedTo.name straight into a lineage node —
+// so a wrong path becomes a fabricated graph node rather than a visible error.
+
+describe("resolveRef() — nested field paths (sl-ez36)", () => {
+  // schema src { order_id, address record { city, postcode } }
+  const nestedLookup = () => makeLookup({
+    "::src": {
+      fields: [
+        { name: "order_id" },
+        { name: "address", children: [{ name: "city" }, { name: "postcode" }] },
+      ],
+      hasSpreads: false,
+    },
+  });
+  const ctx = { sources: ["::src"], targets: [], namespace: null };
+
+  it("reports the full path for a bare ref naming a nested field", () => {
+    // @city omits the `address.` prefix. Before the fix this resolved to
+    // ::src.city — a field that does not exist — so field-lineage on the real
+    // ::src.address.city reported no connection at all.
+    const r = resolveRef("city", ctx, nestedLookup());
+    assert.equal(r.resolved, true);
+    assert.equal(r.resolvedTo.name, "::src.address.city");
+  });
+
+  it("leaves a fully-spelled nested ref unchanged", () => {
+    // The anchored path already names the field; the fix must not double it up
+    // into ::src.address.address.city.
+    const r = resolveRef("address.city", ctx, nestedLookup());
+    assert.equal(r.resolved, true);
+    assert.equal(r.resolvedTo.name, "::src.address.city");
+  });
+
+  it("reports the full path for a dotted ref anchored at a nested record", () => {
+    // @contents.sku matches the subtree at parcels.contents, so the ancestor
+    // prefix must be prepended: the ref names parcels.contents.sku.
+    const lookup = makeLookup({
+      "::src": {
+        fields: [{
+          name: "parcels",
+          children: [{ name: "contents", children: [{ name: "sku" }, { name: "qty" }] }],
+        }],
+        hasSpreads: false,
+      },
+    });
+    const r = resolveRef("contents.sku", ctx, lookup);
+    assert.equal(r.resolved, true);
+    assert.equal(r.resolvedTo.name, "::src.parcels.contents.sku");
+  });
+
+  it("prefers the shallowest match when a leaf name occurs at two depths", () => {
+    // Pinning the documented rule: breadth-first, so a top-level `city` wins
+    // over a nested `address.city`. Depth-first order would let the nested one
+    // win purely because `address` is declared first, and the answer would
+    // change if the author reordered the fields.
+    const lookup = makeLookup({
+      "::src": {
+        fields: [
+          { name: "address", children: [{ name: "city" }] },
+          { name: "city" },
+        ],
+        hasSpreads: false,
+      },
+    });
+    const r = resolveRef("city", ctx, lookup);
+    assert.equal(r.resolvedTo.name, "::src.city");
+  });
+
+  it("still reports unresolved when no field matches at any depth", () => {
+    // The fix widens what a match *reports*, not what counts as a match.
+    const r = resolveRef("nonexistent", ctx, nestedLookup());
+    assert.equal(r.resolved, false);
+    assert.equal(r.resolvedTo, null);
+  });
+
+  it("reports the full path for a namespace-qualified ref to a nested field", () => {
+    // ns::schema.field goes through the same lookup, so it needs the same fix.
+    const lookup = makeLookup({
+      "crm::src": {
+        fields: [{ name: "address", children: [{ name: "city" }] }],
+        hasSpreads: false,
+      },
+    });
+    const r = resolveRef("crm::src.city", { sources: [], targets: [], namespace: null }, lookup);
+    assert.equal(r.resolved, true);
+    assert.equal(r.resolvedTo.name, "crm::src.address.city");
+  });
+});
+
+// ── Container target qualification (sl-hrql) ──────────────────────────────────
+//
+// targetField must be absolute from the target schema root. Downstream
+// qualifyField() prepends the target schema and cannot recover a base it was
+// never given, so a relative ".line_total" became "tgt.line_total" — a field
+// that does not exist, carrying the edge that the real one then appeared to lack.
+
+describe("extractNLRefData — container target qualification (sl-hrql)", () => {
+  before(async () => {
+    await initParser(WASM_PATH);
+  });
+
+  // One item per ref-bearing NL string (the split into individual @refs
+  // happens later, in resolveAllNLRefs), so a two-ref string yields one entry.
+  function targetFields(src) {
+    return extractNLRefData(getParser().parse(src).rootNode).map((i) => i.targetField);
+  }
+
+  it("qualifies a computed arrow target inside an each block", () => {
+    const src = 'mapping m {\n  each items -> lines {\n    -> .line_total { "Multiply @qty by @price" }\n  }\n}';
+    assert.deepEqual(targetFields(src), ["lines.line_total"]);
+  });
+
+  it("qualifies a computed arrow target inside a nested_arrow block", () => {
+    // A braced `src -> tgt` establishes a target base just as `each` does.
+    const src = 'mapping m {\n  hdr -> head {\n    -> .gross { "Add @amount and @vat" }\n  }\n}';
+    assert.deepEqual(targetFields(src), ["head.gross"]);
+  });
+
+  it("accumulates bases across two levels of nesting", () => {
+    // flatten written relative (`.contents -> .packed_items`) names a list field
+    // on the current element, so its base stacks on the enclosing each.
+    const src = 'mapping m {\n  each parcels -> parcels {\n    flatten .contents -> .packed_items {\n      -> .label { "Label from @sku" }\n    }\n  }\n}';
+    assert.deepEqual(targetFields(src), ["parcels.packed_items.label"]);
+  });
+
+  it("establishes no base for a top-level flatten, whose target names the schema", () => {
+    // Spec 4.6: `flatten contacts -> tgt` unnests into target schema roots, so
+    // `contact_line` is already absolute and must not become `tgt.contact_line`.
+    const src = 'mapping m {\n  flatten contacts -> tgt {\n    -> contact_line { "Format @email" }\n  }\n}';
+    assert.deepEqual(targetFields(src), ["contact_line"]);
+  });
+
+  it("leaves a mapping-body-level arrow target unqualified", () => {
+    // The no-container control: top-level targets were always correct and must
+    // stay byte-identical, since lint's fix targeting matches on this value.
+    const src = 'mapping m {\n  -> gross_total { "Add @net and @tax" }\n}';
+    assert.deepEqual(targetFields(src), ["gross_total"]);
+  });
+});
