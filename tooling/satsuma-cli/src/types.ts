@@ -34,15 +34,18 @@ export interface Parser {
 
 // ── Extracted record types ──────────────────────────────────────────────────
 
-export interface FieldDecl {
-  name: string;
-  type: string;
-  children?: FieldDecl[];
-  isList?: boolean;
-  metadata?: import("@satsuma/core").MetaEntry[];
-  hasSpreads?: boolean;
-  spreads?: string[];
-}
+/**
+ * Field declarations come straight from core's extractors, so the CLI uses
+ * core's type rather than a structural copy of it.
+ *
+ * The CLI kept its own clone until sl-5sjp, and the clone had silently fallen
+ * behind: it omitted the `startRow`/`startColumn` fields core's extractFieldTree
+ * always sets (aa-65ni), which made field declaration positions invisible to
+ * every CLI command even though the data was already there. Re-export, don't
+ * re-declare.
+ */
+import type { FieldDecl } from "@satsuma/core";
+export type { FieldDecl };
 
 export interface SchemaRecord {
   name: string;
