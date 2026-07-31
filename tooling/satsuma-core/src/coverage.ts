@@ -62,6 +62,18 @@ export interface CoverageSchemaDefinition {
   uri: string;
   /** Top-level fields, in declaration order; nested fields hang off `children`. */
   fields: CoverageField[];
+  /**
+   * Canonical id to report for this schema, when it differs from the reference
+   * as written in the mapping. Defaults to the written reference.
+   *
+   * Resolving a reference is the consumer's job, and the canonical id is an
+   * output of that resolution: a namespaced workspace can name the same schema
+   * `orders` inside its own namespace and `crm::orders` from outside. Reporting
+   * both forms would split one schema into two entries when results are rolled
+   * up across mappings, so a consumer that resolves references should report the
+   * resolved key here.
+   */
+  schemaId?: string;
 }
 
 /**
@@ -153,7 +165,7 @@ export function computeMappingCoverage(
     const def = resolveSchema(schemaId);
     if (!def) continue;
     schemas.push({
-      schemaId,
+      schemaId: def.schemaId ?? schemaId,
       role: "source",
       fields: buildFieldCoverage(def.fields, def.uri, "", coveredSrcPaths),
     });
@@ -163,7 +175,7 @@ export function computeMappingCoverage(
     const def = resolveSchema(schemaId);
     if (!def) continue;
     schemas.push({
-      schemaId,
+      schemaId: def.schemaId ?? schemaId,
       role: "target",
       fields: buildFieldCoverage(def.fields, def.uri, "", coveredTgtPaths),
     });

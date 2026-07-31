@@ -1,0 +1,68 @@
+// Fixture for `satsuma coverage` tests.
+//
+// Shaped to exercise, in one small workspace, the cases the command has to get
+// right: a nested record with one covered and one uncovered leaf, a schema that
+// is a target of one mapping and a source of another, a field populated by one
+// mapping and ignored by another (the per-mapping vs aggregate distinction), and
+// an each block whose element-relative arrows must resolve under the list.
+
+namespace crm {
+
+  schema customers {
+    id INT
+    address record {
+      city STRING
+      line1 STRING
+    }
+    nickname STRING
+  }
+
+  schema contacts {
+    id INT
+    city STRING
+    memo STRING
+  }
+
+  mapping `load contacts` {
+    source { crm::customers }
+    target { crm::contacts }
+
+    id -> id
+    address.city -> city
+  }
+
+  mapping `annotate contacts` {
+    source { crm::customers }
+    target { crm::contacts }
+
+    nickname -> memo
+  }
+}
+
+namespace billing {
+
+  schema invoices {
+    id INT
+    lines list_of record {
+      sku STRING
+      qty INT
+    }
+  }
+
+  schema invoice_rows {
+    id INT
+    rows list_of record {
+      code STRING
+    }
+  }
+
+  mapping `flatten invoices` {
+    source { billing::invoices }
+    target { billing::invoice_rows }
+
+    id -> id
+    each lines -> rows {
+      .sku -> .code
+    }
+  }
+}

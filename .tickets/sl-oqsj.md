@@ -1,6 +1,6 @@
 ---
 id: sl-oqsj
-status: open
+status: closed
 deps: [sl-gsxu, sl-5sjp]
 links: []
 created: 2026-07-31T13:13:05Z
@@ -28,3 +28,12 @@ Command registered and documented in --help; nested-path semantics verified (cov
 
 `fields --unmapped-by` delegates to the core coverage function with getMappedFieldNames/filterUnmappedFields deleted; a test asserts `fields Y --unmapped-by X` and `coverage --uncovered --mapping X --schema Y` report the identical field set on one fixture, locking the two surfaces together; unresolvable scope arguments exit 1; all CLI tests pass locally.
 
+
+## Notes
+
+**2026-07-31T14:11:29Z**
+
+Cause: the CLI had no workspace-level coverage command, and `fields --unmapped-by` computed the per-mapping uncovered set from its own private getMappedFieldNames()/filterUnmappedFields() over index.fieldArrows — a fourth implementation of semantics core now owns.
+Fix: added src/commands/coverage.ts (scoping flags --mapping/--schema/--role/--uncovered, human table, --json) plus src/coverage-workspace.ts, which is the only place ExtractedWorkspace is adapted to core's CoverageSchemaResolver: namespace-aware reference resolution, spread expansion on a copied field list, and declaration positions via field-positions.ts. getMappedFieldNames was deleted and fields --unmapped-by now prunes its tree from the same core result, so the two surfaces cannot drift; a test asserts they report the identical field set on the unmapped-nested fixture, and a second asserts both report empty for a fully-mapped schema.
+
+Two decisions worth recording. (1) Core gained an optional CoverageSchemaDefinition.schemaId so the consumer reports the resolved canonical key rather than the reference as written — without it a namespaced schema written both ways splits into two entries when rolled up. (2) Reported field lists are leaf-only (core's leafFieldEntries), matching the counting rule, so a list of paths and the covered/total beside it are always the same population. Anonymous mappings cannot be looked up by label and are reported as skipped rather than silently dropped. 934 CLI tests pass (22 new); eslint clean.

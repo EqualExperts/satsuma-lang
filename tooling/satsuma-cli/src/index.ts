@@ -59,6 +59,7 @@ const commands = [
   "commands/context.js",
   "commands/arrows.js",
   "commands/fields.js",
+  "commands/coverage.js",
   "commands/nl.js",
   "commands/meta.js",
   "commands/match-fields.js",
