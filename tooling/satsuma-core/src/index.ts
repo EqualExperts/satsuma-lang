@@ -72,6 +72,7 @@ export {
   extractQuestions,
   extractImports,
   extractArrowRecords,
+  extractMappingArrowRecords,
   canonicalPipeChainText,
 } from "./extract.js";
 export {

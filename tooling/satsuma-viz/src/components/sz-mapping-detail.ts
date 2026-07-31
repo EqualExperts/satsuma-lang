@@ -440,8 +440,10 @@ export class SzMappingDetail extends LitElement {
   /** Find source fields that map to a given target field, grouped by schema id. */
   private _findSourceFieldsForTarget(targetField: string, m: MappingBlock): Map<string, Set<string>> {
     const result = new Map<string, Set<string>>();
-    // forEachMappingArrow recurses into nestedEach — hand-rolled loops over
-    // the top-level collections missed nested-each arrows (sl-fm0q).
+    // forEachMappingArrow recurses into every nested each/flatten combination —
+    // hand-rolled loops over the top-level collections missed nested-each arrows
+    // (sl-fm0q), and nestedEach-only recursion missed flatten-inside-each
+    // (sl-vu22).
     forEachMappingArrow(m, (a) => {
       const targetSchema = this.targetSchema;
       const localTargetPath = targetSchema
@@ -467,8 +469,10 @@ export class SzMappingDetail extends LitElement {
     const sourceSchema = this.sourceSchemas.find((schema) => schema.qualifiedId === sourceSchemaId);
     const targetSchema = this.targetSchema;
     if (!sourceSchema || !targetSchema) return result;
-    // forEachMappingArrow recurses into nestedEach — hand-rolled loops over
-    // the top-level collections missed nested-each arrows (sl-fm0q).
+    // forEachMappingArrow recurses into every nested each/flatten combination —
+    // hand-rolled loops over the top-level collections missed nested-each arrows
+    // (sl-fm0q), and nestedEach-only recursion missed flatten-inside-each
+    // (sl-vu22).
     forEachMappingArrow(m, (a) => {
       const sourceMatches = a.sourceFields.some((sf) => {
         const localSourcePath = resolveSchemaLocalFieldPath(sf, sourceSchema, m.sourceRefs);
@@ -694,6 +698,7 @@ export class SzMappingDetail extends LitElement {
       </tr>
       ${eb.arrows.map((a) => this._renderArrowRow(a, sectionPrefix))}
       ${eb.nestedEach.map((ne) => this._renderEachSection(ne, sectionPrefix))}
+      ${eb.nestedFlatten.map((nf) => this._renderFlattenSection(nf, sectionPrefix))}
     `;
   }
 
@@ -708,11 +713,15 @@ export class SzMappingDetail extends LitElement {
         <td colspan="4">
           <div class="scope-label">
             <span class="scope-tag">flatten</span>
-            <span class="scope-fields">${fb.sourceField}</span>
+            <span class="scope-fields">
+              ${fb.sourceField}${fb.targetField ? html` &#x2192; ${fb.targetField}` : nothing}
+            </span>
           </div>
         </td>
       </tr>
       ${fb.arrows.map((a) => this._renderArrowRow(a, sectionPrefix))}
+      ${fb.nestedEach.map((ne) => this._renderEachSection(ne, sectionPrefix))}
+      ${fb.nestedFlatten.map((nf) => this._renderFlattenSection(nf, sectionPrefix))}
     `;
   }
 

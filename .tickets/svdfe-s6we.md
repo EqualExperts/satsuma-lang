@@ -1,0 +1,27 @@
+---
+id: svdfe-s6we
+status: open
+deps: []
+links: [sl-vu22]
+created: 2026-07-31T16:23:49Z
+type: bug
+priority: 2
+assignee: Thorben Louw
+tags: [viz, viz-model, coverage]
+---
+# viz-model: nested_arrow blocks are absent from the model, so their arrows are invisible to viz
+
+The VizModel has EachBlock and FlattenBlock but no representation of nested_arrow (grammar.js:404-414) — the braced 'src -> tgt { .a -> .b }' form. viz-model.ts's buildMappingBlock switches on each_block and flatten_block only, so a nested_arrow and every arrow inside it is dropped from the model.
+
+Same defect class as sl-vu22 (flatten inside each) and sl-qzy3 (nested_arrow missing from the core coverage walk): a consumer enumerating the block types it knows about, falling out of step with the grammar's shared _nested_block_item production. Found while fixing sl-vu22, which corrected the each/flatten half; nested_arrow was out of that ticket's scope.
+
+## Impact
+
+Every viz surface that reads arrows undercounts a mapping using nested_arrow: the 'N arrows' header, the mapping-detail arrow table, hover cross-highlighting, and — once feature 36 lands — the coverage overlay, which will disagree with 'satsuma coverage --json' (core resolves nested_arrow correctly since sl-qzy3). Feature 36's R6 parity test would fail on any fixture using the construct.
+
+The corpus contains no nested_arrow inside a mapping body that viz renders, which is why round-trip tests do not catch it — the same reason named in sl-7236 and sl-vu22.
+
+## Acceptance Criteria
+
+VizModel represents nested_arrow blocks with their src/tgt and nested contents, reusing the shared nested-block collector added for sl-vu22 rather than adding a third enumeration; countMappingArrows and forEachMappingArrow visit them; sz-mapping-detail renders them as a scope section; a viz-backend test asserts a nested_arrow's arrows survive extraction; a corpus/example fixture exercising nested_arrow inside a mapping exists so round-trip tests cover it.
+

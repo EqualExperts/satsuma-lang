@@ -553,6 +553,84 @@ mapping load {
   });
 });
 
+// ── Container targets that are themselves nested paths (sl-vu22) ─────────────
+
+describe("computeMappingCoverage — dotted container targets", () => {
+  // Coverage no longer walks the CST for arrows; it reads extract.ts's records
+  // (PRD 38 R4, ADR-037). These two shapes are where a derivation could plausibly
+  // differ from the walk it replaced, and both appear in the shipped corpus.
+
+  it("qualifies an each's arrows under a multi-segment container target", () => {
+    // examples/cobol-to-avro/pipeline.stm:148 — `each PHONE_NUMBERS ->
+    // contact_info.phones`. The container target is itself a nested path, so its
+    // children must resolve to contact_info.phones.type, not phones.type or
+    // type. A base that kept only the last segment would report the whole block
+    // uncovered while marking a same-named top-level field mapped.
+    const src = `
+schema src { PHONE_NUMBERS list_of record { PHONE_TYPE STRING PHONE_NUM STRING } }
+schema tgt {
+  type STRING
+  contact_info record { phones list_of record { type STRING number STRING } }
+}
+mapping load {
+  source { src }
+  target { tgt }
+  each PHONE_NUMBERS -> contact_info.phones {
+    .PHONE_TYPE -> .type
+    .PHONE_NUM -> .number
+  }
+}`;
+    const t = forRole(coverage(src, "load"), "target");
+    assertMapped(t, "contact_info", true);
+    assertMapped(t, "contact_info.phones", true);
+    assertMapped(t, "contact_info.phones.type", true);
+    assertMapped(t, "contact_info.phones.number", true);
+    // The top-level `type` shares a name with the nested leaf and no arrow
+    // writes it — the sl-joeq invariant, restated against a dotted base.
+    assertMapped(t, "type", false);
+  });
+
+  it("unions two each blocks writing the same target list without double counting", () => {
+    // examples/edi-to-json/pipeline.stm:137-171 — three `each` blocks write into
+    // ShipmentHeader.asnDetails and its nested items. Each block contributes its
+    // own leaves and the result is their union: a leaf written by either block is
+    // covered, and one written by neither is not.
+    const src = `
+schema src {
+  POReferences list_of record { poNumber STRING }
+  LineItems list_of record { sku STRING }
+  Quantities list_of record { qty INT }
+}
+schema tgt {
+  ShipmentHeader record {
+    asnDetails list_of record {
+      poNumber STRING
+      items list_of record { sku STRING qty INT uom STRING }
+    }
+  }
+}
+mapping load {
+  source { src }
+  target { tgt }
+  each POReferences -> ShipmentHeader.asnDetails {
+    .poNumber -> .poNumber
+  }
+  each LineItems -> ShipmentHeader.asnDetails.items {
+    .sku -> .sku
+  }
+  each Quantities -> ShipmentHeader.asnDetails.items {
+    .qty -> .qty
+  }
+}`;
+    const t = forRole(coverage(src, "load"), "target");
+    assertMapped(t, "ShipmentHeader.asnDetails.poNumber", true);
+    assertMapped(t, "ShipmentHeader.asnDetails.items.sku", true);
+    assertMapped(t, "ShipmentHeader.asnDetails.items.qty", true);
+    // Written by none of the three blocks — the union must not swallow the gap.
+    assertMapped(t, "ShipmentHeader.asnDetails.items.uom", false);
+  });
+});
+
 // ── Coverage is by path, never by local field name (sl-joeq) ─────────────────
 
 describe("computeMappingCoverage — path identity, not name identity", () => {

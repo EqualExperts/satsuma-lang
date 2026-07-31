@@ -832,12 +832,35 @@ export function extractArrowRecords(rootNode: SyntaxNode): ExtractedArrow[] {
   const records: ExtractedArrow[] = [];
 
   for (const { node: mappingNode, namespace } of collectFromNamespaces(rootNode, "mapping_block")) {
-    const mappingName = labelText(mappingNode);
-    const body = child(mappingNode, "mapping_body");
-    if (!body) continue;
-    collectArrowRecords(body.namedChildren, mappingName, namespace, null, null, records);
+    records.push(...extractMappingArrowRecords(mappingNode, namespace));
   }
 
+  return records;
+}
+
+/**
+ * Arrow records for **one** `mapping_block` node, with the same absolute-path
+ * semantics {@link extractArrowRecords} gives every arrow in a file.
+ *
+ * Exists because a consumer that has already located a single mapping must not
+ * re-derive the nesting rules to read its arrows. Coverage is that consumer: it
+ * reports on one named mapping, and two same-named mappings in different
+ * namespaces are different mappings — so it cannot filter the whole-file list by
+ * label without conflating them.
+ *
+ * @param mappingNode A `mapping_block` node.
+ * @param namespace   Namespace the block was found in, or null at file scope.
+ *                    Recorded on each returned arrow; it does not affect paths.
+ */
+export function extractMappingArrowRecords(
+  mappingNode: SyntaxNode,
+  namespace: string | null = null,
+): ExtractedArrow[] {
+  const body = child(mappingNode, "mapping_body");
+  if (!body) return [];
+
+  const records: ExtractedArrow[] = [];
+  collectArrowRecords(body.namedChildren, labelText(mappingNode), namespace, null, null, records);
   return records;
 }
 

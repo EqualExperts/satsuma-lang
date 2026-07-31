@@ -1000,35 +1000,55 @@ function extractTransform(pipeChain: SyntaxNode): TransformInfo {
 }
 
 /**
+ * Arrows and nested containers declared inside one `each` or `flatten` block.
+ *
+ * Both block types accept exactly the same children — the grammar routes them
+ * through one shared `_nested_block_item` production (`grammar.js:265-270`) — so
+ * one collector serves both rather than each block type listing what it permits.
+ * That enumeration is what dropped `flatten` inside `each` from the model
+ * (sl-vu22), and it is the same defect the core coverage walk had (sl-qzy3).
+ */
+interface NestedBlockContents {
+  arrows: ArrowEntry[];
+  nestedEach: EachBlock[];
+  nestedFlatten: FlattenBlock[];
+}
+
+function extractNestedBlockContents(uri: string, node: SyntaxNode): NestedBlockContents {
+  const contents: NestedBlockContents = { arrows: [], nestedEach: [], nestedFlatten: [] };
+
+  for (const ch of node.namedChildren) {
+    if (ch.type === "map_arrow") {
+      contents.arrows.push(extractArrow(uri, ch));
+    } else if (ch.type === "computed_arrow") {
+      contents.arrows.push(extractComputedArrow(uri, ch));
+    } else if (ch.type === "each_block") {
+      contents.nestedEach.push(extractEachBlock(uri, ch));
+    } else if (ch.type === "flatten_block") {
+      contents.nestedFlatten.push(extractFlattenBlock(uri, ch));
+    }
+  }
+
+  return contents;
+}
+
+/**
  * Extract an `each` sub-block — a per-list-element mapping nested inside a
  * parent mapping.
  *
- * `each` may itself contain further `each` blocks (e.g. mapping a list of
- * orders, each containing a list of line items), so we recurse to build a
- * nested structure rather than flattening. Computed arrows are valid inside
- * `each` and are collected alongside direct arrows.
+ * `each` may contain further `each` *and* `flatten` blocks (e.g. mapping a list
+ * of orders, each containing a list of parcels flattened into line items), so we
+ * recurse to build a nested structure rather than flattening. Computed arrows
+ * are valid inside `each` and are collected alongside direct arrows.
  */
 function extractEachBlock(uri: string, node: SyntaxNode): EachBlock {
   const srcPath = child(node, "src_path");
   const tgtPath = child(node, "tgt_path");
-  const arrows: ArrowEntry[] = [];
-  const nestedEach: EachBlock[] = [];
-
-  for (const ch of node.namedChildren) {
-    if (ch.type === "map_arrow") {
-      arrows.push(extractArrow(uri, ch));
-    } else if (ch.type === "computed_arrow") {
-      arrows.push(extractComputedArrow(uri, ch));
-    } else if (ch.type === "each_block") {
-      nestedEach.push(extractEachBlock(uri, ch));
-    }
-  }
 
   return {
     sourceField: srcPath ? pathText(srcPath) : "",
     targetField: tgtPath ? pathText(tgtPath) : "",
-    arrows,
-    nestedEach,
+    ...extractNestedBlockContents(uri, node),
     location: nodeLocation(uri, node),
   };
 }
@@ -1037,26 +1057,18 @@ function extractEachBlock(uri: string, node: SyntaxNode): EachBlock {
  * Extract a `flatten` sub-block — collapses a list source into a flat target
  * by mapping each element's fields directly without an enclosing record.
  *
- * Unlike `each`, flatten does not nest: it has a single source path and a set
- * of arrows that target fields on the parent mapping's target. We do not
- * recurse into nested `flatten` blocks because the grammar does not permit
- * them.
+ * `flatten` nests exactly as `each` does, and carries a target of its own; see
+ * the `FlattenBlock.targetField` contract for the two readings spec §4.6 gives
+ * that target.
  */
 function extractFlattenBlock(uri: string, node: SyntaxNode): FlattenBlock {
   const srcPath = child(node, "src_path");
-  const arrows: ArrowEntry[] = [];
-
-  for (const ch of node.namedChildren) {
-    if (ch.type === "map_arrow") {
-      arrows.push(extractArrow(uri, ch));
-    } else if (ch.type === "computed_arrow") {
-      arrows.push(extractComputedArrow(uri, ch));
-    }
-  }
+  const tgtPath = child(node, "tgt_path");
 
   return {
     sourceField: srcPath ? pathText(srcPath) : "",
-    arrows,
+    targetField: tgtPath ? pathText(tgtPath) : "",
+    ...extractNestedBlockContents(uri, node),
     location: nodeLocation(uri, node),
   };
 }

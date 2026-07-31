@@ -1,8 +1,8 @@
 ---
 id: sl-vu22
-status: open
+status: closed
 deps: [sl-qzy3]
-links: [sl-2nxu]
+links: [sl-2nxu, svdfe-s6we]
 created: 2026-07-31T14:43:17Z
 type: task
 priority: 1
@@ -42,3 +42,21 @@ Two findings settled it after the PRD was written:
 2. The gutter check this ticket asked for ('check what the VS Code gutter needs before committing') comes back clean. The gutter consumes FieldCoverageEntry.line, which propagates from CoverageField.line supplied by the consumer's resolver — satsuma-lsp/src/coverage.ts maps FieldInfo.range.start.line — not from the arrow walk, which contributes path strings only. No consumer depends on per-node CST positions extraction cannot supply; ExtractedArrow carries line/startColumn regardless.
 
 Implementation note: sl-joeq left the seam in place. collectBodyPaths now yields a string[] of container-qualified AUTHORED references (schema prefix retained), and the new schemaLocalFieldPath in coverage-paths.ts resolves them per schema on top. ExtractedArrow.sources/target are already absolute authored paths of that same shape, so this ticket is a swap of the producer with the resolution step unchanged — not a re-derivation of the semantics. See ADR-035.
+
+**2026-07-31T16:24:21Z**
+
+Cause: coverage.ts maintained its own CST walk for arrow paths alongside extract.ts's, which already handled every nesting construct uniformly. Four defects of that duplication had been found by inspection and none by a test — relative dots unstripped (sc-xnxp), flatten-inside-each and nested_arrow never visited (sl-qzy3), and schema prefixes never resolved (sl-joeq).
+
+Fix: deleted the walker (~130 lines: collectBodyPaths / collectBlockItemPaths / collectContainerPaths / containerTargetBase / isRelativePath / qualify / pathText / PathBases / CONTAINER_BLOCK_TYPES) and derived src/tgt references from extract.ts instead, via a new exported extractMappingArrowRecords(mappingNode, namespace). That function exists because coverage reports on ONE named mapping and two same-named mappings in different namespaces are different mappings, so it cannot filter the whole-file list by label; extractArrowRecords now delegates to it, so no walk was duplicated to add it.
+
+One real divergence had to be handled. For spec §4.6's top-level flatten (flatten contacts -> tgt) the walker produced 'email' while extraction produces 'tgt.email' — which is a SCHEMA-QUALIFIED path, so sl-joeq's schemaLocalFieldPath already resolves it, and the declaresTopLevel guard added there is what keeps the relative form (flatten items -> .packed inside an each, prefix 'orders') from being stripped. One rule needed adding: a bare reference identical to the schema's own name names the schema, not a field, so it returns null instead of entering the covered set as a phantom field.
+
+Verification that the swap is behaviour-preserving: coverage --json over all 47 example files plus all CLI fixtures is byte-identical before and after (zero diff), and all 495 core tests pass unchanged, including every sl-qzy3 and sl-joeq regression test and the both-flatten-forms case.
+
+Second half of the AC — viz-model corrected: EachBlock gains nestedFlatten, FlattenBlock gains targetField plus nestedEach/nestedFlatten, and the incorrect comment asserting the grammar forbids nested flatten is removed. Both extractors now share one extractNestedBlockContents() collector rather than each enumerating permitted children — the same shape the core walk was given in sl-qzy3. viz's forEachMappingArrow walks [...nestedEach, ...nestedFlatten] so the count, hover lookups and coverage overlay all see flatten-inside-each arrows; sz-mapping-detail renders nested flatten sections and shows a flatten's target.
+
+New tests: core 'dotted container targets' — each with a multi-segment target (cobol-to-avro:148) qualifying under the full path, and three each blocks writing the same target list (edi-to-json:137-171) unioning without swallowing a gap; coverage-paths cases for the bare-schema-name rule; viz-backend cases for flatten targetField and each/flatten nesting; viz count case for flatten-inside-each.
+
+Out of scope, raised as svdfe-s6we: nested_arrow is absent from the VizModel entirely — same defect class, the other construct. Also not run: the viz Playwright harness (needs a human-launched browser); its 10 specs make no arrow-count or coverage assertions.
+
+Totals: core 495, cli 968, lsp 292, viz 98, viz-backend 166, viz-model 6, vscode 21 golden files, tree-sitter 315/315 parses, npm run lint clean.
