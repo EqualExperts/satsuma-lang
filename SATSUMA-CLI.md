@@ -125,6 +125,8 @@ Flags: `--mapping <name>`, `--schema <name>`, `--role source|target`, `--uncover
 
 **Coverage is structural.** A field is covered when at least one arrow references it. Nested paths cover their parents: mapping `address.city` covers `address` but not `address.line1`. Element-relative arrows inside `each`/`flatten` blocks resolve against the iterated list, so `.sku` under `each lines -> rows` covers `lines.sku`. A field described only in prose is uncovered *by definition* — use `nl-refs` to find those, and `lint` for policy judgements about which gaps are acceptable.
 
+**Coverage matches whole paths, never bare field names.** `home_address.city` covers exactly that path — not a top-level `city`, and not `work_address.city`. Repeated leaf names across depths (`id`, `sku`, `code`, `BIC`) are normal in nested schemas, so name matching would report unmapped fields as mapped. In a multi-source mapping, an arrow's schema prefix resolves to the schema it names: `crm.consent.email_marketing` covers `consent.email_marketing` in `crm` and contributes nothing to any other source.
+
 **Percentages count leaf fields only.** A `record` is structure, not data; counting it alongside its children would count the same data twice and let a schema's nesting depth move the number on its own.
 
 #### Per-mapping vs aggregate

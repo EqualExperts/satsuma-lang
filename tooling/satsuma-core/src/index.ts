@@ -36,7 +36,13 @@ export type {
   CoverageSchemaDefinition,
   CoverageSchemaResolver,
 } from "./coverage.js";
-export { addPathAndPrefixes, buildCoveredFieldSet, isCoveredFieldPath } from "./coverage-paths.js";
+export {
+  addPathAndPrefixes,
+  buildCoveredFieldSet,
+  isCoveredFieldPath,
+  schemaLocalFieldPath,
+  schemaRefPrefixes,
+} from "./coverage-paths.js";
 export { aggregateCoverage, summarizeFieldCoverage, leafFieldEntries } from "./coverage-rollup.js";
 export type {
   MappingCoverageInput,

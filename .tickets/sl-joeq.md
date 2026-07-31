@@ -1,6 +1,6 @@
 ---
 id: sl-joeq
-status: open
+status: closed
 deps: []
 links: [sl-j6g9]
 created: 2026-07-31T14:42:19Z
@@ -78,3 +78,14 @@ Regression tests (each must fail before the fix):
 
 Existing core test at satsuma-core/test/coverage.test.js asserting set.has("city") for the bare leaf is updated, with a comment citing this ticket rather than silently deleted. CLI, core, LSP, viz and vscode suites pass. Coverage-figure change noted in CHANGELOG.md.
 
+
+## Notes
+
+**2026-07-31T15:57:24Z**
+
+Cause: addPathAndPrefixes registered every segment of a covered path as a standalone bare name, so coverage resolved by field NAME rather than by PATH — any field whose own path matched a segment of another covered path in the same schema read as mapped. Removing the bare entries exposed a second defect they had masked: schema-qualified arrows in multi-source mappings (crm.email -> email) matched only via that trailing bare segment, and so could never reach a nested declared path.
+Fix: bare-segment registration removed; new schemaRefPrefixes/schemaLocalFieldPath in coverage-paths.ts resolve an arrow's schema prefix against the schema it names, applied per schema in coverage.ts; satsuma-viz's resolveSchemaLocalFieldPath now delegates to core instead of keeping its own copy. Corpus effect: four example files move — three inflated figures drop (customer_profiles 4/8 -> 2/8; order_transactions, support_tickets and finance_transactions each 1 -> 0, all joined-but-unread schemas crediting a sibling's arrows) and one under-count rises (governance.stm crm_customers 6/13 -> 9/13, the nested consent paths a qualified prefix could not previously reach). Coverage-figure change recorded in CHANGELOG.md under Unreleased. (branch fix/sl-joeq-bare-segment, single commit — the repo rebase-merges, so the landed sha differs)
+
+Scope note on the acceptance criteria: two listed regression tests already passed on main and are kept as guards rather than proofs. The 'fields --unmapped-by on deep-nested-bugs.stm reports GrpHdr.InstdAgt.BIC as unmapped' case and the sibling-record fragment-spread case both pass pre-fix, because main's fields.ts:162 tests only the full path — the mapped.has(f.name) OR clause the ticket cites was removed when sl-oqsj re-based the command onto core. The invariant is covered at core level ('distinguishes repeated leaf names at equal depth under different parents' and 'judges sibling records sharing a leaf name independently'); a CLI-level duplicate was not added, per the no-redundant-tests rule.
+
+Not verified: the viz Playwright harness was not run (it needs a human-launched browser). Its 10 specs make no coverage/mapped assertions, so the changed path is unexercised there; satsuma-viz's 97 unit tests pass.

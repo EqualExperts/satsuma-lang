@@ -1,0 +1,41 @@
+// Fixture for schema-qualified arrow coverage in a multi-source mapping (sl-joeq).
+//
+// Two source schemas that deliberately declare the same field names. Only
+// `crm` is read by an arrow, and every arrow qualifies its source by schema —
+// the style every multi-source example in examples/ uses. That makes this the
+// minimal case for two rules at once:
+//
+//  1. the schema prefix must be resolved away, including onto a NESTED declared
+//     path (`crm.consent.email_marketing` -> `consent.email_marketing`);
+//  2. `ledger`, which shares every field name with `crm`, must stay at 0%.
+
+namespace warehouse {
+  schema crm {
+    customer_id UUID
+    email STRING
+    consent record {
+      email_marketing BOOLEAN
+      sms_marketing   BOOLEAN
+    }
+  }
+
+  schema ledger {
+    customer_id UUID
+    email       STRING
+  }
+
+  schema profile {
+    customer_id    UUID
+    email          STRING
+    consent_email  BOOLEAN
+  }
+
+  mapping assemble {
+    source { crm, ledger }
+    target { profile }
+
+    crm.customer_id -> customer_id
+    crm.email -> email { lowercase }
+    crm.consent.email_marketing -> consent_email
+  }
+}

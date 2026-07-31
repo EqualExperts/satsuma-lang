@@ -5,7 +5,7 @@
  * the LSP coverage path utilities instead of comparing leaf names ad hoc.
  */
 
-import { buildCoveredFieldSet } from "@satsuma/core/coverage-paths";
+import { buildCoveredFieldSet, schemaLocalFieldPath } from "@satsuma/core/coverage-paths";
 import type { ArrowEntry, FieldEntry, MappingBlock, SchemaCard, VizModel } from "./model.js";
 
 /**
@@ -34,23 +34,15 @@ export function schemaHasFieldPath(schema: FieldPathCard, fieldPath: string): bo
 }
 
 /**
- * Prefixes under which an arrow may reference fields of a schema: the
- * qualified id and, for namespaced schemas, the authored bare id. Arrows keep
- * authored text ("customers.id" inside namespace crm) while the backend
- * resolves sourceRefs and qualifiedId to "crm::customers" — matching only the
- * qualified form would miss every bare-prefixed ref in a namespaced mapping
- * (sl-iqud).
- */
-function schemaRefPrefixes(schemaId: string): string[] {
-  const namespaceEnd = schemaId.lastIndexOf("::");
-  if (namespaceEnd < 0) return [schemaId];
-  return [schemaId, schemaId.slice(namespaceEnd + 2)];
-}
-
-/**
  * Resolve an arrow field reference to the schema-local dotted field path for a
- * specific schema card. Schema prefixes match in both authored (bare) and
- * namespace-qualified form.
+ * specific schema card, or null when it belongs to another schema.
+ *
+ * The prefix rules — including matching a namespaced schema by both its
+ * qualified id and its authored bare name (sl-iqud) — live in core's
+ * {@link schemaLocalFieldPath}, shared with `satsuma coverage` and the VS Code
+ * gutter so the three cannot drift. This wrapper adds the one rule specific to
+ * rendering a card: a path this schema does not declare is not shown against
+ * it, since the viz resolves every arrow against every card on screen.
  *
  * Examples:
  * - `customer_profiles.region` + schema `customer_profiles` -> `region`
@@ -63,20 +55,19 @@ export function resolveSchemaLocalFieldPath(
   schema: FieldPathCard,
   sourceRefs: string[],
 ): string | null {
-  for (const prefix of schemaRefPrefixes(schema.qualifiedId)) {
-    if (fieldRef.startsWith(`${prefix}.`)) {
-      return fieldRef.slice(prefix.length + 1);
-    }
-  }
+  const otherRefs = sourceRefs.filter((ref) => ref !== schema.qualifiedId);
+  const declaresTopLevel = (name: string): boolean =>
+    schema.fields.some((field) => field.name === name);
 
-  const explicitOtherSchema = sourceRefs.some(
-    (sourceRef) =>
-      sourceRef !== schema.qualifiedId &&
-      schemaRefPrefixes(sourceRef).some((prefix) => fieldRef.startsWith(`${prefix}.`)),
-  );
-  if (explicitOtherSchema) return null;
+  const local = schemaLocalFieldPath(fieldRef, [schema.qualifiedId], otherRefs, declaresTopLevel);
+  if (local === null) return null;
 
-  return schemaHasFieldPath(schema, fieldRef) ? fieldRef : null;
+  // An explicit `thisSchema.` prefix is proof enough that the ref is meant for
+  // this card. Only an unprefixed ref — which could belong to any card on
+  // screen — has to be confirmed against the declared fields.
+  if (local !== fieldRef) return local;
+
+  return schemaHasFieldPath(schema, local) ? local : null;
 }
 
 /**
