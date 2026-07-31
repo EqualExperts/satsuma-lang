@@ -324,30 +324,55 @@ function getExpandedFields(schema: SchemaLike, lookup: DefinitionLookup): FieldD
   return expandEntityFields(schema as SpreadEntity, schema.namespace ?? null, resolveRef, lookupFrag);
 }
 
+// ── Field lookup: matching a ref to a declared field path ─────────────────────
+//
+// Every helper below answers "where is this field?", not "does it exist?".
+// Returning the path is what keeps resolution honest: a ref may legally omit
+// leading path components (`@city` for `address.city`), and reporting the name
+// as written would name a field that is not declared anywhere. Consumers build
+// lineage edges out of these paths, so a fabricated one becomes a fabricated
+// graph node rather than a visible error (sl-ez36).
+
 /**
- * Check if a field tree contains a field with the given name (flat or nested).
+ * Shallowest declared path to a field named `name`, or null when absent.
+ *
+ * Breadth-first by design, so the match is the one an author would predict:
+ * a top-level `city` wins over a nested `address.city`, and among fields at the
+ * same depth the first declared wins. Depth-first order would instead let a
+ * deeply nested field under the first declaration beat a top-level field
+ * declared second — an arbitrary result that shifts when fields are reordered.
  */
-function hasField(fields: FieldDecl[], name: string): boolean {
-  for (const f of fields) {
-    if (f.name === name) return true;
-    if (f.children && hasField(f.children, name)) return true;
+function findFieldPath(fields: FieldDecl[], name: string): string | null {
+  // Each queue entry is a field plus the dotted path that reaches it.
+  let level: { field: FieldDecl; path: string }[] =
+    fields.map((f) => ({ field: f, path: f.name }));
+
+  while (level.length > 0) {
+    for (const { field, path } of level) {
+      if (field.name === name) return path;
+    }
+    level = level.flatMap(({ field, path }) =>
+      (field.children ?? []).map((c) => ({ field: c, path: `${path}.${c.name}` })),
+    );
   }
-  return false;
+  return null;
 }
 
 /**
- * Check if a path (as pre-split segment names) resolves to a nested field
- * within a field tree. Segment names are matched verbatim — splitting happens
- * at parse time so literal (backticked) names keep their embedded dots.
+ * Declared path for a ref given as pre-split segments, or null when it matches
+ * nothing. Segment names are matched verbatim — splitting happens at parse time
+ * so literal (backticked) names keep their embedded dots.
  *
  * Tries two strategies in order:
- *  1. matchPath — treat the path as anchored from the root of the field tree.
- *  2. searchNestedPath — search for the path starting from any nested record
- *     field, to handle refs that omit leading path segments.
+ *  1. Anchored at the root of the field tree, which is how a fully-spelled ref
+ *     (`@address.city`) is written.
+ *  2. Anchored at any nested record, for a ref that omits leading segments
+ *     (`@contents.sku` for `parcels.contents.sku`). The prefix that reached the
+ *     match is prepended, so the returned path is complete.
  */
-function hasNestedFieldPath(fields: FieldDecl[], segments: string[]): boolean {
-  if (matchPath(fields, segments)) return true;
-  return searchNestedPath(fields, segments);
+function findNestedFieldPath(fields: FieldDecl[], segments: string[]): string | null {
+  if (matchPath(fields, segments)) return segments.join(".");
+  return searchNestedPath(fields, segments, "");
 }
 
 /**
@@ -370,40 +395,53 @@ function matchPath(fields: FieldDecl[], segments: string[]): boolean {
 }
 
 /**
- * Recursively search all record fields for a subtree where matchPath succeeds.
- * Used when the ref omits a leading path component (e.g., writing "city"
- * instead of "address.city") — we descend into record children to find a match.
+ * Search every record subtree for one where `segments` matches when anchored
+ * there, returning the full path from the original root. `prefix` accumulates
+ * the ancestors walked so far.
+ *
+ * Breadth-first for the same reason as findFieldPath: prefer the shallowest
+ * record whose subtree matches.
  */
-function searchNestedPath(fields: FieldDecl[], segments: string[]): boolean {
-  for (const f of fields) {
-    if (f.children) {
-      if (matchPath(f.children, segments)) return true;
-      if (searchNestedPath(f.children, segments)) return true;
-    }
+function searchNestedPath(fields: FieldDecl[], segments: string[], prefix: string): string | null {
+  const records = fields.filter((f) => f.children && f.children.length > 0);
+
+  for (const f of records) {
+    const path = prefix ? `${prefix}.${f.name}` : f.name;
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- Safe: filtered to fields with children above
+    if (matchPath(f.children!, segments)) return `${path}.${segments.join(".")}`;
   }
-  return false;
+  for (const f of records) {
+    const path = prefix ? `${prefix}.${f.name}` : f.name;
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- Safe: same filter
+    const found = searchNestedPath(f.children!, segments, path);
+    if (found) return found;
+  }
+  return null;
 }
 
 /**
- * Check if a field path (parsed segments) exists on a schema, consulting
- * fragment-spread expansion when declared fields alone don't match.
+ * Declared path for a ref on a schema, consulting fragment-spread expansion
+ * when declared fields alone don't match. Returns null when the ref matches no
+ * field.
  *
  * A single segment is matched as an exact field name — a literal (backticked)
  * segment may contain "." or "::" but still names ONE field, never a nested
  * path (sl-g6ga). Multi-segment paths walk the field tree per segment.
  */
-function hasFieldWithSpreads(schema: SchemaLike, fieldSegs: RefSegment[], lookup: DefinitionLookup): boolean {
+function findFieldPathWithSpreads(schema: SchemaLike, fieldSegs: RefSegment[], lookup: DefinitionLookup): string | null {
   const names = fieldSegs.map((s) => s.name);
   if (names.length > 1) {
-    if (hasNestedFieldPath(schema.fields, names)) return true;
-    if (!schema.hasSpreads) return false;
+    const direct = findNestedFieldPath(schema.fields, names);
+    if (direct) return direct;
+    if (!schema.hasSpreads) return null;
     const expanded = getExpandedFields(schema, lookup);
-    return hasNestedFieldPath([...schema.fields, ...expanded], names);
+    return findNestedFieldPath([...schema.fields, ...expanded], names);
   }
   const fieldName = names[0]!;
-  if (hasField(schema.fields, fieldName)) return true;
-  if (!schema.hasSpreads) return false;
-  return hasField(getExpandedFields(schema, lookup), fieldName);
+  const direct = findFieldPath(schema.fields, fieldName);
+  if (direct) return direct;
+  if (!schema.hasSpreads) return null;
+  return findFieldPath(getExpandedFields(schema, lookup), fieldName);
 }
 
 /**
@@ -470,10 +508,10 @@ export function resolveRef(ref: string, mappingContext: MappingContext, lookup: 
     const firstDot = separators.indexOf(".");
     const schemaRef = segments.slice(0, firstDot + 1).map((s) => s.name).join("::");
     const fieldSegs = segments.slice(firstDot + 1);
-    const fieldName = fieldSegs.map((s) => s.name).join(".");
     const schema = lookup.getSchema(schemaRef);
-    if (schema && hasFieldWithSpreads(schema, fieldSegs, lookup)) {
-      return { resolved: true, resolvedTo: { kind: "field", name: `${canonicalKey(schemaRef)}.${fieldName}` } };
+    const fieldPath = schema ? findFieldPathWithSpreads(schema, fieldSegs, lookup) : null;
+    if (fieldPath) {
+      return { resolved: true, resolvedTo: { kind: "field", name: `${canonicalKey(schemaRef)}.${fieldPath}` } };
     }
     return { resolved: false, resolvedTo: null };
   }
@@ -482,20 +520,21 @@ export function resolveRef(ref: string, mappingContext: MappingContext, lookup: 
     const names = segments.map((s) => s.name);
     const schemaName = names[0]!;
     const fieldSegs = segments.slice(1);
-    const fieldName = fieldSegs.map((s) => s.name).join(".");
-    const fullPath = names.join(".");
 
     const allSchemas = [...(mappingContext.sources ?? []), ...(mappingContext.targets ?? [])];
     for (const s of allSchemas) {
       const key = contextSchemaKey(s, mappingContext.namespace, lookup);
       const schema = lookup.getSchema(key);
-      if (schema && hasNestedFieldPath(schema.fields, names)) {
-        return { resolved: true, resolvedTo: { kind: "field", name: `${canonicalKey(key)}.${fullPath}` } };
+      if (!schema) continue;
+      const direct = findNestedFieldPath(schema.fields, names);
+      if (direct) {
+        return { resolved: true, resolvedTo: { kind: "field", name: `${canonicalKey(key)}.${direct}` } };
       }
-      if (schema?.hasSpreads) {
+      if (schema.hasSpreads) {
         const expanded = getExpandedFields(schema, lookup);
-        if (hasNestedFieldPath([...schema.fields, ...expanded], names)) {
-          return { resolved: true, resolvedTo: { kind: "field", name: `${canonicalKey(key)}.${fullPath}` } };
+        const viaSpread = findNestedFieldPath([...schema.fields, ...expanded], names);
+        if (viaSpread) {
+          return { resolved: true, resolvedTo: { kind: "field", name: `${canonicalKey(key)}.${viaSpread}` } };
         }
       }
     }
@@ -506,8 +545,9 @@ export function resolveRef(ref: string, mappingContext: MappingContext, lookup: 
       if (baseName === schemaName || s === schemaName) {
         const key = contextSchemaKey(s, mappingContext.namespace, lookup);
         const schema = lookup.getSchema(key);
-        if (schema && hasFieldWithSpreads(schema, fieldSegs, lookup)) {
-          return { resolved: true, resolvedTo: { kind: "field", name: `${canonicalKey(key)}.${fieldName}` } };
+        const fieldPath = schema ? findFieldPathWithSpreads(schema, fieldSegs, lookup) : null;
+        if (fieldPath) {
+          return { resolved: true, resolvedTo: { kind: "field", name: `${canonicalKey(key)}.${fieldPath}` } };
         }
       }
     }
@@ -523,13 +563,15 @@ export function resolveRef(ref: string, mappingContext: MappingContext, lookup: 
         const nsIdx = key.indexOf("::");
         const baseName = nsIdx !== -1 ? key.slice(nsIdx + 2) : key;
         if (baseName === schemaName || key === schemaName) {
-          if (hasFieldWithSpreads(schema, fieldSegs, lookup)) {
-            return { resolved: true, resolvedTo: { kind: "field", name: `${canonicalKey(key)}.${fieldName}` } };
+          const fieldPath = findFieldPathWithSpreads(schema, fieldSegs, lookup);
+          if (fieldPath) {
+            return { resolved: true, resolvedTo: { kind: "field", name: `${canonicalKey(key)}.${fieldPath}` } };
           }
         }
         // Also try as nested path within this schema
-        if (hasNestedFieldPath(schema.fields, names)) {
-          return { resolved: true, resolvedTo: { kind: "field", name: `${canonicalKey(key)}.${fullPath}` } };
+        const nestedPath = findNestedFieldPath(schema.fields, names);
+        if (nestedPath) {
+          return { resolved: true, resolvedTo: { kind: "field", name: `${canonicalKey(key)}.${nestedPath}` } };
         }
       }
     }
@@ -543,8 +585,9 @@ export function resolveRef(ref: string, mappingContext: MappingContext, lookup: 
   for (const s of allSchemaNames) {
     const key = contextSchemaKey(s, mappingContext.namespace, lookup);
     const schema = lookup.getSchema(key);
-    if (schema && hasFieldWithSpreads(schema, segments, lookup)) {
-      return { resolved: true, resolvedTo: { kind: "field", name: `${canonicalKey(key)}.${bareName}` } };
+    const fieldPath = schema ? findFieldPathWithSpreads(schema, segments, lookup) : null;
+    if (fieldPath) {
+      return { resolved: true, resolvedTo: { kind: "field", name: `${canonicalKey(key)}.${fieldPath}` } };
     }
   }
 
@@ -552,8 +595,9 @@ export function resolveRef(ref: string, mappingContext: MappingContext, lookup: 
   // searching all workspace schemas for the bare field name.
   if (allSchemaNames.length === 0 && lookup.iterateSchemas) {
     for (const [key, schema] of lookup.iterateSchemas()) {
-      if (hasFieldWithSpreads(schema, segments, lookup)) {
-        return { resolved: true, resolvedTo: { kind: "field", name: `${canonicalKey(key)}.${bareName}` } };
+      const fieldPath = findFieldPathWithSpreads(schema, segments, lookup);
+      if (fieldPath) {
+        return { resolved: true, resolvedTo: { kind: "field", name: `${canonicalKey(key)}.${fieldPath}` } };
       }
     }
   }
@@ -763,6 +807,62 @@ function extractBlockNoteRefs(
   }
 }
 
+// ── Target qualification inside containers ────────────────────────────────────
+//
+// Arrows nest inside `each`, `flatten` and braced `src -> tgt` (`nested_arrow`)
+// blocks, and inside them a target is written relative to the container
+// (`-> .line_total`). The recorded targetField must be absolute from the target
+// schema root, because downstream qualifyField() prepends the schema and cannot
+// recover a base it was never given: `.line_total` became `tgt.line_total`
+// rather than `tgt.lines.line_total`, inventing a field (sl-hrql).
+//
+// The rule itself is extract.ts's accumulating-prefix contract, which PRD 38
+// records as correct and which declared arrows have always followed; this walk
+// was simply not applying it. coverage.ts solved the same problem in its own CST
+// walker, and PRD 38 Open Question 1 has since resolved to delete that walker
+// and derive covered paths from extraction instead (sl-vu22) — so treat
+// extract.ts as the reference here, not coverage.ts.
+
+/** True when a tgt_path was authored relative to the current element (`.field`). */
+function isRelativeTargetPath(pathNode: SyntaxNode | undefined): boolean {
+  return pathNode?.namedChildren.some((x) => x.type === "relative_field_path") ?? false;
+}
+
+/**
+ * Append a target leaf to the base its enclosing container established,
+ * dropping the leading `.` that marks the leaf as element-relative. Returns the
+ * base unchanged when the node carries no target (an arrow with no tgt_path).
+ */
+function qualifyTarget(base: string | null, leaf: string | null): string | null {
+  if (leaf === null) return base;
+  const relative = leaf.startsWith(".") ? leaf.slice(1) : leaf;
+  return base ? `${base}.${relative}` : relative;
+}
+
+/**
+ * The target base a container establishes for the arrows inside it.
+ *
+ * `each` and `nested_arrow` always establish one: their target names a field,
+ * and their children are written against it.
+ *
+ * `flatten` is the exception, and the grammar says which case applies. In spec
+ * §4.6's top-level form the target names the target *schema*
+ * (`flatten contacts -> tgt`) and the block unnests into schema-root fields, so
+ * there is no base. Written relative — `flatten .contents -> .packed_items`
+ * inside an `each` — it names a list field on the current element and its
+ * arrows are relative to that. A `relative_field_path` node is the authored
+ * signal separating the two.
+ */
+function containerTargetBase(
+  node: SyntaxNode,
+  rawTgt: SyntaxNode | undefined,
+  outerTgt: string | null,
+): string | null {
+  if (!rawTgt) return outerTgt;
+  if (node.type === "flatten_block" && !isRelativeTargetPath(rawTgt)) return outerTgt;
+  return qualifyTarget(outerTgt, extractPathText(rawTgt));
+}
+
 function walkArrowsForNL(
   node: SyntaxNode,
   mappingName: string,
@@ -823,13 +923,13 @@ function walkArrowsForNL(
     }
     if (c.type === "each_block" || c.type === "flatten_block") {
       const tgtNode = c.namedChildren.find((x) => x.type === "tgt_path");
-      const tgt = extractPathText(tgtNode) ?? targetField;
+      const tgt = containerTargetBase(c, tgtNode, targetField);
       walkArrowsForNL(c, mappingName, namespace, tgt, results);
       continue;
     }
     if (c.type === "map_arrow" || c.type === "computed_arrow" || c.type === "nested_arrow") {
       const tgtNode = c.namedChildren.find((x) => x.type === "tgt_path");
-      const tgt = extractPathText(tgtNode) ?? targetField;
+      const tgt = qualifyTarget(targetField, extractPathText(tgtNode));
 
       const pipeChain = c.namedChildren.find((x) => x.type === "pipe_chain");
       if (pipeChain) {

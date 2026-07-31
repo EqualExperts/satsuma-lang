@@ -172,3 +172,55 @@ describe("field-lineage NL-derived edges in namespaced mappings (sl-njej)", () =
     assert.equal(nlEdges[0].via_mapping, "ns::load_s2");
   });
 });
+
+// ---------------------------------------------------------------------------
+// sl-hrql / sl-ez36: NL @refs inside containers resolved to fabricated paths
+// ---------------------------------------------------------------------------
+describe("field-lineage — NL @refs inside containers (sl-hrql, sl-ez36)", () => {
+  // The canonical SAP example nests a computed arrow two ways at once:
+  //   each Items -> items { .MENGE -> .orderedQty { "... @MEINS ..." } }
+  // @MEINS is declared at Items.MEINS (nested source), and the arrow target is
+  // element-relative. Both ends were wrong, and wrong silently: the edge landed
+  // on ::sap_purchase_order.MEINS -> ::mfcs_purchase_order.orderedQty, neither
+  // of which is a declared field. Guarding the shipped corpus rather than a
+  // fixture keeps the regression tied to a shape real specs use.
+  const SAP = resolve(__dirname, "../../../examples/sap-po-to-mfcs/pipeline.stm");
+
+  it("anchors the nl-derived edge on the nested source field, not the schema root", async () => {
+    const { stdout, code } = await run(
+      "field-lineage", "sap_purchase_order.Items.MEINS", SAP, "--json", "--downstream",
+    );
+    assert.equal(code, 0, `expected exit 0\n${stdout}`);
+    const nlEdges = (JSON.parse(stdout).downstream as any[])
+      .filter((e) => e.classification === "nl-derived");
+    assert.deepEqual(
+      nlEdges.map((e) => e.field),
+      ["::mfcs_purchase_order.items.orderedQty"],
+      "the @MEINS ref must resolve to Items.MEINS and target items.orderedQty",
+    );
+  });
+
+  it("leaves no lineage on the phantom top-level path the bug invented", async () => {
+    // sap_purchase_order has no top-level MEINS. The command still resolves the
+    // name (the index is indexed by leaf too), so the assertion that matters is
+    // that no edge hangs off it any more.
+    const { stdout, code } = await run(
+      "field-lineage", "sap_purchase_order.MEINS", SAP, "--json", "--downstream",
+    );
+    assert.equal(code, 0, `expected exit 0\n${stdout}`);
+    assert.deepEqual(JSON.parse(stdout).downstream, []);
+  });
+
+  it("agrees with the declared arrow index on the target of the same arrow", async () => {
+    // The clearest statement of the target-side bug: `graph` emitted an `nl`
+    // edge to items.orderedQty and an `nl-derived` edge to orderedQty for one
+    // source line. Any consumer building a graph got two nodes for one field.
+    const { stdout, code } = await run("graph", SAP, "--json");
+    assert.equal(code, 0, `expected exit 0\n${stdout}`);
+    const edges = (JSON.parse(stdout).edges as any[])
+      .filter((e) => e.to.endsWith("orderedQty"));
+    const targets = [...new Set(edges.map((e) => e.to))];
+    assert.deepEqual(targets, ["::mfcs_purchase_order.items.orderedQty"],
+      "nl and nl-derived edges for one arrow must name one target field");
+  });
+});

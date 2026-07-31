@@ -1,6 +1,6 @@
 ---
 id: sl-hrql
-status: open
+status: closed
 deps: []
 links: [sl-ez36]
 created: 2026-07-31T15:53:53Z
@@ -65,3 +65,23 @@ target side — and see the sibling ticket for the source side.
 - A corpus regression test asserts the corrected edge for
   `examples/sap-po-to-mfcs/pipeline.stm`.
 
+
+## Notes
+
+**2026-07-31T16:11:42Z**
+
+**2026-07-31T16:11:42Z**
+
+Cause: walkArrowsForNL in satsuma-core/src/nl-ref.ts recorded targetField as the
+arrow's own tgt_path text verbatim, never accumulating the target base its
+enclosing each/flatten/nested_arrow container established. Downstream
+qualifyField() strips the leading dot and prepends the target schema, so
+'.line_total' became 'tgt.line_total' instead of 'tgt.lines.line_total' —
+a field that does not exist.
+Fix: added qualifyTarget() and containerTargetBase() and threaded the base
+through the walk, mirroring collectBlockItemPaths/containerTargetBase in
+coverage.ts. flatten keeps its two cases: a relative target (.contents ->
+.packed_items) stacks a base, a top-level one (flatten contacts -> tgt) names
+the schema and establishes none. 5 core tests cover each/nested_arrow/two-level
+nesting/top-level flatten/the no-container control; 3 CLI tests guard the
+shipped corpus and assert graph's nl and nl-derived edges now name one target.

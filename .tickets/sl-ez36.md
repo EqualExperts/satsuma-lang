@@ -1,6 +1,6 @@
 ---
 id: sl-ez36
-status: open
+status: closed
 deps: []
 links: [sl-hrql, sl-0zgi]
 created: 2026-07-31T15:54:12Z
@@ -76,3 +76,24 @@ Sibling of the target-side defect in this same walk.
 - Corpus regression test for `examples/sap-po-to-mfcs/pipeline.stm`
   (`@MEINS` -> `::sap_purchase_order.Items.MEINS`).
 
+
+## Notes
+
+**2026-07-31T16:11:42Z**
+
+**2026-07-31T16:11:42Z**
+
+Cause: resolveRef in satsuma-core/src/nl-ref.ts located nested fields but built
+the result from the ref as written — the bare branch returned
+`${schemaKey}.${bareName}` and the dotted branch's searchNestedPath fallback
+returned the path without the ancestor prefix that reached the match. Both
+reported resolved:true, so unresolved-nl-ref stayed silent and the fabricated
+path flowed into lineage: field-lineage on the real nested field showed nothing
+while a phantom node carried the edge.
+Fix: replaced the boolean helpers (hasField, hasNestedFieldPath,
+hasFieldWithSpreads) with path-returning equivalents (findFieldPath,
+findNestedFieldPath, findFieldPathWithSpreads) and used their result to build
+resolvedTo.name in all four resolution branches. Search is breadth-first so the
+match is the shallowest — a top-level 'city' wins over 'address.city' — which
+makes the answer independent of field declaration order; pinned by test. 6 core
+tests plus the shared corpus regression tests with sl-hrql.
