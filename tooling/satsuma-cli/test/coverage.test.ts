@@ -23,6 +23,11 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const CLI = resolve(__dirname, "../dist/index.js");
 const WORKSPACE = resolve(__dirname, "fixtures/coverage-workspace.stm");
 const NESTED = resolve(__dirname, "fixtures/unmapped-nested.stm");
+// The repo's canonical nested-iteration example: two levels of `each` with a
+// `flatten` inside them. Fully mapped apart from one deliberately unread field,
+// which makes it the reference case for nested container coverage (sl-qzy3).
+const NESTED_ITERATION = resolve(__dirname, "../../../examples/nested-iteration/pipeline.stm");
+const NESTED_ARROW = resolve(__dirname, "fixtures/nested-arrow-lookup.stm");
 
 const run = (...args: string[]) => _run(CLI, ...args);
 
@@ -514,5 +519,69 @@ describe("satsuma coverage --fail-under", () => {
     // legitimately arrives at zero.
     const { code } = await run("coverage", WORKSPACE, "--fail-under", "0");
     assert.equal(code, 0);
+  });
+});
+
+// ── Nested containers on the real corpus (sl-qzy3) ──────────────────────────
+
+describe("satsuma coverage — nested containers", () => {
+  // These assert *percentages*, not just per-field booleans, because the
+  // percentage is what --fail-under gates on. Before sl-qzy3 the walk skipped
+  // `flatten` inside `each`, so this fully-mapped example reported 75% on the
+  // target and would have failed `--fail-under 90` — blocking correct work.
+
+  it("reports the fully-mapped nested-iteration target as 100%", async () => {
+    const { stdout, code } = await run("coverage", NESTED_ITERATION, "--json");
+    assert.equal(code, 0);
+    const target = schemaEntry(parseJson(stdout), "::dispatch manifest", "target", "::dispatch_manifest_json");
+    assert.deepEqual(
+      { covered: target.covered, total: target.total, pct: target.pct },
+      { covered: 8, total: 8, pct: 100 },
+    );
+  });
+
+  it("reports the one genuinely unread source leaf and nothing else", async () => {
+    // orders.parcels.barcode is never referenced by any arrow; every other
+    // source leaf is, including those reached only through the nested flatten.
+    const { stdout } = await run("coverage", NESTED_ITERATION, "--uncovered", "--json");
+    const source = schemaEntry(parseJson(stdout), "::dispatch manifest", "source", "::warehouse_dispatch_events");
+    assert.deepEqual(source.fields.map((f: any) => f.path), ["orders.parcels.barcode"]);
+    assert.deepEqual(
+      { covered: source.covered, total: source.total, pct: source.pct },
+      { covered: 8, total: 9, pct: 89 },
+    );
+  });
+
+  it("keeps fields --unmapped-by agreeing with coverage on the same example", async () => {
+    // fields --unmapped-by was correct before sl-oqsj re-based it onto the core
+    // walker and wrong afterwards, because the walker missed the nested flatten.
+    // This pins the two commands together on a nested fixture, which is where
+    // they diverged.
+    const { stdout, code } = await run(
+      "fields", "warehouse_dispatch_events", "--unmapped-by", "dispatch manifest", NESTED_ITERATION, "--json",
+    );
+    assert.equal(code, 0);
+    const leaves: string[] = [];
+    const walk = (fields: any[], prefix: string) => {
+      for (const f of fields) {
+        const path = prefix ? `${prefix}.${f.name}` : f.name;
+        if (f.children?.length) walk(f.children, path);
+        else leaves.push(path);
+      }
+    };
+    walk(parseJson(stdout), "");
+    assert.deepEqual(leaves, ["orders.parcels.barcode"]);
+  });
+
+  it("covers both sides of a braced src -> tgt arrow", async () => {
+    // nested_arrow was absent from the walk, so this fixture reported 0% on
+    // both sides despite every field being explicitly mapped.
+    const { stdout, code } = await run("coverage", NESTED_ARROW, "--json");
+    assert.equal(code, 0);
+    const data = parseJson(stdout);
+    for (const [role, schema] of [["source", "::src_sys"], ["target", "::tgt_sys"]] as const) {
+      const entry = schemaEntry(data, "::addr_map", role, schema);
+      assert.equal(entry.pct, 100, `${role} ${schema} should be fully covered`);
+    }
   });
 });

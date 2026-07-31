@@ -412,3 +412,143 @@ mapping load {
     }
   });
 });
+
+// ── Nested containers (sl-qzy3) ─────────────────────────────────────────────
+
+describe("computeMappingCoverage — nested containers", () => {
+  // The walk must recurse over every container the grammar permits, in any
+  // combination. It previously enumerated the children each parent accepted,
+  // which silently dropped `flatten` inside `each` and `nested_arrow`
+  // everywhere: explicitly mapped fields were reported as spec gaps, and
+  // `--fail-under` would fail a complete spec.
+
+  it("qualifies arrows inside a braced src -> tgt arrow against both sides", () => {
+    // nested_arrow was absent from the walk entirely, so every field on both
+    // sides of `addr -> address { ... }` reported uncovered despite explicit
+    // arrows. The base applies to source and target alike, as it does for each.
+    const src = `
+schema src { addr record { street STRING city STRING } name STRING }
+schema tgt { address record { line STRING city STRING } full STRING }
+mapping load {
+  source { src }
+  target { tgt }
+  name -> full
+  addr -> address {
+    .street -> .line
+    .city -> .city
+  }
+}`;
+    const result = coverage(src, "load");
+    const s = forRole(result, "source");
+    assertMapped(s, "addr", true);
+    assertMapped(s, "addr.street", true);
+    assertMapped(s, "addr.city", true);
+    const t = forRole(result, "target");
+    assertMapped(t, "address.line", true);
+    assertMapped(t, "address.city", true);
+  });
+
+  it("leaves a sibling field uncovered when a nested_arrow does not map it", () => {
+    // Guards against the opposite failure: recursing into nested_arrow must not
+    // mark the whole subtree covered just because the container is referenced.
+    const src = `
+schema src { addr record { street STRING zip STRING } }
+schema tgt { address record { line STRING zip STRING } }
+mapping load {
+  source { src }
+  target { tgt }
+  addr -> address {
+    .street -> .line
+  }
+}`;
+    const result = coverage(src, "load");
+    assertMapped(forRole(result, "source"), "addr.zip", false);
+    assertMapped(forRole(result, "target"), "address.zip", false);
+  });
+
+  it("resolves a flatten nested inside an each against the each's bases", () => {
+    // The shape of examples/nested-iteration/pipeline.stm:100. The each child
+    // loop handled each_block but not flatten_block, so the entire flatten
+    // subtree — source and target — reported uncovered.
+    const src = `
+schema src { orders list_of record {
+  parcels list_of record { barcode STRING contents list_of record { sku STRING } }
+} }
+schema tgt { orders list_of record { packed list_of record { sku STRING } } }
+mapping load {
+  source { src }
+  target { tgt }
+  each orders -> orders {
+    flatten parcels.contents -> .packed {
+      .sku -> .sku
+    }
+  }
+}`;
+    const result = coverage(src, "load");
+    const s = forRole(result, "source");
+    assertMapped(s, "orders.parcels", true);
+    assertMapped(s, "orders.parcels.contents", true);
+    assertMapped(s, "orders.parcels.contents.sku", true);
+    // barcode is genuinely never read — the one real gap in this fixture.
+    assertMapped(s, "orders.parcels.barcode", false);
+    const t = forRole(result, "target");
+    assertMapped(t, "orders.packed", true);
+    assertMapped(t, "orders.packed.sku", true);
+  });
+
+  it("resolves an each nested inside a flatten", () => {
+    // The mirror of the case above. collectFlattenPaths handled no nested
+    // blocks at all, so an each inside a flatten contributed nothing.
+    const src = `
+schema src { rows list_of record { lines list_of record { sku STRING } } }
+schema tgt { out list_of record { sku STRING } spare STRING }
+mapping load {
+  source { src }
+  target { tgt }
+  flatten rows -> tgt {
+    each .lines -> out {
+      .sku -> .sku
+    }
+  }
+}`;
+    const result = coverage(src, "load");
+    const s = forRole(result, "source");
+    assertMapped(s, "rows.lines", true);
+    assertMapped(s, "rows.lines.sku", true);
+    const t = forRole(result, "target");
+    assertMapped(t, "out.sku", true);
+    assertMapped(t, "spare", false);
+  });
+
+  it("keeps a top-level flatten's targets at the schema root while a relative one bases", () => {
+    // Both flatten forms in one mapping. `-> tgt` names the target schema, so
+    // `email` resolves at the root; `-> .packed` inside an each names a list
+    // field on the current element, so `.sku` resolves under it. The authored
+    // relative_field_path is what separates the two.
+    const src = `
+schema src {
+  contacts list_of record { email STRING }
+  orders list_of record { items list_of record { sku STRING } }
+}
+schema tgt {
+  email STRING
+  orders list_of record { packed list_of record { sku STRING } }
+}
+mapping load {
+  source { src }
+  target { tgt }
+  flatten contacts -> tgt {
+    .email -> email
+  }
+  each orders -> orders {
+    flatten items -> .packed {
+      .sku -> .sku
+    }
+  }
+}`;
+    const result = coverage(src, "load");
+    const t = forRole(result, "target");
+    assertMapped(t, "email", true);
+    assertMapped(t, "orders.packed.sku", true);
+  });
+});
