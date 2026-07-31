@@ -9,13 +9,15 @@
  *
  * "Covered" means:
  *   - source field: its name (or a path that starts with it) appears as a
- *     src_path in at least one arrow, each_block, or flatten_block inside the
- *     mapping.
- *   - target field: its name (or a path that starts with it) appears as a
- *     tgt_path in at least one arrow inside the mapping.
+ *     src_path in at least one arrow anywhere in the mapping.
+ *   - target field: the same, as a tgt_path.
  *
- * Nested record fields are handled recursively. each_block and flatten_block
- * src-paths contribute both the top-level field and the qualified nested path.
+ * Nested record fields are handled recursively. Arrows nest inside three
+ * container blocks — `each`, `flatten` and a braced `src -> tgt` (`nested_arrow`)
+ * — which the grammar allows to interleave to any depth, so the walk recurses
+ * uniformly over all three rather than enumerating what each may contain
+ * (sl-qzy3). A container's own src/tgt count as touched and become the prefixes
+ * for the arrows inside it.
  *
  * Coverage is deliberately *structural only*: a field a note block describes in
  * prose is uncovered by definition. NL interpretation belongs to nl-refs, and
@@ -187,115 +189,120 @@ export function computeMappingCoverage(
 // ── Path collection ─────────────────────────────────────────────────────────
 
 /**
- * Walk all arrows (including inside each/flatten) in the mapping body and
- * populate the covered src-path and tgt-path sets.
+ * Path prefixes established by the enclosing container, or null at mapping-body
+ * level. A container's own — already qualified — source and target become the
+ * bases for its children, accumulating across arbitrary depth.
+ */
+interface PathBases {
+  /** Absolute source path of the enclosing container, null at body level. */
+  src: string | null;
+  /** Absolute target path of the enclosing container, null at body level. */
+  tgt: string | null;
+}
+
+/**
+ * Block types that declare one src/tgt pair plus a body of further block items.
+ *
+ * All three are walked through one shared branch rather than each parent
+ * enumerating the children it permits. That enumeration is what caused
+ * `flatten` inside `each` and `nested_arrow` anywhere to be silently dropped
+ * from coverage (sl-qzy3): the grammar's `_nested_block_item` allows any of
+ * these inside any of them, so a walk that lists cases per parent falls out of
+ * step with the grammar the moment a construct is added.
+ */
+const CONTAINER_BLOCK_TYPES = new Set(["each_block", "flatten_block", "nested_arrow"]);
+
+/**
+ * Walk every arrow in the mapping body — including those nested inside
+ * containers to arbitrary depth — and populate the covered src/tgt path sets.
  */
 function collectBodyPaths(
   body: SyntaxNode,
   srcPaths: Set<string>,
   tgtPaths: Set<string>,
 ): void {
-  for (const node of body.namedChildren) {
-    switch (node.type) {
-      case "map_arrow":
-        for (const sp of children(node, "src_path")) addPathAndPrefixes(srcPaths, pathText(sp));
-        { const tp = child(node, "tgt_path"); if (tp) addPathAndPrefixes(tgtPaths, pathText(tp)); }
-        break;
-      case "computed_arrow":
-        { const tp = child(node, "tgt_path"); if (tp) addPathAndPrefixes(tgtPaths, pathText(tp)); }
-        break;
-      case "each_block":
-        collectEachPaths(node, srcPaths, tgtPaths, null, null);
-        break;
-      case "flatten_block":
-        collectFlattenPaths(node, srcPaths, tgtPaths);
-        break;
+  collectBlockItemPaths(body.namedChildren, srcPaths, tgtPaths, { src: null, tgt: null });
+}
+
+/**
+ * Collect paths from a list of sibling block items, qualifying each against the
+ * bases its enclosing container established.
+ */
+function collectBlockItemPaths(
+  nodes: SyntaxNode[],
+  srcPaths: Set<string>,
+  tgtPaths: Set<string>,
+  bases: PathBases,
+): void {
+  for (const node of nodes) {
+    if (node.type === "map_arrow") {
+      for (const sp of children(node, "src_path")) {
+        addPathAndPrefixes(srcPaths, qualify(bases.src, pathText(sp)));
+      }
+      const tp = child(node, "tgt_path");
+      if (tp) addPathAndPrefixes(tgtPaths, qualify(bases.tgt, pathText(tp)));
+    } else if (node.type === "computed_arrow") {
+      // Source-less arrow: the target is still populated by this mapping.
+      const tp = child(node, "tgt_path");
+      if (tp) addPathAndPrefixes(tgtPaths, qualify(bases.tgt, pathText(tp)));
+    } else if (CONTAINER_BLOCK_TYPES.has(node.type)) {
+      collectContainerPaths(node, srcPaths, tgtPaths, bases);
     }
   }
 }
 
 /**
- * Recursively collect paths from an each_block.
- * Arrows inside an each_block are relative to the iteration field.
- *
- * Nullability contract for outerSrcBase / outerTgtBase:
- *   null     — no enclosing each_block has established a base path yet; this
- *               is the top-level call for this each_block, so paths from the
- *               block's own src_path/tgt_path become the new base.
- *   non-null — an enclosing each_block already established a prefix; paths in
- *               this nested block are qualified relative to that prefix via
- *               qualify(outerBase, localPath).
- *
- * Recursive call sites pass srcBase/tgtBase (the base resolved for this level)
- * as the outer values for any nested each_blocks found within this node.
+ * Register a container's own source and target, then recurse into its body with
+ * those as the bases for the level below.
  */
-function collectEachPaths(
+function collectContainerPaths(
   node: SyntaxNode,
   srcPaths: Set<string>,
   tgtPaths: Set<string>,
-  outerSrcBase: string | null,
-  outerTgtBase: string | null,
+  outer: PathBases,
 ): void {
   const rawSrc = child(node, "src_path");
   const rawTgt = child(node, "tgt_path");
-  const srcBase = rawSrc ? qualify(outerSrcBase, pathText(rawSrc)) : outerSrcBase;
-  const tgtBase = rawTgt ? qualify(outerTgtBase, pathText(rawTgt)) : outerTgtBase;
 
-  if (srcBase) addPathAndPrefixes(srcPaths, srcBase);
-  if (tgtBase) addPathAndPrefixes(tgtPaths, tgtBase);
+  const src = rawSrc ? qualify(outer.src, pathText(rawSrc)) : outer.src;
+  const tgt = containerTargetBase(node, rawTgt, outer.tgt);
 
-  for (const ch of node.namedChildren) {
-    if (ch.type === "map_arrow") {
-      for (const sp of children(ch, "src_path")) {
-        const leaf = pathText(sp);
-        addPathAndPrefixes(srcPaths, srcBase ? qualify(srcBase, leaf) : leaf);
-      }
-      const tp = child(ch, "tgt_path");
-      if (tp) {
-        const leaf = pathText(tp);
-        addPathAndPrefixes(tgtPaths, tgtBase ? qualify(tgtBase, leaf) : leaf);
-      }
-    } else if (ch.type === "computed_arrow") {
-      const tp = child(ch, "tgt_path");
-      if (tp) {
-        const leaf = pathText(tp);
-        addPathAndPrefixes(tgtPaths, tgtBase ? qualify(tgtBase, leaf) : leaf);
-      }
-    } else if (ch.type === "each_block") {
-      collectEachPaths(ch, srcPaths, tgtPaths, srcBase, tgtBase);
-    }
-  }
+  // The container's own paths count as touched: iterating a list consumes it,
+  // and writing into one populates it.
+  if (src) addPathAndPrefixes(srcPaths, src);
+  if (tgt) addPathAndPrefixes(tgtPaths, tgt);
+
+  collectBlockItemPaths(node.namedChildren, srcPaths, tgtPaths, { src, tgt });
 }
 
 /**
- * Collect paths from a flatten_block.
+ * Resolve the target base a container establishes for its children.
  *
- * Unlike each_block, only the *source* side has a base path: flatten unnests a
- * source list into flat target fields, so target paths inside the block are
- * already schema-root-relative and must not be prefixed.
+ * `each` and `nested_arrow` always establish one: their target names a field,
+ * and the arrows inside are written against it.
+ *
+ * `flatten` is the exception, and the grammar says which case applies. In
+ * spec §4.6's top-level form the target names the target *schema*
+ * (`flatten contacts -> tgt`) and the block unnests into flat schema-root
+ * fields, so there is no base and the named schema is not a field to register.
+ * Written relative — `flatten parcels.contents -> .packed_items` inside an
+ * `each` (examples/nested-iteration/pipeline.stm:100) — it names a list field
+ * on the current element, and its arrows are relative to that. A
+ * `relative_field_path` node is the authored signal separating the two.
  */
-function collectFlattenPaths(
+function containerTargetBase(
   node: SyntaxNode,
-  srcPaths: Set<string>,
-  tgtPaths: Set<string>,
-): void {
-  const rawSrc = child(node, "src_path");
-  const srcBase = rawSrc ? pathText(rawSrc) : null;
-  if (srcBase) addPathAndPrefixes(srcPaths, srcBase);
+  rawTgt: SyntaxNode | null,
+  outerTgt: string | null,
+): string | null {
+  if (!rawTgt) return outerTgt;
+  if (node.type === "flatten_block" && !isRelativePath(rawTgt)) return outerTgt;
+  return qualify(outerTgt, pathText(rawTgt));
+}
 
-  for (const ch of node.namedChildren) {
-    if (ch.type === "map_arrow") {
-      for (const sp of children(ch, "src_path")) {
-        const leaf = pathText(sp);
-        addPathAndPrefixes(srcPaths, srcBase ? qualify(srcBase, leaf) : leaf);
-      }
-      const tp = child(ch, "tgt_path");
-      if (tp) addPathAndPrefixes(tgtPaths, pathText(tp));
-    } else if (ch.type === "computed_arrow") {
-      const tp = child(ch, "tgt_path");
-      if (tp) addPathAndPrefixes(tgtPaths, pathText(tp));
-    }
-  }
+/** True when a src_path/tgt_path was authored relative to the current element (`.field`). */
+function isRelativePath(pathNode: SyntaxNode): boolean {
+  return child(pathNode, "relative_field_path") !== null;
 }
 
 function qualify(base: string | null, leaf: string): string {
