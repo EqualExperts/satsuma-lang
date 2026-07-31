@@ -105,3 +105,28 @@ the code:
   ADR-036.
 - `3cc-t6uo` is either fixed or explicitly re-scoped: the VS Code status bar's
   own rule now disagrees on two axes, not one.
+
+## Notes
+
+**2026-07-31T16:15:18Z**
+
+**2026-07-31T16:15:18Z**
+
+Unblocked: sl-hrql and sl-ez36 are both fixed and closed, so resolved @refs now
+carry real field paths on both ends and coverage can credit them safely.
+
+Two changes on main since this ticket was written make the work smaller than the
+description implies:
+
+1. sl-joeq replaced name-based matching with path-based matching, and left the
+   seam collectBodyPaths -> schemaLocalFieldPath in place. A resolved @ref
+   already yields a canonical absolute path, which is exactly the shape that
+   seam consumes — so the interaction noted in the description resolves in this
+   ticket's favour rather than needing separate work.
+2. PRD 38 Open Question 1 resolved (sl-vu22): coverage will derive covered paths
+   from extract.ts's arrow output and delete its own CST walker. Sequence this
+   ticket AFTER that swap if both are in flight, so the NL tier is added to one
+   producer rather than to a walker that is about to be deleted.
+
+ADR-036 is on the branch for PR #409 (adrs/adr-036-nl-ref-coverage-tier.md).
+Numbered 036 because another session took 035 for coverage path identity.
