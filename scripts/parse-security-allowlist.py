@@ -10,13 +10,15 @@ Prints a comma-separated list of allowlisted IDs to stdout (empty string if none
 import re
 import sys
 
+
 def main():
     if len(sys.argv) != 2:
         print(f"Usage: {sys.argv[0]} <npm-audit|semgrep>", file=sys.stderr)
         sys.exit(1)
 
     section = sys.argv[1]
-    text = open(".security-allowlist.yml").read()
+    with open(".security-allowlist.yml") as f:
+        text = f.read()
 
     in_section = False
     ids = []

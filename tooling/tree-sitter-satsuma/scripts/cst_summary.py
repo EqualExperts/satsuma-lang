@@ -4,14 +4,13 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import subprocess
+import sys
+import typing as t
 from collections import Counter
 from dataclasses import dataclass, field
 from pathlib import Path
-import sys
-import typing as t
-import re
-
 
 ROOT = Path(__file__).resolve().parents[3]
 # Prefer the npm-local tree-sitter binary (always has --wasm support) over the
@@ -76,8 +75,8 @@ class Node:
     start: Point
     end: Point
     field_name: str | None = None
-    children: list["Node"] = field(default_factory=list)
-    parent: "Node | None" = None
+    children: list[Node] = field(default_factory=list)
+    parent: Node | None = None
 
 
 class SourceText:

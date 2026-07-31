@@ -6,7 +6,6 @@ import unittest
 
 from cst_summary import SourceText, parse_tree_dump, summarize_tree
 
-
 SOURCE = """schema customer {
   id STRING (pk)
   note { "Customer record" }

@@ -1,0 +1,43 @@
+# Ruff configuration for the Python utility scripts in this repo
+# (scripts/, tooling/tree-sitter-satsuma/scripts/, skills/, smoke-tests/ —
+# see the `lint:python` script in package.json for the linted paths).
+#
+# Rule selection is EXPLICIT rather than inherited from ruff's defaults:
+# ruff's default rule set changes between releases (0.16 replaced the old
+# minimal E/F default with a large curated preset), which turned CI red
+# without any code change on our side (sl-5kvp). With `select` pinned here
+# and the ruff version pinned in requirements-dev.txt, lint behaviour only
+# changes when a Dependabot PR bumps ruff — and any new-rule fallout shows
+# up in that PR, not on unrelated ones.
+
+# Matches the Python version CI installs (.github/workflows/ci.yml).
+target-version = "py312"
+
+[lint]
+# Family-level selection, chosen deliberately for small utility scripts:
+#   E4/E7/E9, F — pycodestyle errors + pyflakes (ruff's classic core)
+#   W          — pycodestyle warnings
+#   I          — import sorting
+#   UP         — pyupgrade: keep syntax modern for target-version
+#   B          — flake8-bugbear: likely-bug patterns
+#   SIM        — flake8-simplify
+#   PIE        — flake8-pie misc lints
+#   RUF        — ruff-native rules (mutable class defaults, unused noqa, …)
+#   PLW        — pylint warnings (e.g. subprocess.run without check=)
+#   FURB       — refurb modernisation rules
+#   EXE        — shebang/executable-bit consistency
+#   BLE        — no blind `except Exception`
+select = [
+    "E4", "E7", "E9", "F",
+    "W",
+    "I",
+    "UP",
+    "B",
+    "SIM",
+    "PIE",
+    "RUF",
+    "PLW",
+    "FURB",
+    "EXE",
+    "BLE",
+]

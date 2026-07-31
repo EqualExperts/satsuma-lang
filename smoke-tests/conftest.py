@@ -62,7 +62,7 @@ def _run(
     The extra_flags list is inserted before the trailing --json and fixture path.
     """
     cmd = _SATSUMA + args + (extra_flags or []) + ["--json", fixture]
-    result = subprocess.run(cmd, capture_output=True, text=True)
+    result = subprocess.run(cmd, capture_output=True, text=True, check=False)
     assert result.returncode == expect_exit, (
         f"Expected exit {expect_exit}, got {result.returncode}.\n"
         f"cmd:    {' '.join(cmd)}\n"
@@ -78,7 +78,7 @@ def _run_exit_only(args: list[str], fixture: str) -> int:
     Used by steps that test error conditions without asserting on output.
     """
     cmd = _SATSUMA + args + ["--json", fixture]
-    return subprocess.run(cmd, capture_output=True, text=True).returncode
+    return subprocess.run(cmd, capture_output=True, text=True, check=False).returncode
 
 
 # ---------------------------------------------------------------------------

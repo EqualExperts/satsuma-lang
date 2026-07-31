@@ -18,9 +18,9 @@ from __future__ import annotations
 
 import unittest
 from pathlib import Path
+from typing import ClassVar
 
 from cst_summary import build_summary
-
 
 ROOT = Path(__file__).resolve().parents[3]
 
@@ -188,8 +188,9 @@ class SmokeSummaryTests(unittest.TestCase):
     """Run cst_summary.build_summary against every expected file."""
 
     # Populated once in setUpClass so the parser is only invoked once per file.
-    _summaries: dict[str, dict] = {}
-    _errors: dict[str, str] = {}
+    # ClassVar: these are shared class-level caches, not per-instance state.
+    _summaries: ClassVar[dict[str, dict]] = {}
+    _errors: ClassVar[dict[str, str]] = {}
 
     @classmethod
     def setUpClass(cls) -> None:

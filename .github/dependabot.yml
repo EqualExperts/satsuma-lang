@@ -100,3 +100,13 @@ updates:
       interval: "weekly"
     open-pull-requests-limit: 5
     labels: ["dependencies", "ci"]
+
+  # Python lint tools (ruff, yamllint) pinned in requirements-dev.txt.
+  # Pinned so a new ruff release can't change the enforced rule set outside
+  # a reviewable PR (sl-5kvp); rule selection itself lives in ruff.toml.
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    labels: ["dependencies", "ci"]

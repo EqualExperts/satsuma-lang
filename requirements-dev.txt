@@ -1,0 +1,9 @@
+# Python lint tools used by CI (.github/workflows/ci.yml) and locally via
+# `npm run lint:yaml` / `npm run lint:python`.
+#
+# Versions are pinned exactly so lint behaviour is deterministic: unpinned
+# installs let a new ruff release change the enforced rules under us
+# (sl-5kvp). Dependabot's pip ecosystem watches this file and proposes
+# bumps as reviewable PRs.
+ruff==0.16.1
+yamllint==1.38.0
