@@ -142,7 +142,16 @@ Aggregate figures respect the active scope, so `--schema X --fail-under 90` gate
 
 #### JSON contract
 
-`--json` emits a **stable contract**, consumed by the satsuma-viz coverage overlay:
+`--json` emits a **stable contract**, consumed by the satsuma-viz coverage overlay.
+
+**Keys are spelled differently in `--json` and in human output**, deliberately.
+`--json` uses the *canonical* key, which prefixes a non-namespaced entity with
+`::` (`::load hub`) so that a consumer matching keys across commands has exactly
+one spelling per entity. Human output uses the *display* form and drops that
+empty prefix (`load hub`), because `::` is not valid Satsuma syntax — it cannot
+be pasted back into a file — and in a workspace with no namespaces it prefixes
+every line with noise. A real namespace is information, so `crm::customers`
+appears unchanged in both.
 
 ```jsonc
 {

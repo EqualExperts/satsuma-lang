@@ -23,13 +23,15 @@ const run = (...args: string[]) => runCli(CLI, ...args);
 describe("satsuma lineage", () => {
   it("prints downstream text trees with node types for --from", async () => {
     // Human downstream output should show the start schema, mapping, target,
-    // and node types in data-flow order.
+    // and node types in data-flow order. Names appear bare because this fixture
+    // declares no namespace — human output drops the empty "::" prefix that
+    // --json still carries (displayKey vs canonicalKey in index-builder.ts).
     const { stdout, code } = await run("lineage", "--from", "source_a", LINEAGE_CHAIN);
 
     assert.equal(code, 0);
-    assert.match(stdout, /^::source_a {2}\[schema\]/m);
-    assert.match(stdout, /^ {2}::a_to_b {2}\[mapping\]/m);
-    assert.match(stdout, /^ {4}::intermediate_b {2}\[schema\]/m);
+    assert.match(stdout, /^source_a {2}\[schema\]/m);
+    assert.match(stdout, /^ {2}a_to_b {2}\[mapping\]/m);
+    assert.match(stdout, /^ {4}intermediate_b {2}\[schema\]/m);
   });
 
   it("prints upstream text paths for --to", async () => {
@@ -38,8 +40,8 @@ describe("satsuma lineage", () => {
     const { stdout, code } = await run("lineage", "--to", "target_d", LINEAGE_CHAIN);
 
     assert.equal(code, 0);
-    assert.match(stdout, /::source_a -> ::a_to_b -> ::intermediate_b/);
-    assert.match(stdout, /::c_to_d -> ::target_d/);
+    assert.match(stdout, /source_a -> a_to_b -> intermediate_b/);
+    assert.match(stdout, /c_to_d -> target_d/);
   });
 
   it("emits depth-limited downstream JSON without dangling edges", async () => {
@@ -77,7 +79,7 @@ describe("satsuma lineage", () => {
     const { stdout, code } = await run("lineage", "--from", "cycle_a", LINEAGE_CYCLE);
 
     assert.equal(code, 0);
-    assert.match(stdout, /::cycle_a {2}\[schema\] \(cycle\)/);
+    assert.match(stdout, /cycle_a {2}\[schema\] \(cycle\)/);
     assert.ok(stdout.trim().split(/\r?\n/).length <= 5);
   });
 
@@ -120,14 +122,16 @@ describe("satsuma lineage", () => {
 
     assert.equal(text.code, 0);
     assert.equal(json.code, 0);
-    // JSON names are bare index keys ("cycle_a"); text prints canonical refs ("::cycle_a").
+    // Human output prints the display form (bare "cycle_a" here, since this
+    // fixture declares no namespace); --json keeps the canonical "::cycle_a".
+    // The two spellings are deliberate — see displayKey() in index-builder.ts.
     const jsonNames = JSON.parse(json.stdout).nodes.map((node: { name: string }) => node.name);
     assert.ok(jsonNames.length >= 4, `cycle fixture should yield all 4 nodes in JSON, got: ${jsonNames.join(", ")}`);
     for (const name of jsonNames) {
-      assert.ok(text.stdout.includes(`::${name}`), `text output must mention '${name}'; got:\n${text.stdout}`);
+      assert.ok(text.stdout.includes(name), `text output must mention '${name}'; got:\n${text.stdout}`);
     }
     // The upstream path itself must be visible, not just the target line.
-    assert.match(text.stdout, /::cycle_b -> ::b_to_a -> ::cycle_a/);
+    assert.match(text.stdout, /cycle_b -> b_to_a -> cycle_a/);
   });
 
   it("resolves namespace-qualified --from names without crossing namespace scope", async () => {

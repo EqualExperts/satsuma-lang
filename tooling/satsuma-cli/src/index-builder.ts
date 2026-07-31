@@ -118,11 +118,38 @@ export function qualifiedKey(namespace: string | null | undefined, name: string 
 /**
  * Produce the canonical output form for an index key.
  * Non-namespaced keys get a :: prefix; namespaced keys pass through.
- * Use this for CLI output, not for internal map lookups.
+ * Use this for `--json` output and internal comparison, not for prose or
+ * tables a human reads — see {@link displayKey}.
  */
 export function canonicalKey(key: string): string {
   if (key.includes("::")) return key;
   return canonicalRef(null, key);
+}
+
+/**
+ * Produce the human-readable form of an index key: `ns::name` when the entity
+ * is namespaced, the bare name when it is not.
+ *
+ * Why this differs from {@link canonicalKey}: the leading `::` marks "the
+ * global namespace" unambiguously, which matters for a machine consumer
+ * matching keys across commands. It buys a human nothing — `::` is not even
+ * valid Satsuma syntax (`qualified_name` is `identifier "::" identifier`), so
+ * it cannot be pasted back into a file, and in a workspace with no namespaces
+ * at all it prefixes every line of output with noise.
+ *
+ * The split is deliberate: `--json` keeps the canonical key so downstream
+ * consumers have one spelling per entity, and human output drops the empty
+ * prefix. Namespaced entities read identically either way.
+ *
+ * Accepts either an internal index key (already bare) or an
+ * already-canonicalised string, so call sites need not know which they hold.
+ * That makes it the same transformation as {@link resolveCanonicalKey}, kept
+ * separate because the intents differ and only one of them is safe to change:
+ * that one maps a ref back to a key for *lookup*, this one formats a key for
+ * *rendering*.
+ */
+export function displayKey(key: string): string {
+  return key.startsWith("::") ? key.slice(2) : key;
 }
 
 /**
