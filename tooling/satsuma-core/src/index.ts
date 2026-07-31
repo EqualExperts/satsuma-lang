@@ -29,6 +29,7 @@ export { collectParseErrors } from "./parse-errors.js";
 export type { ParseErrorEntry } from "./parse-errors.js";
 export { computeMappingCoverage } from "./coverage.js";
 export type {
+  CoverageTier,
   FieldCoverageEntry,
   SchemaCoverageResult,
   MappingCoverageResult,

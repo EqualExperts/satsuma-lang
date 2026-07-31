@@ -6,7 +6,14 @@
  * the status bar needs a target-coverage percentage. This module owns those
  * two transformations so they stay unit-testable in plain Node; decoration
  * types, editors, and the status bar live in coverage.ts (sl-89id).
+ *
+ * It owns no counting rule of its own. Percentages come from
+ * `@satsuma/core`'s `summarizeFieldCoverage`, so the status bar, `satsuma
+ * coverage` and the viz overlay cannot report different numbers for one mapping
+ * (ADR-034, ADR-036).
  */
+
+import { summarizeFieldCoverage } from "@satsuma/core";
 
 /** One schema's fields from the LSP satsuma/mappingCoverage response. */
 export interface CoverageSchema {
@@ -14,8 +21,18 @@ export interface CoverageSchema {
   schemaId: string;
   /** Whether the mapping reads from (source) or writes to (target) this schema. */
   role: "source" | "target";
-  /** Every declared field with its location and whether the mapping touches it. */
-  fields: Array<{ path: string; uri: string; line: number; mapped: boolean }>;
+  /**
+   * Every declared field with its location and whether the mapping touches it.
+   * `tier` is present exactly when `mapped` is true and says which tier covered
+   * it — a declared arrow, or a resolved NL `@ref` (ADR-036).
+   */
+  fields: Array<{
+    path: string;
+    uri: string;
+    line: number;
+    mapped: boolean;
+    tier?: "declared" | "nl";
+  }>;
 }
 
 /** A single gutter marker: where it goes and what its hover says. */
@@ -61,26 +78,41 @@ export function groupCoverageByUri(
 
 /** Status-bar summary of how much of the target schema the mapping fills. */
 export interface TargetCoverageStats {
-  /** Count of top-level target fields the mapping writes. */
+  /** Leaf target fields the mapping writes, per ADR-034's counting rule. */
   mapped: number;
-  /** Count of all top-level target fields. */
+  /** Leaf target fields declared. */
   total: number;
   /** Whole-number percentage (mapped/total), 0 when the schema has no fields. */
   pct: number;
+  /** Of `mapped`, the leaves covered only by a resolved NL `@ref` (ADR-036). */
+  mappedNl: number;
 }
 
 /**
- * Compute the target-coverage percentage shown in the status bar, counting
- * only top-level fields (nested paths contain "." and would double-count
- * their parent). Returns undefined when the result has no target schema.
+ * Compute the target-coverage percentage shown in the status bar.
+ *
+ * Delegates the counting to core's `summarizeFieldCoverage`, which is the single
+ * implementation of ADR-034's rule (leaves only, on each leaf's own flag). It
+ * used to count top-level fields only, which disagreed with `satsuma coverage`
+ * on any schema with nested records: a twelve-field `address` record counted as
+ * one unit, so one mapped leaf read as a fully covered record. A user with the
+ * extension open beside a terminal saw two percentages for one mapping and could
+ * not tell which was wrong (3cc-t6uo). ADR-036's tier split would have made that
+ * two disagreements rather than one, which is why this is reconciled here rather
+ * than carried.
+ *
+ * Returns undefined when the result has no target schema.
  */
 export function computeTargetCoverageStats(
   schemas: CoverageSchema[],
 ): TargetCoverageStats | undefined {
   const target = schemas.find((s) => s.role === "target");
   if (!target) return undefined;
-  const topLevel = target.fields.filter((f) => !f.path.includes("."));
-  const mapped = topLevel.filter((f) => f.mapped).length;
-  const total = topLevel.length;
-  return { mapped, total, pct: total > 0 ? Math.round((mapped / total) * 100) : 0 };
+  const totals = summarizeFieldCoverage(target.fields);
+  return {
+    mapped: totals.covered,
+    total: totals.total,
+    pct: totals.pct,
+    mappedNl: totals.coveredNl,
+  };
 }

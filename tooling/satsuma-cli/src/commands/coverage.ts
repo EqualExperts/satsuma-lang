@@ -34,6 +34,7 @@ import {
 import { parsePercentage } from "../option-parsers.js";
 import { canonicalKey, displayKey, resolveIndexKey } from "../index-builder.js";
 import { coverageForWorkspace } from "../coverage-workspace.js";
+import { resolveAllNLRefs } from "../nl-ref-extract.js";
 import type { MappingCoverage } from "../coverage-workspace.js";
 import { aggregateCoverage, summarizeFieldCoverage, leafFieldEntries } from "@satsuma/core";
 import type {
@@ -76,10 +77,20 @@ export function register(program: Command): void {
     .option("--fail-under <pct>", "exit 3 when aggregate coverage is below <pct>", parsePercentage)
     .option("--json", "structured JSON output")
     .addHelpText("after", `
-Coverage is structural: a field counts as covered when at least one arrow in the
-mapping references it. Nested paths cover their parents — mapping 'address.city'
-covers 'address' but not 'address.line1'. A field described only in prose (a note
-block) is uncovered by definition; use 'nl-refs' to find those.
+Coverage follows explicit references. A field counts as covered when an arrow in
+the mapping references it (the 'declared' tier) or a resolved NL @ref names it
+(the 'nl' tier). Nested paths cover their parents — mapping 'address.city' covers
+'address' but not 'address.line1'.
+
+The two tiers share one denominator and never double-count: a field covered both
+ways is reported as declared. Rows show the split only when there is NL coverage
+to distinguish, e.g. "3/3  100%  (1 declared, 2 nl)"; --json always carries both
+counts and tags each covered field with its tier.
+
+Following an @ref is resolution, not interpretation — the author wrote '@' to mark
+a reference, and resolving it reads no prose. A field prose merely describes
+WITHOUT an @ref is still uncovered, and an @ref that resolves to nothing counts
+for nothing: use 'nl-refs' to find the former and 'lint' for the latter.
 
 Percentages count leaf fields only: a record is structure, not data, so counting
 it alongside its children would count the same data twice.
@@ -94,10 +105,13 @@ JSON shape (--json):
       "schemas": [{
         "schema":  str,        # canonical schema key
         "role":    "source" | "target",
-        "covered": int,        # leaf fields covered by THIS mapping
-        "total":   int,        # leaf fields declared
-        "pct":     int,        # covered/total, whole-number percent
-        "fields":  [{"path": str, "mapped": bool, "file": str, "line": int}, ...]
+        "covered":          int,   # leaf fields covered by THIS mapping
+        "covered_declared": int,   # of those, covered by a declared arrow
+        "covered_nl":       int,   # of those, covered only by a resolved @ref
+        "total":            int,   # leaf fields declared
+        "pct":              int,   # covered/total, whole-number percent
+        "fields":  [{"path": str, "mapped": bool, "tier": "declared" | "nl",
+                     "file": str, "line": int}, ...]
       }, ...]
     }, ...]
   }
@@ -105,10 +119,9 @@ JSON shape (--json):
   ... plus an "aggregate" section, unioned across the mappings in scope:
     "aggregate": {
       "schemas":    [{"schema": str, "role": str, "mappings": [str, ...],
-                      "covered": int, "total": int, "pct": int, "fields": [...]}, ...],
+                      <counts as above>, "fields": [...]}, ...],
       "namespaces": [{"namespace": str | null,
-                      "source": {"covered": int, "total": int, "pct": int},
-                      "target": {...}}, ...],
+                      "source": <counts as above>, "target": <counts as above>}, ...],
       "workspace":  {"source": {...}, "target": {...}}
     }
 
@@ -118,15 +131,18 @@ mapping may well populate it. Under "aggregate", uncovered means "no mapping in
 scope touches it", which is the claim worth acting on. Deleting a field on the
 strength of a per-mapping figure will delete a live one.
 
-'fields' lists leaf fields only, matching the counts; 'line' is 1-indexed and
-omitted when the declaration position is unknown. With --uncovered, 'fields' is
-filtered to unmapped entries and the counts are unchanged.
+'fields' lists leaf fields only, matching the counts; 'tier' is present exactly
+when 'mapped' is true; 'line' is 1-indexed and omitted when the declaration
+position is unknown. With --uncovered, 'fields' is filtered to unmapped entries
+and the counts are unchanged.
 
 --fail-under <pct> turns spec completeness into a CI gate, the way 'fmt --check'
 gates formatting. It gates the aggregate percentage for the target role by
 default — the share of declared target fields some mapping populates — or the
 source role with --role source, and it respects --mapping and --schema, so a
 pipeline can gate one mapping or one schema rather than the whole workspace.
+The figure gated is the COMBINED one, both tiers together: the gate asks "is this
+spec complete", and an @ref is a declaration of intent, not a hint.
 
 Exit codes:
   0  report produced (and the --fail-under threshold met, if given)
@@ -161,7 +177,11 @@ Examples:
       const mappingKey = opts.mapping ? resolveScopeName(opts.mapping, "Mapping", index.mappings) : null;
       const schemaKey = opts.schema ? resolveScopeName(opts.schema, "Schema", index.schemas) : null;
 
-      const { mappings, skippedAnonymous } = coverageForWorkspace(index, files);
+      // Resolved once for the whole workspace and reused for every mapping —
+      // resolution is workspace-wide, and it is what makes the NL tier possible
+      // at all (ADR-036).
+      const nlRefs = resolveAllNLRefs(index);
+      const { mappings, skippedAnonymous } = coverageForWorkspace(index, files, nlRefs);
       const scoped = applyScope(mappings, { mappingKey, schemaKey, role });
 
       if (scoped.length === 0) {
@@ -285,17 +305,31 @@ function toJson(mapping: MappingCoverage, opts: CoverageOptions): Record<string,
   return {
     mapping: canonicalKey(mapping.mappingId),
     file: mapping.file,
-    schemas: mapping.result.schemas.map((schema) => {
-      const totals = summarizeFieldCoverage(schema.fields);
-      return {
-        schema: canonicalKey(schema.schemaId),
-        role: schema.role,
-        covered: totals.covered,
-        total: totals.total,
-        pct: totals.pct,
-        fields: reportedFields(schema, opts).map(fieldToJson),
-      };
-    }),
+    schemas: mapping.result.schemas.map((schema) => ({
+      schema: canonicalKey(schema.schemaId),
+      role: schema.role,
+      ...totalsToJson(summarizeFieldCoverage(schema.fields)),
+      fields: reportedFields(schema, opts).map(fieldToJson),
+    })),
+  };
+}
+
+/**
+ * Coverage counts as JSON, in the snake_case the contract uses.
+ *
+ * The single serialiser for {@link CoverageTotals} everywhere it appears — a
+ * per-mapping schema, an aggregate schema, a namespace subtotal and the workspace
+ * total — so the tier keys cannot be present in one section and absent from
+ * another. Core's field names are camelCase; the published contract is
+ * snake_case, and this is the one place that translation happens.
+ */
+function totalsToJson(totals: CoverageTotals): Record<string, number> {
+  return {
+    covered: totals.covered,
+    covered_declared: totals.coveredDeclared,
+    covered_nl: totals.coveredNl,
+    total: totals.total,
+    pct: totals.pct,
   };
 }
 
@@ -310,6 +344,10 @@ function fieldToJson(field: FieldCoverageEntry): Record<string, unknown> {
     mapped: field.mapped,
     file: field.uri,
   };
+  // Present exactly when `mapped` is true — an uncovered field has no tier to
+  // report. Emitted so a consumer differentiates declared from NL-derived
+  // coverage from this contract rather than reconstructing it (ADR-036).
+  if (field.tier !== undefined) entry.tier = field.tier;
   if (field.line !== undefined) entry.line = field.line + 1;
   return entry;
 }
@@ -343,11 +381,9 @@ function printPerMappingReport(mappings: MappingCoverage[], opts: CoverageOption
       ...mapping.result.schemas.map((s) => displayKey(s.schemaId).length),
     );
     for (const schema of mapping.result.schemas) {
-      const totals = summarizeFieldCoverage(schema.fields);
-      const counts = `${totals.covered}/${totals.total}`;
       console.log(
         `  ${schema.role.padEnd(ROLE_COLUMN_WIDTH)}  ${displayKey(schema.schemaId).padEnd(schemaWidth)}  ` +
-        `${counts.padStart(7)}  ${String(totals.pct).padStart(3)}%`,
+        `${formatTotals(summarizeFieldCoverage(schema.fields))}`,
       );
     }
 
@@ -483,17 +519,18 @@ function aggregateToJson(aggregate: AggregateCoverage, opts: CoverageOptions): R
       schema: canonicalKey(schema.schemaId),
       role: schema.role,
       mappings: schema.mappings.map(canonicalKey),
-      covered: schema.totals.covered,
-      total: schema.totals.total,
-      pct: schema.totals.pct,
+      ...totalsToJson(schema.totals),
       fields: aggregateFields(schema, opts).map(fieldToJson),
     })),
     namespaces: aggregate.namespaces.map((ns) => ({
       namespace: ns.namespace,
-      source: ns.source,
-      target: ns.target,
+      source: totalsToJson(ns.source),
+      target: totalsToJson(ns.target),
     })),
-    workspace: { source: aggregate.workspace.source, target: aggregate.workspace.target },
+    workspace: {
+      source: totalsToJson(aggregate.workspace.source),
+      target: totalsToJson(aggregate.workspace.target),
+    },
   };
 }
 
@@ -573,7 +610,25 @@ function namespaceLabel(namespace: string | null): string {
 
 /** "3/4  75%" — the shared counts-and-percentage cell. */
 function formatTotals(totals: CoverageTotals): string {
-  return `${`${totals.covered}/${totals.total}`.padStart(7)}  ${String(totals.pct).padStart(3)}%`;
+  return (
+    `${`${totals.covered}/${totals.total}`.padStart(7)}  ${String(totals.pct).padStart(3)}%` +
+    formatTierSplit(totals)
+  );
+}
+
+/**
+ * "  (1 declared, 2 nl)" — the tier annotation, or "" when there is nothing to
+ * distinguish (ADR-036).
+ *
+ * Printed only when the row actually has NL-tier coverage. A structural-only
+ * spec has nothing to tell apart, and annotating every row of every report with
+ * "(n declared, 0 nl)" would add a column of noise to the common case; the split
+ * appears exactly where a reviewer needs to know that some coverage is inferred
+ * from prose rather than declared. `--json` always carries both counts.
+ */
+function formatTierSplit(totals: CoverageTotals): string {
+  if (totals.coveredNl === 0) return "";
+  return `  (${totals.coveredDeclared} declared, ${totals.coveredNl} nl)`;
 }
 
 /**

@@ -19,7 +19,7 @@
  * (coverage-paths.ts), or how any of it is rendered.
  */
 
-import type { FieldCoverageEntry, MappingCoverageResult } from "./coverage.js";
+import type { CoverageTier, FieldCoverageEntry, MappingCoverageResult } from "./coverage.js";
 
 // ── Inputs ──────────────────────────────────────────────────────────────────
 
@@ -57,8 +57,22 @@ export interface MappingCoverageInput {
  * toward reporting a gap that is not there rather than hiding one that is.
  */
 export interface CoverageTotals {
-  /** Leaf fields whose own entry is marked covered. */
+  /**
+   * Leaf fields whose own entry is marked covered — the sum of the two tiers
+   * below, and the figure `--fail-under` gates. ADR-036 splits the numerator
+   * into tiers; it does not change what is counted.
+   */
   covered: number;
+  /** Of `covered`, the leaves a declared arrow references. */
+  coveredDeclared: number;
+  /**
+   * Of `covered`, the leaves only a resolved NL `@ref` names.
+   *
+   * Disjoint from {@link coveredDeclared} by construction: a field covered both
+   * ways is reported in the declared tier, so the two always sum to `covered`
+   * and a consumer can render the split without risk of double counting.
+   */
+  coveredNl: number;
   /** Leaf fields declared. Zero for a schema with no leaves. */
   total: number;
   /** covered/total as a whole-number percentage; 0 when `total` is 0. */
@@ -129,8 +143,17 @@ export interface AggregateCoverage {
  */
 export function summarizeFieldCoverage(fields: FieldCoverageEntry[]): CoverageTotals {
   const leaves = leafFieldEntries(fields);
-  const covered = leaves.filter((f) => f.mapped).length;
-  return { covered, total: leaves.length, pct: percentage(covered, leaves.length) };
+  const coveredLeaves = leaves.filter((f) => f.mapped);
+  // Count from the per-field tier rather than re-deriving it, so a rendered
+  // field list and the split printed beside it cannot disagree (ADR-036).
+  const coveredNl = coveredLeaves.filter((f) => f.tier === "nl").length;
+  return {
+    covered: coveredLeaves.length,
+    coveredDeclared: coveredLeaves.length - coveredNl,
+    coveredNl,
+    total: leaves.length,
+    pct: percentage(coveredLeaves.length, leaves.length),
+  };
 }
 
 /**
@@ -164,12 +187,16 @@ function percentage(covered: number, total: number): number {
 /** Sum a set of totals, recomputing the percentage from the summed counts. */
 function sumTotals(parts: Iterable<CoverageTotals>): CoverageTotals {
   let covered = 0;
+  let coveredDeclared = 0;
+  let coveredNl = 0;
   let total = 0;
   for (const part of parts) {
     covered += part.covered;
+    coveredDeclared += part.coveredDeclared;
+    coveredNl += part.coveredNl;
     total += part.total;
   }
-  return { covered, total, pct: percentage(covered, total) };
+  return { covered, coveredDeclared, coveredNl, total, pct: percentage(covered, total) };
 }
 
 // ── Aggregation ─────────────────────────────────────────────────────────────
@@ -209,7 +236,7 @@ export function aggregateCoverage(inputs: MappingCoverageInput[]): AggregateCove
           fields: schema.fields.map((f) => ({ ...f })),
           // Placeholder; every entry's totals are computed once all mappings
           // have been unioned in, below.
-          totals: { covered: 0, total: 0, pct: 0 },
+          totals: { covered: 0, coveredDeclared: 0, coveredNl: 0, total: 0, pct: 0 },
         });
         continue;
       }
@@ -252,7 +279,24 @@ function unionInto(accumulated: FieldCoverageEntry[], incoming: FieldCoverageEnt
       continue;
     }
     existing.mapped = existing.mapped || field.mapped;
+    // Tier unions toward the stronger claim: a field one mapping declares and
+    // another only mentions in prose is declared-covered in the aggregate
+    // (ADR-036). Without this the aggregate could report a declared field as
+    // merely inferred, purely on mapping order.
+    const tier = strongerTier(existing.tier, field.tier);
+    if (tier !== undefined) existing.tier = tier;
+    else delete existing.tier;
   }
+}
+
+/** `declared` beats `nl` beats absent — see {@link CoverageTier}. */
+function strongerTier(
+  a: CoverageTier | undefined,
+  b: CoverageTier | undefined,
+): CoverageTier | undefined {
+  if (a === "declared" || b === "declared") return "declared";
+  if (a === "nl" || b === "nl") return "nl";
+  return undefined;
 }
 
 /**

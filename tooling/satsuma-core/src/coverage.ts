@@ -9,8 +9,13 @@
  * "Covered" means:
  *   - source field: its qualified path from the schema root — or a path that
  *     starts with it — appears as a src_path in at least one arrow anywhere in
- *     the mapping.
+ *     the mapping, **or** is named by a resolved NL `@ref` in that mapping.
  *   - target field: the same, as a tgt_path.
+ *
+ * The two are reported as distinct tiers over one denominator (ADR-036): a
+ * resolved `@ref` carries the same lineage weight as a declared source field
+ * (ADR-013), which `arrows`, `graph`, `lineage`, `field-lineage` and `lint` have
+ * always honoured and coverage alone did not. See {@link CoverageTier}.
  *
  * Matching is by path, never by local field name: two records under one schema
  * routinely declare the same leaf name, and treating a name match as coverage
@@ -30,9 +35,14 @@
  * references (spec §5's resolved NL @refs, ADR-036) is then one change, in
  * extract.ts, rather than two that can disagree.
  *
- * Coverage is deliberately *structural only*: a field a note block describes in
- * prose is uncovered by definition. NL interpretation belongs to nl-refs, and
- * policy judgements ("optional fields shouldn't count") belong to lint.
+ * Coverage follows *explicit references only*. Resolving `@net_amount` to a
+ * declared field is structural resolution of a reference the author marked with
+ * a sigil — it reads no surrounding prose, which is why counting it does not
+ * make coverage an NL interpreter (ADR-036). A field that prose merely describes
+ * without an `@ref`, and a ref that resolves to nothing, both remain uncovered:
+ * unresolved refs are `lint`'s `unresolved-nl-ref`, and letting them count would
+ * make coverage rise when a spec breaks. Policy judgements ("optional fields
+ * shouldn't count") still belong to lint.
  *
  * This module does not own an index either. Callers supply a
  * {@link CoverageSchemaResolver} that adapts their own workspace model — the
@@ -46,6 +56,7 @@
 import { child, children, labelText, sourceRefStructuralText } from "./cst-utils.js";
 import { buildCoveredFieldSet, isCoveredFieldPath, schemaLocalFieldPath } from "./coverage-paths.js";
 import { extractMappingArrowRecords } from "./extract.js";
+import type { ResolvedNLRef } from "./nl-ref.js";
 import type { SyntaxNode, Tree } from "./types.js";
 
 // ── Resolver input contract ─────────────────────────────────────────────────
@@ -102,6 +113,22 @@ export type CoverageSchemaResolver = (schemaId: string) => CoverageSchemaDefinit
 // ── Public result types ─────────────────────────────────────────────────────
 
 /**
+ * How a field came to be covered (ADR-036).
+ *
+ * `declared` — an arrow in the mapping references the field's path.
+ * `nl` — a resolved NL `@ref` in the mapping names it, and no arrow does.
+ *
+ * The two are tiers over one denominator, not separate denominators: ADR-034
+ * still governs what is counted. `declared` is the stronger claim and wins when
+ * a field is covered both ways, so the tiers never double-count.
+ *
+ * Consumers must render the distinction rather than reconstruct it — an NL-derived
+ * hop is inferred from prose, not declared, and a reviewer has to be able to see
+ * which is which.
+ */
+export type CoverageTier = "declared" | "nl";
+
+/**
  * Coverage status for a single field (leaf or record) in a schema.
  */
 export interface FieldCoverageEntry {
@@ -116,8 +143,13 @@ export interface FieldCoverageEntry {
    * rather than assume 0.
    */
   line?: number;
-  /** True when at least one arrow in the mapping covers this field. */
+  /** True when an arrow or a resolved `@ref` in the mapping covers this field. */
   mapped: boolean;
+  /**
+   * Which tier covered it. Absent exactly when `mapped` is false — the two
+   * always agree, so a consumer may branch on either.
+   */
+  tier?: CoverageTier;
 }
 
 /**
@@ -154,16 +186,23 @@ export interface MappingCoverageResult {
  * @param mappingName  Mapping label to report on; matched against top-level
  *                     and namespaced `mapping` blocks in this tree.
  * @param resolveSchema Adapter from the caller's index to field trees.
+ * @param nlRefs       Resolved NL `@refs` for the workspace, from
+ *                     `resolveAllNLRefs()`. Those belonging to this mapping
+ *                     contribute `nl`-tier coverage (ADR-036). Omit — or pass an
+ *                     empty array — for declared-tier coverage only; note that
+ *                     omitting it under-reports any mapping whose sources appear
+ *                     only in prose, which is the whole reason the tier exists.
  */
 export function computeMappingCoverage(
   tree: Tree,
   mappingName: string,
   resolveSchema: CoverageSchemaResolver,
+  nlRefs: readonly ResolvedNLRef[] = [],
 ): MappingCoverageResult {
-  const mappingNode = findMappingBlock(tree, mappingName);
-  if (!mappingNode) return { schemas: [] };
+  const found = findMappingBlock(tree, mappingName);
+  if (!found) return { schemas: [] };
 
-  const body = child(mappingNode, "mapping_body");
+  const body = child(found.node, "mapping_body");
   if (!body) return { schemas: [] };
 
   const sourceIds = getSchemaIdsFromBlock(body, "source_block");
@@ -177,87 +216,159 @@ export function computeMappingCoverage(
   // The `each`/`flatten`/`nested_arrow` container itself yields a record too, so
   // a container's own source and target are registered as touched: iterating a
   // list consumes it, and writing into one populates it.
-  const arrows = extractMappingArrowRecords(mappingNode);
-  const srcRefs = arrows.flatMap((a) => a.sources);
-  const tgtRefs = arrows.map((a) => a.target).filter((t): t is string => t !== null);
+  const arrows = extractMappingArrowRecords(found.node);
+  const declaredSrc = arrows.flatMap((a) => a.sources);
+  const declaredTgt = arrows.map((a) => a.target).filter((t): t is string => t !== null);
+
+  const nl = nlRefFieldPaths(nlRefs, found.mappingKey);
 
   const schemas: SchemaCoverageResult[] = [];
 
   for (const schemaId of sourceIds) {
     const def = resolveSchema(schemaId);
     if (!def) continue;
-    schemas.push(coverageForSchema(def, schemaId, "source", srcRefs, sourceIds));
+    schemas.push(coverageForSchema(def, schemaId, "source", sourceIds, declaredSrc, nl.anyContext));
   }
 
   for (const schemaId of targetIds) {
     const def = resolveSchema(schemaId);
     if (!def) continue;
-    schemas.push(coverageForSchema(def, schemaId, "target", tgtRefs, targetIds));
+    schemas.push(coverageForSchema(def, schemaId, "target", targetIds, declaredTgt, nl.arrowBodyOnly));
   }
 
   return { schemas };
 }
 
+// ── Resolved NL @ref paths (ADR-036) ────────────────────────────────────────
+
 /**
- * Report one schema, resolving the mapping's authored arrow references into
- * paths local to it before matching them against its declared fields.
+ * The canonical field paths a mapping's resolved `@refs` name, split by whether
+ * a target schema may claim them.
+ *
+ * Only `kind: "field"` resolutions are field references at all — a ref naming a
+ * schema, fragment or transform covers no field. Only *resolved* refs count:
+ * letting an unresolved ref count would make coverage rise when a spec breaks,
+ * and reporting one is `lint`'s `unresolved-nl-ref` (ADR-036).
+ */
+interface NLRefPaths {
+  /**
+   * Every resolved field ref in the mapping. Source schemas may claim any of
+   * them: a ref in a join condition demonstrates the mapping reads that field.
+   */
+  anyContext: string[];
+  /**
+   * Refs from arrow bodies and note blocks only — `context: "source_block"`
+   * excluded. A join condition or filter names no *target* field, so it can
+   * never contribute target coverage (ADR-036).
+   */
+  arrowBodyOnly: string[];
+}
+
+function nlRefFieldPaths(nlRefs: readonly ResolvedNLRef[], mappingKey: string): NLRefPaths {
+  const anyContext: string[] = [];
+  const arrowBodyOnly: string[] = [];
+
+  for (const ref of nlRefs) {
+    if (ref.mapping !== mappingKey) continue;
+    if (!ref.resolved || ref.resolvedTo?.kind !== "field") continue;
+    anyContext.push(ref.resolvedTo.name);
+    if (ref.context !== "source_block") arrowBodyOnly.push(ref.resolvedTo.name);
+  }
+
+  return { anyContext, arrowBodyOnly };
+}
+
+/**
+ * Report one schema, resolving the mapping's references into paths local to it
+ * before matching them against its declared fields.
+ *
+ * Declared and NL references are resolved separately and kept in separate sets,
+ * because the tier a field is reported under depends on which set matched.
  */
 function coverageForSchema(
   def: CoverageSchemaDefinition,
   writtenRef: string,
   role: "source" | "target",
-  arrowRefs: readonly string[],
   participatingRefs: readonly string[],
+  declaredRefs: readonly string[],
+  nlRefPaths: readonly string[],
 ): SchemaCoverageResult {
-  // An arrow may name this schema by the reference as written in the mapping or
-  // by the id the resolver canonicalised it to, so both forms must resolve.
+  // A reference may name this schema by the form written in the mapping or by the
+  // id the resolver canonicalised it to, so both must resolve.
   const canonicalRef = def.schemaId ?? writtenRef;
   const ownRefs = canonicalRef === writtenRef ? [writtenRef] : [writtenRef, canonicalRef];
   const otherRefs = participatingRefs.filter((ref) => ref !== writtenRef);
 
   const topLevelNames = new Set(def.fields.map((f) => f.name));
   const declaresTopLevel = (name: string): boolean => topLevelNames.has(name);
+  const toLocal = (ref: string): string | null =>
+    schemaLocalFieldPath(ref, ownRefs, otherRefs, declaresTopLevel);
 
-  const localPaths: string[] = [];
-  for (const ref of arrowRefs) {
-    const local = schemaLocalFieldPath(ref, ownRefs, otherRefs, declaresTopLevel);
-    if (local !== null) localPaths.push(local);
+  const declaredLocal: string[] = [];
+  for (const ref of declaredRefs) {
+    const local = toLocal(ref);
+    if (local !== null) declaredLocal.push(local);
+  }
+
+  // A resolved @ref is always fully schema-qualified, so it belongs to this
+  // schema only if the prefix actually came off. Requiring that — rather than
+  // accepting the fall-through — keeps another schema's refs out of this set
+  // instead of parking unmatchable paths in it.
+  const nlLocal: string[] = [];
+  for (const ref of nlRefPaths) {
+    const local = toLocal(ref);
+    if (local !== null && local !== ref) nlLocal.push(local);
   }
 
   return {
     schemaId: canonicalRef,
     role,
-    fields: buildFieldCoverage(def.fields, def.uri, "", buildCoveredFieldSet(localPaths)),
+    fields: buildFieldCoverage(def.fields, def.uri, "", {
+      declared: buildCoveredFieldSet(declaredLocal),
+      nl: buildCoveredFieldSet(nlLocal),
+    }),
   };
 }
 
 // ── Field coverage building ─────────────────────────────────────────────────
 
+/** The covered-path sets for one schema, one per tier (ADR-036). */
+interface TieredCoveredPaths {
+  declared: Set<string>;
+  nl: Set<string>;
+}
+
 /**
  * Recursively build the FieldCoverageEntry list for a schema's fields.
  * `prefix` is the path from the schema root to the current level; record
  * fields emit an entry of their own *and* entries for every descendant.
+ *
+ * A field in both sets is reported as `declared`: declared coverage is the
+ * stronger claim, and reporting the weaker one would let a field that an arrow
+ * genuinely writes read as merely inferred from prose (ADR-036).
  */
 function buildFieldCoverage(
   fields: CoverageField[],
   uri: string,
   prefix: string,
-  coveredPaths: Set<string>,
+  covered: TieredCoveredPaths,
 ): FieldCoverageEntry[] {
   const result: FieldCoverageEntry[] = [];
   for (const f of fields) {
     const path = prefix ? `${prefix}.${f.name}` : f.name;
-    const entry: FieldCoverageEntry = {
-      path,
-      uri,
-      mapped: isCoveredFieldPath(path, coveredPaths),
-    };
+    const tier: CoverageTier | undefined = isCoveredFieldPath(path, covered.declared)
+      ? "declared"
+      : isCoveredFieldPath(path, covered.nl)
+        ? "nl"
+        : undefined;
+    const entry: FieldCoverageEntry = { path, uri, mapped: tier !== undefined };
+    if (tier !== undefined) entry.tier = tier;
     // Omit `line` entirely when unknown rather than defaulting to 0 — see the
     // CoverageField.line contract.
     if (f.line !== undefined) entry.line = f.line;
     result.push(entry);
     if (f.children && f.children.length > 0) {
-      result.push(...buildFieldCoverage(f.children, uri, path, coveredPaths));
+      result.push(...buildFieldCoverage(f.children, uri, path, covered));
     }
   }
   return result;
@@ -265,13 +376,36 @@ function buildFieldCoverage(
 
 // ── CST helpers ─────────────────────────────────────────────────────────────
 
+/** A located `mapping` block, with the key its resolved NL refs are filed under. */
+interface LocatedMapping {
+  node: SyntaxNode;
+  /**
+   * Namespace-qualified mapping key (`crm::load`), or the bare label at file
+   * scope — the same key `resolveAllNLRefs` writes to `ResolvedNLRef.mapping`.
+   *
+   * Matching refs on this rather than on the label alone is what keeps two
+   * same-named mappings in different namespaces apart. They are different
+   * mappings, and crediting one with the other's refs would be a silent
+   * over-count of exactly the kind ADR-036's "only resolved refs" rule guards.
+   */
+  mappingKey: string;
+}
+
 /** Find a `mapping` block by label, at file scope or inside a namespace block. */
-function findMappingBlock(tree: Tree, name: string): SyntaxNode | null {
+function findMappingBlock(tree: Tree, name: string): LocatedMapping | null {
   for (const node of tree.rootNode.namedChildren) {
-    if (node.type === "mapping_block" && labelText(node) === name) return node;
+    if (node.type === "mapping_block" && labelText(node) === name) {
+      return { node, mappingKey: name };
+    }
     if (node.type === "namespace_block") {
+      // A namespace's name is its first `identifier` child, not a label — the
+      // same read extract.ts's collectFromNamespaces() does, so the key built
+      // here matches the one resolveAllNLRefs() files refs under.
+      const namespace = node.namedChildren.find((c) => c.type === "identifier")?.text ?? null;
       for (const ch of node.namedChildren) {
-        if (ch.type === "mapping_block" && labelText(ch) === name) return ch;
+        if (ch.type === "mapping_block" && labelText(ch) === name) {
+          return { node: ch, mappingKey: namespace ? `${namespace}::${name}` : name };
+        }
       }
     }
   }

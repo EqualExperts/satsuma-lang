@@ -164,9 +164,13 @@ export function registerCoverageCommand(
       const stats = computeTargetCoverageStats(coverageResult.schemas);
       if (stats && coverageBar) {
         coverageBar.text = `$(check) Coverage: ${stats.pct}%`;
+        // The tier split goes in the tooltip rather than the bar: the bar has to
+        // stay short, but a reviewer deciding whether the spec is done needs to
+        // know how much of that figure is inferred from prose (ADR-036).
+        const viaNl = stats.mappedNl > 0 ? ` (${stats.mappedNl} via @ref)` : "";
         coverageBar.tooltip =
           `${stats.mapped}/${stats.total} target fields mapped by ` +
-          `'${mappingName}' — click to clear coverage icons`;
+          `'${mappingName}'${viaNl} — click to clear coverage icons`;
         coverageBar.show();
       }
     }),

@@ -1,6 +1,6 @@
 ---
 id: 3cc-t6uo
-status: open
+status: closed
 deps: []
 links: [3cc-iedv, sl-4qvp]
 created: 2026-07-31T14:40:39Z
@@ -23,3 +23,15 @@ Fix direction: delete computeTargetCoverageStats' own counting and call core's s
 
 computeTargetCoverageStats delegates to @satsuma/core summarizeFieldCoverage with no counting logic of its own; a nested-record fixture asserts the status-bar percentage equals what satsuma coverage reports for the same mapping and schema; existing vscode unit tests updated to the leaf-only expectations; the top-level-only rule and its 'nested paths would double-count' comment removed rather than left as a stale explanation.
 
+
+## Notes
+
+**2026-07-31T16:51:57Z**
+
+Cause: computeTargetCoverageStats counted top-level target fields only (filtering !path.includes('.')), a third counting rule alongside ADR-034's leaf-only rule in core. It disagreed with satsuma coverage on any schema with nested records — the sample fixture reported 1/2 (50%) where core reports 2/3 (67%).
+
+Fix: deleted the local counting and delegated to @satsuma/core summarizeFieldCoverage, per the fix direction in the description. The top-level-only rule and its stale 'nested paths would double-count' comment are removed rather than left as an explanation for code that no longer does that. TargetCoverageStats also gains mappedNl so the status-bar tooltip can report how much of the figure came from resolved @refs.
+
+Fixed as part of sl-qxyl rather than separately: ADR-036 requires that a consumer computing its own coverage figure be reconciled rather than carried, because the tier split would have turned one disagreement into two. Status bar, satsuma coverage and (once feature 36 lands) the viz overlay now share one implementation.
+
+vscode suite: 34 pass. The grouping test's marker count moved from 2 to 3 with the fixture — gutter decorations mark every entry including records, unlike the percentage, which counts leaves; that distinction is now stated in the test.

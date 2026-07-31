@@ -1424,17 +1424,43 @@ describe("satsuma fields", () => {
     assert.match(stdout, /all fields.*mapped/i);
   });
 
-  it("--unmapped-by on source schema filters mapped fields", async () => {
+  it("--unmapped-by counts fields referenced only by a resolved @ref as mapped", async () => {
+    // The corpus's clearest ADR-036 case. `customer migration` writes address_id
+    // from a note that names @ADDR_LINE_1, @CITY and four more with the @ sigil
+    // (pipeline.stm:143) — no arrow lists them, but the mapping demonstrably
+    // consumes them, and field-lineage has always traced them. Before ADR-036
+    // this command listed all six as unmapped, i.e. as the review queue, so a
+    // reader trusting it would have deleted live fields.
     const { stdout, code } = await run(
       "fields", "legacy_sqlserver", "--unmapped-by", "customer migration", DB,
     );
     assert.equal(code, 0);
-    // CUST_ID, FIRST_NM etc. are mapped — should NOT appear
-    assert.doesNotMatch(stdout, /CUST_ID/);
-    assert.doesNotMatch(stdout, /FIRST_NM/);
-    // Address fields aren't directly mapped — should appear
-    assert.match(stdout, /ADDR_LINE_1/);
-    assert.match(stdout, /CITY/);
+    assert.match(stdout, /All fields in 'legacy_sqlserver' are mapped/);
+  });
+
+  it("splits the coverage figure into declared and NL tiers for the same schema", async () => {
+    // The other half of the same claim: reaching 100% must not hide HOW. Fifteen
+    // of the twenty-one fields are covered by arrows and six only by resolved
+    // @refs, and a reviewer has to be able to tell — an inferred hop is weaker
+    // evidence than a declared one even though both count (ADR-036).
+    const { stdout, code } = await run("coverage", DB, "--schema", "legacy_sqlserver", "--json");
+    assert.equal(code, 0);
+    const schema = JSON.parse(stdout).mappings[0].schemas.find(
+      (s: any) => s.role === "source",
+    );
+    assert.equal(schema.covered, 21);
+    assert.equal(schema.covered_declared, 15);
+    assert.equal(schema.covered_nl, 6);
+    assert.equal(
+      schema.fields.find((f: any) => f.path === "ADDR_LINE_1").tier,
+      "nl",
+      "a field named only in prose is covered in the nl tier",
+    );
+    assert.equal(
+      schema.fields.find((f: any) => f.path === "CUST_ID").tier,
+      "declared",
+      "a field an arrow reads is covered in the declared tier",
+    );
   });
 
   it("--with-meta includes tags", async () => {
