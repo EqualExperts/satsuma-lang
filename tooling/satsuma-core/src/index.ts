@@ -37,6 +37,15 @@ export type {
   CoverageSchemaResolver,
 } from "./coverage.js";
 export { addPathAndPrefixes, buildCoveredFieldSet, isCoveredFieldPath } from "./coverage-paths.js";
+export { aggregateCoverage, summarizeFieldCoverage } from "./coverage-rollup.js";
+export type {
+  MappingCoverageInput,
+  CoverageTotals,
+  AggregateSchemaCoverage,
+  RoleTotals,
+  NamespaceCoverage,
+  AggregateCoverage,
+} from "./coverage-rollup.js";
 export { format } from "./format.js";
 export type { SyntaxNode, Tree, Classification, PipeStep, MetaEntry, MetaEntryTag, MetaEntryKV, MetaEntryEnum, MetaEntryNote, MetaEntrySlice, FieldDecl } from "./types.js";
 export { child, children, allDescendants, labelText, stringText, entryText, qualifiedNameText, sourceRefText, sourceRefStructuralText, fieldNameText, walkDescendants } from "./cst-utils.js";
