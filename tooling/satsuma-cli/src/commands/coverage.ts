@@ -27,8 +27,15 @@ import { runCommand, CommandError, EXIT_NOT_FOUND, EXIT_PARSE_ERROR } from "../c
 import { canonicalKey, resolveIndexKey } from "../index-builder.js";
 import { coverageForWorkspace } from "../coverage-workspace.js";
 import type { MappingCoverage } from "../coverage-workspace.js";
-import { summarizeFieldCoverage, leafFieldEntries } from "@satsuma/core";
-import type { FieldCoverageEntry, SchemaCoverageResult } from "@satsuma/core";
+import { aggregateCoverage, summarizeFieldCoverage, leafFieldEntries } from "@satsuma/core";
+import type {
+  AggregateCoverage,
+  AggregateSchemaCoverage,
+  CoverageTotals,
+  FieldCoverageEntry,
+  RoleTotals,
+  SchemaCoverageResult,
+} from "@satsuma/core";
 
 /** Roles a schema can play in a mapping; the accepted values of `--role`. */
 const ROLES = ["source", "target"] as const;
@@ -79,6 +86,22 @@ JSON shape (--json):
     }, ...]
   }
 
+  ... plus an "aggregate" section, unioned across the mappings in scope:
+    "aggregate": {
+      "schemas":    [{"schema": str, "role": str, "mappings": [str, ...],
+                      "covered": int, "total": int, "pct": int, "fields": [...]}, ...],
+      "namespaces": [{"namespace": str | null,
+                      "source": {"covered": int, "total": int, "pct": int},
+                      "target": {...}}, ...],
+      "workspace":  {"source": {...}, "target": {...}}
+    }
+
+The two sections answer different questions and are not interchangeable. Under
+"mappings", uncovered means "this mapping does not touch the field" — another
+mapping may well populate it. Under "aggregate", uncovered means "no mapping in
+scope touches it", which is the claim worth acting on. Deleting a field on the
+strength of a per-mapping figure will delete a live one.
+
 'fields' lists leaf fields only, matching the counts; 'line' is 1-indexed and
 omitted when the declaration position is unknown. With --uncovered, 'fields' is
 filtered to unmapped entries and the counts are unchanged.
@@ -112,12 +135,20 @@ Examples:
         return EXIT_NOT_FOUND;
       }
 
+      // Aggregate over the *scoped* mappings, so `--schema X` reports X's
+      // workspace-wide coverage rather than the whole workspace's.
+      const aggregate = aggregateCoverage(scoped);
+
       if (opts.json) {
-        console.log(JSON.stringify({ mappings: scoped.map((m) => toJson(m, opts)) }, null, 2));
+        console.log(JSON.stringify({
+          mappings: scoped.map((m) => toJson(m, opts)),
+          aggregate: aggregateToJson(aggregate, opts),
+        }, null, 2));
         return;
       }
 
       printPerMappingReport(scoped, opts);
+      printAggregateReport(aggregate, opts);
       if (skippedAnonymous > 0) printAnonymousNote(skippedAnonymous);
     }));
 }
@@ -262,6 +293,8 @@ function fieldToJson(field: FieldCoverageEntry): Record<string, unknown> {
 const ROLE_COLUMN_WIDTH = 6; // "source" — the longer of the two role words
 /** Uncovered paths are wrapped rather than printed one per line, to stay compact. */
 const UNCOVERED_LINE_BUDGET = 72;
+/** Label for the total row, padded to the same width as the namespace rows. */
+const WORKSPACE_LABEL = "workspace";
 
 /**
  * Print the per-mapping report: one block per mapping, a row per participating
@@ -333,6 +366,122 @@ function wrapPaths(paths: string[]): string[] {
   }
   if (current) lines.push(current);
   return lines;
+}
+
+// ── Aggregate output ────────────────────────────────────────────────────────
+
+/**
+ * The aggregate section as JSON: every schema in scope counted once, plus
+ * namespace and workspace subtotals.
+ *
+ * Deliberately a sibling of `mappings` rather than merged into it. A consumer
+ * reading `aggregate.schemas[].fields[].mapped === false` is being told nothing
+ * in scope covers the field; the same key under `mappings` means only that one
+ * mapping does not. Keeping them in separate objects means a consumer has to
+ * choose which claim it is making.
+ */
+function aggregateToJson(aggregate: AggregateCoverage, opts: CoverageOptions): Record<string, unknown> {
+  return {
+    schemas: aggregate.schemas.map((schema) => ({
+      schema: canonicalKey(schema.schemaId),
+      role: schema.role,
+      mappings: schema.mappings.map(canonicalKey),
+      covered: schema.totals.covered,
+      total: schema.totals.total,
+      pct: schema.totals.pct,
+      fields: aggregateFields(schema, opts).map(fieldToJson),
+    })),
+    namespaces: aggregate.namespaces.map((ns) => ({
+      namespace: ns.namespace,
+      source: ns.source,
+      target: ns.target,
+    })),
+    workspace: { source: aggregate.workspace.source, target: aggregate.workspace.target },
+  };
+}
+
+/**
+ * The aggregate field entries to report, filtered exactly as the per-mapping
+ * ones are so the two sections stay comparable line for line.
+ */
+function aggregateFields(schema: AggregateSchemaCoverage, opts: CoverageOptions): FieldCoverageEntry[] {
+  const leaves = leafFieldEntries(schema.fields);
+  return opts.uncovered ? leaves.filter((f) => !f.mapped) : leaves;
+}
+
+/**
+ * Print the aggregate section.
+ *
+ * The heading states the claim in words rather than trusting the section title:
+ * a reviewer skimming for "uncovered" needs to know, at the point of reading it,
+ * that these gaps are the ones no mapping fills — the per-mapping list above
+ * contains fields another mapping populates.
+ */
+function printAggregateReport(aggregate: AggregateCoverage, opts: CoverageOptions): void {
+  console.log();
+  console.log("Aggregate — a field is uncovered here only when NO mapping in scope covers it");
+
+  const schemaWidth = Math.max(
+    ...aggregate.schemas.map((s) => canonicalKey(s.schemaId).length),
+  );
+  for (const schema of aggregate.schemas) {
+    console.log(
+      `  ${schema.role.padEnd(ROLE_COLUMN_WIDTH)}  ${canonicalKey(schema.schemaId).padEnd(schemaWidth)}  ` +
+      `${formatTotals(schema.totals)}`,
+    );
+  }
+
+  for (const schema of aggregate.schemas) {
+    const uncovered = aggregateFields(schema, opts).filter((f) => !f.mapped);
+    if (uncovered.length === 0) continue;
+    console.log(
+      `    covered by no mapping — ${canonicalKey(schema.schemaId)} (${schema.role}): ` +
+      `${uncovered.length} field${uncovered.length !== 1 ? "s" : ""}`,
+    );
+    for (const line of wrapPaths(uncovered.map((f) => f.path))) {
+      console.log(`      ${line}`);
+    }
+  }
+
+  printSubtotals(aggregate);
+}
+
+/**
+ * Print namespace subtotals and the workspace total.
+ *
+ * The single-namespace case is suppressed: when every schema is at file scope
+ * (or in one namespace) the subtotal row is identical to the workspace row, and
+ * printing both invites the reader to look for a difference that cannot exist.
+ */
+function printSubtotals(aggregate: AggregateCoverage): void {
+  const showNamespaces = aggregate.namespaces.length > 1;
+  // One label width across namespace rows and the workspace row, so the
+  // percentages line up into a column the eye can scan down.
+  const labels = showNamespaces ? aggregate.namespaces.map((ns) => namespaceLabel(ns.namespace)) : [];
+  const labelWidth = Math.max(...labels.map((l) => l.length), WORKSPACE_LABEL.length);
+
+  console.log();
+  if (showNamespaces) {
+    for (const ns of aggregate.namespaces) {
+      console.log(`  ${namespaceLabel(ns.namespace).padEnd(labelWidth)}  ${formatRoleTotals(ns)}`);
+    }
+  }
+  console.log(`  ${WORKSPACE_LABEL.padEnd(labelWidth)}  ${formatRoleTotals(aggregate.workspace)}`);
+}
+
+/** Display name for a namespace subtotal row; file scope has no name of its own. */
+function namespaceLabel(namespace: string | null): string {
+  return namespace === null ? "(file scope)" : namespace;
+}
+
+/** "3/4  75%" — the shared counts-and-percentage cell. */
+function formatTotals(totals: CoverageTotals): string {
+  return `${`${totals.covered}/${totals.total}`.padStart(7)}  ${String(totals.pct).padStart(3)}%`;
+}
+
+/** "source 3/4  75%   target 3/3  100%" — both roles on one subtotal row. */
+function formatRoleTotals(totals: RoleTotals): string {
+  return `source ${formatTotals(totals.source)}   target ${formatTotals(totals.target)}`;
 }
 
 /**

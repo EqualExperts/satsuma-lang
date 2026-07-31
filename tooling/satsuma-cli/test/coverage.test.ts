@@ -238,6 +238,108 @@ describe("satsuma coverage — JSON contract", () => {
   });
 });
 
+// ── Aggregate rollups ───────────────────────────────────────────────────────
+
+describe("satsuma coverage — aggregate rollups", () => {
+  /** The aggregate entry for one schema and role. */
+  function aggregateEntry(data: any, role: string, schema: string): any {
+    const found = data.aggregate.schemas.find((s: any) => s.role === role && s.schema === schema);
+    assert.ok(found, `expected aggregate ${role} ${schema} in ${JSON.stringify(data.aggregate.schemas.map((s: any) => [s.role, s.schema]))}`);
+    return found;
+  }
+
+  it("counts a field covered when any one mapping covers it", async () => {
+    // crm::contacts.memo is written by 'annotate contacts' and ignored by
+    // 'load contacts'. The aggregate is the only figure that says so.
+    const { stdout, code } = await run("coverage", WORKSPACE, "--json");
+    assert.equal(code, 0);
+    const contacts = aggregateEntry(parseJson(stdout), "target", "crm::contacts");
+    assert.deepEqual(
+      { covered: contacts.covered, total: contacts.total, pct: contacts.pct },
+      { covered: 3, total: 3, pct: 100 },
+    );
+  });
+
+  it("keeps the per-mapping and aggregate figures for one field distinguishable", async () => {
+    // The confusion the two sections exist to prevent, asserted end to end:
+    // 'memo' is a gap under 'load contacts' and covered in the aggregate. A
+    // reviewer who reads the wrong one deletes a field another mapping populates.
+    const { stdout } = await run("coverage", WORKSPACE, "--json");
+    const data = parseJson(stdout);
+    const perMapping = schemaEntry(data, "crm::load contacts", "target", "crm::contacts")
+      .fields.find((f: any) => f.path === "memo");
+    assert.equal(perMapping.mapped, false);
+    const aggregated = aggregateEntry(data, "target", "crm::contacts")
+      .fields.find((f: any) => f.path === "memo");
+    assert.equal(aggregated.mapped, true);
+  });
+
+  it("names the mappings behind each aggregate figure", async () => {
+    // Without them an aggregate gap is not actionable — the reviewer cannot tell
+    // which mapping to go and edit.
+    const { stdout } = await run("coverage", WORKSPACE, "--json");
+    assert.deepEqual(
+      aggregateEntry(parseJson(stdout), "target", "crm::contacts").mappings.sort(),
+      ["crm::annotate contacts", "crm::load contacts"],
+    );
+  });
+
+  it("counts a schema once however many mappings reference it", async () => {
+    // crm::customers is a source of two mappings; counting it twice would halve
+    // the workspace percentage for no reason.
+    const { stdout } = await run("coverage", WORKSPACE, "--json");
+    const data = parseJson(stdout);
+    const sources = data.aggregate.schemas.filter((s: any) => s.role === "source");
+    assert.equal(sources.filter((s: any) => s.schema === "crm::customers").length, 1);
+    // customers 3/4 + invoices 2/3 = 5/7 source leaves across the workspace.
+    assert.deepEqual(data.aggregate.workspace.source, { covered: 5, total: 7, pct: 71 });
+  });
+
+  it("reports per-namespace subtotals that sum to the workspace total", async () => {
+    // Two numbers that can disagree means one of them is a lie.
+    const { stdout } = await run("coverage", WORKSPACE, "--json");
+    const { namespaces, workspace } = parseJson(stdout).aggregate;
+    assert.deepEqual(namespaces.map((n: any) => n.namespace).sort(), ["billing", "crm"]);
+    const summed = namespaces.reduce(
+      (acc: any, ns: any) => ({ covered: acc.covered + ns.source.covered, total: acc.total + ns.source.total }),
+      { covered: 0, total: 0 },
+    );
+    assert.deepEqual(summed, { covered: workspace.source.covered, total: workspace.source.total });
+  });
+
+  it("aggregates over the scoped mappings, not the whole workspace", async () => {
+    // --fail-under will gate whatever scope is active (sl-268g), so scope has to
+    // reach the aggregate. Restricted to 'load contacts' alone, memo is a gap.
+    const { stdout } = await run("coverage", WORKSPACE, "--mapping", "load contacts", "--json");
+    const data = parseJson(stdout);
+    const contacts = aggregateEntry(data, "target", "crm::contacts");
+    assert.deepEqual({ covered: contacts.covered, total: contacts.total }, { covered: 2, total: 3 });
+    assert.deepEqual(data.aggregate.namespaces.map((n: any) => n.namespace), ["crm"]);
+  });
+
+  it("labels the human aggregate section with the claim it is making", async () => {
+    // A section title alone is too easy to skim past; the stronger claim has to
+    // be stated where the numbers are read.
+    const { stdout } = await run("coverage", WORKSPACE);
+    assert.match(stdout, /Aggregate — a field is uncovered here only when NO mapping in scope covers it/);
+    assert.match(stdout, /covered by no mapping — crm::customers \(source\)/);
+  });
+
+  it("prints namespace subtotals and a workspace total in human output", async () => {
+    const { stdout } = await run("coverage", WORKSPACE);
+    assert.match(stdout, /^ {2}crm\s+source\s+3\/4\s+75%\s+target\s+3\/3\s+100%$/m);
+    assert.match(stdout, /^ {2}workspace\s+source\s+5\/7\s+71%\s+target\s+5\/5\s+100%$/m);
+  });
+
+  it("omits the namespace rows when there is only one group to subtotal", async () => {
+    // The row would be identical to the workspace row, inviting the reader to
+    // look for a difference that cannot exist.
+    const { stdout } = await run("coverage", NESTED);
+    assert.match(stdout, /^ {2}workspace\s+source/m);
+    assert.ok(!/\(file scope\)/.test(stdout), `single-group subtotal row should be suppressed:\n${stdout}`);
+  });
+});
+
 // ── Exit codes ──────────────────────────────────────────────────────────────
 
 describe("satsuma coverage — exit codes", () => {
