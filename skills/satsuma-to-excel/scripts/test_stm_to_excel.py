@@ -217,13 +217,13 @@ def _run_stm_to_excel(stm_files: list[str], output: str, extra_args: list[str] |
 
 
 class TestIntegrationDbToDb:
-    """Integration tests against examples/db-to-db.stm."""
+    """Integration tests against examples/db-to-db/pipeline.stm."""
 
     @pytest.fixture(autouse=True)
     def setup(self, tmp_path):
         _skip_if_no_cli()
         self.output = str(tmp_path / "db-to-db.xlsx")
-        self.stm = str(REPO_ROOT / "examples" / "db-to-db.stm")
+        self.stm = str(REPO_ROOT / "examples" / "db-to-db" / "pipeline.stm")
         _run_stm_to_excel([self.stm], self.output)
         import openpyxl
         self.wb = openpyxl.load_workbook(self.output)
@@ -264,7 +264,10 @@ class TestIntegrationDbToDb:
             1 for r in range(1, ws.max_row + 1)
             if ws.cell(r, 4).value == "\u2192" and isinstance(ws.cell(r, 1).value, int)
         )
-        assert arrows == 19
+        # 19 explicit `->` mappings in the fixture, plus 11 implicit source
+        # contributions surfaced from @field refs in NL mapping descriptions
+        # (4 for display_name, 1 for phone, 6 for address_id).
+        assert arrows == 30
 
     def test_computed_field_dash(self):
         """Computed/derived fields should show '—' in source column."""
@@ -321,13 +324,13 @@ class TestIntegrationDbToDb:
 
 
 class TestIntegrationSfdc:
-    """Integration tests against examples/sfdc_to_snowflake.stm."""
+    """Integration tests against examples/sfdc-to-snowflake/pipeline.stm."""
 
     @pytest.fixture(autouse=True)
     def setup(self, tmp_path):
         _skip_if_no_cli()
         self.output = str(tmp_path / "sfdc.xlsx")
-        self.stm = str(REPO_ROOT / "examples" / "sfdc_to_snowflake.stm")
+        self.stm = str(REPO_ROOT / "examples" / "sfdc-to-snowflake" / "pipeline.stm")
         _run_stm_to_excel([self.stm], self.output)
         import openpyxl
         self.wb = openpyxl.load_workbook(self.output)
@@ -348,7 +351,10 @@ class TestIntegrationSfdc:
             1 for r in range(1, ws.max_row + 1)
             if ws.cell(r, 4).value == "\u2192" and isinstance(ws.cell(r, 1).value, int)
         )
-        assert arrows == 10
+        # 10 explicit `->` mappings in the fixture, plus 2 implicit source
+        # contributions surfaced from @field refs in NL mapping descriptions
+        # (@Amount for arr_value, @StageName for is_closed).
+        assert arrows == 12
 
     def test_overview_title(self):
         ws = self.wb["Overview"]
@@ -365,7 +371,7 @@ class TestIntegrationOptions:
     @pytest.fixture(autouse=True)
     def setup(self):
         _skip_if_no_cli()
-        self.stm = str(REPO_ROOT / "examples" / "db-to-db.stm")
+        self.stm = str(REPO_ROOT / "examples" / "db-to-db" / "pipeline.stm")
 
     def test_no_issues_flag(self, tmp_path):
         output = str(tmp_path / "no-issues.xlsx")
@@ -417,7 +423,7 @@ class TestIntegrationFragments:
     def setup(self, tmp_path):
         _skip_if_no_cli()
         self.output = str(tmp_path / "sfdc-frags.xlsx")
-        self.stm = str(REPO_ROOT / "examples" / "sfdc_to_snowflake.stm")
+        self.stm = str(REPO_ROOT / "examples" / "sfdc-to-snowflake" / "pipeline.stm")
         _run_stm_to_excel([self.stm], self.output)
         import openpyxl
         self.wb = openpyxl.load_workbook(self.output)

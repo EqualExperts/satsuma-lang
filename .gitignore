@@ -2,8 +2,7 @@
 .tree-sitter
 .DS_Store
 log.html
-scripts/__pycache__
-tooling/tree-sitter-satsuma/scripts/__pycache__
+__pycache__/
 **/node_modules
 **/dist
 **/generated
