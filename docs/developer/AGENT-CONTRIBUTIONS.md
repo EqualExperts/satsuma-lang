@@ -159,4 +159,18 @@ After PR is merged:
 - [ ] Delete the local branch: `git branch -d <branch>`
 
 ## Running tree-sitter CLI
-Always use --wasm flag to avoid the need for a C compiler and because we want to keep things platform portable.
+
+Always pass `--wasm` — there is no native build in this repository, and the native
+path needs a C toolchain the WASM migration removed (ADR-002). The npm scripts
+already do this, so `npm --prefix tooling/tree-sitter-satsuma test` is correct as-is.
+
+In the agent sandbox you must also redirect the tree-sitter cache, because both
+the native and WASM paths compile into `~/.cache/tree-sitter/` and fail there with
+an opaque `Operation not permitted` lock-file error:
+
+```bash
+XDG_CACHE_HOME="$SCRATCHPAD/ts-cache" npm --prefix tooling/tree-sitter-satsuma test
+```
+
+See the "Running tree-sitter CLI" section of [AGENTS.md](../../AGENTS.md) for the
+full explanation.

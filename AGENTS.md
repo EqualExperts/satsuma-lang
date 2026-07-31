@@ -194,7 +194,32 @@ HOMEBREW_NO_AUTO_UPDATE=1 brew ...
 Prefer these forms over prompt-prone variants such as plain `cp`, `mv`, or `rm`.
 
 ## Running tree-sitter CLI
-Always use --wasm flag to avoid the need for a C compiler and because we want to keep things platform portable.
+
+**Always pass `--wasm`.** There is no native build in this repository: the
+`tree-sitter-satsuma` package's `install` script deliberately skips node-gyp, and
+every consumer loads `tree-sitter-satsuma.wasm`. The native path needs a C
+toolchain, which is exactly the portability the WASM migration removed (ADR-002).
+`npm test` in that package is already the `--wasm` path (sl-cysb) — you do not
+need to add the flag yourself when using the npm scripts.
+
+**In the agent sandbox, also redirect the tree-sitter cache.** `--wasm` alone is
+not sufficient. Both the native and the WASM path compile the grammar into
+`~/.cache/tree-sitter/`, which the sandbox cannot write, and the failure is an
+opaque lock-file error that looks nothing like a permissions problem:
+
+```
+Error: Operation not permitted (os error 1) (~/.cache/tree-sitter/lock/satsuma-<hash>.lock)
+```
+
+Point `XDG_CACHE_HOME` at your scratchpad and the corpus tests run normally:
+
+```bash
+XDG_CACHE_HOME="$SCRATCHPAD/ts-cache" npm --prefix tooling/tree-sitter-satsuma test
+```
+
+Do **not** conclude from the lock error that the corpus tests cannot be run
+locally — they can, and they must be before any grammar change is pushed. All 315
+parses should pass.
 
 ## Code Search with ast-grep
 
