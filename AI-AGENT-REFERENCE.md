@@ -296,7 +296,7 @@ mapping {
 
 The `satsuma` CLI is a deterministic structural extraction tool. It extracts facts from parse trees and delivers NL content verbatim. **It does not interpret natural language — that is your job.** The CLI is the toolkit. You are the runtime.
 
-Every command produces 100% correct results from structural analysis. There are no `impact`, `coverage`, `audit`, or `inventory` commands — those are workflows you compose from primitives, applying your own reasoning to the NL content the CLI surfaces.
+Every command produces 100% correct results from structural analysis. There are no `impact`, `audit`, or `inventory` commands — those are workflows you compose from primitives, applying your own reasoning to the NL content the CLI surfaces. `coverage` *is* a command, because which fields an arrow references is a fact about the parse tree and the rollup across mappings is arithmetic; judging whether a gap matters is still yours.
 
 **Self-discovery:** Every command supports `--help` with its full flag list, JSON output shape, and examples. Run `satsuma <command> --help` to inspect any command without consulting external docs.
 
@@ -326,9 +326,16 @@ satsuma nl mart_customer_360.email            # NL content on a specific field
 satsuma nl all platform.stm                   # all NL across the entry-file workspace
 satsuma meta loyalty_sfdc.Email              # metadata entries (tags, type, constraints)
 satsuma fields sat_customer_demographics     # field list with types
-satsuma fields mart_customer_360 --unmapped-by 'demographics to mart'  # fields with no arrows
+satsuma fields mart_customer_360 --unmapped-by 'demographics to mart'  # one schema vs one mapping
 satsuma match-fields --source loyalty_sfdc --target sat_customer_demographics  # name comparison
 satsuma nl-refs platform.stm --json          # extract @ref references from NL text
+
+# Coverage — which declared fields is nothing mapping yet?
+satsuma coverage platform.stm --json         # every mapping, per-mapping AND aggregate figures
+satsuma coverage platform.stm --uncovered    # the review queue: only the gaps
+satsuma coverage platform.stm --schema mart_customer_360 --json   # one schema, every mapping
+satsuma coverage platform.stm --role target  # only what gets written
+satsuma coverage platform.stm --fail-under 90 # CI gate: exit 3 below the threshold
 
 # Workspace graph — full topology in one call
 satsuma graph platform.stm --json            # complete semantic graph (nodes, edges, field-level flow)
@@ -388,7 +395,11 @@ Every arrow the CLI returns carries one of three classifications:
 
 **Impact analysis:** Call `satsuma arrows <field> --as-source --json`, follow each target with another `arrows` call, recurse. At `[nl]` hops, call `satsuma nl` to read the transform or note content and reason about it yourself.
 
-**Coverage check:** Call `satsuma fields <target> --unmapped-by <mapping> --json` for each mapping. Intersect results to find fields unmapped by all mappings. For mapped fields, check classification via `satsuma arrows`.
+**Coverage check:** Call `satsuma coverage <entry-file>.stm --json` once. Do **not** compose this from `fields --unmapped-by` calls — the CLI performs the aggregation because that is where hand-composed versions went wrong.
+
+The output has two sections making different claims about the same field. `mappings[].schemas[].fields[]` says whether *that mapping* touches it; `aggregate.schemas[].fields[]` says whether *any* mapping does. A target field populated by mapping A and ignored by mapping B is a gap in B's section and covered in the aggregate — so read the aggregate to decide a field is unmapped, and the per-mapping section to find which mapping to edit. (This is the "intersect across mappings" step you would otherwise do yourself, and the reason to stop doing it: treating a field as unmapped because one mapping ignores it is the classic error.)
+
+A field populated only by prose in a note block is uncovered by definition — coverage is structural. Check `nl-refs` for those, and `satsuma arrows` for the classification of a covered field, to judge whether a gap or a cover is real.
 
 **PII audit:** Call `satsuma find --tag pii --json`, then `satsuma arrows` for each tagged field, recurse downstream. At `[nl]` hops, read the transform text to judge whether PII survives.
 
@@ -406,7 +417,9 @@ Every arrow the CLI returns carries one of three classifications:
 | Need NL content for interpretation | `satsuma nl <scope>` — not pulling the entire block |
 | Need extracted refs inside NL text | `satsuma nl-refs <file>.stm` — inspect `@ref` usage without rereading whole files |
 | Need metadata on a field | `satsuma meta <schema.field>` — not parsing raw text |
-| Need to check which fields lack arrows | `satsuma fields <schema> --unmapped-by <mapping>` |
+| Need one schema's gaps against one mapping | `satsuma fields <schema> --unmapped-by <mapping>` — a field tree with types |
+| Need workspace-wide, aggregated, or percentage coverage | `satsuma coverage <file>.stm --json` — never compose it from `--unmapped-by` calls |
+| Need coverage to gate CI | `satsuma coverage <file>.stm --fail-under <pct>` — exit 3 when below |
 | Need to validate after editing | `satsuma validate <file>.stm` for correctness, `satsuma lint <file>.stm` for conventions |
 | Need to compare versions | `satsuma diff` — not text diff |
 | Need full file content for editing | Read the file directly — CLI is for querying, not raw content |
@@ -438,7 +451,7 @@ When reporting results to humans, be transparent about which parts of your analy
 13. Run `satsuma fmt <file>.stm` to apply canonical formatting
 14. Run `satsuma validate <file>.stm` to check for parse errors and semantic issues
 15. Run `satsuma lint <file>.stm` to check for policy/convention issues; use `--fix` to auto-correct fixable ones
-16. Run `satsuma fields <target> --unmapped-by <mapping>` to check which target fields you haven't covered
+16. Run `satsuma coverage <file>.stm --uncovered` to see which declared fields nothing maps yet — check the aggregate section, since another mapping may already populate a field your mapping ignores
 
 ### When reading/interpreting Satsuma:
 
