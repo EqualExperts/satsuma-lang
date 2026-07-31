@@ -13,7 +13,7 @@ import { describe, it } from "node:test";
 import { InvalidArgumentError } from "commander";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { parsePositiveInt } from "../src/option-parsers.js";
+import { parsePositiveInt, parsePercentage } from "../src/option-parsers.js";
 import { run as runCli } from "./helpers.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -65,5 +65,29 @@ describe("numeric options reject garbage as a usage error", () => {
 
     assert.notEqual(code, 0);
     assert.match(stderr, /option '--budget <n>' argument '0' is invalid/);
+  });
+});
+
+describe("parsePercentage", () => {
+  it("accepts the full 0-100 range, including both boundaries", () => {
+    // 0 must be accepted: a pipeline that computes its own --fail-under
+    // threshold can legitimately arrive at zero, and rejecting it would break
+    // the boundary case rather than the mistake.
+    assert.equal(parsePercentage("0"), 0);
+    assert.equal(parsePercentage("71"), 71);
+    assert.equal(parsePercentage("100"), 100);
+  });
+
+  it("rejects a threshold above 100", () => {
+    // A gate no coverage figure can ever satisfy is a typo, not a policy.
+    assert.throws(() => parsePercentage("101"), InvalidArgumentError);
+  });
+
+  it("rejects non-integer and non-numeric values rather than truncating them", () => {
+    // Bare parseInt would turn "90.5" into 90 and "ninety" into NaN, silently
+    // gating on a threshold the caller never asked for (the sl-bvd0 shape).
+    for (const bad of ["90.5", "ninety", "-1", "", "90abc"]) {
+      assert.throws(() => parsePercentage(bad), InvalidArgumentError, `expected "${bad}" to be rejected`);
+    }
   });
 });

@@ -40,3 +40,26 @@ export function parsePositiveInt(value: string): number {
   }
   return parsed;
 }
+
+/** A coverage percentage is a whole number in [0, 100] — 0 and 100 both mean something. */
+const MIN_PERCENTAGE = 0;
+const MAX_PERCENTAGE = 100;
+
+/**
+ * Commander coercion for a percentage threshold such as `coverage --fail-under`.
+ *
+ * Unlike {@link parsePositiveInt}, zero is accepted: `--fail-under 0` is a
+ * meaningful (if trivially satisfied) gate, and rejecting it would make a
+ * pipeline that computes its threshold fail on the boundary value. Values above
+ * 100 are rejected because no coverage figure can ever satisfy them — a gate
+ * that can never pass is a typo, not a policy.
+ */
+export function parsePercentage(value: string): number {
+  const parsed = POSITIVE_INT_PATTERN.test(value) ? parseInt(value, 10) : NaN;
+  if (!Number.isSafeInteger(parsed) || parsed < MIN_PERCENTAGE || parsed > MAX_PERCENTAGE) {
+    throw new InvalidArgumentError(
+      `Expected a whole number between ${MIN_PERCENTAGE} and ${MAX_PERCENTAGE}.`,
+    );
+  }
+  return parsed;
+}

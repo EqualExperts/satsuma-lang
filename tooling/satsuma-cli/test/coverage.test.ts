@@ -362,11 +362,13 @@ describe("satsuma coverage — exit codes", () => {
     assert.equal(code, 2);
   });
 
-  it("rejects an invalid --role rather than silently reporting both", async () => {
-    // Ignoring the flag would look like a bug in the numbers, not the command line.
+  it("rejects an invalid --role as a usage error rather than reporting both roles", async () => {
+    // Silently ignoring the flag would surface as a bug in the coverage numbers
+    // rather than in the command line. Exit 1 + help is the CLI's convention for
+    // every other bad flag value, so --role must not invent a second one.
     const { stderr, code } = await run("coverage", WORKSPACE, "--role", "sources");
-    assert.equal(code, 2);
-    assert.match(stderr, /Invalid --role 'sources'/);
+    assert.equal(code, 1);
+    assert.match(stderr, /--role <role>' argument 'sources' is invalid/);
   });
 });
 
@@ -411,5 +413,106 @@ describe("satsuma coverage vs fields --unmapped-by", () => {
       schemaEntry(parseJson(viaCoverage.stdout), "::full_map", "target", "::nested_tgt").fields,
       [],
     );
+  });
+});
+
+// ── --fail-under CI gate ────────────────────────────────────────────────────
+
+describe("satsuma coverage --fail-under", () => {
+  it("exits 0 when the gated coverage meets the threshold", async () => {
+    // Target coverage across the fixture's mappings is 100%, so any threshold
+    // passes — the gate must not fail on the per-mapping figures beneath it.
+    const { code } = await run("coverage", WORKSPACE, "--fail-under", "100");
+    assert.equal(code, 0);
+  });
+
+  it("exits 3 when the gated coverage is below the threshold", async () => {
+    // The distinct code is the whole point: CI has to tell an incomplete spec
+    // from a broken invocation.
+    const { code } = await run("coverage", WORKSPACE, "--fail-under", "90", "--role", "source");
+    assert.equal(code, 3);
+  });
+
+  it("exits 1, not 3, when --mapping names something that does not exist", async () => {
+    // The case that motivated a separate code. If both were 1, a misspelled
+    // mapping name and genuine under-coverage would be indistinguishable, and CI
+    // could not tell "fix the pipeline" from "finish the mapping".
+    const { stderr, code } = await run("coverage", WORKSPACE, "--fail-under", "90", "--mapping", "typo");
+    assert.equal(code, 1);
+    assert.match(stderr, /Mapping 'typo' not found/);
+  });
+
+  it("exits 2 for a parse or filesystem error, whatever the threshold", async () => {
+    const { code } = await run(
+      "coverage", resolve(__dirname, "fixtures/does-not-exist.stm"), "--fail-under", "90",
+    );
+    assert.equal(code, 2);
+  });
+
+  it("gates target coverage by default", async () => {
+    // Completeness at sign-off is about what the spec produces, so the default
+    // measures the target side even though both roles are reported.
+    const { stdout, code } = await run("coverage", WORKSPACE, "--fail-under", "100", "--json");
+    assert.equal(code, 0);
+    const { gate } = parseJson(stdout);
+    assert.deepEqual(gate, { role: "target", threshold: 100, pct: 100, met: true });
+  });
+
+  it("gates source consumption when combined with --role source", async () => {
+    const { stdout, code } = await run(
+      "coverage", WORKSPACE, "--fail-under", "90", "--role", "source", "--json",
+    );
+    assert.equal(code, 3);
+    assert.deepEqual(parseJson(stdout).gate, { role: "source", threshold: 90, pct: 71, met: false });
+  });
+
+  it("gates the scoped percentage when --mapping narrows the report", async () => {
+    // 'load contacts' alone leaves memo unwritten, so the same workspace that
+    // passes at 100% aggregate fails once the scope is one mapping.
+    const { stdout, code } = await run(
+      "coverage", WORKSPACE, "--mapping", "load contacts", "--fail-under", "100", "--json",
+    );
+    assert.equal(code, 3);
+    assert.deepEqual(parseJson(stdout).gate, { role: "target", threshold: 100, pct: 67, met: false });
+  });
+
+  it("still prints the report when the gate fails", async () => {
+    // A gate that printed only a verdict would tell CI it failed without telling
+    // anyone which fields to go and map.
+    const { stdout } = await run("coverage", WORKSPACE, "--fail-under", "90", "--role", "source");
+    assert.match(stdout, /covered by no mapping — crm::customers \(source\)/);
+    assert.match(stdout, /--fail-under: source coverage 71% vs threshold 90% — NOT met/);
+  });
+
+  it("exits 1 when the gated role has nothing in scope to measure", async () => {
+    // crm::customers is only ever a source, so gating target coverage measures
+    // nothing. Reporting that as 0% would blame the spec for an invocation error.
+    const { stderr, code } = await run(
+      "coverage", WORKSPACE, "--schema", "crm::customers", "--fail-under", "90",
+    );
+    assert.equal(code, 1);
+    assert.match(stderr, /No target-role coverage in scope to gate/);
+    assert.match(stderr, /use --role source/);
+  });
+
+  it("omits the gate from JSON when --fail-under is absent", async () => {
+    // A gate key that is always present would push consumers into checking
+    // met === false on a check nobody asked for.
+    const { stdout } = await run("coverage", WORKSPACE, "--json");
+    assert.ok(!("gate" in parseJson(stdout)), "no gate should be reported without --fail-under");
+  });
+
+  it("rejects a threshold above 100 as a usage error", async () => {
+    // A gate that can never pass is a typo, not a policy.
+    const { stderr, code } = await run("coverage", WORKSPACE, "--fail-under", "150");
+    assert.equal(code, 1);
+    assert.match(stderr, /Expected a whole number between 0 and 100/);
+  });
+
+  it("accepts a threshold of 0 as a trivially satisfied gate", async () => {
+    // Rejecting 0 would break a pipeline that computes its own threshold and
+    // legitimately arrives at zero.
+    const { code } = await run("coverage", WORKSPACE, "--fail-under", "0");
+    assert.equal(code, 0);
   });
 });
