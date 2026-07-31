@@ -247,7 +247,10 @@ jobs:
           fi
 
       - name: Run corpus tests
-        run: node_modules/.bin/tree-sitter test
+        # --wasm is the repo-wide convention (AGENTS.md): there is no native
+        # build here, so the corpus must be exercised through the same WASM
+        # parser every consumer loads (sl-cysb).
+        run: node_modules/.bin/tree-sitter test --wasm
 
       - name: Install pytest
         run: pip install pytest

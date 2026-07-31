@@ -8,8 +8,7 @@
     "install": "echo 'Skipping native build — WASM only'",
     "generate": "tree-sitter generate",
     "build": "tree-sitter generate && tree-sitter build --wasm . -o tree-sitter-satsuma.wasm",
-    "test": "tree-sitter generate && tree-sitter test",
-    "test:wasm": "tree-sitter generate && tree-sitter test --wasm",
+    "test": "tree-sitter generate && tree-sitter test --wasm",
     "smoke": "node scripts/smoke-check.js"
   },
   "devDependencies": {
