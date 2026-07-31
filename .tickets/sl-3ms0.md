@@ -1,6 +1,6 @@
 ---
 id: sl-3ms0
-status: open
+status: closed
 deps: [sl-oqsj, sl-4qvp]
 links: []
 created: 2026-07-31T13:13:05Z
@@ -22,3 +22,10 @@ Consume the core aggregation exported by sl-4qvp — no aggregation logic in the
 
 Aggregate rollups appear in human and --json output with labelling that distinguishes per-mapping from aggregate figures; workspace and per-namespace subtotals render correctly on a namespaced fixture; --json aggregate section matches the shape documented in sl-tdfx; no aggregation logic implemented in the CLI (it delegates to core); CLI suite passes locally.
 
+
+## Notes
+
+**2026-07-31T14:14:39Z**
+
+Cause: the coverage command reported only per-mapping figures, so the workspace-level question PRD 35 P1 names — which fields does NO mapping populate — still required the caller to union the results.
+Fix: the command now calls core's aggregateCoverage over the scoped mappings and renders it in both human and --json output. The aggregate is a sibling section, never merged into the per-mapping one, and its heading states the claim in words ('a field is uncovered here only when NO mapping in scope covers it') rather than relying on a section title a reader can skim past. Namespace subtotals and a workspace total are printed on aligned rows; the single-group namespace row is suppressed because it would duplicate the workspace row exactly. Aggregating over the *scoped* mappings is deliberate — --fail-under (sl-268g) gates whatever scope is active. No aggregation logic in the CLI; it delegates entirely to core. 943 CLI tests pass (9 new); eslint clean.
