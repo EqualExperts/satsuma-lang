@@ -1,6 +1,6 @@
 ---
 id: sc-xnxp
-status: open
+status: closed
 deps: []
 links: []
 created: 2026-07-31T13:51:09Z
@@ -21,3 +21,10 @@ Pre-existing in tooling/satsuma-lsp/src/coverage.ts, so the VS Code coverage gut
 
 pathText() strips a single leading dot as well as backtick quoting, with the rule and its rationale documented at the call site; core coverage tests assert nested each and flatten fields written with .-prefixed relative paths report mapped=true and their unwritten siblings report mapped=false; LSP and vscode suites pass.
 
+
+## Notes
+
+**2026-07-31T13:53:25Z**
+
+Cause: pathText() in the coverage walker stripped backtick quoting but not the leading dot of a relative_field_path, so qualifying '.id' under 'each items -> lines' produced 'items..id'. addPathAndPrefixes split that on '.', registering 'items.' and 'items..id' but never 'items.id' — the path the declared field carries.
+Fix: pathText() now strips one leading dot as well, with the rule and rationale documented at the definition; regression tests in satsuma-core/test/coverage.test.js lock both the each and flatten arms using the spec's .-prefixed syntax (commit 1024955).
