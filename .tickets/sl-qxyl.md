@@ -4,29 +4,31 @@ status: open
 deps: [sl-hrql, sl-ez36]
 links: []
 created: 2026-07-31T15:54:44Z
-type: task
-priority: 3
+type: bug
+priority: 1
 assignee: Thorben Louw
-tags: [coverage, product-decision]
+tags: [coverage, core, nl-refs]
 ---
-# decide: source-role coverage reads 0% for specs that name their sources only in NL
+# coverage: resolved @refs do not count toward coverage, contradicting ADR-013
 
-Not a bug — a decision to confirm or revisit.
+`satsuma coverage` treats a field referenced only by a resolved NL `@ref` as
+uncovered. ADR-013 ("NL @ref Mentions as Implicit Field Lineage", Accepted,
+unsuperseded) says the opposite: a resolved `@ref` "carries the same lineage
+weight as a declared source field to the left of an arrow" and such refs "are
+not second-class". `arrows`, `graph`, `lineage`, `field-lineage` and `lint` all
+honour that. `coverage` is the sole dissenter.
 
-`coverage` is structural by design: "a field described only in prose (a note
-block) is uncovered by definition; use 'nl-refs' to find those"
-(coverage.ts module comment, features/35-coverage-command/PRD.md:233,
-features/38-hierarchical-coverage/PRD.md:576).
+The exclusion was introduced as a Feature 35 non-goal and was never recorded as
+an amendment to ADR-013. ADR-036 reverses it and defines the replacement
+contract; this ticket implements ADR-036.
 
-The consequence is sharper than the wording suggests, because the
-`-> target { "... @a and @b" }` idiom is a *first-class* way to declare a
-mapping, not an aside in a note block. For:
+## Observed
 
     mapping load {
       source { src_a, src_b }
       target { tgt }
       -> gross_total { "Add @net_amount and @tax_amount" }
-      -> final_total { "@gross_total minus @discount" }
+      -> final_total  { "@gross_total minus @discount" }
     }
 
     $ satsuma coverage
@@ -34,41 +36,72 @@ mapping, not an aside in a note block. For:
       source  src_b   0/2   0%
       target  tgt     2/3  67%
 
-Every source field is reported uncovered, and `--uncovered` lists all five as
-the review queue, even though `field-lineage` resolves them and labels the edges
-`nl-derived`. `coverage --fail-under <n> --role source` is therefore unusable on
-any spec that leans on the idiom, and the "covered by no mapping" aggregate —
-the one the help text says is "the claim worth acting on" — will send a reader
-to delete live fields.
+All five source fields are reported uncovered and listed by `--uncovered`, while
+`field-lineage` resolves every one of them and labels the edges `nl-derived`.
+The aggregate "covered by no mapping" section — which `coverage --help` calls
+"the claim worth acting on" — names live fields, so a reader who trusts it will
+delete them. `coverage --fail-under --role source` is unusable on any spec that
+leans on the idiom.
 
-The toolchain is already inconsistent about this: `field-lineage`, `arrows` and
-`graph` all follow NL @refs and mark them `nl-derived`; only `coverage` does
-not. `nl-refs` finds them but has no coverage view.
+## Expected (per ADR-036)
 
-Options:
-  1. Keep structural-only, and make the source-role report say so — e.g. flag
-     schemas whose fields are reached only via NL refs, so 0% is legible rather
-     than alarming.
-  2. Count NL-ref coverage as a distinct tier, reported separately from
-     declared coverage (`covered` / `nl-covered` / `uncovered`), leaving the
-     structural percentage untouched. Matches how `arrows` and `graph` already
-     separate `none` / `nl` / `nl-derived`.
-  3. Add an opt-in flag (`--include-nl`) that folds NL-ref coverage into the
-     percentage for teams that treat prose refs as declarations.
+    $ satsuma coverage
+      source  src_a   3/3  100%  (1 declared, 2 nl)
+      source  src_b   1/2   50%  (0 declared, 1 nl)
+      target  tgt     2/3   67%  (2 declared, 0 nl)
 
-Option 2 preserves the existing contract while making the report actionable, and
-reuses classification vocabulary the CLI already ships.
+Two tiers over one denominator. ADR-034's leaf-only denominator is unchanged —
+this splits the numerator only.
 
-Blocked on the two nl-ref path bugs: NL-ref coverage computed today would
-attribute coverage to fabricated field paths for anything nested.
+## Blocked on the resolution defects
+
+`sl-hrql` and `sl-ez36` must land first. Until they do, refs inside
+`each` / `flatten` / `nested_arrow` resolve to fabricated field paths, and this
+change would attribute coverage to fields that do not exist — a silent
+overstatement inside a merge gate.
+
+Interacts with `sl-joeq`: a resolved `@ref` yields a canonical full path, so it
+must be registered as a real path rather than a bare segment.
+
+## Documentation to reconcile
+
+The superseded claim is recorded in five places, all of which must change with
+the code:
+
+- `features/35-coverage-command/PRD.md:233` — Out of Scope bullet
+- `features/38-hierarchical-coverage/PRD.md:576` — Out of Scope bullet
+- `tooling/satsuma-core/src/coverage.ts` — module comment ("deliberately
+  structural only")
+- `tooling/satsuma-cli/src/commands/coverage.ts` — `--help` text
+- `SATSUMA-CLI.md:126`, `:317`, `:383` — including the positioning claim that
+  "`coverage` is a command rather than a workflow precisely because it needs no
+  NL interpretation", which needs restating as *resolution is not
+  interpretation* rather than deletion
 
 ## Acceptance Criteria
 
-- A decision is recorded (spec, PRD, or ADR) on whether coverage stays
-  structural-only, gains a separate NL tier, or gains an opt-in flag.
-- If the answer is "stays structural-only", `coverage --role source` output and
-  the `--fail-under` help text call out that NL-only sources read as 0%, and
-  point at `nl-refs`.
-- The decision names how `--fail-under --role source` should behave for a
-  prose-heavy spec.
-
+- A leaf counts as covered when a declared arrow references it **or** a resolved
+  `@ref` in the same mapping names it. A field covered both ways counts once, in
+  the declared tier.
+- `covered` = `covered_declared` + `covered_nl`; `total` is unchanged and still
+  governed by ADR-034 (leaves only, own flag, records excluded).
+- Unresolved refs contribute nothing — coverage must not rise when a ref breaks.
+- A ref with `context: "source_block"` counts toward source coverage only; it
+  names no target field and cannot contribute target coverage.
+- Each `FieldCoverageEntry` carries the tier that covered it, so a rendered
+  field list and its adjacent count derive from one definition.
+- The rule lives only in `computeMappingCoverage()` (path collection, tagged by
+  origin) and `summarizeFieldCoverage()` (all counting). No consumer computes
+  its own denominator *or* its own split.
+- `--fail-under` gates the combined figure; `--role source` gates combined
+  source coverage.
+- Human output shows the split; `--json` exposes `covered_declared` /
+  `covered_nl` per schema, per namespace, per workspace, and in the aggregate.
+- Tests: a field covered only by NL; covered by both (counted once, declared);
+  covered by an unresolved ref (not counted); a `source_block` ref (source only,
+  never target); NL coverage inside `each` / `flatten` / `nested_arrow` once
+  sl-hrql and sl-ez36 land; and cross-consumer parity per `sl-5nsv`.
+- The five documentation sites above are reconciled in the same PR, each citing
+  ADR-036.
+- `3cc-t6uo` is either fixed or explicitly re-scoped: the VS Code status bar's
+  own rule now disagrees on two axes, not one.
