@@ -123,7 +123,17 @@ satsuma coverage pipeline.stm --fail-under 90        # CI gate
 
 Flags: `--mapping <name>`, `--schema <name>`, `--role source|target`, `--uncovered`, `--fail-under <pct>`, `--json`. Scoping flags compose — `--schema X --role target` reports only X's target-side coverage, in only the mappings that write to it.
 
-**Coverage is structural.** A field is covered when at least one arrow references it. Nested paths cover their parents: mapping `address.city` covers `address` but not `address.line1`. Element-relative arrows inside `each`/`flatten` blocks resolve against the iterated list, so `.sku` under `each lines -> rows` covers `lines.sku`. A field described only in prose is uncovered *by definition* — use `nl-refs` to find those, and `lint` for policy judgements about which gaps are acceptable.
+**Coverage follows explicit references.** A field is covered when at least one arrow references it — the **declared** tier — or when a resolved NL `@ref` in the same mapping names it — the **nl** tier. Nested paths cover their parents: mapping `address.city` covers `address` but not `address.line1`. Element-relative arrows inside `each`/`flatten` blocks resolve against the iterated list, so `.sku` under `each lines -> rows` covers `lines.sku`.
+
+**The two tiers share one denominator and never double-count.** A field covered both ways is reported as declared, the stronger claim. Rows show the split only when there is NL coverage to distinguish:
+
+```text
+  source  legacy_sqlserver    21/21  100%  (15 declared, 6 nl)
+```
+
+`--json` always carries `covered_declared` and `covered_nl`, and tags each covered field with its `tier`, so a reviewer — or an overlay — can tell a declared arrow from an inferred one. `--fail-under` gates the combined figure: an `@ref` is a declaration of intent, not a hint.
+
+Counting a resolved `@ref` is **resolution, not interpretation**: the author wrote `@` to mark a reference, and resolving it against the index reads no surrounding prose. Two things still do not count — a field prose merely *describes* without an `@ref` (use `nl-refs` to find those), and an `@ref` that resolves to nothing (that is `lint`'s `unresolved-nl-ref`; letting it count would make coverage rise when a spec breaks). Policy judgements about which gaps are acceptable remain `lint`'s. See **ADR-036**, and **ADR-013** for why an `@ref` carries the same lineage weight as a declared source field.
 
 **Coverage matches whole paths, never bare field names.** `home_address.city` covers exactly that path — not a top-level `city`, and not `work_address.city`. Repeated leaf names across depths (`id`, `sku`, `code`, `BIC`) are normal in nested schemas, so name matching would report unmapped fields as mapped. In a multi-source mapping, an arrow's schema prefix resolves to the schema it names: `crm.consent.email_marketing` covers `consent.email_marketing` in `crm` and contributes nothing to any other source.
 
@@ -164,10 +174,13 @@ appears unchanged in both.
       "schema": "::hub_customer",     // canonical schema key
       "role": "target",               // "source" | "target"
       "covered": 8,                   // leaf fields covered by THIS mapping
+      "covered_declared": 6,          // of those, covered by a declared arrow
+      "covered_nl": 2,                // of those, covered only by a resolved @ref
       "total": 11,                    // leaf fields declared
       "pct": 73,                      // covered/total, whole-number percent
       "fields": [
-        { "path": "email", "mapped": true, "file": "/abs/path/pipeline.stm", "line": 42 }
+        { "path": "email", "mapped": true, "tier": "declared",
+          "file": "/abs/path/pipeline.stm", "line": 42 }
       ]
     }]
   }],
@@ -176,13 +189,13 @@ appears unchanged in both.
       "schema": "::hub_customer",
       "role": "target",
       "mappings": ["::load hub", "::enrich hub"],   // the mappings behind the figure
-      "covered": 11, "total": 11, "pct": 100,
+      "covered": 11, "covered_declared": 9, "covered_nl": 2, "total": 11, "pct": 100,
       "fields": [ /* same entry shape; `mapped` is the union across `mappings` */ ]
     }],
     "namespaces": [{
       "namespace": "crm",             // null for schemas at file scope
-      "source": { "covered": 3, "total": 4, "pct": 75 },
-      "target": { "covered": 3, "total": 3, "pct": 100 }
+      "source": { "covered": 3, "covered_declared": 3, "covered_nl": 0, "total": 4, "pct": 75 },
+      "target": { "covered": 3, "covered_declared": 3, "covered_nl": 0, "total": 3, "pct": 100 }
     }],
     "workspace": { "source": { /* … */ }, "target": { /* … */ } }
   },
@@ -192,7 +205,9 @@ appears unchanged in both.
 }
 ```
 
-`fields` lists leaf fields only, matching the counts, so the paths shown and the number beside them are always the same population. `line` is 1-indexed and **omitted** when the declaration position is unknown — never 0, which would send an editor-jump link to line 1 of the wrong file. Fields arriving via a fragment spread report the *consuming* schema's position, not the fragment's.
+`fields` lists leaf fields only, matching the counts, so the paths shown and the number beside them are always the same population. `tier` is present exactly when `mapped` is true, and says which tier covered the field — consumers differentiate declared from NL-derived coverage from this key rather than reconstructing it. `line` is 1-indexed and **omitted** when the declaration position is unknown — never 0, which would send an editor-jump link to line 1 of the wrong file. Fields arriving via a fragment spread report the *consuming* schema's position, not the fragment's.
+
+`covered_declared` and `covered_nl` are the two tiers of `covered` and always sum to it: a field covered both ways is reported as declared, so they are disjoint. They appear on every counts object — per-mapping schema, aggregate schema, namespace subtotal and workspace total.
 
 With `--uncovered`, `fields` is filtered to unmapped entries while `covered`/`total` stay unchanged, so the denominator survives.
 
@@ -316,7 +331,7 @@ satsuma coverage pipeline.stm --schema mart_customer_360 --uncovered --json
 
 Read `aggregate.schemas[].fields[]` for fields **no** mapping covers — that is the claim worth acting on. Read `mappings[].schemas[].fields[]` to see which mapping to edit. The two are not interchangeable: a field mapping A populates appears as a gap in mapping B's section.
 
-The CLI performs the aggregation because that is where callers composing it by hand went wrong — treating a field as unmapped because one mapping ignores it, when another populates it. What remains an agent judgement is *whether a gap matters*: read the arrow classification (`satsuma arrows`) and any NL notes, since a field populated only by prose in a note block is uncovered by definition.
+The CLI performs the aggregation because that is where callers composing it by hand went wrong — treating a field as unmapped because one mapping ignores it, when another populates it. What remains an agent judgement is *whether a gap matters*: read the arrow classification (`satsuma arrows`) and any NL notes. Note that a field a note references with an `@ref` is already counted, in the `nl` tier — the gaps left are fields nothing references at all, plus any whose `@ref` does not resolve (`satsuma lint`).
 
 ### PII audit
 
@@ -382,7 +397,7 @@ satsuma arrows changed_schema.changed_field --as-source --json
 ## What the CLI Does Not Do
 
 - **Does not interpret NL.** Transform strings, notes, and comments are extracted verbatim. The CLI never assesses whether an NL transform is correct, complete, or semantically equivalent to another.
-- **Does not compose analysis workflows.** There are no `impact`, `audit`, `scaffold`, or `inventory` commands. These are agent workflows built from primitives — their correctness depends on NL interpretation that the CLI cannot perform. `coverage` is a command rather than a workflow precisely because it needs no NL interpretation: which fields an arrow references is a fact about the parse tree, and the aggregation across mappings is arithmetic. Judging whether a given gap *matters* stays with the agent.
+- **Does not compose analysis workflows.** There are no `impact`, `audit`, `scaffold`, or `inventory` commands. These are agent workflows built from primitives — their correctness depends on NL interpretation that the CLI cannot perform. `coverage` is a command rather than a workflow precisely because it needs no NL *interpretation*: which fields an arrow references is a fact about the parse tree, resolving an `@ref` is structural resolution of a marked reference rather than a reading of prose, and the aggregation across mappings is arithmetic. Judging whether a given gap *matters* stays with the agent.
 - **Does not call language models.** The CLI is deterministic, fast, and reproducible. Same input, same output, every time.
 - **Does not accept NL queries.** Commands take explicit structural arguments. The agent decides which commands to call based on the user's question.
 

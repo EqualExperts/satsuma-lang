@@ -230,9 +230,16 @@ Minimal-snippet tests (per test quality standards), covering at least:
   (see Feature 37 and the lint framework) and must not be baked into the
   deterministic count. The JSON includes field metadata so policy layers can
   filter.
-- NL interpretation: a field populated "implicitly" by prose in a note block
-  is uncovered by definition. Surfacing candidate NL mentions stays with
-  `nl-refs`/`hidden-source-in-nl`.
+- ~~NL interpretation: a field populated "implicitly" by prose in a note block
+  is uncovered by definition.~~ **Superseded by ADR-036** (implemented in
+  `sl-qxyl`). The carve-out equated "follows a resolved `@ref`" with "interprets
+  natural language", and those are different acts: the author wrote `@` as a
+  sigil meaning *this is a reference*, and resolving it reads no surrounding
+  prose. It also contradicted ADR-013, which every other lineage-aware command
+  honoured. A resolved `@ref` now counts, as a distinct `nl` tier over the same
+  denominator. A field prose merely *describes* without an `@ref` is still
+  uncovered, and an unresolved `@ref` still counts for nothing — those remain
+  `nl-refs` and `lint`'s territory.
 
 ## Open Questions
 

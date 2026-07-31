@@ -16,7 +16,15 @@ import assert from "node:assert/strict";
 import { describe, it, before } from "node:test";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { initParser, getParser, computeMappingCoverage, extractSchemas } from "@satsuma/core";
+import {
+  initParser,
+  getParser,
+  computeMappingCoverage,
+  extractSchemas,
+  extractMappings,
+  extractNLRefData,
+  resolveAllNLRefs,
+} from "@satsuma/core";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const WASM_PATH = resolve(__dirname, "../../tree-sitter-satsuma/tree-sitter-satsuma.wasm");
@@ -37,8 +45,13 @@ function toCoverageFields(fields) {
 }
 
 /**
- * Run computeMappingCoverage over single-file source text, resolving schemas
- * from that same file.
+ * Run computeMappingCoverage over single-file source text, resolving schemas —
+ * and NL `@refs` — from that same file.
+ *
+ * Resolving refs here rather than stubbing them means these tests exercise the
+ * real `resolveRef` output shape (`{ kind: "field", name: "::schema.path" }`),
+ * which is the contract coverage now depends on (ADR-036). A stub would let the
+ * two drift.
  */
 function coverage(source, mappingName) {
   const tree = getParser().parse(source);
@@ -46,10 +59,39 @@ function coverage(source, mappingName) {
   for (const s of extractSchemas(tree.rootNode)) {
     byId.set(s.namespace ? `${s.namespace}::${s.name}` : s.name, s);
   }
-  return computeMappingCoverage(tree, mappingName, (schemaId) => {
-    const schema = byId.get(schemaId);
-    return schema ? { uri: TEST_URI, fields: toCoverageFields(schema.fields) } : null;
-  });
+  return computeMappingCoverage(
+    tree,
+    mappingName,
+    (schemaId) => {
+      const schema = byId.get(schemaId);
+      return schema ? { uri: TEST_URI, fields: toCoverageFields(schema.fields) } : null;
+    },
+    resolveRefsIn(tree, byId),
+  );
+}
+
+/** Resolve every NL `@ref` in the tree against the schemas and mappings it declares. */
+function resolveRefsIn(tree, schemasById) {
+  const mappingsById = new Map();
+  for (const m of extractMappings(tree.rootNode)) {
+    const key = m.namespace ? `${m.namespace}::${m.name}` : m.name;
+    mappingsById.set(key, { sources: m.sources, targets: m.targets });
+  }
+  const lookup = {
+    hasSchema: (k) => schemasById.has(k),
+    getSchema: (k) => {
+      const s = schemasById.get(k);
+      return s ? { fields: s.fields, hasSpreads: Boolean(s.spreads?.length), namespace: s.namespace } : null;
+    },
+    hasFragment: () => false,
+    getFragment: () => null,
+    hasTransform: () => false,
+    getMapping: (k) => mappingsById.get(k) ?? null,
+    iterateSchemas: () =>
+      [...schemasById.entries()].map(([k, s]) => [k, { fields: s.fields, hasSpreads: false }]),
+  };
+  const items = extractNLRefData(tree.rootNode).map((item) => ({ ...item, file: TEST_URI }));
+  return resolveAllNLRefs(items, lookup);
 }
 
 /** Coverage entries for the single schema playing `role` in the result. */
@@ -64,6 +106,14 @@ function assertMapped(schema, path, expected) {
   const matches = schema.fields.filter((f) => f.path === path);
   assert.equal(matches.length, 1, `expected exactly one "${path}" entry in ${schema.fields.map((f) => f.path)}`);
   assert.equal(matches[0].mapped, expected, `"${path}" should be mapped=${expected}`);
+}
+
+/** Assert `path` is covered and reported under `tier` ("declared" | "nl"). */
+function assertTier(schema, path, tier) {
+  const match = schema.fields.find((f) => f.path === path);
+  assert.ok(match, `expected a "${path}" entry in ${schema.fields.map((f) => f.path)}`);
+  assert.equal(match.mapped, true, `"${path}" should be covered`);
+  assert.equal(match.tier, tier, `"${path}" should be covered in the ${tier} tier`);
 }
 
 // ── Result structure ────────────────────────────────────────────────────────
@@ -550,6 +600,159 @@ mapping load {
     const t = forRole(result, "target");
     assertMapped(t, "email", true);
     assertMapped(t, "orders.packed.sku", true);
+  });
+});
+
+// ── Resolved NL @refs count, as a distinct tier (ADR-036, sl-qxyl) ───────────
+
+describe("computeMappingCoverage — resolved NL @ref tier", () => {
+  // ADR-013 settled that a resolved @ref carries the same lineage weight as a
+  // declared source field, and arrows/graph/lineage/field-lineage/lint all honour
+  // it. Coverage alone did not, so a mapping whose sources appear only in prose
+  // reported every source field uncovered — and the aggregate "covered by no
+  // mapping" list, which the docs call the claim worth acting on, named live
+  // fields. ADR-036 reverses that and defines these tiers.
+
+  it("counts a source field named only by a resolved @ref", () => {
+    // The headline case from ADR-036: no arrow reads net_amount, but the prose
+    // references it explicitly with the @ sigil and it resolves to a real field.
+    const src = `
+schema src { net_amount DECIMAL tax_amount DECIMAL unused DECIMAL }
+schema tgt { gross_total DECIMAL }
+mapping load {
+  source { src }
+  target { tgt }
+  -> gross_total { "Add @net_amount and @tax_amount" }
+}`;
+    const s = forRole(coverage(src, "load"), "source");
+    assertTier(s, "net_amount", "nl");
+    assertTier(s, "tax_amount", "nl");
+    // Prose that names nothing covers nothing — the gap must survive.
+    assertMapped(s, "unused", false);
+  });
+
+  it("reports a field covered both ways in the declared tier only", () => {
+    // Declared coverage is the stronger claim, so it wins and the field is
+    // counted once. Reporting the weaker tier would make a field an arrow
+    // genuinely writes read as merely inferred from prose.
+    const src = `
+schema src { amount DECIMAL }
+schema tgt { total DECIMAL }
+mapping load {
+  source { src }
+  target { tgt }
+  amount -> total { "rounded @amount" }
+}`;
+    const s = forRole(coverage(src, "load"), "source");
+    assertTier(s, "amount", "declared");
+  });
+
+  it("does not count an @ref that resolves to nothing", () => {
+    // Letting an unresolved ref count would make coverage RISE when a spec
+    // breaks. Reporting it is lint's unresolved-nl-ref, not coverage's job.
+    const src = `
+schema src { amount DECIMAL }
+schema tgt { total DECIMAL }
+mapping load {
+  source { src }
+  target { tgt }
+  -> total { "derived from @no_such_field" }
+}`;
+    const s = forRole(coverage(src, "load"), "source");
+    assertMapped(s, "amount", false);
+  });
+
+  it("does not let an @ref naming a schema or transform cover a field", () => {
+    // Only kind:"field" resolutions are field references. A ref to the schema
+    // itself resolves, but names no field, so it must contribute nothing.
+    const src = `
+schema src { amount DECIMAL }
+schema tgt { total DECIMAL }
+mapping load {
+  source { src }
+  target { tgt }
+  -> total { "sum over @src" }
+}`;
+    const s = forRole(coverage(src, "load"), "source");
+    assertMapped(s, "amount", false);
+  });
+
+  it("counts a source_block @ref toward source coverage", () => {
+    // A join condition demonstrably reads the fields it joins on, so they are
+    // consumed even though no arrow lists them.
+    const src = `
+schema a { id UUID }
+schema b { id UUID note_only STRING }
+schema tgt { out UUID }
+mapping load {
+  source {
+    a,
+    b,
+    "Left join on @a.id = @b.id."
+  }
+  target { tgt }
+  a.id -> out
+}`;
+    const b = coverage(src, "load").schemas.find((s) => s.schemaId === "b");
+    assertTier(b, "id", "nl");
+    assertMapped(b, "note_only", false);
+  });
+
+  it("never lets a source_block @ref cover a target field", () => {
+    // A filter or join condition names no target field, so it cannot populate
+    // one. Counting it would credit the target for work the mapping never does.
+    const src = `
+schema src { id UUID }
+schema tgt { id UUID out STRING }
+mapping load {
+  source {
+    src,
+    "Filter where @tgt.out is not null."
+  }
+  target { tgt }
+  src.id -> id
+}`;
+    const t = forRole(coverage(src, "load"), "target");
+    assertTier(t, "id", "declared");
+    assertMapped(t, "out", false);
+  });
+
+  it("resolves an @ref to a nested field path, not a bare leaf name", () => {
+    // Interacts with sl-joeq: coverage matches whole paths, and a resolved ref
+    // yields a canonical absolute path, so the nested field must be credited and
+    // the same-named top-level field must not.
+    const src = `
+schema src { city STRING address record { city STRING } }
+schema tgt { out STRING }
+mapping load {
+  source { src }
+  target { tgt }
+  -> out { "take @address.city" }
+}`;
+    const s = forRole(coverage(src, "load"), "source");
+    assertTier(s, "address.city", "nl");
+    assertMapped(s, "city", false);
+  });
+
+  it("credits an @ref inside an each block against the real field path", () => {
+    // Coverage depends on ref resolution now, so a resolution defect becomes a
+    // coverage defect (ADR-036's recorded cost). sl-hrql and sl-ez36 fixed refs
+    // inside each/flatten/nested_arrow resolving to fabricated paths; this pins
+    // that coverage credits the real path and not the phantom.
+    const src = `
+schema src { lines list_of record { sku STRING qty INT } }
+schema tgt { rows list_of record { code STRING note STRING } }
+mapping load {
+  source { src }
+  target { rows }
+  each lines -> rows {
+    .sku -> .code
+    -> .note { "describe @lines.qty" }
+  }
+}`;
+    const s = forRole(coverage(src, "load"), "source");
+    assertTier(s, "lines.sku", "declared");
+    assertTier(s, "lines.qty", "nl");
   });
 });
 

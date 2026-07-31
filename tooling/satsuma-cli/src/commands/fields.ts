@@ -16,6 +16,7 @@ import { runCommand, CommandError, EXIT_NOT_FOUND } from "../command-runner.js";
 import { resolveIndexKey } from "../index-builder.js";
 import { expandEntityFields, expandNestedSpreads } from "../spread-expand.js";
 import { coverageForMapping, coveredFieldPaths } from "../coverage-workspace.js";
+import { resolveAllNLRefs } from "../nl-ref-extract.js";
 import type { FieldDecl, ParsedFile, SchemaRecord, FragmentRecord, MetricRecord } from "../types.js";
 
 interface FieldWithTags extends FieldDecl {
@@ -98,7 +99,15 @@ Examples:
           throw new CommandError(lines.join("\n"), EXIT_NOT_FOUND);
         }
 
-        const coverage = coverageForMapping(resolvedMapping.key, index, parsedFiles);
+        // Resolved @refs count toward coverage (ADR-036), and this command must
+        // give the same answer as `satsuma coverage` — the lock sl-oqsj put in
+        // place — so it feeds core the same refs.
+        const coverage = coverageForMapping(
+          resolvedMapping.key,
+          index,
+          parsedFiles,
+          resolveAllNLRefs(index),
+        );
         // No coverage result means the mapping does not reference this entity at
         // all (or is anonymous, which --unmapped-by cannot name) — every field is
         // then unmapped by it, which is what an empty covered set produces.

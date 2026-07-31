@@ -23,6 +23,7 @@ import type {
   CoverageSchemaResolver,
   MappingCoverageInput,
   MappingCoverageResult,
+  ResolvedNLRef,
 } from "@satsuma/core";
 import { resolveScopedEntityRef } from "./index-builder.js";
 import { expandEntityFields, expandNestedSpreads } from "./spread-expand.js";
@@ -110,11 +111,18 @@ function deepCopyFields<T extends { children?: T[] }>(fields: T[]): T[] {
  * not loaded) or when the mapping label cannot be found in that file's tree.
  * Either case means there is nothing to report, which is distinct from a
  * mapping that covers nothing.
+ *
+ * `nlRefs` is the whole workspace's resolved `@refs`; core selects the ones
+ * belonging to this mapping. It is a required parameter rather than an optional
+ * one deliberately — omitting it silently drops the NL tier (ADR-036), which
+ * under-reports every mapping whose sources appear only in prose, and a caller
+ * that forgot would see a plausible-looking number rather than an error.
  */
 export function coverageForMapping(
   mappingKey: string,
   index: ExtractedWorkspace,
   files: ParsedFile[],
+  nlRefs: readonly ResolvedNLRef[],
 ): MappingCoverage | null {
   const mapping = index.mappings.get(mappingKey);
   if (!mapping?.name) return null;
@@ -127,6 +135,7 @@ export function coverageForMapping(
     parsed.tree,
     mapping.name,
     makeSchemaResolver(index, namespace),
+    nlRefs,
   );
   if (result.schemas.length === 0) return null;
 
@@ -138,10 +147,15 @@ export function coverageForMapping(
  *
  * The workspace is whatever `loadWorkspace` resolved — the entry file plus its
  * transitive imports — so coverage answers "this workspace", not "this file".
+ *
+ * `nlRefs` is resolved once by the caller and reused for every mapping: ref
+ * resolution is workspace-wide, and re-resolving per mapping would repeat the
+ * whole index walk for each one.
  */
 export function coverageForWorkspace(
   index: ExtractedWorkspace,
   files: ParsedFile[],
+  nlRefs: readonly ResolvedNLRef[],
 ): WorkspaceCoverage {
   const mappings: MappingCoverage[] = [];
   let skippedAnonymous = 0;
@@ -151,7 +165,7 @@ export function coverageForWorkspace(
       skippedAnonymous += 1;
       continue;
     }
-    const coverage = coverageForMapping(key, index, files);
+    const coverage = coverageForMapping(key, index, files, nlRefs);
     if (coverage) mappings.push(coverage);
   }
 

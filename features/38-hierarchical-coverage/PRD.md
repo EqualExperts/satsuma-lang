@@ -573,7 +573,11 @@ fixture is the point. Cases 1–9 must **fail** against `fc3d5a5`.
   plausible future lint rule.
 - Revising `each`/`flatten` path *relativity* rules. `extract.ts`'s
   accumulating-prefix contract is correct and is only regression-locked here.
-- NL-derived coverage. A field populated only by prose stays uncovered.
+- ~~NL-derived coverage. A field populated only by prose stays uncovered.~~
+  **Superseded by ADR-036** (implemented in `sl-qxyl`, which landed before this
+  feature). A resolved `@ref` counts, as a distinct `nl` tier. R1's direct/derived
+  split and R2's container tri-state compose with it: the tier says *how* a leaf
+  was covered, the tri-state says *how much* of a container is.
 - Coverage history or trends.
 
 ## Open Questions

@@ -255,7 +255,7 @@ describe("satsuma coverage — JSON contract", () => {
     assert.equal(mapping.file, WORKSPACE);
     assert.deepEqual(
       Object.keys(mapping.schemas[0]),
-      ["schema", "role", "covered", "total", "pct", "fields"],
+      ["schema", "role", "covered", "covered_declared", "covered_nl", "total", "pct", "fields"],
     );
   });
 
@@ -333,8 +333,12 @@ describe("satsuma coverage — aggregate rollups", () => {
     const data = parseJson(stdout);
     const sources = data.aggregate.schemas.filter((s: any) => s.role === "source");
     assert.equal(sources.filter((s: any) => s.schema === "crm::customers").length, 1);
-    // customers 3/4 + invoices 2/3 = 5/7 source leaves across the workspace.
-    assert.deepEqual(data.aggregate.workspace.source, { covered: 5, total: 7, pct: 71 });
+    // customers 3/4 + invoices 2/3 = 5/7 source leaves across the workspace, all
+    // via declared arrows — this fixture uses no @refs, so the nl tier is empty
+    // and the split must say so rather than omitting the keys (ADR-036).
+    assert.deepEqual(data.aggregate.workspace.source, {
+      covered: 5, covered_declared: 5, covered_nl: 0, total: 7, pct: 71,
+    });
   });
 
   it("reports per-namespace subtotals that sum to the workspace total", async () => {

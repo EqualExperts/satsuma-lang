@@ -2,6 +2,42 @@
 
 ## Unreleased
 
+### Resolved NL `@refs` now count toward coverage (`sl-qxyl`, ADR-036)
+
+**Coverage percentages rise, and `--fail-under` thresholds need re-baselining in
+the unsafe direction** — a threshold tuned against structural-only figures becomes
+weaker rather than failing loudly.
+
+`satsuma coverage` treated a field referenced only by a resolved NL `@ref` as
+uncovered, contradicting ADR-013, which every other lineage-aware command
+(`arrows`, `graph`, `lineage`, `field-lineage`, `lint`) honours. A mapping whose
+sources appear only in prose reported every source field uncovered, and the
+aggregate "covered by no mapping" list — which the docs call the claim worth
+acting on — named fields `field-lineage` traces without difficulty.
+
+A resolved `@ref` now counts, as a **distinct tier** over the same denominator:
+
+```text
+  source  legacy_sqlserver    21/21  100%  (15 declared, 6 nl)
+```
+
+- Human output shows the split only where there is NL coverage to distinguish.
+- `--json` gains `covered_declared` and `covered_nl` on every counts object, and a
+  `tier` on every covered field. Both are additive; `covered`, `total` and `pct`
+  keep their meaning, and `covered` is still the figure `--fail-under` gates.
+- Only *resolved* refs count, so coverage cannot rise when a spec breaks. A field
+  prose merely describes without an `@ref` stays uncovered. A ref in a
+  `source {}` join or filter counts toward source coverage only — it names no
+  target field.
+- 17 example files gain NL-tier coverage. Several source schemas that reported 0%
+  now report real figures.
+
+ADR-034's denominator is unchanged: leaves only, on each leaf's own flag.
+
+The VS Code status bar now takes its percentage from core rather than counting
+top-level fields itself (`3cc-t6uo`), so the editor and the CLI agree; its
+tooltip reports how much of the figure came from `@refs`.
+
 ### Coverage figures will change (`sl-joeq`)
 
 **Recorded coverage percentages will move after this release — in both

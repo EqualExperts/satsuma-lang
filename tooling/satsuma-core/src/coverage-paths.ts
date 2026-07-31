@@ -79,16 +79,24 @@ export function isCoveredFieldPath(path: string, coveredPaths: Set<string>): boo
 // ── Schema-qualified arrow references ───────────────────────────────────────
 
 /**
- * The prefixes an arrow may legitimately use to name one schema.
+ * Every prefix a reference may legitimately use to name one schema.
  *
- * A namespaced schema can be referred to by its qualified id (`crm::customers`)
- * from outside the namespace and by its bare name (`customers`) from inside it,
- * and arrows keep whichever form the author wrote. Matching only the qualified
- * form would miss every bare-prefixed reference in a namespaced mapping.
+ * Three spellings of the same schema circulate, and coverage matches references
+ * from sources that use different ones:
+ *
+ *  - `crm::customers` — the namespace-qualified id, written from outside the
+ *    namespace and used as the index key.
+ *  - `customers` — the bare name, written from inside the namespace. Arrows keep
+ *    whichever form the author wrote, so matching only the qualified form would
+ *    miss every bare-prefixed reference in a namespaced mapping (sl-iqud).
+ *  - `::customers` — the *canonical* form of a schema in no namespace, which is
+ *    what `resolveRef` returns for a resolved NL `@ref` (sl-qxyl). A resolved ref
+ *    is always fully canonical, so without this a global schema's NL coverage
+ *    would never match.
  */
 export function schemaRefPrefixes(schemaRef: string): string[] {
   const namespaceEnd = schemaRef.lastIndexOf("::");
-  if (namespaceEnd < 0) return [schemaRef];
+  if (namespaceEnd < 0) return [schemaRef, `::${schemaRef}`];
   return [schemaRef, schemaRef.slice(namespaceEnd + 2)];
 }
 

@@ -42,6 +42,14 @@ function toCoverageFields(fields) {
   }));
 }
 
+/**
+ * Expected CoverageTotals. `nl` defaults to 0 because most fixtures here use
+ * declared arrows only; the tier split (ADR-036) is exercised separately below.
+ */
+function expectTotals(covered, total, pct, nl = 0) {
+  return { covered, coveredDeclared: covered - nl, coveredNl: nl, total, pct };
+}
+
 /** Namespace-qualified id, matching what the CLI's index keys use. */
 function qualify(namespace, name) {
   return namespace ? `${namespace}::${name}` : name;
@@ -97,7 +105,7 @@ describe("summarizeFieldCoverage()", () => {
       { path: "address.line2", uri: "u", mapped: false },
       { path: "id", uri: "u", mapped: true },
     ]);
-    assert.deepEqual(totals, { covered: 2, total: 3, pct: 67 });
+    assert.deepEqual(totals, expectTotals(2, 3, 67));
   });
 
   it("does not let a covered record vouch for its uncovered leaves", () => {
@@ -110,11 +118,11 @@ describe("summarizeFieldCoverage()", () => {
       { path: "address.line1", uri: "u", mapped: true },
       { path: "address.line2", uri: "u", mapped: false },
     ]);
-    assert.deepEqual(totals, { covered: 1, total: 2, pct: 50 });
+    assert.deepEqual(totals, expectTotals(1, 2, 50));
   });
 
   it("reports 0% rather than dividing by zero for a schema with no fields", () => {
-    assert.deepEqual(summarizeFieldCoverage([]), { covered: 0, total: 0, pct: 0 });
+    assert.deepEqual(summarizeFieldCoverage([]), expectTotals(0, 0, 0));
   });
 
   it("rounds the percentage to a whole number", () => {
@@ -187,7 +195,7 @@ mapping load_memos {
     // tgt is a target of two mappings; double counting it would halve the
     // workspace percentage for no reason.
     const { aggregate: result } = aggregate(SRC);
-    assert.deepEqual(entry(result, "target", "tgt").totals, { covered: 2, total: 3, pct: 67 });
+    assert.deepEqual(entry(result, "target", "tgt").totals, expectTotals(2, 3, 67));
   });
 });
 
@@ -229,8 +237,8 @@ mapping load {
   id -> id
 }`;
     const { aggregate: result } = aggregate(src);
-    assert.deepEqual(result.workspace.source, { covered: 1, total: 2, pct: 50 });
-    assert.deepEqual(result.workspace.target, { covered: 1, total: 2, pct: 50 });
+    assert.deepEqual(result.workspace.source, expectTotals(1, 2, 50));
+    assert.deepEqual(result.workspace.target, expectTotals(1, 2, 50));
   });
 });
 
@@ -264,9 +272,9 @@ namespace billing {
     const { aggregate: result } = aggregate(SRC);
     const crm = result.namespaces.find((n) => n.namespace === "crm");
     const billing = result.namespaces.find((n) => n.namespace === "billing");
-    assert.deepEqual(crm.source, { covered: 1, total: 2, pct: 50 }, "crm::customers: id read, email not");
-    assert.deepEqual(billing.source, { covered: 2, total: 3, pct: 67 }, "billing::invoices: memo not read");
-    assert.deepEqual(billing.target, { covered: 2, total: 2, pct: 100 }, "billing::ledger fully populated");
+    assert.deepEqual(crm.source, expectTotals(1, 2, 50), "crm::customers: id read, email not");
+    assert.deepEqual(billing.source, expectTotals(2, 3, 67), "billing::invoices: memo not read");
+    assert.deepEqual(billing.target, expectTotals(2, 2, 100), "billing::ledger fully populated");
   });
 
   it("workspace totals equal the sum of the namespace subtotals", () => {
@@ -305,7 +313,7 @@ describe("aggregateCoverage() — degenerate inputs", () => {
     const result = aggregateCoverage([]);
     assert.deepEqual(result.schemas, []);
     assert.deepEqual(result.namespaces, []);
-    assert.deepEqual(result.workspace.target, { covered: 0, total: 0, pct: 0 });
+    assert.deepEqual(result.workspace.target, expectTotals(0, 0, 0));
   });
 
   it("skips a mapping whose coverage resolved to no schemas", () => {

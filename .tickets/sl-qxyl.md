@@ -1,6 +1,6 @@
 ---
 id: sl-qxyl
-status: open
+status: closed
 deps: [sl-hrql, sl-ez36]
 links: []
 created: 2026-07-31T15:54:44Z
@@ -130,3 +130,26 @@ description implies:
 
 ADR-036 is on the branch for PR #409 (adrs/adr-036-nl-ref-coverage-tier.md).
 Numbered 036 because another session took 035 for coverage path identity.
+
+**2026-07-31T16:51:44Z**
+
+Cause: coverage excluded NL @refs as a Feature 35 non-goal, contradicting ADR-013 (Accepted, unsuperseded), which binds all lineage-aware tools to follow a resolved @ref with the same weight as a declared source field. Five commands honoured it; coverage alone dissented.
+
+Fix: implements ADR-036. computeMappingCoverage() takes the workspace's resolved @refs and credits the ones naming declared fields, tagged with their tier; summarizeFieldCoverage() derives every count from those tags. Both are the only places the rule lives.
+
+Design notes:
+- The seam sl-joeq left in place did the heavy lifting. A resolved ref's resolvedTo.name is a canonical schema-qualified path (::src.net_amount), which is exactly the shape schemaLocalFieldPath consumes, so NL paths resolve through the same per-schema step as arrow paths. One addition to schemaRefPrefixes was needed: a bare schema name now also matches its canonical ::name form, or a global schema's NL coverage would never match.
+- NL paths are accepted only when the schema prefix actually came off. A resolved ref is always fully qualified, so requiring the strip keeps another schema's refs out of this schema's set rather than parking unmatchable paths in it.
+- findMappingBlock now returns the namespace-qualified mapping key, so refs are matched on the same key resolveAllNLRefs files them under. Matching on the bare label would have credited two same-named mappings in different namespaces with each other's refs.
+- Human output shows the tier split only on rows that HAVE nl coverage. Annotating every row of every structural-only report with '(n declared, 0 nl)' is a column of noise for no information; --json always carries both counts. This deviates from the illustrative output in the ticket description, which showed '(2 declared, 0 nl)'.
+- LSP: the gutter feeds core the same refs, via a new DefinitionLookup built from the workspace index (schemas, cross-file) plus extractMappings on the current tree (mapping source/target context, which the index does not store in that shape). Without it the editor would have shown fields as unmapped that the CLI reports as covered — a NEW cross-consumer disagreement introduced by this very ticket.
+
+3cc-t6uo: FIXED rather than re-scoped, per ADR-036's requirement that a consumer with its own rule be reconciled. computeTargetCoverageStats now delegates to summarizeFieldCoverage; the top-level-only rule and its stale 'nested paths would double-count' comment are gone, and the tooltip reports the NL share.
+
+Corpus effect: 17 example files gain NL-tier coverage. Notably several source schemas that read 0% now report real figures — order_transactions 0->6, support_tickets 0->5, finance_transactions 0->3, crm_system 0->2, hr_employees 0->2, sat_contact_details 0->4 — which is precisely the failure ADR-036 describes, since the aggregate section named those as covered by no mapping.
+
+Docs reconciled, all five sites plus two more: features/35 PRD out-of-scope bullet (struck through with the reason), features/38 PRD out-of-scope bullet, coverage.ts module comment, coverage --help, SATSUMA-CLI.md :126 (rewritten), :324, :390 (the 'needs no NL interpretation' positioning restated as resolution-is-not-interpretation), plus the SATSUMA-CLI.md JSON contract block — which a CLI test enforces key-for-key against the actual output.
+
+Totals: core 514, cli 972, lsp 292, viz 98, viz-backend 166, viz-model 6, vscode 34, tree-sitter 315/315 parses, npm run lint clean.
+
+Not run: the viz Playwright harness (needs a human-launched browser). Deliberately not touched: satsuma-viz's own buildMappedFieldsIndex still derives coverage from the viz model rather than from core, so the viz overlay does not yet show the tier — that is feature 36's R3/R6 work (sl-hcan, sl-5nsv), not this ticket's.
