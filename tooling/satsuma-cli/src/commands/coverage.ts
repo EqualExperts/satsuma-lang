@@ -18,12 +18,20 @@
  *   --schema <name>    report on one schema, across every mapping using it
  *   --role <role>      restrict to source or target
  *   --uncovered        list only the fields nothing maps
+ *   --fail-under <pct> exit 3 when the gated coverage is below <pct>
  *   --json             structured JSON output
  */
 
+import { Option } from "commander";
 import type { Command } from "commander";
 import { loadWorkspace } from "../load-workspace.js";
-import { runCommand, CommandError, EXIT_NOT_FOUND, EXIT_PARSE_ERROR } from "../command-runner.js";
+import {
+  runCommand,
+  CommandError,
+  EXIT_NOT_FOUND,
+  EXIT_THRESHOLD_NOT_MET,
+} from "../command-runner.js";
+import { parsePercentage } from "../option-parsers.js";
 import { canonicalKey, resolveIndexKey } from "../index-builder.js";
 import { coverageForWorkspace } from "../coverage-workspace.js";
 import type { MappingCoverage } from "../coverage-workspace.js";
@@ -47,6 +55,8 @@ interface CoverageOptions {
   schema?: string;
   role?: string;
   uncovered?: boolean;
+  /** Already coerced to a whole 0-100 by {@link parsePercentage}. */
+  failUnder?: number;
   json?: boolean;
 }
 
@@ -56,8 +66,14 @@ export function register(program: Command): void {
     .description("Report which declared fields each mapping covers, and which nothing maps")
     .option("--mapping <name>", "only this mapping")
     .option("--schema <name>", "only this schema, across every mapping that uses it")
-    .option("--role <role>", "only 'source' or 'target' schemas")
+    .addOption(
+      // .choices() rather than a hand-rolled check: an invalid value then reports
+      // itself as a usage error with help, exactly like every other bad flag
+      // value in the CLI, instead of inventing a second convention.
+      new Option("--role <role>", "only 'source' or 'target' schemas").choices([...ROLES]),
+    )
     .option("--uncovered", "list only the fields nothing maps")
+    .option("--fail-under <pct>", "exit 3 when aggregate coverage is below <pct>", parsePercentage)
     .option("--json", "structured JSON output")
     .addHelpText("after", `
 Coverage is structural: a field counts as covered when at least one arrow in the
@@ -106,10 +122,25 @@ strength of a per-mapping figure will delete a live one.
 omitted when the declaration position is unknown. With --uncovered, 'fields' is
 filtered to unmapped entries and the counts are unchanged.
 
+--fail-under <pct> turns spec completeness into a CI gate, the way 'fmt --check'
+gates formatting. It gates the aggregate percentage for the target role by
+default — the share of declared target fields some mapping populates — or the
+source role with --role source, and it respects --mapping and --schema, so a
+pipeline can gate one mapping or one schema rather than the whole workspace.
+
 Exit codes:
-  0  report produced
-  1  --mapping/--schema named something that does not exist, or nothing matched
+  0  report produced (and the --fail-under threshold met, if given)
+  1  --mapping/--schema named something that does not exist, nothing matched, or
+     there is no coverage in the gated role to measure
   2  parse or filesystem error
+  3  --fail-under threshold not met
+
+An invalid flag *value* (--role banana, --fail-under 150) is a usage error: it
+reports the problem with help and exits 1, as everywhere else in the CLI.
+
+3 is distinct from 1 on purpose: 'coverage --fail-under 90 --mapping typo' can
+fail because the name is misspelled or because the spec is genuinely incomplete,
+and CI has to tell "fix the pipeline" from "finish the mapping".
 
 Examples:
   satsuma coverage pipeline.stm                          # every mapping
@@ -117,9 +148,12 @@ Examples:
   satsuma coverage pipeline.stm --role target             # only what gets written
   satsuma coverage pipeline.stm --mapping 'load hub'      # one mapping
   satsuma coverage pipeline.stm --schema hub_customer     # one schema everywhere
-  satsuma coverage pipeline.stm --json                    # machine-readable`)
+  satsuma coverage pipeline.stm --json                    # machine-readable
+  satsuma coverage pipeline.stm --fail-under 90            # CI gate on target coverage
+  satsuma coverage pipeline.stm --fail-under 80 --role source
+  satsuma coverage pipeline.stm --fail-under 95 --mapping 'load hub'`)
     .action(runCommand(async (pathArg: string | undefined, opts: CoverageOptions) => {
-      const role = parseRole(opts.role);
+      const role = (opts.role ?? null) as Role | null;
       const { files, index } = await loadWorkspace(pathArg);
 
       // Resolve scope arguments before doing any work, so a typo reports itself
@@ -138,36 +172,29 @@ Examples:
       // Aggregate over the *scoped* mappings, so `--schema X` reports X's
       // workspace-wide coverage rather than the whole workspace's.
       const aggregate = aggregateCoverage(scoped);
+      const gate = evaluateGate(aggregate, role, opts.failUnder);
 
       if (opts.json) {
-        console.log(JSON.stringify({
+        const report: Record<string, unknown> = {
           mappings: scoped.map((m) => toJson(m, opts)),
           aggregate: aggregateToJson(aggregate, opts),
-        }, null, 2));
-        return;
+        };
+        if (gate) report.gate = gate;
+        console.log(JSON.stringify(report, null, 2));
+      } else {
+        printPerMappingReport(scoped, opts);
+        printAggregateReport(aggregate, opts);
+        if (gate) printGate(gate);
+        if (skippedAnonymous > 0) printAnonymousNote(skippedAnonymous);
       }
 
-      printPerMappingReport(scoped, opts);
-      printAggregateReport(aggregate, opts);
-      if (skippedAnonymous > 0) printAnonymousNote(skippedAnonymous);
+      // The report is printed either way — a failed gate must still show the
+      // reviewer which fields are missing, not just that a number was too low.
+      return gate && !gate.met ? EXIT_THRESHOLD_NOT_MET : undefined;
     }));
 }
 
 // ── Scope resolution ────────────────────────────────────────────────────────
-
-/**
- * Validate `--role`, which is a closed set rather than free text: silently
- * ignoring `--role sources` would report both roles and look like a bug in the
- * coverage numbers rather than in the invocation.
- */
-function parseRole(raw: string | undefined): Role | null {
-  if (raw === undefined) return null;
-  if ((ROLES as readonly string[]).includes(raw)) return raw as Role;
-  throw new CommandError(
-    `Invalid --role '${raw}'. Expected one of: ${ROLES.join(", ")}.`,
-    EXIT_PARSE_ERROR,
-  );
-}
 
 /**
  * Resolve a `--mapping` / `--schema` argument to an index key, or fail with
@@ -368,6 +395,76 @@ function wrapPaths(paths: string[]): string[] {
   return lines;
 }
 
+// ── CI gate ─────────────────────────────────────────────────────────────────
+
+/** The role `--fail-under` gates when `--role` does not say otherwise. */
+const DEFAULT_GATED_ROLE: Role = "target";
+
+/** Outcome of a `--fail-under` check, reported in output and as an exit code. */
+interface CoverageGate {
+  /** Which role's aggregate percentage was measured. */
+  role: Role;
+  /** The threshold the caller asked for, as a whole percentage. */
+  threshold: number;
+  /** The measured aggregate percentage for `role`, over the active scope. */
+  pct: number;
+  /** Whether `pct` reached `threshold`. False is exit 3. */
+  met: boolean;
+}
+
+/**
+ * Evaluate `--fail-under`, or return null when no gate was requested.
+ *
+ * Gates target coverage by default: "how much of what we are meant to produce do
+ * we actually produce?" is the completeness question a sign-off turns on.
+ * `--role source` gates consumption instead, for pipelines that care whether an
+ * upstream feed is being fully read.
+ *
+ * The measured figure is the *aggregate* over the active scope, never a
+ * per-mapping one — a workspace where each mapping covers a different third of a
+ * schema is fully specified, and gating any single mapping would fail it.
+ *
+ * Throws EXIT_NOT_FOUND when the gated role has no leaves in scope. That is not
+ * 0% coverage, it is nothing to measure: `--schema customers --fail-under 90`
+ * where `customers` is only ever a source would otherwise report a spec failure
+ * caused entirely by the invocation.
+ */
+function evaluateGate(
+  aggregate: AggregateCoverage,
+  role: Role | null,
+  threshold: number | undefined,
+): CoverageGate | null {
+  if (threshold === undefined) return null;
+
+  const gatedRole = role ?? DEFAULT_GATED_ROLE;
+  const totals = aggregate.workspace[gatedRole];
+  if (totals.total === 0) {
+    throw new CommandError(
+      `No ${gatedRole}-role coverage in scope to gate with --fail-under.\n` +
+      `Nothing in scope declares ${gatedRole} fields; ` +
+      `use --role ${gatedRole === "target" ? "source" : "target"} or widen the scope.`,
+      EXIT_NOT_FOUND,
+    );
+  }
+
+  return { role: gatedRole, threshold, pct: totals.pct, met: totals.pct >= threshold };
+}
+
+/**
+ * Print the gate verdict.
+ *
+ * Named as a threshold check rather than as coverage, so a reader scanning CI
+ * logs sees which number was compared against what, and does not mistake the
+ * gated aggregate for one of the per-mapping percentages above it.
+ */
+function printGate(gate: CoverageGate): void {
+  console.log();
+  console.log(
+    `--fail-under: ${gate.role} coverage ${gate.pct}% vs threshold ${gate.threshold}% — ` +
+    `${gate.met ? "met" : "NOT met"}`,
+  );
+}
+
 // ── Aggregate output ────────────────────────────────────────────────────────
 
 /**
@@ -479,9 +576,19 @@ function formatTotals(totals: CoverageTotals): string {
   return `${`${totals.covered}/${totals.total}`.padStart(7)}  ${String(totals.pct).padStart(3)}%`;
 }
 
-/** "source 3/4  75%   target 3/3  100%" — both roles on one subtotal row. */
+/**
+ * "source 3/4  75%   target 3/3  100%" — the subtotal row's role cells.
+ *
+ * A role with no declared leaves in scope is omitted rather than shown as
+ * "0/0 0%", which reads as zero coverage. Under `--role source` the target side
+ * is structurally absent, and printing it as a failing figure would be a lie
+ * about the workspace.
+ */
 function formatRoleTotals(totals: RoleTotals): string {
-  return `source ${formatTotals(totals.source)}   target ${formatTotals(totals.target)}`;
+  const cells: string[] = [];
+  if (totals.source.total > 0) cells.push(`source ${formatTotals(totals.source)}`);
+  if (totals.target.total > 0) cells.push(`target ${formatTotals(totals.target)}`);
+  return cells.join("   ");
 }
 
 /**

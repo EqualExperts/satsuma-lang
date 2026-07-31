@@ -55,6 +55,24 @@ export const EXIT_NOT_FOUND = 1;
 export const EXIT_PARSE_ERROR = 2;
 
 /**
+ * `coverage --fail-under <pct>`: the report was produced fine, and the coverage
+ * it reports is below the requested threshold.
+ *
+ * Deliberately its own code rather than reusing {@link EXIT_NOT_FOUND}. Both
+ * outcomes are possible from a single invocation — `coverage --fail-under 90
+ * --mapping "typo"` can fail because the mapping name is misspelled *or*
+ * because the spec is genuinely incomplete — and CI must be able to tell them
+ * apart: one means fix the pipeline, the other means finish the mapping. `fmt
+ * --check` gets away with a shared code only because it takes no scope
+ * arguments that can fail to resolve.
+ *
+ * Coverage-specific by design. A future gate on another command should reuse
+ * this code only if it means the same thing: "the work succeeded, and the
+ * measurement it produced fails a policy the caller set".
+ */
+export const EXIT_THRESHOLD_NOT_MET = 3;
+
+/**
  * Structured failure raised by command handlers and shared utilities.
  *
  * Throwing a `CommandError` is the canonical way for a handler to abort
