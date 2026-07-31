@@ -28,3 +28,17 @@ Also correct viz-model regardless of the choice: EachBlock has nestedEach but no
 
 Open question 1 resolved and the decision recorded in the PRD. If (b): one derivation path for covered paths, the CST walker in coverage.ts deleted, and every sl-qzy3 regression test still passing against the new derivation — plus each with a dotted multi-segment target (cobol-to-avro:148) qualifying under the full path, and two each blocks writing the same target list (edi-to-json:106-171) unioning without double counting. Either way: viz-model carries nested flatten blocks and a flatten target, the incorrect comment is removed, and viz coverage reflects nested flatten arrows.
 
+
+## Notes
+
+**2026-07-31T16:02:34Z**
+
+PRD 38 Open Question 1 RESOLVED — derive from extraction (option b). Recorded in features/38-hierarchical-coverage/PRD.md under Open Questions and R4. This ticket stands as specified; it does not close as won't-do.
+
+Two findings settled it after the PRD was written:
+
+1. A fourth defect of the same class surfaced while fixing sl-joeq: the CST walker never resolved an arrow's schema prefix at all. The qualified form multi-source mappings use (crm_customers.email -> email) matched only via the bare-segment leak, so it could never reach a nested declared path — governance.stm's crm_customers read 6/13 instead of 9/13. extract.ts's consumers (arrows.ts, graph-builder.ts) had handled schema qualification for some time. Four defects found by inspection, none by a test, each a rule the walker lacked and extraction already had.
+
+2. The gutter check this ticket asked for ('check what the VS Code gutter needs before committing') comes back clean. The gutter consumes FieldCoverageEntry.line, which propagates from CoverageField.line supplied by the consumer's resolver — satsuma-lsp/src/coverage.ts maps FieldInfo.range.start.line — not from the arrow walk, which contributes path strings only. No consumer depends on per-node CST positions extraction cannot supply; ExtractedArrow carries line/startColumn regardless.
+
+Implementation note: sl-joeq left the seam in place. collectBodyPaths now yields a string[] of container-qualified AUTHORED references (schema prefix retained), and the new schemaLocalFieldPath in coverage-paths.ts resolves them per schema on top. ExtractedArrow.sources/target are already absolute authored paths of that same shape, so this ticket is a swap of the producer with the resolution step unchanged — not a re-derivation of the semantics. See ADR-035.
