@@ -1,6 +1,6 @@
 ---
 id: sl-vhyo
-status: in_progress
+status: closed
 deps: []
 links: []
 created: 2026-07-31T08:29:53Z
@@ -16,3 +16,10 @@ New brace-expansion DoS advisory wave: 1.x line patched in 1.1.16 (dev-scope, si
 
 brace-expansion >=1.1.16 / >=5.0.8 in all lockfiles; npm audit clean for brace-expansion in every package; Dependabot alerts 53/55/66 close on next default-branch scan
 
+
+## Notes
+
+**2026-07-31T08:36:52Z**
+
+Cause: new brace-expansion DoS advisory wave — 1.x line vulnerable <1.1.16 (dev-scope, site + vscode-satsuma) and 5.x line vulnerable <=5.0.7 (runtime-scope via vscode-languageclient in vscode-satsuma; all package lockfiles carried 5.0.7).
+Fix: lockfile-only npm update brace-expansion in every package dir -> 1.1.18 / 5.0.9; all 11 packages pass npm audit --omit=dev --audit-level=high (commit 9e3f555)
