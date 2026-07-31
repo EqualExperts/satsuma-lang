@@ -1,6 +1,6 @@
 ---
 id: sl-tdfx
-status: open
+status: closed
 deps: [sl-oqsj, sl-3ms0, sl-268g]
 links: []
 created: 2026-07-31T13:13:05Z
@@ -24,3 +24,12 @@ Also document the coverage-specific exit code table from sl-268g (0/1/2/3), foll
 
 SATSUMA-CLI.md documents flags, the coverage-specific exit code table, and the full JSON shape marked as a stable contract; the per-mapping vs aggregate distinction is explained, not just labelled; docs state when to use `fields --unmapped-by` versus `coverage`; AI-AGENT-REFERENCE.md:391 composed recipe replaced (semantics retained as explanation) and lines 329/409/441 updated; agent-reference output regenerated and includes the new command; HOW-DO-I.md index updated if it references coverage workflows.
 
+
+## Notes
+
+**2026-07-31T14:22:57Z**
+
+Cause: coverage was documented only as a composed agent workflow (query fields, repeat per mapping, intersect yourself) across SATSUMA-CLI.md and AI-AGENT-REFERENCE.md.
+Fix: SATSUMA-CLI.md gains coverage in the Structural Analysis table plus a full section — flags, the structural/leaf-counting semantics, an explicit per-mapping vs aggregate table explaining why the two are not interchangeable, the JSON shape marked as a stable contract, the coverage-specific 0/1/2/3 exit table with the reasoning for 3, and a 'which do I reach for' table positioning coverage against fields --unmapped-by. AI-AGENT-REFERENCE.md: the intersect-yourself recipe at :391 is replaced by a single command with the aggregation semantics retained as explanation of why not to compose it by hand; the 'no coverage command' claim at :299, the command reference at :329, the decision table at :409 and the authoring checklist at :441 all updated; agent-reference output regenerated at build time and contains the new command. HOW-DO-I.md gains two entries (finding unmapped fields, gating CI).
+
+Added a docs test asserting every key coverage --json emits appears in the documented contract — a stable contract nobody checks is just a comment. 959 CLI tests pass; all four lints clean.

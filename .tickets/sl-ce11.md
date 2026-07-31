@@ -1,6 +1,6 @@
 ---
 id: sl-ce11
-status: open
+status: closed
 deps: []
 links: []
 created: 2026-07-31T13:12:19Z

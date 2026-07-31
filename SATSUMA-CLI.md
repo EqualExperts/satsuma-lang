@@ -93,6 +93,7 @@ Operations that check or compare workspace structure.
 |---|---|---|
 | `validate [path]` | Parse errors and semantic reference checks | `satsuma validate pipeline.stm` |
 | `lint [path]` | Policy and convention checks with optional autofix | `satsuma lint pipeline.stm --json` |
+| `coverage [path]` | Which declared fields each mapping covers, and which nothing maps | `satsuma coverage pipeline.stm --uncovered` |
 | `diff <a> <b>` | Structural comparison of two Satsuma files | `satsuma diff v1.stm v2.stm` |
 
 ### validate vs lint
@@ -108,6 +109,107 @@ Flags: `--json` (structured output), `--fix` (apply safe fixes), `--select <rule
 | `hidden-source-in-nl` | error | yes | NL text references a schema not in the mapping's source/target list |
 | `unresolved-nl-ref` | warning | no | `@ref` in NL does not resolve to any known identifier |
 | `duplicate-definition` | error | no | Named definition is declared more than once in a namespace |
+
+### coverage
+
+`satsuma coverage` answers the first question every reviewer of a mapping spec asks: **which declared fields is nothing mapping yet?**
+
+```bash
+satsuma coverage pipeline.stm                        # every mapping in the workspace
+satsuma coverage pipeline.stm --uncovered            # the review queue
+satsuma coverage pipeline.stm --schema mart_customer_360
+satsuma coverage pipeline.stm --fail-under 90        # CI gate
+```
+
+Flags: `--mapping <name>`, `--schema <name>`, `--role source|target`, `--uncovered`, `--fail-under <pct>`, `--json`. Scoping flags compose — `--schema X --role target` reports only X's target-side coverage, in only the mappings that write to it.
+
+**Coverage is structural.** A field is covered when at least one arrow references it. Nested paths cover their parents: mapping `address.city` covers `address` but not `address.line1`. Element-relative arrows inside `each`/`flatten` blocks resolve against the iterated list, so `.sku` under `each lines -> rows` covers `lines.sku`. A field described only in prose is uncovered *by definition* — use `nl-refs` to find those, and `lint` for policy judgements about which gaps are acceptable.
+
+**Percentages count leaf fields only.** A `record` is structure, not data; counting it alongside its children would count the same data twice and let a schema's nesting depth move the number on its own.
+
+#### Per-mapping vs aggregate
+
+The report has two sections, and they make **different claims about the same field**:
+
+| Section | "uncovered" means | Use it to |
+|---|---|---|
+| per-mapping | *this* mapping does not touch the field — another may well populate it | Review one mapping's completeness |
+| aggregate | *no* mapping in scope touches it | Decide a field is genuinely unmapped |
+
+A target field populated by mapping A and ignored by mapping B is a gap in B's per-mapping report and covered in the aggregate. Acting on the per-mapping figure — deleting the field, or filing it as missing work — will act on a field that is already mapped. The aggregate is the claim worth acting on; the per-mapping view tells you *where* to fix it.
+
+Aggregate figures respect the active scope, so `--schema X --fail-under 90` gates X rather than the workspace.
+
+#### JSON contract
+
+`--json` emits a **stable contract**, consumed by the satsuma-viz coverage overlay:
+
+```jsonc
+{
+  "mappings": [{
+    "mapping": "::load hub",          // canonical mapping key
+    "file": "/abs/path/pipeline.stm",
+    "schemas": [{
+      "schema": "::hub_customer",     // canonical schema key
+      "role": "target",               // "source" | "target"
+      "covered": 8,                   // leaf fields covered by THIS mapping
+      "total": 11,                    // leaf fields declared
+      "pct": 73,                      // covered/total, whole-number percent
+      "fields": [
+        { "path": "email", "mapped": true, "file": "/abs/path/pipeline.stm", "line": 42 }
+      ]
+    }]
+  }],
+  "aggregate": {
+    "schemas": [{
+      "schema": "::hub_customer",
+      "role": "target",
+      "mappings": ["::load hub", "::enrich hub"],   // the mappings behind the figure
+      "covered": 11, "total": 11, "pct": 100,
+      "fields": [ /* same entry shape; `mapped` is the union across `mappings` */ ]
+    }],
+    "namespaces": [{
+      "namespace": "crm",             // null for schemas at file scope
+      "source": { "covered": 3, "total": 4, "pct": 75 },
+      "target": { "covered": 3, "total": 3, "pct": 100 }
+    }],
+    "workspace": { "source": { /* … */ }, "target": { /* … */ } }
+  },
+  "gate": {                           // present only with --fail-under
+    "role": "target", "threshold": 90, "pct": 100, "met": true
+  }
+}
+```
+
+`fields` lists leaf fields only, matching the counts, so the paths shown and the number beside them are always the same population. `line` is 1-indexed and **omitted** when the declaration position is unknown — never 0, which would send an editor-jump link to line 1 of the wrong file. Fields arriving via a fragment spread report the *consuming* schema's position, not the fragment's.
+
+With `--uncovered`, `fields` is filtered to unmapped entries while `covered`/`total` stay unchanged, so the denominator survives.
+
+Anonymous mappings are not reported: coverage is looked up by mapping label and an anonymous block has none. The count of skipped mappings is printed rather than silently omitted.
+
+#### Exit codes
+
+`coverage` adds a code to the CLI's standard set, so a CI gate can be told apart from a broken invocation:
+
+| Code | Meaning |
+|---|---|
+| 0 | Report produced — and the `--fail-under` threshold met, if one was given |
+| 1 | `--mapping`/`--schema` named something that does not exist, nothing matched the scope, or the gated role has no coverage to measure |
+| 2 | Parse or filesystem error |
+| 3 | `--fail-under` threshold not met |
+
+3 is distinct from 1 deliberately. `coverage --fail-under 90 --mapping "typo"` can fail because the name is misspelled *or* because the spec is genuinely incomplete; sharing a code would leave CI unable to tell "fix the pipeline" from "finish the mapping". (`fmt --check` avoids this only because it takes no scope arguments that can fail to resolve.)
+
+An invalid flag *value* (`--role banana`, `--fail-under 150`) is a usage error: it reports the problem with help and exits 1, as everywhere else in the CLI.
+
+#### coverage vs fields --unmapped-by
+
+Both answer coverage questions and are the **same computation** — `fields --unmapped-by` delegates to it, so the two cannot disagree. Choose by shape of question:
+
+| Reach for | When |
+|---|---|
+| `fields <schema> --unmapped-by <mapping>` | One schema against one mapping, and you want the answer as a field tree with types |
+| `coverage` | Anything workspace-wide, aggregated across mappings, percentage-based, or CI-gated |
 
 ## Transform Classification
 
@@ -191,16 +293,19 @@ satsuma nl mart_customer_360.loyalty_tier
 
 ### Coverage assessment
 
+One command, not a composed workflow:
+
 ```bash
-# 1. Which target fields have no arrows from this mapping?
-satsuma fields mart_customer_360 --unmapped-by "demographics to mart" --json
+# Every mapping, with both per-mapping and aggregate figures
+satsuma coverage pipeline.stm --json
 
-# 2. Repeat for other mappings targeting the same schema
-satsuma fields mart_customer_360 --unmapped-by "online to mart" --json
-
-# 3. Agent intersects results to find fields unmapped by ALL mappings
-# 4. For mapped fields, agent checks arrow classification via satsuma arrows
+# Just the gaps nothing fills, for one schema
+satsuma coverage pipeline.stm --schema mart_customer_360 --uncovered --json
 ```
+
+Read `aggregate.schemas[].fields[]` for fields **no** mapping covers — that is the claim worth acting on. Read `mappings[].schemas[].fields[]` to see which mapping to edit. The two are not interchangeable: a field mapping A populates appears as a gap in mapping B's section.
+
+The CLI performs the aggregation because that is where callers composing it by hand went wrong — treating a field as unmapped because one mapping ignores it, when another populates it. What remains an agent judgement is *whether a gap matters*: read the arrow classification (`satsuma arrows`) and any NL notes, since a field populated only by prose in a note block is uncovered by definition.
 
 ### PII audit
 
@@ -266,7 +371,7 @@ satsuma arrows changed_schema.changed_field --as-source --json
 ## What the CLI Does Not Do
 
 - **Does not interpret NL.** Transform strings, notes, and comments are extracted verbatim. The CLI never assesses whether an NL transform is correct, complete, or semantically equivalent to another.
-- **Does not compose analysis workflows.** There are no `impact`, `coverage`, `audit`, `scaffold`, or `inventory` commands. These are agent workflows built from primitives — their correctness depends on NL interpretation that the CLI cannot perform.
+- **Does not compose analysis workflows.** There are no `impact`, `audit`, `scaffold`, or `inventory` commands. These are agent workflows built from primitives — their correctness depends on NL interpretation that the CLI cannot perform. `coverage` is a command rather than a workflow precisely because it needs no NL interpretation: which fields an arrow references is a fact about the parse tree, and the aggregation across mappings is arithmetic. Judging whether a given gap *matters* stays with the agent.
 - **Does not call language models.** The CLI is deterministic, fast, and reproducible. Same input, same output, every time.
 - **Does not accept NL queries.** Commands take explicit structural arguments. The agent decides which commands to call based on the user's question.
 
@@ -276,3 +381,4 @@ satsuma arrows changed_schema.changed_field --as-source --json
 - Tree-sitter grammar: `tooling/tree-sitter-satsuma/`
 - Feature 09 (workspace extractors): `features/09-stm-cli-llm-context/`
 - Feature 10 (structural primitives): `features/10-stm-cli-enhancements/`
+- Feature 35 (`coverage` command): `features/35-coverage-command/`

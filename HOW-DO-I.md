@@ -126,6 +126,12 @@ Run `satsuma lineage --from <schema> pipeline.stm`. For field-level edges: `sats
 **How do I lint my Satsuma files?**
 Run `satsuma lint pipeline.stm`. Use `--fix` for auto-fixing. Use `--json` for CI integration.
 
+**How do I find out which fields aren't mapped yet?**
+Run `satsuma coverage pipeline.stm --uncovered`. Read the **aggregate** section to decide a field is genuinely unmapped — the per-mapping section lists fields another mapping may already populate. See [SATSUMA-CLI.md](SATSUMA-CLI.md#coverage).
+
+**How do I stop mapping coverage from regressing in CI?**
+Run `satsuma coverage pipeline.stm --fail-under 90`. It exits 3 when coverage is below the threshold, distinctly from exit 1 for a bad `--mapping`/`--schema` name, so CI can tell an incomplete spec from a broken invocation.
+
 **How do I format my Satsuma files?**
 Run `satsuma fmt pipeline.stm` or use Format Document in VS Code.
 

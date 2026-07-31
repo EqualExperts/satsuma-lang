@@ -1,12 +1,16 @@
 /**
- * docs.test.ts — Keeps the CLI reference (SATSUMA-CLI.md) in sync with the
- * commands the binary actually registers.
+ * docs.test.ts — Keeps the CLI reference (SATSUMA-CLI.md) in sync with what the
+ * binary actually does.
  *
  * Regression coverage for sl-w1dr: the CLI grew to 22 commands while
  * SATSUMA-CLI.md documented 21 (nl-refs was missing) and other docs still
  * claimed 16. Living docs no longer hardcode a command count; this test is
  * the check that every shipped command is documented, so a newly registered
  * command fails CI until its reference entry exists.
+ *
+ * The second suite guards the one JSON shape the docs call a *stable contract*
+ * (`coverage`, consumed by the viz overlay). A contract nobody checks is a
+ * comment, so the keys the command emits must appear in the documented shape.
  */
 
 import assert from "node:assert/strict";
@@ -49,6 +53,47 @@ describe("SATSUMA-CLI.md command coverage", () => {
       undocumented,
       [],
       `commands missing from SATSUMA-CLI.md: ${undocumented.join(", ")}`,
+    );
+  });
+});
+
+describe("SATSUMA-CLI.md coverage JSON contract", () => {
+  const COVERAGE_FIXTURE = resolve(__dirname, "fixtures/coverage-workspace.stm");
+
+  /** Every distinct object key appearing anywhere in a JSON value. */
+  function allKeys(value: unknown, found = new Set<string>()): Set<string> {
+    if (Array.isArray(value)) {
+      for (const item of value) allKeys(item, found);
+    } else if (value !== null && typeof value === "object") {
+      for (const [key, child] of Object.entries(value)) {
+        found.add(key);
+        allKeys(child, found);
+      }
+    }
+    return found;
+  }
+
+  it("documents every key the coverage JSON emits", async () => {
+    // SATSUMA-CLI.md presents this shape as a stable contract that feature 36's
+    // overlay renders from. If the command grows a key the reference does not
+    // mention, the contract has silently changed — which is exactly the drift
+    // calling it "stable" is meant to prevent.
+    const { stdout, code } = await runCli(
+      CLI, "coverage", COVERAGE_FIXTURE, "--fail-under", "50", "--json",
+    );
+    assert.equal(code, 0);
+
+    const keys = [...allKeys(JSON.parse(stdout))];
+    // Sanity floor: a parsing slip here must fail loudly, not assert nothing.
+    assert.ok(keys.length >= 10, `expected a populated coverage payload, got keys: ${keys.join(", ")}`);
+
+    const reference = readFileSync(CLI_REFERENCE, "utf8");
+    const contract = reference.slice(reference.indexOf("#### JSON contract"));
+    const undocumented = keys.filter((key) => !contract.includes(`"${key}"`));
+    assert.deepEqual(
+      undocumented,
+      [],
+      `coverage --json keys missing from the documented contract: ${undocumented.join(", ")}`,
     );
   });
 });
