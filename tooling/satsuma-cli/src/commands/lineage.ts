@@ -19,7 +19,7 @@ import type { Command } from "commander";
 import { loadWorkspace } from "../load-workspace.js";
 import { runCommand, CommandError, EXIT_NOT_FOUND } from "../command-runner.js";
 import { parsePositiveInt } from "../option-parsers.js";
-import { resolveIndexKey, canonicalKey } from "../index-builder.js";
+import { resolveIndexKey, displayKey } from "../index-builder.js";
 import { buildFullGraph } from "../schema-graph.js";
 import type { FullGraph } from "../schema-graph.js";
 
@@ -119,7 +119,7 @@ Examples:
         if (opts.json) {
           console.log(JSON.stringify(dag, null, 2));
         } else if (opts.compact) {
-          for (const n of dag.nodes) console.log(canonicalKey(n.name));
+          for (const n of dag.nodes) console.log(displayKey(n.name));
         } else {
           printUpstreamFlat(dag, target);
         }
@@ -298,7 +298,7 @@ function printUpstreamFlat(dag: Dag, target: string): void {
   climb(target, [], new Set());
 
   for (const path of paths) {
-    console.log(path.map((n) => canonicalKey(n)).join(" -> "));
+    console.log(path.map((n) => displayKey(n)).join(" -> "));
   }
 }
 
@@ -316,7 +316,7 @@ function printTree(dag: Dag, start: string, _unused: number): void {
     const type = nodeInfo?.type ?? "?";
     const prefix = "  ".repeat(depth);
     const cycleNote = visited.has(node) && depth > 0 ? " (cycle)" : "";
-    console.log(`${prefix}${canonicalKey(node)}  [${type}]${cycleNote}`);
+    console.log(`${prefix}${displayKey(node)}  [${type}]${cycleNote}`);
     if (visited.has(node)) return;
     visited.add(node);
     for (const child of adj.get(node) ?? []) {

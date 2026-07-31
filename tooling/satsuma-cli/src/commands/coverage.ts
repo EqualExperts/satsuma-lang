@@ -32,7 +32,7 @@ import {
   EXIT_THRESHOLD_NOT_MET,
 } from "../command-runner.js";
 import { parsePercentage } from "../option-parsers.js";
-import { canonicalKey, resolveIndexKey } from "../index-builder.js";
+import { canonicalKey, displayKey, resolveIndexKey } from "../index-builder.js";
 import { coverageForWorkspace } from "../coverage-workspace.js";
 import type { MappingCoverage } from "../coverage-workspace.js";
 import { aggregateCoverage, summarizeFieldCoverage, leafFieldEntries } from "@satsuma/core";
@@ -250,8 +250,8 @@ function applyScope(mappings: MappingCoverage[], scope: Scope): MappingCoverage[
 function describeEmptyScope(totalMappings: number, scope: Scope): string {
   if (totalMappings === 0) return "No named mappings found in this workspace.";
   const filters: string[] = [];
-  if (scope.mappingKey) filters.push(`mapping '${canonicalKey(scope.mappingKey)}'`);
-  if (scope.schemaKey) filters.push(`schema '${canonicalKey(scope.schemaKey)}'`);
+  if (scope.mappingKey) filters.push(`mapping '${displayKey(scope.mappingKey)}'`);
+  if (scope.schemaKey) filters.push(`schema '${displayKey(scope.schemaKey)}'`);
   if (scope.role) filters.push(`role '${scope.role}'`);
   return filters.length > 0
     ? `No coverage matches ${filters.join(" + ")}.`
@@ -337,16 +337,16 @@ function printPerMappingReport(mappings: MappingCoverage[], opts: CoverageOption
 
   for (const mapping of mappings) {
     console.log();
-    console.log(`mapping ${canonicalKey(mapping.mappingId)}  (${mapping.file})`);
+    console.log(`mapping ${displayKey(mapping.mappingId)}  (${mapping.file})`);
 
     const schemaWidth = Math.max(
-      ...mapping.result.schemas.map((s) => canonicalKey(s.schemaId).length),
+      ...mapping.result.schemas.map((s) => displayKey(s.schemaId).length),
     );
     for (const schema of mapping.result.schemas) {
       const totals = summarizeFieldCoverage(schema.fields);
       const counts = `${totals.covered}/${totals.total}`;
       console.log(
-        `  ${schema.role.padEnd(ROLE_COLUMN_WIDTH)}  ${canonicalKey(schema.schemaId).padEnd(schemaWidth)}  ` +
+        `  ${schema.role.padEnd(ROLE_COLUMN_WIDTH)}  ${displayKey(schema.schemaId).padEnd(schemaWidth)}  ` +
         `${counts.padStart(7)}  ${String(totals.pct).padStart(3)}%`,
       );
     }
@@ -370,7 +370,7 @@ function printFieldList(schema: SchemaCoverageResult, opts: CoverageOptions): vo
   if (uncovered.length === 0) return;
 
   console.log(
-    `    uncovered in ${canonicalKey(schema.schemaId)} (${schema.role}): ` +
+    `    uncovered in ${displayKey(schema.schemaId)} (${schema.role}): ` +
     `${uncovered.length} field${uncovered.length !== 1 ? "s" : ""}`,
   );
   for (const line of wrapPaths(uncovered.map((f) => f.path))) {
@@ -519,11 +519,11 @@ function printAggregateReport(aggregate: AggregateCoverage, opts: CoverageOption
   console.log("Aggregate — a field is uncovered here only when NO mapping in scope covers it");
 
   const schemaWidth = Math.max(
-    ...aggregate.schemas.map((s) => canonicalKey(s.schemaId).length),
+    ...aggregate.schemas.map((s) => displayKey(s.schemaId).length),
   );
   for (const schema of aggregate.schemas) {
     console.log(
-      `  ${schema.role.padEnd(ROLE_COLUMN_WIDTH)}  ${canonicalKey(schema.schemaId).padEnd(schemaWidth)}  ` +
+      `  ${schema.role.padEnd(ROLE_COLUMN_WIDTH)}  ${displayKey(schema.schemaId).padEnd(schemaWidth)}  ` +
       `${formatTotals(schema.totals)}`,
     );
   }
@@ -532,7 +532,7 @@ function printAggregateReport(aggregate: AggregateCoverage, opts: CoverageOption
     const uncovered = aggregateFields(schema, opts).filter((f) => !f.mapped);
     if (uncovered.length === 0) continue;
     console.log(
-      `    covered by no mapping — ${canonicalKey(schema.schemaId)} (${schema.role}): ` +
+      `    covered by no mapping — ${displayKey(schema.schemaId)} (${schema.role}): ` +
       `${uncovered.length} field${uncovered.length !== 1 ? "s" : ""}`,
     );
     for (const line of wrapPaths(uncovered.map((f) => f.path))) {

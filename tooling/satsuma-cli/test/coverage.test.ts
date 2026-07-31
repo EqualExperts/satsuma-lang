@@ -585,3 +585,39 @@ describe("satsuma coverage — nested containers", () => {
     }
   });
 });
+
+// ── Human vs JSON key spelling ──────────────────────────────────────────────
+
+describe("satsuma coverage — key spelling", () => {
+  // Human output and --json deliberately spell a non-namespaced entity
+  // differently: `::` marks the global namespace unambiguously for a machine
+  // matching keys across commands, but it is not valid Satsuma syntax and is
+  // pure noise in a workspace that declares no namespaces. Namespaced entities
+  // read identically in both.
+
+  it("drops the empty namespace prefix from human output", async () => {
+    const { stdout, code } = await run("coverage", NESTED_ITERATION);
+    assert.equal(code, 0);
+    assert.match(stdout, /^mapping dispatch manifest {2}\(/m);
+    assert.match(stdout, /^ {2}target {2}dispatch_manifest_json/m);
+    assert.ok(!stdout.includes("::"), `human output should carry no "::"; got:\n${stdout}`);
+  });
+
+  it("keeps the canonical prefix in --json so consumers have one spelling", async () => {
+    const { stdout } = await run("coverage", NESTED_ITERATION, "--json");
+    const data = parseJson(stdout);
+    assert.equal(data.mappings[0].mapping, "::dispatch manifest");
+    assert.ok(
+      data.mappings[0].schemas.every((s: any) => s.schema.startsWith("::")),
+      "every schema key in --json should be canonical",
+    );
+  });
+
+  it("leaves a real namespace intact in both forms", async () => {
+    // The prefix is only dropped when it is empty; `crm::` is information.
+    const human = await run("coverage", WORKSPACE, "--mapping", "load contacts");
+    assert.match(human.stdout, /^mapping crm::load contacts/m);
+    const json = await run("coverage", WORKSPACE, "--mapping", "load contacts", "--json");
+    assert.equal(parseJson(json.stdout).mappings[0].mapping, "crm::load contacts");
+  });
+});
