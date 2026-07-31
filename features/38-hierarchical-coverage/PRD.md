@@ -389,10 +389,10 @@ What remains here:
 - **Stop maintaining a second walker.** `extract.ts` already handles every
   construct uniformly and is why `fields --unmapped-by` was correct before it
   was re-based. Deriving covered paths from extraction removes Defects 2, 3 and
-  5 as a class instead of patching each — three have now been found by
-  inspection (`sc-xnxp`, plus the two in `sl-qzy3`) and none by a test. See
-  Open Question 1; if the answer is "keep the walker", `sl-vu22` closes as
-  won't-do and `sl-qzy3` is the whole of R4.
+  5 as a class instead of patching each — **four** have now been found by
+  inspection (`sc-xnxp`, the two in `sl-qzy3`, and the unresolved schema prefix
+  in `sl-joeq`) and none by a test. Open Question 1 is **resolved in favour of
+  deriving**, so `sl-vu22` stands as specified.
 - Correct `viz-model`'s `EachBlock`/`FlattenBlock` to carry nested flatten
   blocks and a flatten target, and remove the comment at
   `viz-backend/src/viz-model.ts:1040-1043` asserting the grammar forbids nested
@@ -578,15 +578,38 @@ fixture is the point. Cases 1–9 must **fail** against `fc3d5a5`.
 
 ## Open Questions
 
-1. **One walker or two?** (`sl-vu22`) R4 can be satisfied by patching the CST
-   walker (`nested_arrow` + nested-block recursion) or by deriving covered
-   paths from `extract.ts`'s arrow output, which already handles every construct
-   and is why the CLI is correct today. Patching is smaller; deriving deletes
-   Defects 2, 3 and 5 as a class and removes a whole duplicate walker.
-   Proposed: **derive from extraction**, keeping the CST walk only if a consumer
-   needs per-node CST positions extraction cannot supply. This is the feature's
-   main design decision and `sl-vu22` carries it as its first acceptance
-   criterion — settle it before implementing.
+1. **One walker or two?** (`sl-vu22`) **Resolved — derive from extraction.**
+   R4 could have been satisfied by patching the CST walker (`nested_arrow` +
+   nested-block recursion) or by deriving covered paths from `extract.ts`'s
+   arrow output, which already handles every construct and is why the CLI was
+   correct today. Patching was smaller; deriving deletes Defects 2, 3 and 5 as a
+   class and removes a whole duplicate walker. `sl-vu22` therefore stands as
+   specified and is the structural half of R4.
+
+   Two things settled the question after the PRD was written:
+
+   - **A fourth defect of the same class turned up, in `sl-joeq`.** The CST
+     walker never resolved an arrow's schema prefix at all — the qualified form
+     multi-source mappings use (`crm_customers.email -> email`) matched only via
+     the bare-segment leak, and so could never reach a *nested* declared path.
+     `extract.ts`'s consumers (`arrows.ts`, `graph-builder.ts`) had handled
+     schema qualification for some time. That is now four defects found by
+     inspection and none by a test, each one a rule the walker lacked and
+     extraction already had.
+   - **The gutter check the ticket asked for comes back clean.** The VS Code
+     gutter consumes `FieldCoverageEntry.line`, which propagates from
+     `CoverageField.line` supplied by the *consumer's resolver* (the LSP maps
+     `FieldInfo.range.start.line` in `satsuma-lsp/src/coverage.ts`) — not from
+     the arrow walk, which contributes path strings only. So no consumer depends
+     on per-node positions that extraction cannot supply. `ExtractedArrow`
+     carries `line`/`startColumn` in any case.
+
+   `sl-joeq` also left the seam in place: `collectBodyPaths` now yields a
+   `string[]` of container-qualified *authored* references, and
+   `schemaLocalFieldPath` resolves them per schema on top. `ExtractedArrow`'s
+   `sources`/`target` are already absolute authored paths of exactly that shape,
+   so the substitution is a swap of the producer, with the resolution step
+   unchanged. See **ADR-035**.
 2. **Should the leak fix ship ahead of this feature?** **Resolved** — raised as
    `sl-joeq` (P1 bug), fixable now against `main` independently of Features
    35/36, with this epic depending on it. A silent over-count in a shipped
