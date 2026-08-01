@@ -51,21 +51,16 @@ describe("addPathAndPrefixes()", () => {
     assert.deepEqual([...set].sort(), ["a", "a.b", "a.b.c"]);
   });
 
-  it("strips [] array notation before splitting", () => {
-    // Schemas declare "items", arrows write "items[].id". Without stripping,
-    // the declared field would never match the arrow that populates it.
+  it("registers a path verbatim, applying no bracket normalisation", () => {
+    // sl-8o1n: v1's "items[].id" notation is a parse error in v2 (iteration is
+    // each/flatten), so extraction can never produce it — parser.test.js pins
+    // that. The old [] stripping ran only on this build side and never on the
+    // probe side, so it was deleted rather than left silently asymmetric. This
+    // test pins the deletion: paths pass through exactly as given.
     const set = new Set();
     addPathAndPrefixes(set, "items[].id");
-    assert.ok(set.has("items"), "'items' must be registered after stripping '[]'");
-    assert.ok(set.has("items.id"));
-    assert.ok(!set.has("items[]"), "bracket-suffixed form must NOT appear in the set");
-  });
-
-  it("registers the bare field name for a list-root path", () => {
-    // An arrow targeting the whole list ("items[]") covers the "items" field.
-    const set = new Set();
-    addPathAndPrefixes(set, "items[]");
-    assert.deepEqual([...set], ["items"]);
+    assert.ok(set.has("items[].id"), "path must be registered exactly as given");
+    assert.ok(!set.has("items.id"), "no bracket-stripped variant may be registered");
   });
 
   it("ignores an empty path", () => {
@@ -92,12 +87,6 @@ describe("buildCoveredFieldSet()", () => {
     const covered = buildCoveredFieldSet(["customer.email"]);
     assert.equal(isCoveredFieldPath("customer", covered), true);
     assert.equal(isCoveredFieldPath("customer.email", covered), true);
-  });
-
-  it("normalizes array traversal paths via addPathAndPrefixes", () => {
-    const covered = buildCoveredFieldSet(["line_items[].sku"]);
-    assert.equal(isCoveredFieldPath("line_items", covered), true);
-    assert.equal(isCoveredFieldPath("line_items.sku", covered), true);
   });
 
   it("returns false for unrelated paths", () => {
@@ -135,7 +124,7 @@ describe("buildCoveredFieldSet()", () => {
   it("leaves a sibling list container's same-named leaf uncovered", () => {
     // Sibling lists whose element records share field names are the norm in
     // nested schemas; only the container an arrow actually writes is covered.
-    const covered = buildCoveredFieldSet(["orders.lines[].sku"]);
+    const covered = buildCoveredFieldSet(["orders.lines.sku"]);
     assert.equal(isCoveredFieldPath("orders.lines.sku", covered), true);
     assert.equal(isCoveredFieldPath("orders.packed.sku", covered), false);
   });
