@@ -60,3 +60,8 @@ New tests: core 'dotted container targets' — each with a multi-segment target 
 Out of scope, raised as svdfe-s6we: nested_arrow is absent from the VizModel entirely — same defect class, the other construct. Also not run: the viz Playwright harness (needs a human-launched browser); its 10 specs make no arrow-count or coverage assertions.
 
 Totals: core 495, cli 968, lsp 292, viz 98, viz-backend 166, viz-model 6, vscode 21 golden files, tree-sitter 315/315 parses, npm run lint clean.
+
+**2026-08-01T18:14:11Z**
+
+Cause: coverage derived covered paths from its own CST walker, a second implementation of the traversal extract.ts already performed, so the two disagreed and four defects of the same class (relative dots, flatten-inside-each, nested_arrow, unresolved schema prefix) were each found by inspection rather than by a test.
+Fix: computeMappingCoverage now consumes extract.ts's arrow output via the existing collectBodyPaths -> schemaLocalFieldPath seam and the second walker is deleted, making the defect class structurally impossible (commit cd8381d, PR #412). See ADR-035.
