@@ -25,3 +25,16 @@ Either one shared normalization helper used on both the build and probe sides wi
 
 Cause: addPathAndPrefixes stripped v1 bracket notation on the build side while isCoveredFieldPath never stripped it on the probe side — dead code in v2, where bracket paths are a parse error (iteration is each/flatten).
 Fix: deleted the normalization rather than making it symmetric; a parser test pins that bracket paths do not parse, and the [] coverage-path tests were replaced with one pinning verbatim registration (commit 32579a9).
+
+## Notes (addendum)
+
+**2026-08-01T21:45:56Z** (exploratory testing, PR #414)
+
+Differential testing against pre-PR main found the deleted [] normalisation
+was not strictly dead: tree-sitter error recovery hands a bracket-malformed
+arrow (items[].id -> sku) to extraction, and on main the normalisation
+rewrote it to items.id — source coverage ROSE on a file with parse errors.
+The deletion therefore changes observable behaviour on malformed inputs
+only, in the safe direction (a broken spec no longer gains coverage,
+consistent with ADR-036). Pinned by the new "parse-error recovery" case in
+core coverage.test.js.

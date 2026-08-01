@@ -228,7 +228,8 @@ export class SzOverviewEdgeLayer extends LitElement {
 
   private _renderTooltip(edge: OverviewEdge) {
     const m = edge.mapping;
-    // Includes arrows nested in each/nestedEach/flatten blocks (sl-fm0q).
+    // Includes arrows nested in each/flatten/nested_arrow blocks in any
+    // combination, and nested_arrow headers (sl-fm0q, svdfe-s6we).
     const arrowCount = countMappingArrows(m);
 
     return html`

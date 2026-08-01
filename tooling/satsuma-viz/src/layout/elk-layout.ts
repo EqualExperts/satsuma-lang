@@ -590,12 +590,24 @@ function countFields(fields: FieldEntry[]): number {
   return count;
 }
 
+/**
+ * The iteration scope an edge's arrow was declared in, shown as the edge's
+ * badge (`⟲ each` / `⤵ flatten`). Recorded when the edge is built — deriving
+ * it later by parsing the edge id broke the moment the id scheme changed,
+ * silently dropping every each badge (PR #414 review). A `nested_arrow` block
+ * is not an iteration scope: its arrows inherit the enclosing each/flatten
+ * scope, or carry no badge at top level.
+ */
+type EdgeScope = "each" | "flatten";
+
 interface EdgeMeta {
   sourceNode: string;
   targetNode: string;
   sourceField: string;
   targetField: string;
   arrow: ArrowEntry;
+  /** Innermost enclosing iteration scope, if any — becomes the edge's scopeLabel. */
+  scope?: EdgeScope;
 }
 
 /** Identity of a generated port, recorded so extractLayout never has to parse port id strings. */
@@ -640,7 +652,7 @@ function addMappingEdges(mappings: MappingBlock[], edges: ElkEdge[], ctx: GraphC
   };
 
   for (const m of mappings) {
-    const addArrowEdges = (arrows: ArrowEntry[], prefix: string) => {
+    const addArrowEdges = (arrows: ArrowEntry[], prefix: string, scope?: EdgeScope) => {
       for (let i = 0; i < arrows.length; i++) {
         const a = arrows[i];
         const sourceField = a.sourceFields[0] ?? a.targetField;
@@ -675,6 +687,7 @@ function addMappingEdges(mappings: MappingBlock[], edges: ElkEdge[], ctx: GraphC
           sourceField,
           targetField: a.targetField,
           arrow: a,
+          scope,
         });
       }
     };
@@ -685,22 +698,40 @@ function addMappingEdges(mappings: MappingBlock[], edges: ElkEdge[], ctx: GraphC
     // forEachMappingArrow. Separate per-kind loops here walked nestedEach only,
     // so arrows under flatten-inside-each got no edges (the sl-vu22 shape), and
     // nested_arrow blocks were absent from the model entirely (svdfe-s6we).
+    // Each block is paired with the iteration scope its arrows sit in: an
+    // each/flatten block sets it, a nested_arrow block passes the enclosing
+    // scope through unchanged.
     const collectBlockEdges = (
-      blocks: Array<EachBlock | FlattenBlock | NestedArrowBlock>,
+      blocks: Array<[EachBlock | FlattenBlock | NestedArrowBlock, EdgeScope | undefined]>,
       prefix: string,
     ) => {
       for (let j = 0; j < blocks.length; j++) {
-        const block = blocks[j];
-        addArrowEdges(block.arrows, `${prefix}:${j}`);
+        const [block, scope] = blocks[j];
+        addArrowEdges(block.arrows, `${prefix}:${j}`, scope);
         collectBlockEdges(
-          [...block.nestedEach, ...block.nestedFlatten, ...block.nestedArrows],
+          [
+            ...block.nestedEach.map((b): [EachBlock, EdgeScope] => [b, "each"]),
+            ...block.nestedFlatten.map((b): [FlattenBlock, EdgeScope] => [b, "flatten"]),
+            ...block.nestedArrows.map(
+              (b): [NestedArrowBlock, EdgeScope | undefined] => [b, scope],
+            ),
+          ],
           `${prefix}:${j}:nested`,
         );
       }
     };
-    collectBlockEdges(m.eachBlocks, `${m.id}:eb`);
-    collectBlockEdges(m.flattenBlocks, `${m.id}:flat`);
-    collectBlockEdges(m.nestedArrows, `${m.id}:na`);
+    collectBlockEdges(
+      m.eachBlocks.map((b): [EachBlock, EdgeScope] => [b, "each"]),
+      `${m.id}:eb`,
+    );
+    collectBlockEdges(
+      m.flattenBlocks.map((b): [FlattenBlock, EdgeScope] => [b, "flatten"]),
+      `${m.id}:flat`,
+    );
+    collectBlockEdges(
+      m.nestedArrows.map((b): [NestedArrowBlock, EdgeScope | undefined] => [b, undefined]),
+      `${m.id}:na`,
+    );
   }
 }
 
@@ -773,6 +804,9 @@ function extractLayout(
         comments: [],
         location: { uri: "", line: 0, character: 0 },
       },
+      // Badge comes from EdgeMeta, recorded when the edge was built — never
+      // re-derived by parsing the edge id (PR #414 review regression).
+      ...(meta?.scope ? { scopeLabel: meta.scope } : {}),
     });
   }
 
@@ -788,15 +822,6 @@ function extractLayout(
           filters: m.sourceBlock.filters,
         });
       }
-    }
-  }
-
-  // Tag edges with scope labels from each/flatten context
-  for (const e of edges) {
-    if (e.id.includes(":each")) {
-      e.scopeLabel = "each";
-    } else if (e.id.includes(":flat:")) {
-      e.scopeLabel = "flatten";
     }
   }
 

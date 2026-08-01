@@ -51,9 +51,9 @@
  */
 export interface CoveredFieldPaths {
   /** Paths an arrow or resolved NL `@ref` referenced exactly. */
-  direct: Set<string>;
+  direct: ReadonlySet<string>;
   /** Proper ancestor prefixes of direct paths — containers something was written *into*. */
-  ancestors: Set<string>;
+  ancestors: ReadonlySet<string>;
 }
 
 /**
@@ -63,7 +63,10 @@ export interface CoveredFieldPaths {
  * Each path enters `direct` verbatim, and every proper prefix of it enters
  * `ancestors` — so for `"orders.item_id"`, `direct` gains `"orders.item_id"`
  * and `ancestors` gains `"orders"`. Empty paths (from malformed arrows) are
- * ignored rather than registered as `""`.
+ * ignored rather than registered as `""`. (A dot-leading path like `".line1"`
+ * would still register `""` as an ancestor — harmless, since no declared field
+ * has an empty path, and unreachable today because extraction qualifies
+ * relative paths before coverage sees them.)
  *
  * **Qualified paths only — never bare segments (sl-joeq).** An earlier version
  * also registered each segment on its own (`"city"` for `"address.city"`) so a
@@ -126,8 +129,10 @@ export function isDirectlyCovered(path: string, covered: CoveredFieldPaths): boo
  * behaviour; until then this is a model-level query with model-level tests.
  */
 export function hasDirectlyCoveredAncestor(path: string, covered: CoveredFieldPaths): boolean {
-  for (const prefix of properPrefixesOf(path)) {
-    if (covered.direct.has(prefix)) return true;
+  // Inline prefix scan (rather than properPrefixesOf) so the probe allocates
+  // nothing and short-circuits on the first directly-covered ancestor.
+  for (let dot = path.indexOf("."); dot !== -1; dot = path.indexOf(".", dot + 1)) {
+    if (covered.direct.has(path.slice(0, dot))) return true;
   }
   return false;
 }
