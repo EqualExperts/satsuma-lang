@@ -24,3 +24,9 @@ Implement as subtree expansion at set-build time, not a probe-time wildcard, so 
 
 addr -> address between records with three leaves reports all three leaves covered, the record covered, 3/3. Direct and derived are not confused: in one schema where address is covered by a whole-record arrow and billing only by an arrow to billing.city, address's leaves are all covered while billing.line1 is uncovered and billing is partial — the case 3cc-iedv says a naive ancestor-inheritance fix would break. Whole-subtree arrow plus a more specific sibling arrow does not double count and the percentage stays <= 100%. Whole-subtree arrow onto a list_of record expands the same way. 3cc-iedv closed with a note referencing this work.
 
+
+## Notes
+
+**2026-08-01T19:05:38Z**
+
+Sequencing note from sl-fmx0: the CoveredFieldPaths model and hasDirectlyCoveredAncestor are in place, but the direct set is still kind-blind — extraction registers each/flatten iteration subjects as direct paths, so subtree inheritance must not be turned on until the direct set distinguishes plain arrows from iteration headers (ExtractedArrow currently carries no such kind). Otherwise 'each parcels -> .packed { }' manufactures coverage for every leaf of parcels, the exact case sl-0pun's empty-each AC forbids. A test in coverage.test.js ("sl-r6b0's boundary") pins current behaviour and must be flipped by this ticket.

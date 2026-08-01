@@ -1,6 +1,6 @@
 ---
 id: sl-2nxu
-status: open
+status: closed
 deps: []
 links: [sl-vu22, sl-qzy3]
 created: 2026-07-31T14:44:15Z
@@ -23,3 +23,10 @@ sl-7236's ticket identified missing corpus coverage as the reason a nesting defe
 
 Corpus fixture covering a fragment spread inside a record body and inside a list_of record body; corpus fixture covering each nested inside flatten; both parse to the expected CST and the corpus suite passes with --wasm.
 
+
+## Notes
+
+**2026-08-01T19:05:38Z**
+
+Cause: no corpus fixture spread a fragment into a record or list_of record body, and "Nested flatten inside each" had no each-inside-flatten mirror, so consumer enumeration defects in those shapes survived round-trip tests.
+Fix: added both fixtures (fragments.txt, each_flatten.txt); corpus is 318/318 with --wasm (commit b4526ff).

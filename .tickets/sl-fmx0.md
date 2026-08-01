@@ -1,6 +1,6 @@
 ---
 id: sl-fmx0
-status: open
+status: closed
 deps: [sl-joeq]
 links: []
 created: 2026-07-31T14:43:17Z
@@ -22,3 +22,12 @@ Derive rather than store the answers consumers need: a leaf is covered iff its q
 
 Covered-path model distinguishes direct from derived coverage, with the distinction doc-commented as the public contract; isCoveredFieldPath retains its current signature and behaviour for direct+ancestor queries; a leaf beneath a directly-covered record reports covered while a leaf beneath a record that is merely an ancestor of a covered descendant does not; core coverage tests cover both; no consumer needs to change to keep working.
 
+
+## Notes
+
+**2026-08-01T19:05:38Z**
+
+Cause: the covered set was a flat Set<string> mixing "an arrow wrote exactly this path" with "this path is an ancestor prefix of one", making container reasoning (tri-state, whole-subtree arrows) inexpressible.
+Fix: coverage-paths.ts now builds a CoveredFieldPaths model ({direct, ancestors}) with the flat set defined as their union; computeMappingCoverage builds the model and probes direct-or-ancestor, so all consumer output is unchanged and no consumer changed (commit e6a9325).
+
+Finding for sl-r6b0: hasDirectlyCoveredAncestor (the R5 query) exists and is tested, but is deliberately NOT consulted by computeMappingCoverage yet — extraction registers each/flatten iteration subjects as direct paths (kind-blind), so inheriting through direct containers today would manufacture coverage from every each header (the case sl-0pun's empty-each AC guards). sl-r6b0 must make the direct set kind-aware before turning the query on; a coverage.test.js case pins the boundary and says so.
