@@ -153,3 +153,8 @@ Docs reconciled, all five sites plus two more: features/35 PRD out-of-scope bull
 Totals: core 514, cli 972, lsp 292, viz 98, viz-backend 166, viz-model 6, vscode 34, tree-sitter 315/315 parses, npm run lint clean.
 
 Not run: the viz Playwright harness (needs a human-launched browser). Deliberately not touched: satsuma-viz's own buildMappedFieldsIndex still derives coverage from the viz model rather than from core, so the viz overlay does not yet show the tier — that is feature 36's R3/R6 work (sl-hcan, sl-5nsv), not this ticket's.
+
+**2026-08-01T18:14:17Z**
+
+Cause: coverage credited only arrow sources and targets, so a field referenced solely by a resolved NL @ref read as uncovered — the sole consumer dissenting from ADR-013, which gives a resolved @ref the same lineage weight as a declared source field.
+Fix: resolved @ref paths now count toward coverage as a distinct tier, reported separately from arrow-covered fields so the weaker evidence stays visible rather than being silently merged (commit 821ae54, PR #413). See ADR-036.
