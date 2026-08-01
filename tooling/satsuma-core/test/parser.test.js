@@ -82,4 +82,15 @@ describe("parser singleton — post-init", () => {
     assert.equal(tree.rootNode.type, "source_file", "root node must be source_file");
     assert.equal(tree.rootNode.hasError, false, "valid source must parse without errors");
   });
+
+  it("rejects v1 bracket array paths ('items[].id') as a parse error", () => {
+    // sl-8o1n: v2 removed [] from field paths — iteration is expressed via
+    // each/flatten (grammar.js, 'iteration is expressed via each/flatten').
+    // coverage-paths.ts deleted its [] normalisation on the strength of this
+    // guarantee, so if brackets were ever re-admitted to the grammar this test
+    // failing is the signal that path normalisation needs revisiting.
+    const parser = getParser();
+    const tree = parser.parse("mapping load {\n  source { src }\n  target { tgt }\n  items[].id -> sku\n}\n");
+    assert.equal(tree.rootNode.hasError, true, "bracket paths must not parse in v2");
+  });
 });

@@ -21,8 +21,14 @@
 /**
  * Register a path and all its ancestor prefixes in the covered-paths set.
  *
- * Strips array-notation brackets (`[]`) before splitting so that list-traversal
- * paths like `"items[].id"` are registered as `"items"` and `"items.id"`.
+ * Paths are split on `.` verbatim — there is no other normalisation. v1's
+ * `items[].id` bracket notation was removed from the language in v2 (iteration
+ * is expressed via `each`/`flatten`, grammar.js:429-431), so bracket paths are
+ * a parse error and can never reach here from parser-backed extraction. An
+ * earlier version stripped `[]` here anyway, but only on this build side and
+ * not in {@link isCoveredFieldPath}'s probe — dead code that would silently
+ * half-work if brackets ever returned, so it was deleted rather than kept
+ * asymmetric (sl-8o1n).
  *
  * Registering ancestors means a top-level field `"address"` is considered
  * covered when an arrow targets the nested path `"address.city"` — a consumer
@@ -43,9 +49,7 @@
  */
 export function addPathAndPrefixes(set: Set<string>, path: string): void {
   if (!path) return;
-  // Strip array notation: "items[].id" → "items.id"
-  const normalised = path.replace(/\[\]/g, "");
-  const parts = normalised.split(".");
+  const parts = path.split(".");
   let prefix = "";
   for (const part of parts) {
     prefix = prefix ? `${prefix}.${part}` : part;
