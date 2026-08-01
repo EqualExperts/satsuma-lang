@@ -372,3 +372,48 @@ mapping {
             (tgt_path
               (field_path
                 (identifier)))))))))
+
+================================================================================
+Nested each inside flatten (sl-2nxu)
+================================================================================
+
+mapping {
+  source { s }
+  target { t }
+  flatten orders -> .rows {
+    each items -> .lines { name -> name }
+  }
+}
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (mapping_block
+    (mapping_body
+      (source_block
+        (source_ref
+          (identifier)))
+      (target_block
+        (source_ref
+          (identifier)))
+      (flatten_block
+        (src_path
+          (field_path
+            (identifier)))
+        (tgt_path
+          (relative_field_path
+            (identifier)))
+        (each_block
+          (src_path
+            (field_path
+              (identifier)))
+          (tgt_path
+            (relative_field_path
+              (identifier)))
+          (map_arrow
+            (src_path
+              (field_path
+                (identifier)))
+            (tgt_path
+              (field_path
+                (identifier)))))))))
