@@ -2,7 +2,7 @@
 id: sc-xnxp
 status: closed
 deps: []
-links: []
+links: [3cdd-yavi]
 created: 2026-07-31T13:51:09Z
 type: bug
 priority: 1

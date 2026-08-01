@@ -183,6 +183,82 @@ describe("computeLayout", () => {
     assert.ok(result.edges.length >= 0, "Should have edges array");
   });
 
+  it("collects edges for arrows inside each, flatten-inside-each, and nested_arrow blocks (svdfe-s6we)", async () => {
+    // Pins collectBlockEdges' unified recursion: the previous per-kind loops
+    // walked nestedEach only, so arrows under a flatten nested in an each (the
+    // sl-vu22 shape) got no edges, and nested_arrow blocks were absent from the
+    // model entirely. Absolute authored paths are used because relative-path
+    // arrows (.sku -> .sku) do not resolve to ports yet — that is 3cdd-yavi,
+    // and when it lands this fixture's paths can switch to the canonical
+    // relative form.
+    const nested = (name, children) => ({ ...field(name, "record"), children });
+    const model = {
+      uri: "file:///test.stm",
+      fileNotes: [],
+      namespaces: [
+        {
+          name: null,
+          schemas: [
+            schema("s", [
+              nested("orders", [field("id"), nested("parcels", [field("sku")])]),
+              nested("addr", [field("line1")]),
+            ]),
+            schema("t", [
+              nested("orders", [field("id"), nested("packed", [field("sku")])]),
+              nested("address", [field("line1")]),
+            ]),
+          ],
+          mappings: [
+            {
+              ...mapping("m", ["s"], "t"),
+              eachBlocks: [
+                {
+                  sourceField: "orders",
+                  targetField: "orders",
+                  arrows: [arrow("orders.id", "orders.id")],
+                  nestedEach: [],
+                  nestedFlatten: [
+                    {
+                      sourceField: "orders.parcels",
+                      targetField: ".packed",
+                      arrows: [arrow("orders.parcels.sku", "orders.packed.sku")],
+                      nestedEach: [],
+                      nestedFlatten: [],
+                      nestedArrows: [],
+                      location: loc,
+                    },
+                  ],
+                  nestedArrows: [],
+                  location: loc,
+                },
+              ],
+              nestedArrows: [
+                {
+                  sourceField: "addr",
+                  targetField: "address",
+                  arrows: [arrow("addr.line1", "address.line1")],
+                  nestedEach: [],
+                  nestedFlatten: [],
+                  nestedArrows: [],
+                  location: loc,
+                },
+              ],
+            },
+          ],
+          metrics: [],
+          fragments: [],
+        },
+      ],
+    };
+
+    const result = await computeLayout(model);
+
+    // One edge per arrow: each body, flatten-inside-each body, nested_arrow body.
+    assert.equal(result.edges.length, 3, `expected 3 edges, got ${result.edges.length}`);
+    const targetFields = result.edges.map((e) => e.targetField).sort();
+    assert.deepEqual(targetFields, ["address.line1", "orders.id", "orders.packed.sku"]);
+  });
+
   it("keeps namespaced schemas as flat result nodes", async () => {
     const model = {
       uri: "file:///test.stm",

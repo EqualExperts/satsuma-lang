@@ -38,7 +38,6 @@ export type {
   CoverageSchemaResolver,
 } from "./coverage.js";
 export {
-  addPathAndPrefixes,
   buildCoveredFieldPaths,
   buildCoveredFieldSet,
   hasDirectlyCoveredAncestor,
