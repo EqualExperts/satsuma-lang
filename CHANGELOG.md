@@ -2,17 +2,22 @@
 
 ## Unreleased
 
-### Viz surfaces no longer drop `nested_arrow` blocks (`svdfe-s6we`)
+### Viz arrow counts and the detail table no longer drop `nested_arrow` blocks (`svdfe-s6we`)
 
-Mappings using the braced `src -> tgt { .a -> .b }` form were undercounted on
-every viz surface: the "N arrows" header, the mapping-detail table, hover
-cross-highlighting, and overview edges all ignored the block and every arrow
-inside it. The viz model now represents `nested_arrow` (at mapping level,
-inside `each`/`flatten`, and nested within another `nested_arrow`), the detail
-view renders it as a `nested` scope section, and overview edges are collected
-for its arrows — as well as for arrows under `flatten` nested in `each`, which
-the edge pass previously missed. Arrow counts on affected mappings go up; no
-JSON output shapes change.
+Mappings using the braced `src -> tgt { .a -> .b }` form were undercounted:
+the viz model had no representation of `nested_arrow`, so the block and every
+arrow inside it were missing from the "N arrows" header and the mapping-detail
+table. The model now represents `nested_arrow` (at mapping level, inside
+`each`/`flatten`, and nested within another `nested_arrow`), counting walks it,
+and the detail view renders it as a `nested` scope section. Arrow counts on
+affected mappings go up; no JSON output shapes change.
+
+Resolution-dependent surfaces — mapping-detail coverage highlighting, hover
+cross-highlighting, and overview edges — still skip arrows authored with
+element-relative paths (`.line1 -> .line1`, the canonical form inside all
+three container kinds), because the viz model stores authored text without
+qualifying it against the container. That pre-existing gap now has a ticket
+(`3cdd-yavi`) to reuse core's qualification rule.
 
 ### Resolved NL `@refs` now count toward coverage (`sl-qxyl`, ADR-036)
 

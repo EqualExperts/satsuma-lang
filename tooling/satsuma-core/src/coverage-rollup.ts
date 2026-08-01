@@ -48,7 +48,7 @@ export interface MappingCoverageInput {
  *
  * Records are excluded rather than treated as covering their subtree, because a
  * record's `mapped` flag cannot distinguish the two cases that matter:
- * `addPathAndPrefixes` registers ancestor prefixes, so a record reads as mapped
+ * `buildCoveredFieldPaths` registers ancestor prefixes, so a record reads as mapped
  * when *any single descendant* is covered just as it does when the whole record
  * is copied by one arrow. Inheriting from it would turn "one of twelve address
  * fields is mapped" into "all twelve are" — a large, silent overstatement.

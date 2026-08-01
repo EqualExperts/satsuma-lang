@@ -2,7 +2,7 @@
 id: svdfe-s6we
 status: closed
 deps: []
-links: [sl-vu22]
+links: [sl-vu22, 3cdd-yavi]
 created: 2026-07-31T16:23:49Z
 type: bug
 priority: 2
@@ -32,3 +32,15 @@ VizModel represents nested_arrow blocks with their src/tgt and nested contents, 
 
 Cause: VizModel had no representation of nested_arrow; buildMappingBlock and the shared nested-block collector enumerated each_block/flatten_block only, so the block and all arrows inside it were dropped from every viz surface.
 Fix: added NestedArrowBlock to the model (same nesting collections as each/flatten, built by the shared collector), walked it in forEachMappingArrow/countMappingArrows and the mapping-detail scope sections, and unified the elk edge collection over all three container kinds — which also fixes its pre-existing miss of edges under flatten-inside-each. Corpus gains a mapping-body nested_arrow fixture (commit 0ebead6).
+
+**2026-08-01T21:19:37Z** (correction, from PR #414 review)
+
+The original note over-claimed: hover cross-highlighting and overview edges are
+NOT fixed for the canonical relative-path form (.line1 -> .line1) — those
+surfaces resolve authored paths via resolveSchemaLocalFieldPath, which returns
+null for dot-relative text, so relative child arrows still contribute no
+coverage, no hover matches and no edges. What this ticket delivered: the model
+representation, arrow counts, and the detail-view scope section. The unified
+elk recursion is correct but only observable for absolute-path arrows until
+relative paths are qualified — raised as 3cdd-yavi (reuse core's qualification
+rule from extract.ts rather than a viz-local copy).

@@ -10,7 +10,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
-  addPathAndPrefixes,
   buildCoveredFieldPaths,
   buildCoveredFieldSet,
   hasDirectlyCoveredAncestor,
@@ -20,77 +19,20 @@ import {
   schemaLocalFieldPath,
 } from "@satsuma/core";
 
-describe("addPathAndPrefixes()", () => {
-  it("registers a leaf-only path unchanged", () => {
-    // The degenerate case: a top-level field name has no prefixes to expand.
-    const set = new Set();
-    addPathAndPrefixes(set, "id");
-    assert.deepEqual([...set], ["id"]);
-  });
-
-  it("registers every ancestor prefix of a dotted path", () => {
-    // Coverage of "address" must fire when an arrow targets "address.city".
-    // Without prefix registration the parent record always reads as unmapped.
-    const set = new Set();
-    addPathAndPrefixes(set, "address.city");
-    assert.deepEqual([...set].sort(), ["address", "address.city"]);
-  });
-
-  it("does not register a path's segments as standalone bare names", () => {
-    // sl-joeq: this assertion was inverted — the set used to contain "city" so
-    // a consumer could probe by local field name, which made coverage resolve
-    // by NAME rather than PATH and silently reported any same-named field
-    // anywhere in the schema as mapped. Registering only qualified paths is the
-    // invariant every consumer now relies on.
-    const set = new Set();
-    addPathAndPrefixes(set, "address.city");
-    assert.ok(!set.has("city"), "bare leaf 'city' must NOT be registered");
-  });
-
-  it("expands prefixes recursively, not just one level deep", () => {
-    // Three-level paths appear in real workbooks; a one-level implementation
-    // would leave "a.b" unregistered and report the middle record uncovered.
-    const set = new Set();
-    addPathAndPrefixes(set, "a.b.c");
-    assert.deepEqual([...set].sort(), ["a", "a.b", "a.b.c"]);
-  });
-
-  it("registers a path verbatim, applying no bracket normalisation", () => {
-    // sl-8o1n: v1's "items[].id" notation is a parse error in v2 (iteration is
-    // each/flatten), so extraction can never produce it — parser.test.js pins
-    // that. The old [] stripping ran only on this build side and never on the
-    // probe side, so it was deleted rather than left silently asymmetric. This
-    // test pins the deletion: paths pass through exactly as given.
-    const set = new Set();
-    addPathAndPrefixes(set, "items[].id");
-    assert.ok(set.has("items[].id"), "path must be registered exactly as given");
-    assert.ok(!set.has("items.id"), "no bracket-stripped variant may be registered");
-  });
-
-  it("ignores an empty path", () => {
-    // Malformed arrows can yield empty path text; the set must stay clean
-    // rather than gaining an "" entry that matches nothing but inflates counts.
-    const set = new Set();
-    addPathAndPrefixes(set, "");
-    assert.equal(set.size, 0);
-  });
-
-  it("is idempotent for a repeated path", () => {
-    // Several arrows commonly target the same field; re-registering must not
-    // change the set, so coverage counts cannot drift with arrow count.
-    const set = new Set();
-    addPathAndPrefixes(set, "name");
-    const sizeAfterFirst = set.size;
-    addPathAndPrefixes(set, "name");
-    assert.equal(set.size, sizeAfterFirst);
-  });
-});
-
 describe("buildCoveredFieldSet()", () => {
   it("marks nested field paths and their parents as covered", () => {
+    // Coverage of "address" must fire when an arrow targets a path inside it —
+    // without ancestor registration the parent record always reads as unmapped.
     const covered = buildCoveredFieldSet(["customer.email"]);
     assert.equal(isCoveredFieldPath("customer", covered), true);
     assert.equal(isCoveredFieldPath("customer.email", covered), true);
+  });
+
+  it("registers every ancestor of a deep path, not just one level", () => {
+    // Three-level paths appear in real workbooks; a one-level implementation
+    // would leave "a.b" unregistered and report the middle record uncovered.
+    const covered = buildCoveredFieldSet(["a.b.c"]);
+    assert.deepEqual([...covered].sort(), ["a", "a.b", "a.b.c"]);
   });
 
   it("returns false for unrelated paths", () => {
@@ -184,10 +126,23 @@ describe("buildCoveredFieldPaths() — the direct/derived model", () => {
   });
 
   it("ignores empty paths rather than registering an '' entry", () => {
-    // Malformed arrows can yield empty path text; same guard as the flat set.
+    // Malformed arrows can yield empty path text; the model must stay clean
+    // rather than gaining an "" entry that matches nothing but inflates counts.
     const covered = buildCoveredFieldPaths([""]);
     assert.equal(covered.direct.size, 0);
     assert.equal(covered.ancestors.size, 0);
+  });
+
+  it("registers a path verbatim, applying no bracket normalisation", () => {
+    // sl-8o1n: v1's "items[].id" notation is a parse error in v2 (iteration is
+    // each/flatten), so extraction can never produce it — parser.test.js pins
+    // that. The old [] stripping ran only on the build side and never on the
+    // probe side, so it was deleted rather than left silently asymmetric. This
+    // test pins the deletion: paths pass through exactly as given.
+    const covered = buildCoveredFieldPaths(["items[].id"]);
+    assert.ok(covered.direct.has("items[].id"), "path must be registered exactly as given");
+    assert.ok(!covered.direct.has("items.id"), "no bracket-stripped variant may be registered");
+    assert.ok(covered.ancestors.has("items[]"), "the ancestor split is on dots alone");
   });
 
   it("keeps the flat-set view equal to the union of direct and ancestors", () => {

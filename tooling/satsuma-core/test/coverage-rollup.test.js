@@ -110,7 +110,7 @@ describe("summarizeFieldCoverage()", () => {
 
   it("does not let a covered record vouch for its uncovered leaves", () => {
     // A record's mapped flag is true whenever ANY descendant is covered, since
-    // addPathAndPrefixes registers ancestor prefixes. Inheriting from it would
+    // buildCoveredFieldPaths registers ancestor prefixes. Inheriting from it would
     // turn "one of two address fields is mapped" into "both are" — the
     // overstatement 3cc-iedv records the trade-off for.
     const totals = summarizeFieldCoverage([

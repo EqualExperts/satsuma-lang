@@ -90,6 +90,10 @@ export function buildCoveredFieldPaths(paths: Iterable<string>): CoveredFieldPat
  * True when the path is covered at all — directly or as the ancestor of a
  * direct path. This is the boolean every current consumer renders as "mapped",
  * and it is exactly what the flat-set probe has always answered.
+ *
+ * Same-named sibling: {@link isCoveredFieldPath} answers the identical question
+ * over the flat `Set<string>` view for consumers that never build the model.
+ * This one takes the model; that one takes the set.
  */
 export function isCoveredPath(path: string, covered: CoveredFieldPaths): boolean {
   return covered.direct.has(path) || covered.ancestors.has(path);
@@ -146,26 +150,12 @@ function properPrefixesOf(path: string): string[] {
 // union of the model's two sets, so the splitting rules exist once.
 
 /**
- * Register a path and all its ancestor prefixes in a flat covered-paths set —
- * the single-path form of {@link buildCoveredFieldSet}.
- *
- * The registration rules (qualified paths only, never bare segments; no
- * bracket normalisation) are the model's — see {@link buildCoveredFieldPaths}
- * for the rules and their history (sl-joeq, sl-8o1n).
- *
- * Example: addPathAndPrefixes(set, "orders.item_id")
- *   → set now contains "orders" and "orders.item_id"
- */
-export function addPathAndPrefixes(set: Set<string>, path: string): void {
-  if (!path) return;
-  set.add(path);
-  for (const prefix of properPrefixesOf(path)) set.add(prefix);
-}
-
-/**
  * Expand a collection of field paths into a flat coverage set — the union of
  * the model's direct and ancestor sets, for consumers that only need the
- * "covered at all?" boolean and none of the why.
+ * "covered at all?" boolean and none of the why. The registration rules
+ * (qualified paths only, never bare segments; no bracket normalisation) are
+ * the model's — see {@link buildCoveredFieldPaths} for the rules and their
+ * history (sl-joeq, sl-8o1n).
  */
 export function buildCoveredFieldSet(paths: Iterable<string>): Set<string> {
   const { direct, ancestors } = buildCoveredFieldPaths(paths);
@@ -180,6 +170,12 @@ export function buildCoveredFieldSet(paths: Iterable<string>): Set<string> {
  * buildCoveredFieldSet() registers ancestor prefixes, so a record whose
  * descendant is covered matches on its own path, but a field is never matched
  * by local name alone (sl-joeq).
+ *
+ * Same-named sibling: {@link isCoveredPath} answers the identical question over
+ * the {@link CoveredFieldPaths} model. This one takes the flat `Set<string>`
+ * view (the viz card's shape); that one takes the model. Consumers moving onto
+ * the model should prefer it — this set-based probe exists for call sites that
+ * only ever see the flat view.
  */
 export function isCoveredFieldPath(path: string, coveredPaths: Set<string>): boolean {
   return coveredPaths.has(path);
