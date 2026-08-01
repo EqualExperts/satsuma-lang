@@ -181,3 +181,65 @@ fragment address (note "Reusable address fields") {
         (field_name
           (identifier))
         (type_expr)))))
+
+================================================================================
+Fragment spread inside record and list_of record bodies (sl-2nxu)
+================================================================================
+
+fragment address_fields {
+  street STRING
+  city STRING
+}
+
+schema customers {
+  id UUID
+  billing record {
+    ...address_fields
+  }
+  shipments list_of record {
+    ...address_fields
+    tracking STRING
+  }
+}
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (fragment_block
+    (block_label
+      (identifier))
+    (schema_body
+      (field_decl
+        (field_name
+          (identifier))
+        (type_expr))
+      (field_decl
+        (field_name
+          (identifier))
+        (type_expr))))
+  (schema_block
+    (block_label
+      (identifier))
+    (schema_body
+      (field_decl
+        (field_name
+          (identifier))
+        (type_expr))
+      (field_decl
+        (field_name
+          (identifier))
+        (schema_body
+          (fragment_spread
+            (spread_label
+              (identifier)))))
+      (field_decl
+        (field_name
+          (identifier))
+        (schema_body
+          (fragment_spread
+            (spread_label
+              (identifier)))
+          (field_decl
+            (field_name
+              (identifier))
+            (type_expr)))))))
