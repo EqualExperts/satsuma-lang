@@ -11,8 +11,12 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
   addPathAndPrefixes,
+  buildCoveredFieldPaths,
   buildCoveredFieldSet,
+  hasDirectlyCoveredAncestor,
   isCoveredFieldPath,
+  isCoveredPath,
+  isDirectlyCovered,
   schemaLocalFieldPath,
 } from "@satsuma/core";
 
@@ -127,6 +131,75 @@ describe("buildCoveredFieldSet()", () => {
     const covered = buildCoveredFieldSet(["orders.lines.sku"]);
     assert.equal(isCoveredFieldPath("orders.lines.sku", covered), true);
     assert.equal(isCoveredFieldPath("orders.packed.sku", covered), false);
+  });
+});
+
+describe("buildCoveredFieldPaths() — the direct/derived model", () => {
+  // PRD 38 R1 (sl-fmx0): the model must record WHY a path is covered, because
+  // container reasoning (tri-state, whole-subtree arrows) hangs off the
+  // difference between "an arrow wrote exactly this" and "an arrow wrote
+  // something inside this".
+
+  it("separates directly-referenced paths from their ancestor prefixes", () => {
+    // The core distinction: "address.city" was written; "address" only contains
+    // something that was. A flat set cannot tell these apart.
+    const covered = buildCoveredFieldPaths(["address.city"]);
+    assert.equal(isDirectlyCovered("address.city", covered), true);
+    assert.equal(isDirectlyCovered("address", covered), false, "'address' is an ancestor, not direct");
+    assert.equal(isCoveredPath("address", covered), true, "…but it still counts as covered");
+  });
+
+  it("lets one path be both direct and an ancestor, with direct as the stronger claim", () => {
+    // Arrows writing both "address" and "address.city" are legal; membership in
+    // ancestors must not mask the direct claim.
+    const covered = buildCoveredFieldPaths(["address", "address.city"]);
+    assert.equal(isDirectlyCovered("address", covered), true);
+    assert.equal(isCoveredPath("address", covered), true);
+  });
+
+  it("answers the whole-subtree query: a leaf beneath a DIRECTLY covered record inherits", () => {
+    // sl-fmx0 AC / PRD 38 R5: `addr -> address` writes "address" exactly, so
+    // its unmentioned leaves descend from a directly-covered container.
+    // (computeMappingCoverage does not consult this yet — see sl-r6b0.)
+    const covered = buildCoveredFieldPaths(["address"]);
+    assert.equal(hasDirectlyCoveredAncestor("address.line1", covered), true);
+    assert.equal(hasDirectlyCoveredAncestor("address.nested.deeper", covered), true);
+  });
+
+  it("refuses the trap 3cc-iedv documents: a merely-ancestor record confers nothing downward", () => {
+    // With only "address.city" written, "address" is covered as an ancestor —
+    // but its OTHER leaves must not inherit, or "one of twelve address fields
+    // is mapped" reads as "all twelve are".
+    const covered = buildCoveredFieldPaths(["address.city"]);
+    assert.equal(hasDirectlyCoveredAncestor("address.line1", covered), false);
+    assert.equal(isCoveredPath("address.line1", covered), false);
+  });
+
+  it("does not report a path as its own ancestor", () => {
+    // hasDirectlyCoveredAncestor is a PROPER-ancestor query: a directly covered
+    // leaf inherits nothing from itself, so callers can compose it with
+    // isDirectlyCovered without double counting.
+    const covered = buildCoveredFieldPaths(["address"]);
+    assert.equal(hasDirectlyCoveredAncestor("address", covered), false);
+  });
+
+  it("ignores empty paths rather than registering an '' entry", () => {
+    // Malformed arrows can yield empty path text; same guard as the flat set.
+    const covered = buildCoveredFieldPaths([""]);
+    assert.equal(covered.direct.size, 0);
+    assert.equal(covered.ancestors.size, 0);
+  });
+
+  it("keeps the flat-set view equal to the union of direct and ancestors", () => {
+    // buildCoveredFieldSet is defined as the model's union, so consumers on the
+    // boolean view can never drift from consumers on the model.
+    const paths = ["a.b.c", "x", "a.other"];
+    const flat = buildCoveredFieldSet(paths);
+    const model = buildCoveredFieldPaths(paths);
+    assert.deepEqual(flat, new Set([...model.direct, ...model.ancestors]));
+    for (const p of flat) {
+      assert.equal(isCoveredPath(p, model), true, `'${p}' must probe as covered on the model too`);
+    }
   });
 });
 

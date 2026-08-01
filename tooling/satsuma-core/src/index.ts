@@ -39,11 +39,16 @@ export type {
 } from "./coverage.js";
 export {
   addPathAndPrefixes,
+  buildCoveredFieldPaths,
   buildCoveredFieldSet,
+  hasDirectlyCoveredAncestor,
   isCoveredFieldPath,
+  isCoveredPath,
+  isDirectlyCovered,
   schemaLocalFieldPath,
   schemaRefPrefixes,
 } from "./coverage-paths.js";
+export type { CoveredFieldPaths } from "./coverage-paths.js";
 export { aggregateCoverage, summarizeFieldCoverage, leafFieldEntries } from "./coverage-rollup.js";
 export type {
   MappingCoverageInput,

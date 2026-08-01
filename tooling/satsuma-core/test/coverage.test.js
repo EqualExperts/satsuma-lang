@@ -285,6 +285,28 @@ mapping load {
     assertMapped(src, "address.line1", true);
     assertMapped(src, "address.line2", false);
   });
+
+  it("a whole-record arrow does not (yet) cover the record's leaves — sl-r6b0's boundary", () => {
+    // Pins the deliberate limit of the sl-fmx0 model change: `address -> address`
+    // marks the record itself covered, but its leaves stay unmapped until
+    // sl-r6b0 makes the direct set kind-aware and turns subtree inheritance on
+    // (PRD 38 R5, 3cc-iedv). When that lands, this test flips to expect true —
+    // if it starts failing WITHOUT that work, coverage has begun inheriting
+    // through kind-blind direct paths, which manufactures coverage from every
+    // `each` header.
+    const WHOLE_RECORD = `
+schema src { address record { line1 STRING line2 STRING } }
+schema tgt { address record { line1 STRING line2 STRING } }
+mapping copy {
+  source { src }
+  target { tgt }
+  address -> address
+}`;
+    const tgt = forRole(coverage(WHOLE_RECORD, "copy"), "target");
+    assertMapped(tgt, "address", true);
+    assertMapped(tgt, "address.line1", false);
+    assertMapped(tgt, "address.line2", false);
+  });
 });
 
 // ── each / flatten blocks ───────────────────────────────────────────────────

@@ -54,7 +54,8 @@
  */
 
 import { child, children, labelText, sourceRefStructuralText } from "./cst-utils.js";
-import { buildCoveredFieldSet, isCoveredFieldPath, schemaLocalFieldPath } from "./coverage-paths.js";
+import { buildCoveredFieldPaths, isCoveredPath, schemaLocalFieldPath } from "./coverage-paths.js";
+import type { CoveredFieldPaths } from "./coverage-paths.js";
 import { extractMappingArrowRecords } from "./extract.js";
 import type { ResolvedNLRef } from "./nl-ref.js";
 import type { SyntaxNode, Tree } from "./types.js";
@@ -324,18 +325,18 @@ function coverageForSchema(
     schemaId: canonicalRef,
     role,
     fields: buildFieldCoverage(def.fields, def.uri, "", {
-      declared: buildCoveredFieldSet(declaredLocal),
-      nl: buildCoveredFieldSet(nlLocal),
+      declared: buildCoveredFieldPaths(declaredLocal),
+      nl: buildCoveredFieldPaths(nlLocal),
     }),
   };
 }
 
 // ── Field coverage building ─────────────────────────────────────────────────
 
-/** The covered-path sets for one schema, one per tier (ADR-036). */
+/** The covered-path models for one schema, one per tier (ADR-036). */
 interface TieredCoveredPaths {
-  declared: Set<string>;
-  nl: Set<string>;
+  declared: CoveredFieldPaths;
+  nl: CoveredFieldPaths;
 }
 
 /**
@@ -343,9 +344,17 @@ interface TieredCoveredPaths {
  * `prefix` is the path from the schema root to the current level; record
  * fields emit an entry of their own *and* entries for every descendant.
  *
- * A field in both sets is reported as `declared`: declared coverage is the
+ * A field in both models is reported as `declared`: declared coverage is the
  * stronger claim, and reporting the weaker one would let a field that an arrow
  * genuinely writes read as merely inferred from prose (ADR-036).
+ *
+ * Probes ask {@link isCoveredPath} — direct or ancestor-of-direct, the same
+ * boolean the flat set always answered. The model's stronger query (a leaf
+ * inheriting from a *directly* covered record, `hasDirectlyCoveredAncestor`)
+ * is deliberately not consulted yet: the direct set still records each/flatten
+ * iteration subjects as direct paths, and inheriting through those would
+ * manufacture coverage from every `each` header. sl-r6b0 makes the direct set
+ * kind-aware and turns the query on (PRD 38 R5, 3cc-iedv).
  */
 function buildFieldCoverage(
   fields: CoverageField[],
@@ -356,9 +365,9 @@ function buildFieldCoverage(
   const result: FieldCoverageEntry[] = [];
   for (const f of fields) {
     const path = prefix ? `${prefix}.${f.name}` : f.name;
-    const tier: CoverageTier | undefined = isCoveredFieldPath(path, covered.declared)
+    const tier: CoverageTier | undefined = isCoveredPath(path, covered.declared)
       ? "declared"
-      : isCoveredFieldPath(path, covered.nl)
+      : isCoveredPath(path, covered.nl)
         ? "nl"
         : undefined;
     const entry: FieldCoverageEntry = { path, uri, mapped: tier !== undefined };
