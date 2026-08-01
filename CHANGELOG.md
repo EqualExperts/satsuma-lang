@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+### Viz surfaces no longer drop `nested_arrow` blocks (`svdfe-s6we`)
+
+Mappings using the braced `src -> tgt { .a -> .b }` form were undercounted on
+every viz surface: the "N arrows" header, the mapping-detail table, hover
+cross-highlighting, and overview edges all ignored the block and every arrow
+inside it. The viz model now represents `nested_arrow` (at mapping level,
+inside `each`/`flatten`, and nested within another `nested_arrow`), the detail
+view renders it as a `nested` scope section, and overview edges are collected
+for its arrows — as well as for arrows under `flatten` nested in `each`, which
+the edge pass previously missed. Arrow counts on affected mappings go up; no
+JSON output shapes change.
+
 ### Resolved NL `@refs` now count toward coverage (`sl-qxyl`, ADR-036)
 
 **Coverage percentages rise, and `--fail-under` thresholds need re-baselining in

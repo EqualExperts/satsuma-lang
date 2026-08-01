@@ -1,6 +1,6 @@
 ---
 id: svdfe-s6we
-status: open
+status: closed
 deps: []
 links: [sl-vu22]
 created: 2026-07-31T16:23:49Z
@@ -25,3 +25,10 @@ The corpus contains no nested_arrow inside a mapping body that viz renders, whic
 
 VizModel represents nested_arrow blocks with their src/tgt and nested contents, reusing the shared nested-block collector added for sl-vu22 rather than adding a third enumeration; countMappingArrows and forEachMappingArrow visit them; sz-mapping-detail renders them as a scope section; a viz-backend test asserts a nested_arrow's arrows survive extraction; a corpus/example fixture exercising nested_arrow inside a mapping exists so round-trip tests cover it.
 
+
+## Notes
+
+**2026-08-01T19:05:38Z**
+
+Cause: VizModel had no representation of nested_arrow; buildMappingBlock and the shared nested-block collector enumerated each_block/flatten_block only, so the block and all arrows inside it were dropped from every viz surface.
+Fix: added NestedArrowBlock to the model (same nesting collections as each/flatten, built by the shared collector), walked it in forEachMappingArrow/countMappingArrows and the mapping-detail scope sections, and unified the elk edge collection over all three container kinds — which also fixes its pre-existing miss of edges under flatten-inside-each. Corpus gains a mapping-body nested_arrow fixture (commit 0ebead6).

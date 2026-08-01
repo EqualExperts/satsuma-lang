@@ -1,6 +1,6 @@
 ---
 id: sl-8o1n
-status: open
+status: closed
 deps: []
 links: []
 created: 2026-07-31T14:44:15Z
@@ -18,3 +18,10 @@ PRD 38 R7, hygiene. addPathAndPrefixes strips [] when BUILDING the covered set b
 
 Either one shared normalization helper used on both the build and probe sides with a test asserting both directions match, or the normalization removed with a test asserting bracket paths are a parse error; the existing core tests that assert [] stripping (coverage.test.js, coverage-paths.test.js) updated to match whichever is chosen, with a comment citing the v2 syntax decision.
 
+
+## Notes
+
+**2026-08-01T19:05:38Z**
+
+Cause: addPathAndPrefixes stripped v1 bracket notation on the build side while isCoveredFieldPath never stripped it on the probe side — dead code in v2, where bracket paths are a parse error (iteration is each/flatten).
+Fix: deleted the normalization rather than making it symmetric; a parser test pins that bracket paths do not parse, and the [] coverage-path tests were replaced with one pinning verbatim registration (commit 32579a9).
