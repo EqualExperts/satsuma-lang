@@ -80,7 +80,7 @@ describe("field-coverage helpers", () => {
         },
       ],
       eachBlocks: [],
-      flattenBlocks: [],
+      flattenBlocks: [], nestedArrows: [],
       sourceBlock: null,
       notes: [],
       comments: [],
@@ -157,7 +157,7 @@ describe("field-coverage helpers", () => {
         },
       ],
       eachBlocks: [],
-      flattenBlocks: [],
+      flattenBlocks: [], nestedArrows: [],
       sourceBlock: null,
       notes: [],
       comments: [],
@@ -207,10 +207,10 @@ const arrowAtEveryLevel = () => ({
       targetField: "lines.discounts",
       arrows: [arrow("items.discounts.code", "lines.discounts.code")],
       nestedEach: [],
-      nestedFlatten: [],
+      nestedFlatten: [], nestedArrows: [],
       location: loc,
     }],
-    nestedFlatten: [],
+    nestedFlatten: [], nestedArrows: [],
     location: loc,
   }],
   flattenBlocks: [{
@@ -218,9 +218,10 @@ const arrowAtEveryLevel = () => ({
     targetField: "invoice",
     arrows: [arrow("tags.label", "tag_label")],
     nestedEach: [],
-    nestedFlatten: [],
+    nestedFlatten: [], nestedArrows: [],
     location: loc,
   }],
+  nestedArrows: [],
   sourceBlock: null,
   notes: [],
   comments: [],
@@ -244,7 +245,7 @@ describe("countMappingArrows (sl-fm0q)", () => {
     const mapping = {
       ...arrowAtEveryLevel(),
       arrows: [],
-      flattenBlocks: [],
+      flattenBlocks: [], nestedArrows: [],
       eachBlocks: [{
         sourceField: "orders",
         targetField: "orders",
@@ -255,13 +256,41 @@ describe("countMappingArrows (sl-fm0q)", () => {
           targetField: "orders.packed_items",
           arrows: [arrow("orders.parcels.contents.sku", "orders.packed_items.sku")],
           nestedEach: [],
-          nestedFlatten: [],
+          nestedFlatten: [], nestedArrows: [],
           location: loc,
         }],
+        nestedArrows: [],
         location: loc,
       }],
     };
     assert.equal(countMappingArrows(mapping), 2);
+  });
+
+  it("counts arrows inside nested_arrow blocks at mapping level and inside each (svdfe-s6we)", async () => {
+    // nested_arrow had no model representation at all, so its arrows were
+    // invisible to every counting surface. Three arrows here: one flat, one in
+    // a mapping-level nested_arrow, one in a nested_arrow inside an each.
+    const { countMappingArrows } = await import("../dist/satsuma-viz.js");
+    const nestedArrowBlock = (src, tgt, arrows) => ({
+      sourceField: src, targetField: tgt, arrows,
+      nestedEach: [], nestedFlatten: [], nestedArrows: [], location: loc,
+    });
+    const mapping = {
+      ...arrowAtEveryLevel(),
+      arrows: [arrow("id", "id")],
+      flattenBlocks: [],
+      nestedArrows: [nestedArrowBlock("addr", "address", [arrow(".line1", ".line1")])],
+      eachBlocks: [{
+        sourceField: "items",
+        targetField: "lines",
+        arrows: [],
+        nestedEach: [],
+        nestedFlatten: [],
+        nestedArrows: [nestedArrowBlock(".dims", ".dims", [arrow(".h", ".h")])],
+        location: loc,
+      }],
+    };
+    assert.equal(countMappingArrows(mapping), 3);
   });
 });
 

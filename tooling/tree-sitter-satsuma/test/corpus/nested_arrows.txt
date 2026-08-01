@@ -363,3 +363,51 @@ mapping {
           (field_path
             (identifier)))))))
 
+
+================================================================================
+Nested arrow at mapping body level (svdfe-s6we)
+================================================================================
+
+mapping copy_customer {
+  source { src }
+  target { tgt }
+  addr -> address {
+    .line1 -> .line1
+    .city -> .city
+  }
+}
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (mapping_block
+    (block_label
+      (identifier))
+    (mapping_body
+      (source_block
+        (source_ref
+          (identifier)))
+      (target_block
+        (source_ref
+          (identifier)))
+      (nested_arrow
+        (src_path
+          (field_path
+            (identifier)))
+        (tgt_path
+          (field_path
+            (identifier)))
+        (map_arrow
+          (src_path
+            (relative_field_path
+              (identifier)))
+          (tgt_path
+            (relative_field_path
+              (identifier))))
+        (map_arrow
+          (src_path
+            (relative_field_path
+              (identifier)))
+          (tgt_path
+            (relative_field_path
+              (identifier))))))))

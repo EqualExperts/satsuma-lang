@@ -15,6 +15,8 @@ import type {
   FieldEntry,
   ArrowEntry,
   EachBlock,
+  FlattenBlock,
+  NestedArrowBlock,
 } from "../model.js";
 import { resolveSchemaLocalFieldPath, type FieldPathCard } from "../field-coverage.js";
 import { metricFieldEntries } from "../metric-adapter.js";
@@ -679,19 +681,26 @@ function addMappingEdges(mappings: MappingBlock[], edges: ElkEdge[], ctx: GraphC
 
     addArrowEdges(m.arrows, `${m.id}:arrow`);
 
-    for (let j = 0; j < m.eachBlocks.length; j++) {
-      const collectEachEdges = (eb: EachBlock, ePrefix: string) => {
-        addArrowEdges(eb.arrows, `${ePrefix}:each`);
-        for (let k = 0; k < eb.nestedEach.length; k++) {
-          collectEachEdges(eb.nestedEach[k], `${ePrefix}:nested:${k}`);
-        }
-      };
-      collectEachEdges(m.eachBlocks[j], `${m.id}:eb:${j}`);
-    }
-
-    for (let j = 0; j < m.flattenBlocks.length; j++) {
-      addArrowEdges(m.flattenBlocks[j].arrows, `${m.id}:flat:${j}`);
-    }
+    // One recursion over all three container kinds, mirroring
+    // forEachMappingArrow. Separate per-kind loops here walked nestedEach only,
+    // so arrows under flatten-inside-each got no edges (the sl-vu22 shape), and
+    // nested_arrow blocks were absent from the model entirely (svdfe-s6we).
+    const collectBlockEdges = (
+      blocks: Array<EachBlock | FlattenBlock | NestedArrowBlock>,
+      prefix: string,
+    ) => {
+      for (let j = 0; j < blocks.length; j++) {
+        const block = blocks[j];
+        addArrowEdges(block.arrows, `${prefix}:${j}`);
+        collectBlockEdges(
+          [...block.nestedEach, ...block.nestedFlatten, ...block.nestedArrows],
+          `${prefix}:${j}:nested`,
+        );
+      }
+    };
+    collectBlockEdges(m.eachBlocks, `${m.id}:eb`);
+    collectBlockEdges(m.flattenBlocks, `${m.id}:flat`);
+    collectBlockEdges(m.nestedArrows, `${m.id}:na`);
   }
 }
 

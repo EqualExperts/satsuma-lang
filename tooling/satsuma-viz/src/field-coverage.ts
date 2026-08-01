@@ -12,6 +12,7 @@ import type {
   FieldEntry,
   FlattenBlock,
   MappingBlock,
+  NestedArrowBlock,
   SchemaCard,
   VizModel,
 } from "./model.js";
@@ -80,27 +81,28 @@ export function resolveSchemaLocalFieldPath(
 
 /**
  * Walk every arrow in a mapping, including those nested arbitrarily deep inside
- * `each` and `flatten` blocks in any combination.
+ * `each`, `flatten` and `nested_arrow` blocks in any combination.
  *
- * `each` and `flatten` accept the same children and may interleave to any depth,
- * so one recursion handles both rather than each block type getting its own
+ * All three container kinds carry the same nesting collections, so one
+ * recursion handles them rather than each block type getting its own
  * traversal. Walking only `nestedEach` missed every arrow under a `flatten`
  * inside an `each` — the shape of `examples/nested-iteration/pipeline.stm:100`
- * (sl-vu22).
+ * (sl-vu22) — and omitting `nestedArrows` dropped every arrow inside a braced
+ * `src -> tgt { .a -> .b }` group from all counting surfaces (svdfe-s6we).
  */
 export function forEachMappingArrow(
   mapping: MappingBlock,
   visit: (arrow: ArrowEntry) => void,
 ): void {
-  const visitBlocks = (blocks: Array<EachBlock | FlattenBlock>): void => {
+  const visitBlocks = (blocks: Array<EachBlock | FlattenBlock | NestedArrowBlock>): void => {
     for (const block of blocks) {
       for (const arrow of block.arrows) visit(arrow);
-      visitBlocks([...block.nestedEach, ...block.nestedFlatten]);
+      visitBlocks([...block.nestedEach, ...block.nestedFlatten, ...block.nestedArrows]);
     }
   };
 
   for (const arrow of mapping.arrows) visit(arrow);
-  visitBlocks([...mapping.eachBlocks, ...mapping.flattenBlocks]);
+  visitBlocks([...mapping.eachBlocks, ...mapping.flattenBlocks, ...mapping.nestedArrows]);
 }
 
 /**

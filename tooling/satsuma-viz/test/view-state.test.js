@@ -32,7 +32,7 @@ const mapping = (id, sourceRefs = ["src"], targetRef = "tgt") => ({
   targetRef,
   arrows: [],
   eachBlocks: [],
-  flattenBlocks: [],
+  flattenBlocks: [], nestedArrows: [],
   sourceBlock: null,
   notes: [],
   comments: [],

@@ -19,7 +19,7 @@ const mapping = {
   targetRef: "orders",
   arrows: [],
   eachBlocks: [],
-  flattenBlocks: [],
+  flattenBlocks: [], nestedArrows: [],
   sourceBlock: null,
   metadata: [],
   notes: [],

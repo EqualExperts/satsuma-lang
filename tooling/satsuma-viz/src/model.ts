@@ -17,6 +17,7 @@ export type {
   ResolvedAtRef,
   EachBlock,
   FlattenBlock,
+  NestedArrowBlock,
   MetricCard,
   MetricFieldEntry,
   FragmentCard,

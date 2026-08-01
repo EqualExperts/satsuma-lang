@@ -40,6 +40,7 @@ export type {
   TransformInfo,
   EachBlock,
   FlattenBlock,
+  NestedArrowBlock,
   MetricCard,
   MetricFieldEntry,
   FragmentCard,
@@ -63,6 +64,7 @@ import type {
   TransformInfo,
   EachBlock,
   FlattenBlock,
+  NestedArrowBlock,
   MetricCard,
   MetricFieldEntry,
   FragmentCard,
@@ -806,6 +808,7 @@ function extractMapping(
   const arrows: ArrowEntry[] = [];
   const eachBlocks: EachBlock[] = [];
   const flattenBlocks: FlattenBlock[] = [];
+  const nestedArrows: NestedArrowBlock[] = [];
   let sourceBlock: SourceBlockInfo | null = null;
   let targetRef = "";
   const notes: NoteBlock[] = [];
@@ -841,6 +844,9 @@ function extractMapping(
         case "flatten_block":
           flattenBlocks.push(extractFlattenBlock(uri, ch));
           break;
+        case "nested_arrow":
+          nestedArrows.push(extractNestedArrowBlock(uri, ch));
+          break;
         case "note_block":
           notes.push(extractNoteBlock(uri, ch));
           break;
@@ -874,6 +880,7 @@ function extractMapping(
     arrows,
     eachBlocks,
     flattenBlocks,
+    nestedArrows,
     sourceBlock,
     metadata: meta ? extractMetadataEntries(meta) : [],
     notes,
@@ -1012,10 +1019,11 @@ interface NestedBlockContents {
   arrows: ArrowEntry[];
   nestedEach: EachBlock[];
   nestedFlatten: FlattenBlock[];
+  nestedArrows: NestedArrowBlock[];
 }
 
 function extractNestedBlockContents(uri: string, node: SyntaxNode): NestedBlockContents {
-  const contents: NestedBlockContents = { arrows: [], nestedEach: [], nestedFlatten: [] };
+  const contents: NestedBlockContents = { arrows: [], nestedEach: [], nestedFlatten: [], nestedArrows: [] };
 
   for (const ch of node.namedChildren) {
     if (ch.type === "map_arrow") {
@@ -1026,6 +1034,8 @@ function extractNestedBlockContents(uri: string, node: SyntaxNode): NestedBlockC
       contents.nestedEach.push(extractEachBlock(uri, ch));
     } else if (ch.type === "flatten_block") {
       contents.nestedFlatten.push(extractFlattenBlock(uri, ch));
+    } else if (ch.type === "nested_arrow") {
+      contents.nestedArrows.push(extractNestedArrowBlock(uri, ch));
     }
   }
 
@@ -1062,6 +1072,28 @@ function extractEachBlock(uri: string, node: SyntaxNode): EachBlock {
  * that target.
  */
 function extractFlattenBlock(uri: string, node: SyntaxNode): FlattenBlock {
+  const srcPath = child(node, "src_path");
+  const tgtPath = child(node, "tgt_path");
+
+  return {
+    sourceField: srcPath ? pathText(srcPath) : "",
+    targetField: tgtPath ? pathText(tgtPath) : "",
+    ...extractNestedBlockContents(uri, node),
+    location: nodeLocation(uri, node),
+  };
+}
+
+/**
+ * Extract a `nested_arrow` block — the braced `src -> tgt { .a -> .b }` form
+ * that maps a record's fields as a group.
+ *
+ * Runs the same shared collector as each/flatten even though the grammar's
+ * nested_arrow body admits arrow declarations only: enumerating a narrower set
+ * of children per container is exactly how these blocks went missing from the
+ * model in the first place (svdfe-s6we, sl-vu22), so every container collects
+ * identically and the grammar decides what can actually appear.
+ */
+function extractNestedArrowBlock(uri: string, node: SyntaxNode): NestedArrowBlock {
   const srcPath = child(node, "src_path");
   const tgtPath = child(node, "tgt_path");
 
@@ -1634,6 +1666,7 @@ export const _testInternals = {
   extractTransform,
   extractEachBlock,
   extractFlattenBlock,
+  extractNestedArrowBlock,
   extractNoteBlock,
   extractNotes,
   extractComments,
