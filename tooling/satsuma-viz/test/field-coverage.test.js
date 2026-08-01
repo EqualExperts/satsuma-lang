@@ -80,7 +80,8 @@ describe("field-coverage helpers", () => {
         },
       ],
       eachBlocks: [],
-      flattenBlocks: [], nestedArrows: [],
+      flattenBlocks: [],
+      nestedArrows: [],
       sourceBlock: null,
       notes: [],
       comments: [],
@@ -157,7 +158,8 @@ describe("field-coverage helpers", () => {
         },
       ],
       eachBlocks: [],
-      flattenBlocks: [], nestedArrows: [],
+      flattenBlocks: [],
+      nestedArrows: [],
       sourceBlock: null,
       notes: [],
       comments: [],
@@ -207,10 +209,12 @@ const arrowAtEveryLevel = () => ({
       targetField: "lines.discounts",
       arrows: [arrow("items.discounts.code", "lines.discounts.code")],
       nestedEach: [],
-      nestedFlatten: [], nestedArrows: [],
+      nestedFlatten: [],
+      nestedArrows: [],
       location: loc,
     }],
-    nestedFlatten: [], nestedArrows: [],
+    nestedFlatten: [],
+    nestedArrows: [],
     location: loc,
   }],
   flattenBlocks: [{
@@ -218,7 +222,8 @@ const arrowAtEveryLevel = () => ({
     targetField: "invoice",
     arrows: [arrow("tags.label", "tag_label")],
     nestedEach: [],
-    nestedFlatten: [], nestedArrows: [],
+    nestedFlatten: [],
+    nestedArrows: [],
     location: loc,
   }],
   nestedArrows: [],
@@ -245,7 +250,8 @@ describe("countMappingArrows (sl-fm0q)", () => {
     const mapping = {
       ...arrowAtEveryLevel(),
       arrows: [],
-      flattenBlocks: [], nestedArrows: [],
+      flattenBlocks: [],
+      nestedArrows: [],
       eachBlocks: [{
         sourceField: "orders",
         targetField: "orders",
@@ -256,7 +262,8 @@ describe("countMappingArrows (sl-fm0q)", () => {
           targetField: "orders.packed_items",
           arrows: [arrow("orders.parcels.contents.sku", "orders.packed_items.sku")],
           nestedEach: [],
-          nestedFlatten: [], nestedArrows: [],
+          nestedFlatten: [],
+          nestedArrows: [],
           location: loc,
         }],
         nestedArrows: [],
@@ -266,10 +273,14 @@ describe("countMappingArrows (sl-fm0q)", () => {
     assert.equal(countMappingArrows(mapping), 2);
   });
 
-  it("counts arrows inside nested_arrow blocks at mapping level and inside each (svdfe-s6we)", async () => {
+  it("counts nested_arrow headers and bodies at mapping level and inside each (svdfe-s6we)", async () => {
     // nested_arrow had no model representation at all, so its arrows were
-    // invisible to every counting surface. Three arrows here: one flat, one in
-    // a mapping-level nested_arrow, one in a nested_arrow inside an each.
+    // invisible to every counting surface. Unlike an each/flatten header (an
+    // iteration scope, not a mapping), a nested_arrow header genuinely maps
+    // record to record and core's extractArrowRecords counts it as an arrow —
+    // so viz must too, or its "N arrows" disagrees with the CLI's for the same
+    // file (PR #414 review). Five arrows here: one flat, then a header + body
+    // arrow each for a mapping-level nested_arrow and one inside an each.
     const { countMappingArrows } = await import("../dist/satsuma-viz.js");
     const nestedArrowBlock = (src, tgt, arrows) => ({
       sourceField: src, targetField: tgt, arrows,
@@ -290,7 +301,7 @@ describe("countMappingArrows (sl-fm0q)", () => {
         location: loc,
       }],
     };
-    assert.equal(countMappingArrows(mapping), 3);
+    assert.equal(countMappingArrows(mapping), 5);
   });
 });
 

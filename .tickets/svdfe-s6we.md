@@ -44,3 +44,20 @@ representation, arrow counts, and the detail-view scope section. The unified
 elk recursion is correct but only observable for absolute-path arrows until
 relative paths are qualified — raised as 3cdd-yavi (reuse core's qualification
 rule from extract.ts rather than a viz-local copy).
+
+**2026-08-01T21:45:56Z** (PR #414 review fix round)
+
+Cause: two review findings on the delivered work. (1) The unified
+collectBlockEdges dropped the ":each" edge-id segment while extractLayout
+still derived scope badges by substring-matching edge ids, so every
+each-scoped edge silently lost its "⟲ each" badge, and nothing in the suite
+asserted on scopeLabel. (2) countMappingArrows walked only block bodies, so
+viz's "N arrows" came out one lower per nested_arrow block than core's
+extractArrowRecords, which counts the container header (addr -> address) as
+an arrow.
+
+Fix: the iteration scope is now recorded on EdgeMeta when each edge is built
+(nested_arrow blocks inherit the enclosing each/flatten scope; ids are never
+parsed), with a layout test pinning one badge per container kind including
+flatten-inside-each; forEachMappingArrow now visits a synthesized header
+arrow for every nested_arrow block, restoring count parity with the CLI.

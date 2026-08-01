@@ -48,7 +48,8 @@ const mapping = (id, sourceRefs, targetRef, arrows = []) => ({
   targetRef,
   arrows,
   eachBlocks: [],
-  flattenBlocks: [], nestedArrows: [],
+  flattenBlocks: [],
+  nestedArrows: [],
   sourceBlock: null,
   notes: [],
   comments: [],
@@ -152,7 +153,8 @@ describe("computeLayout", () => {
                 }),
               ],
               eachBlocks: [],
-              flattenBlocks: [], nestedArrows: [],
+              flattenBlocks: [],
+              nestedArrows: [],
               sourceBlock: null,
               notes: [],
               comments: [],
@@ -257,6 +259,103 @@ describe("computeLayout", () => {
     assert.equal(result.edges.length, 3, `expected 3 edges, got ${result.edges.length}`);
     const targetFields = result.edges.map((e) => e.targetField).sort();
     assert.deepEqual(targetFields, ["address.line1", "orders.id", "orders.packed.sku"]);
+  });
+
+  it("badges every edge with its innermost iteration scope, from EdgeMeta rather than the edge id (PR #414 review)", async () => {
+    // Pins the scope badge for each container kind. The previous
+    // implementation substring-matched the edge id (":each" / ":flat:"), so
+    // when collectBlockEdges changed the id scheme every each badge silently
+    // disappeared — and nothing in the suite asserted on scopeLabel. The rule:
+    // an edge is badged with the innermost each/flatten scope its arrow sits
+    // in; a nested_arrow block is not an iteration scope, so its arrows
+    // inherit the enclosing scope and top-level nested_arrow edges carry no
+    // badge at all.
+    const nested = (name, children) => ({ ...field(name, "record"), children });
+    const eachBlock = (over) => ({
+      sourceField: "orders",
+      targetField: "orders",
+      arrows: [],
+      nestedEach: [],
+      nestedFlatten: [],
+      nestedArrows: [],
+      location: loc,
+      ...over,
+    });
+    const model = {
+      uri: "file:///test.stm",
+      fileNotes: [],
+      namespaces: [
+        {
+          name: null,
+          schemas: [
+            schema("s", [
+              field("plain"),
+              nested("orders", [
+                field("id"),
+                nested("parcels", [field("sku")]),
+                nested("ship", [field("carrier")]),
+              ]),
+              nested("addr", [field("line1")]),
+            ]),
+            schema("t", [
+              field("plain"),
+              nested("orders", [
+                field("id"),
+                nested("packed", [field("sku")]),
+                nested("shipping", [field("carrier")]),
+              ]),
+              nested("address", [field("line1")]),
+            ]),
+          ],
+          mappings: [
+            {
+              ...mapping("m", ["s"], "t", [arrow("plain", "plain")]),
+              eachBlocks: [
+                eachBlock({
+                  arrows: [arrow("orders.id", "orders.id")],
+                  nestedFlatten: [
+                    eachBlock({
+                      sourceField: "orders.parcels",
+                      targetField: ".packed",
+                      arrows: [arrow("orders.parcels.sku", "orders.packed.sku")],
+                    }),
+                  ],
+                  nestedArrows: [
+                    eachBlock({
+                      sourceField: ".ship",
+                      targetField: ".shipping",
+                      arrows: [arrow("orders.ship.carrier", "orders.shipping.carrier")],
+                    }),
+                  ],
+                }),
+              ],
+              nestedArrows: [
+                eachBlock({
+                  sourceField: "addr",
+                  targetField: "address",
+                  arrows: [arrow("addr.line1", "address.line1")],
+                }),
+              ],
+            },
+          ],
+          metrics: [],
+          fragments: [],
+        },
+      ],
+    };
+
+    const result = await computeLayout(model);
+
+    const badgeByTarget = Object.fromEntries(
+      result.edges.map((e) => [e.targetField, e.scopeLabel]),
+    );
+    assert.deepEqual(badgeByTarget, {
+      plain: undefined, // top-level arrow — no scope
+      "orders.id": "each", // each body
+      "orders.packed.sku": "flatten", // flatten-inside-each — innermost wins
+      "orders.shipping.carrier": "each", // nested_arrow inside each inherits the scope
+      "address.line1": undefined, // top-level nested_arrow — not an iteration scope
+    });
   });
 
   it("keeps namespaced schemas as flat result nodes", async () => {

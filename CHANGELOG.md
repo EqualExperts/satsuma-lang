@@ -9,8 +9,11 @@ the viz model had no representation of `nested_arrow`, so the block and every
 arrow inside it were missing from the "N arrows" header and the mapping-detail
 table. The model now represents `nested_arrow` (at mapping level, inside
 `each`/`flatten`, and nested within another `nested_arrow`), counting walks it,
-and the detail view renders it as a `nested` scope section. Arrow counts on
-affected mappings go up; no JSON output shapes change.
+and the detail view renders it as a `nested` scope section. The block's header
+(`addr -> address`) is itself counted as an arrow — matching core's
+`extractArrowRecords`, which emits a record for the container, so viz's
+"N arrows" agrees with the CLI for the same file. Arrow counts on affected
+mappings go up; no JSON output shapes change.
 
 Resolution-dependent surfaces — mapping-detail coverage highlighting, hover
 cross-highlighting, and overview edges — still skip arrows authored with

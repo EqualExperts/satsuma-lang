@@ -1034,3 +1034,32 @@ mapping load {
     assertMapped(s, "amount", false);
   });
 });
+
+// ── Parse-error recovery ─────────────────────────────────────────────────────
+//
+// Coverage runs on files with parse errors (the CLI warns and proceeds), so
+// whatever tree-sitter's error recovery surfaces to extraction is part of the
+// behaviour worth pinning.
+
+describe("computeMappingCoverage — parse-error recovery", () => {
+  it("a bracket-malformed arrow ('items[].id -> sku') confers no source coverage (sl-8o1n)", () => {
+    // sl-8o1n deleted the build-side [] normalisation because v2 rejects
+    // brackets at parse time. True — but error recovery still hands the
+    // malformed arrow to extraction, and before the deletion the
+    // normalisation quietly rewrote "items[].id" to "items.id" there, making
+    // source coverage RISE on a broken file (found by differential testing
+    // against pre-PR-414 main). This pins the corrected behaviour: the
+    // malformed ref matches no declared path, in the same direction as
+    // ADR-036's rule that a spec breaking must never raise coverage.
+    const BRACKETS = `
+schema src { items list_of record { id STRING } }
+schema tgt { sku STRING }
+mapping load {
+  source { src }
+  target { tgt }
+  items[].id -> sku
+}`;
+    const s = forRole(coverage(BRACKETS, "load"), "source");
+    assertMapped(s, "items.id", false);
+  });
+});

@@ -89,27 +89,47 @@ export function resolveSchemaLocalFieldPath(
  * inside an `each` — the shape of `examples/nested-iteration/pipeline.stm:100`
  * (sl-vu22) — and omitting `nestedArrows` dropped every arrow inside a braced
  * `src -> tgt { .a -> .b }` group from all counting surfaces (svdfe-s6we).
+ *
+ * **Which headers count as arrows** (mirrors core's `extractArrowRecords`, so
+ * viz counts agree with the CLI's for the same file): an each/flatten header
+ * opens an iteration scope and is NOT an arrow, but a `nested_arrow` header
+ * genuinely maps record to record (`addr -> address`) and IS one — it is
+ * visited as a synthesized {@link ArrowEntry} before the block's body.
  */
 export function forEachMappingArrow(
   mapping: MappingBlock,
   visit: (arrow: ArrowEntry) => void,
 ): void {
+  // The model stores a nested_arrow's own record→record mapping as header
+  // fields on the block; reconstitute it as the arrow core counts it as.
+  const headerArrowOf = (block: NestedArrowBlock): ArrowEntry => ({
+    sourceFields: [block.sourceField],
+    targetField: block.targetField,
+    transform: null,
+    metadata: [],
+    comments: [],
+    location: block.location,
+  });
+
   const visitBlocks = (blocks: Array<EachBlock | FlattenBlock | NestedArrowBlock>): void => {
     for (const block of blocks) {
       for (const arrow of block.arrows) visit(arrow);
+      for (const nested of block.nestedArrows) visit(headerArrowOf(nested));
       visitBlocks([...block.nestedEach, ...block.nestedFlatten, ...block.nestedArrows]);
     }
   };
 
   for (const arrow of mapping.arrows) visit(arrow);
+  for (const nested of mapping.nestedArrows) visit(headerArrowOf(nested));
   visitBlocks([...mapping.eachBlocks, ...mapping.flattenBlocks, ...mapping.nestedArrows]);
 }
 
 /**
- * Total arrow count of a mapping, including arrows nested arbitrarily deep
- * in each_blocks (and their nestedEach) and flatten_blocks. Every "N arrows"
- * surface must use this rather than summing the top-level collections, which
- * silently undercounts nested iteration (sl-fm0q).
+ * Total arrow count of a mapping, including arrows nested arbitrarily deep in
+ * `each`, `flatten` and `nested_arrow` blocks in any combination, plus each
+ * `nested_arrow` header itself (see {@link forEachMappingArrow} for the header
+ * rule). Every "N arrows" surface must use this rather than summing the
+ * top-level collections, which silently undercounts nested iteration (sl-fm0q).
  */
 export function countMappingArrows(mapping: MappingBlock): number {
   let count = 0;

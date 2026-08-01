@@ -166,7 +166,8 @@ describe("viz automation helpers", () => {
       sourceBlock: null,
       arrows: [],
       eachBlocks: [],
-      flattenBlocks: [], nestedArrows: [],
+      flattenBlocks: [],
+      nestedArrows: [],
       metadata: [],
       location: { uri: "file:///t.stm", line: 0, character: 0 },
     };
