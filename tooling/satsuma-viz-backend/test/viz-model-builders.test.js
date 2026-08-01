@@ -15,6 +15,7 @@ const {
   extractSchema,
   extractFragment,
   extractMapping,
+  extractNestedArrowBlock,
   extractMetric,
   extractMetricMetadata,
   extractMetricFields,
@@ -199,6 +200,7 @@ describe("extractMapping (direct)", () => {
       ],
       eachBlocks: [],
       flattenBlocks: [],
+      nestedArrows: [],
       sourceBlock: { schemas: ["s"], joinDescription: null, filters: [] },
       metadata: [],
       notes: [],
@@ -676,6 +678,76 @@ describe("each and flatten nesting (sl-vu22)", () => {
     assert.deepStrictEqual(each.nestedEach, []);
     assert.deepStrictEqual(each.nestedFlatten[0].nestedEach, []);
     assert.deepStrictEqual(each.nestedFlatten[0].nestedFlatten, []);
+  });
+});
+
+describe("nested_arrow blocks (svdfe-s6we)", () => {
+  // The braced `src -> tgt { .a -> .b }` form is an _arrow_decl, legal in a
+  // mapping body, inside each/flatten, and inside another nested_arrow. The
+  // model had no representation for it at all, so the block and every arrow
+  // inside it were dropped — undercounting 'N arrows', the detail table, hover
+  // highlighting, and (once feature 36 lands) the coverage overlay.
+
+  it("carries a nested_arrow's src/tgt and its arrows through extraction", () => {
+    const src =
+      "schema s { addr record { line1 STRING } }\n" +
+      "schema t { address record { line1 STRING } }\n" +
+      "mapping m {\n  source { s }\n  target { t }\n" +
+      "  addr -> address {\n    .line1 -> .line1\n  }\n}";
+    const na = extractNestedArrowBlock(URI, findNode(root(src), "nested_arrow"));
+    assert.equal(na.sourceField, "addr");
+    assert.equal(na.targetField, "address");
+    assert.equal(na.arrows.length, 1);
+    assert.equal(na.arrows[0].sourceFields[0], ".line1");
+    assert.equal(na.arrows[0].targetField, ".line1");
+    assert.equal(na.location.uri, URI);
+  });
+
+  it("extractMapping collects nested_arrow blocks declared in the mapping body", () => {
+    // The mapping-body switch enumerated each_block and flatten_block only, so
+    // a top-level nested_arrow vanished even though the grammar routes all
+    // three through _arrow_decl / _nested_block_item.
+    const src =
+      "schema s { addr record { line1 STRING } }\n" +
+      "schema t { address record { line1 STRING } }\n" +
+      "mapping m {\n  source { s }\n  target { t }\n" +
+      "  addr -> address {\n    .line1 -> .line1\n  }\n}";
+    const wsIndex = createWorkspaceIndex();
+    const mapping = extractMapping(URI, findNode(root(src), "mapping_block"), null, wsIndex);
+    assert.equal(mapping.nestedArrows.length, 1);
+    assert.equal(mapping.nestedArrows[0].targetField, "address");
+    assert.equal(mapping.arrows.length, 0, "the block must not be double-reported as a flat arrow");
+  });
+
+  it("recurses into nested_arrow inside nested_arrow, and defaults all collections", () => {
+    // nested_arrow bodies accept further _arrow_decls, so the shape must nest;
+    // and consumers walk every collection unconditionally, so all four must be
+    // present (empty, not missing) at every level.
+    const src =
+      "schema s { o record { addr record { line1 STRING } } }\n" +
+      "schema t { o record { address record { line1 STRING } } }\n" +
+      "mapping m {\n  source { s }\n  target { t }\n" +
+      "  o -> o {\n    .addr -> .address {\n      .line1 -> .line1\n    }\n  }\n}";
+    const outer = extractNestedArrowBlock(URI, findNode(root(src), "nested_arrow"));
+    assert.equal(outer.nestedArrows.length, 1);
+    const inner = outer.nestedArrows[0];
+    assert.equal(inner.arrows.length, 1);
+    assert.deepStrictEqual(inner.nestedArrows, []);
+    assert.deepStrictEqual(inner.nestedEach, []);
+    assert.deepStrictEqual(inner.nestedFlatten, []);
+  });
+
+  it("collects a nested_arrow declared inside an each block", () => {
+    // each/flatten bodies route through _nested_block_item, which includes
+    // _arrow_decl — so nested_arrow is legal there too and must survive.
+    const src =
+      "schema s { items list_of record { addr record { line1 STRING } } }\n" +
+      "schema t { items list_of record { address record { line1 STRING } } }\n" +
+      "mapping m {\n  source { s }\n  target { t }\n" +
+      "  each items -> items {\n    .addr -> .address {\n      .line1 -> .line1\n    }\n  }\n}";
+    const each = extractEachBlock(URI, findNode(root(src), "each_block"));
+    assert.equal(each.nestedArrows.length, 1);
+    assert.equal(each.nestedArrows[0].arrows.length, 1);
   });
 });
 

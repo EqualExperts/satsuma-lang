@@ -17,7 +17,7 @@ const loc = { uri: "file:///test.stm", line: 1, character: 0 };
 const field = (name, type = "STRING") => ({ name, type, constraints: [], notes: [], comments: [], children: [], location: loc });
 const arrow = (source, target) => ({ sourceFields: [source], targetField: target, transform: null, metadata: [], comments: [], location: loc });
 const schema = (id, fields) => ({ id, qualifiedId: id, kind: "schema", label: null, fields, notes: [], comments: [], metadata: [], location: loc, hasExternalLineage: false, spreads: [] });
-const mapping = (id, sourceRefs, targetRef, arrows) => ({ id, sourceRefs, targetRef, arrows, eachBlocks: [], flattenBlocks: [], sourceBlock: null, notes: [], comments: [], location: loc });
+const mapping = (id, sourceRefs, targetRef, arrows) => ({ id, sourceRefs, targetRef, arrows, eachBlocks: [], flattenBlocks: [], nestedArrows: [], sourceBlock: null, notes: [], comments: [], location: loc });
 
 const model = {
   uri: "file:///test.stm",

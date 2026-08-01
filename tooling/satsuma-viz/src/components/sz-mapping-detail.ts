@@ -7,6 +7,7 @@ import type {
   ArrowEntry,
   EachBlock,
   FlattenBlock,
+  NestedArrowBlock,
 } from "../model.js";
 import { SzNavigateEvent, SzFieldHoverEvent } from "../satsuma-viz.js";
 import { forEachMappingArrow, resolveSchemaLocalFieldPath } from "../field-coverage.js";
@@ -626,6 +627,7 @@ export class SzMappingDetail extends LitElement {
             ${m.arrows.map((a) => this._renderArrowRow(a, ""))}
             ${m.eachBlocks.map((eb) => this._renderEachSection(eb, ""))}
             ${m.flattenBlocks.map((fb) => this._renderFlattenSection(fb, ""))}
+            ${m.nestedArrows.map((na) => this._renderNestedArrowSection(na, ""))}
           </tbody>
         </table>
       </div>
@@ -699,6 +701,7 @@ export class SzMappingDetail extends LitElement {
       ${eb.arrows.map((a) => this._renderArrowRow(a, sectionPrefix))}
       ${eb.nestedEach.map((ne) => this._renderEachSection(ne, sectionPrefix))}
       ${eb.nestedFlatten.map((nf) => this._renderFlattenSection(nf, sectionPrefix))}
+      ${eb.nestedArrows.map((na) => this._renderNestedArrowSection(na, sectionPrefix))}
     `;
   }
 
@@ -722,6 +725,33 @@ export class SzMappingDetail extends LitElement {
       ${fb.arrows.map((a) => this._renderArrowRow(a, sectionPrefix))}
       ${fb.nestedEach.map((ne) => this._renderEachSection(ne, sectionPrefix))}
       ${fb.nestedFlatten.map((nf) => this._renderFlattenSection(nf, sectionPrefix))}
+      ${fb.nestedArrows.map((na) => this._renderNestedArrowSection(na, sectionPrefix))}
+    `;
+  }
+
+  // A nested_arrow (`addr -> address { .line1 -> .line1 }`) groups a record's
+  // arrows the way each/flatten group a list's, so it renders as the same kind
+  // of scope section. Before svdfe-s6we these blocks were absent from the model
+  // and their arrows simply missing from this table.
+  private _renderNestedArrowSection(na: NestedArrowBlock, parentPrefix: string): TemplateResult {
+    const sectionId = sanitizeTestIdSegment(`nested-${na.targetField}`);
+    const sectionPrefix = parentPrefix ? `${parentPrefix}-${sectionId}` : sectionId;
+    return html`
+      <tr
+        class="scope-section"
+        data-testid=${`${this.testIdPrefix}-${sectionPrefix}`}
+      >
+        <td colspan="4">
+          <div class="scope-label">
+            <span class="scope-tag">nested</span>
+            <span class="scope-fields">${na.sourceField} &#x2192; ${na.targetField}</span>
+          </div>
+        </td>
+      </tr>
+      ${na.arrows.map((a) => this._renderArrowRow(a, sectionPrefix))}
+      ${na.nestedEach.map((ne) => this._renderEachSection(ne, sectionPrefix))}
+      ${na.nestedFlatten.map((nf) => this._renderFlattenSection(nf, sectionPrefix))}
+      ${na.nestedArrows.map((nn) => this._renderNestedArrowSection(nn, sectionPrefix))}
     `;
   }
 

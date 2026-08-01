@@ -96,6 +96,8 @@ export interface MappingBlock {
   arrows: ArrowEntry[];
   eachBlocks: EachBlock[];
   flattenBlocks: FlattenBlock[];
+  /** nested_arrow blocks declared directly in the mapping body (svdfe-s6we). */
+  nestedArrows: NestedArrowBlock[];
   /** Structured source-block info (multi-schema joins, filters). */
   sourceBlock: SourceBlockInfo | null;
   /** Metadata entries on the mapping declaration itself, e.g.
@@ -177,6 +179,8 @@ export interface EachBlock {
   nestedEach: EachBlock[];
   /** Nested flatten_blocks declared inside this one. */
   nestedFlatten: FlattenBlock[];
+  /** Nested nested_arrow blocks declared inside this one (svdfe-s6we). */
+  nestedArrows: NestedArrowBlock[];
   location: SourceLocation;
 }
 
@@ -203,6 +207,38 @@ export interface FlattenBlock {
   nestedEach: EachBlock[];
   /** Nested flatten_blocks declared inside this one. */
   nestedFlatten: FlattenBlock[];
+  /** Nested nested_arrow blocks declared inside this one (svdfe-s6we). */
+  nestedArrows: NestedArrowBlock[];
+  location: SourceLocation;
+}
+
+/**
+ * A nested_arrow block — the braced `src -> tgt { .a -> .b }` form that maps a
+ * record's fields as a group (grammar.js `nested_arrow`).
+ *
+ * A consumer enumerating only each/flatten dropped these blocks and every arrow
+ * inside them from the model, undercounting each affected mapping's arrows on
+ * every viz surface (svdfe-s6we) — the same defect class as flatten-inside-each
+ * (sl-vu22) and the core coverage walk (sl-qzy3).
+ *
+ * The grammar's nested_arrow body accepts arrow declarations only — including
+ * further nested_arrows, but not each/flatten. The each/flatten collections are
+ * still carried (always empty today) so all four block containers share one
+ * shape and one walker; if the grammar ever admits iteration inside a
+ * nested_arrow, the model and its consumers are already correct.
+ */
+export interface NestedArrowBlock {
+  /** Source record path, as authored (relative `.addr` inside a container). */
+  sourceField: string;
+  /** Target record path, as authored. */
+  targetField: string;
+  arrows: ArrowEntry[];
+  /** Always empty today — see the interface comment. */
+  nestedEach: EachBlock[];
+  /** Always empty today — see the interface comment. */
+  nestedFlatten: FlattenBlock[];
+  /** Further nested_arrow blocks declared inside this one. */
+  nestedArrows: NestedArrowBlock[];
   location: SourceLocation;
 }
 
