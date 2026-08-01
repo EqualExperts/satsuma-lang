@@ -1,11 +1,27 @@
 /**
- * coverage-paths.ts — Field-path set helpers for nested field coverage.
+ * coverage-paths.ts — The covered-path model for nested field coverage.
  *
  * Owns the *path* half of coverage: turning the dotted paths an arrow
- * references into a set that can answer "is this declared field covered?".
- * Every consumer needs identical nested-path semantics — if an arrow
- * references `customer.email`, both `customer` and `customer.email` count as
- * covered — so those rules live here rather than in each UI layer.
+ * references into a model that can answer "is this declared field covered?" —
+ * and, just as importantly, "*why* is it covered?". Every consumer needs
+ * identical nested-path semantics, so those rules live here rather than in
+ * each UI layer.
+ *
+ * The model ({@link CoveredFieldPaths}) distinguishes two claims that a flat
+ * set of strings cannot (PRD 38 R1, sl-fmx0):
+ *
+ *  - **direct** — an arrow (or resolved NL `@ref`) referenced exactly this
+ *    path. "An arrow wrote THIS."
+ *  - **ancestor** — the path is a proper prefix of a direct path. "Something
+ *    INSIDE this container was written."
+ *
+ * Both count as covered today ({@link isCoveredPath}), which is why the two
+ * were conflated in one set for so long. They diverge the moment coverage has
+ * to reason about *containers*: a record that is directly covered by a
+ * whole-record arrow (`addr -> address`) has had its entire subtree asserted
+ * across, while a record that is merely the ancestor of one covered leaf has
+ * not (3cc-iedv). Only a model that keeps the two apart can express that —
+ * see {@link hasDirectlyCoveredAncestor} for the query and its current limits.
  *
  * It also owns the rule that turns an arrow's *authored* field reference into a
  * schema-local path: in a multi-source mapping arrows name their schema
@@ -18,21 +34,36 @@
  * modules can be reasoned about independently.
  */
 
+// ── The covered-path model ───────────────────────────────────────────────────
+
 /**
- * Register a path and all its ancestor prefixes in the covered-paths set.
+ * Why each covered path is covered — the public contract of the model
+ * (PRD 38 R1).
  *
- * Paths are split on `.` verbatim — there is no other normalisation. v1's
- * `items[].id` bracket notation was removed from the language in v2 (iteration
- * is expressed via `each`/`flatten`, grammar.js:429-431), so bracket paths are
- * a parse error and can never reach here from parser-backed extraction. An
- * earlier version stripped `[]` here anyway, but only on this build side and
- * not in {@link isCoveredFieldPath}'s probe — dead code that would silently
- * half-work if brackets ever returned, so it was deleted rather than kept
- * asymmetric (sl-8o1n).
+ * The two sets may overlap: when arrows write both `address` and
+ * `address.city`, `address` is direct (an arrow named it exactly) *and* an
+ * ancestor (of `address.city`). Direct membership is always the stronger
+ * claim, and queries treat it that way.
  *
- * Registering ancestors means a top-level field `"address"` is considered
- * covered when an arrow targets the nested path `"address.city"` — a consumer
- * checking the record's own path will correctly find the parent covered.
+ * The ancestor set is derivable from the direct set — it is materialised at
+ * build time only so probes stay O(1). Nothing may be added to it except by
+ * {@link buildCoveredFieldPaths}.
+ */
+export interface CoveredFieldPaths {
+  /** Paths an arrow or resolved NL `@ref` referenced exactly. */
+  direct: Set<string>;
+  /** Proper ancestor prefixes of direct paths — containers something was written *into*. */
+  ancestors: Set<string>;
+}
+
+/**
+ * Build the covered-path model from the schema-local paths a mapping's arrows
+ * reference.
+ *
+ * Each path enters `direct` verbatim, and every proper prefix of it enters
+ * `ancestors` — so for `"orders.item_id"`, `direct` gains `"orders.item_id"`
+ * and `ancestors` gains `"orders"`. Empty paths (from malformed arrows) are
+ * ignored rather than registered as `""`.
  *
  * **Qualified paths only — never bare segments (sl-joeq).** An earlier version
  * also registered each segment on its own (`"city"` for `"address.city"`) so a
@@ -42,29 +73,103 @@
  * depths (`id`, `sku`, `code`, `city`, `BIC`) is normal in nested schemas, so
  * the collision rate rose with exactly the schemas coverage analysis is for —
  * and it failed in the dangerous direction, silently reporting an incomplete
- * spec as complete. Consumers must pass the schema-local qualified path.
+ * spec as complete. Callers must pass the schema-local qualified path.
+ */
+export function buildCoveredFieldPaths(paths: Iterable<string>): CoveredFieldPaths {
+  const direct = new Set<string>();
+  const ancestors = new Set<string>();
+  for (const path of paths) {
+    if (!path) continue;
+    direct.add(path);
+    for (const prefix of properPrefixesOf(path)) ancestors.add(prefix);
+  }
+  return { direct, ancestors };
+}
+
+/**
+ * True when the path is covered at all — directly or as the ancestor of a
+ * direct path. This is the boolean every current consumer renders as "mapped",
+ * and it is exactly what the flat-set probe has always answered.
+ */
+export function isCoveredPath(path: string, covered: CoveredFieldPaths): boolean {
+  return covered.direct.has(path) || covered.ancestors.has(path);
+}
+
+/**
+ * True when an arrow or resolved `@ref` referenced exactly this path — the
+ * strong claim. A container that is only in `ancestors` returns false.
+ */
+export function isDirectlyCovered(path: string, covered: CoveredFieldPaths): boolean {
+  return covered.direct.has(path);
+}
+
+/**
+ * True when some proper ancestor of `path` is *directly* covered — the query
+ * behind whole-subtree arrow semantics (PRD 38 R5): a leaf beneath a record
+ * that an arrow wrote wholesale (`addr -> address`) is covered, while a leaf
+ * beneath a record that is merely the ancestor of one covered sibling is not.
+ * That second half is the trap 3cc-iedv documents: inheriting from *any*
+ * covered ancestor would turn "one of twelve address fields is mapped" into
+ * "all twelve are".
+ *
+ * **Not yet consulted by computeMappingCoverage.** The direct set is currently
+ * kind-blind: an `each`/`flatten` header registers its iteration subject as a
+ * direct path ("iterating a list consumes it"), so this query cannot yet tell
+ * `addr -> address` (asserts the whole subtree) from `each items -> lines { }`
+ * (opens an iteration scope and asserts nothing about unmentioned leaves).
+ * Wiring it in without that distinction would manufacture coverage from every
+ * each header. sl-r6b0 makes the direct set kind-aware and flips the
+ * behaviour; until then this is a model-level query with model-level tests.
+ */
+export function hasDirectlyCoveredAncestor(path: string, covered: CoveredFieldPaths): boolean {
+  for (const prefix of properPrefixesOf(path)) {
+    if (covered.direct.has(prefix)) return true;
+  }
+  return false;
+}
+
+/** Proper dotted prefixes of a path, shortest first: "a.b.c" → ["a", "a.b"]. */
+function properPrefixesOf(path: string): string[] {
+  const prefixes: string[] = [];
+  let prefix = "";
+  for (const part of path.split(".").slice(0, -1)) {
+    prefix = prefix ? `${prefix}.${part}` : part;
+    prefixes.push(prefix);
+  }
+  return prefixes;
+}
+
+// ── Flat-set compatibility view ──────────────────────────────────────────────
+//
+// Consumers that only need the "covered at all?" boolean (the viz card, the
+// LSP gutter) work over a flat Set<string>. That view is now *defined* as the
+// union of the model's two sets, so the splitting rules exist once.
+
+/**
+ * Register a path and all its ancestor prefixes in a flat covered-paths set —
+ * the single-path form of {@link buildCoveredFieldSet}.
+ *
+ * The registration rules (qualified paths only, never bare segments; no
+ * bracket normalisation) are the model's — see {@link buildCoveredFieldPaths}
+ * for the rules and their history (sl-joeq, sl-8o1n).
  *
  * Example: addPathAndPrefixes(set, "orders.item_id")
  *   → set now contains "orders" and "orders.item_id"
  */
 export function addPathAndPrefixes(set: Set<string>, path: string): void {
   if (!path) return;
-  const parts = path.split(".");
-  let prefix = "";
-  for (const part of parts) {
-    prefix = prefix ? `${prefix}.${part}` : part;
-    set.add(prefix);
-  }
+  set.add(path);
+  for (const prefix of properPrefixesOf(path)) set.add(prefix);
 }
 
 /**
- * Expand a collection of field paths into a coverage set containing the full
- * path and its ancestor prefixes for each entry.
+ * Expand a collection of field paths into a flat coverage set — the union of
+ * the model's direct and ancestor sets, for consumers that only need the
+ * "covered at all?" boolean and none of the why.
  */
 export function buildCoveredFieldSet(paths: Iterable<string>): Set<string> {
-  const covered = new Set<string>();
-  for (const path of paths) addPathAndPrefixes(covered, path);
-  return covered;
+  const { direct, ancestors } = buildCoveredFieldPaths(paths);
+  return new Set([...direct, ...ancestors]);
 }
 
 /**
