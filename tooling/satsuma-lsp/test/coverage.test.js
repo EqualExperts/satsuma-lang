@@ -93,3 +93,93 @@ mapping load {
     );
   });
 });
+
+// ── Fragment spreads (sl-5nsv) ──────────────────────────────────────────────
+//
+// The gutter and the status bar must show what `satsuma coverage` shows, and a
+// spread is the case where they did not: the index records spreads unresolved
+// (a spread may name a fragment in a file not indexed yet), and the adapter
+// used to hand core the unexpanded tree — so `address record {
+// ...address_fields }` reached the gutter as one childless leaf.
+//
+// The two fixtures are shared, deliberately, with the CLI suite
+// (satsuma-cli/test/coverage.test.ts) and the viz-backend suite: same file,
+// same expected leaves and totals in all three, so a divergence fails a test
+// rather than showing up as two numbers on one reviewer's screen.
+
+describe("LSP coverage adapter — fragment spreads", () => {
+  const { readFileSync } = require("node:fs");
+  const { resolve } = require("node:path");
+
+  /** Fixtures live in the CLI package because the CLI suite asserts on them too. */
+  const fixture = (name) =>
+    readFileSync(resolve(__dirname, "../../satsuma-cli/test/fixtures", name), "utf8");
+
+  it("reports the leaves a spread materialises inside a record body", () => {
+    // The CLI reports 2/5 for this file with `address` partly covered; before
+    // the adapter expanded spreads the gutter reported 1/3 with `address` fully
+    // covered — the same file, two numbers, and the more flattering one wrong.
+    const target = coverage(fixture("nested-record-spread.stm"), "customer_map").schemas.find(
+      (s) => s.role === "target",
+    );
+    assert.deepEqual(
+      target.fields.map((f) => [f.path, f.state]),
+      [
+        ["id", "uncovered"],
+        ["name", "uncovered"],
+        ["address", "partial"],
+        ["address.street", "covered"],
+        ["address.city", "covered"],
+        ["address.zip", "uncovered"],
+      ],
+    );
+  });
+
+  it("reports them the same way inside a list_of record body", () => {
+    // A list_of record is a container like any other. The CLI reports 2/4 here.
+    const target = coverage(fixture("list-of-record-spread.stm"), "invoice_load").schemas.find(
+      (s) => s.role === "target",
+    );
+    assert.deepEqual(
+      target.fields.map((f) => [f.path, f.state]),
+      [
+        ["invoice_no", "covered"],
+        ["lines", "partial"],
+        ["lines.sku", "covered"],
+        ["lines.qty", "uncovered"],
+        ["lines.unit_price", "uncovered"],
+      ],
+    );
+  });
+
+  it("keeps two records spread from one fragment independently covered", () => {
+    // The examples/lib/sfdc_fragments.stm shape. Both records materialise a
+    // field named `Street` from the same fragment, so a coverage model keyed by
+    // field *name* — or one that credited the fragment rather than the record
+    // that spreads it — would report ShippingAddress.Street as mapped because
+    // BillingAddress.Street is. Only the billing arrow exists (sl-joeq).
+    const src = `fragment address_fields { Street STRING City STRING }
+schema account {
+  BillingAddress record { ...address_fields }
+  ShippingAddress record { ...address_fields }
+}
+schema src { billing_street STRING }
+mapping load {
+  source { src }
+  target { account }
+  billing_street -> BillingAddress.Street
+}`;
+    const target = coverage(src, "load").schemas.find((s) => s.role === "target");
+    assert.deepEqual(
+      target.fields.map((f) => [f.path, f.state]),
+      [
+        ["BillingAddress", "partial"],
+        ["BillingAddress.Street", "covered"],
+        ["BillingAddress.City", "uncovered"],
+        ["ShippingAddress", "uncovered"],
+        ["ShippingAddress.Street", "uncovered"],
+        ["ShippingAddress.City", "uncovered"],
+      ],
+    );
+  });
+});

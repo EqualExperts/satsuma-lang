@@ -14,6 +14,7 @@
 import {
   collectFieldPaths as _collectFieldPaths,
   expandSpreads as _expandSpreads,
+  expandDeclaredFields as _expandDeclaredFields,
   expandEntityFields as _expandEntityFields,
   expandNestedSpreads as _expandNestedSpreads,
 } from "@satsuma/core";
@@ -68,6 +69,23 @@ export function expandEntityFields(
   const resolveRef = makeIndexRefResolver(currentNs, index.fragments);
   const lookupFragment = (key: string) => index.fragments.get(key);
   return _expandEntityFields(entity, currentNs, resolveRef, lookupFragment);
+}
+
+/**
+ * Every field a schema declares with its fragment spreads inlined — nested
+ * record-body spreads and schema-level ones alike, on a copy. Wraps
+ * satsuma-core's callback-based expandDeclaredFields, which owns the ordering
+ * of the two passes so every consumer materialises the same field tree
+ * (sl-5nsv).
+ */
+export function expandDeclaredFields(
+  entity: SpreadEntity | null | undefined,
+  currentNs: string | null,
+  index: ExtractedWorkspace,
+): FieldDecl[] {
+  const resolveRef = makeIndexRefResolver(currentNs, index.fragments);
+  const lookupFragment = (key: string) => index.fragments.get(key);
+  return _expandDeclaredFields(entity, currentNs, resolveRef, lookupFragment);
 }
 
 /**

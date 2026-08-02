@@ -1192,3 +1192,84 @@ mapping m {
     );
   });
 });
+
+// ---------- Nested (record-body) fragment spreads (sl-5nsv) ----------
+//
+// The model is what the viz card counts coverage from, so a spread it fails to
+// materialise is a field the card cannot count. It expanded schema-level
+// spreads only, leaving `address record { ...address_fields }` a childless
+// record — one leaf where `satsuma coverage` sees three.
+//
+// The fixtures are shared with the CLI suite (satsuma-cli/test/coverage.test.ts)
+// and the LSP suite: the leaf lists below are exactly the paths those two
+// report on the same files, which is the parity claim under test.
+
+describe("nested fragment spreads (sl-5nsv)", () => {
+  const { readFileSync } = require("node:fs");
+  const { resolve } = require("node:path");
+
+  /** Fixtures live in the CLI package because its suite asserts on them too. */
+  const fixture = (name) =>
+    readFileSync(resolve(__dirname, "../../satsuma-cli/test/fixtures", name), "utf8");
+
+  /** Dotted paths of the schema's leaves, the unit coverage is counted in. */
+  const leafPaths = (fields, prefix = "") =>
+    fields.flatMap((f) =>
+      f.children.length > 0 ? leafPaths(f.children, `${prefix}${f.name}.`) : [`${prefix}${f.name}`],
+    );
+
+  const schemaNamed = (source, id) =>
+    vizModel(source)
+      .namespaces.flatMap((ns) => ns.schemas)
+      .find((s) => s.id === id);
+
+  it("materialises a spread inside a record body as that record's children", () => {
+    const customer = schemaNamed(fixture("nested-record-spread.stm"), "customer");
+    assert.deepEqual(leafPaths(customer.fields), [
+      "id",
+      "name",
+      "address.street",
+      "address.city",
+      "address.zip",
+    ]);
+  });
+
+  it("materialises a spread inside a list_of record body the same way", () => {
+    const invoice = schemaNamed(fixture("list-of-record-spread.stm"), "invoice");
+    assert.deepEqual(leafPaths(invoice.fields), [
+      "invoice_no",
+      "lines.sku",
+      "lines.qty",
+      "lines.unit_price",
+    ]);
+  });
+
+  it("keeps the declaring field's own display data when it gains children", () => {
+    // Expansion runs over core's FieldDecl, which carries no constraints, notes
+    // or source location. A record that merely acquires children must keep the
+    // entry the CST gave it, or the card loses its jump link and badges.
+    const src = `fragment address_fields { street STRING }
+schema customer {
+  address record (pii) {
+    ...address_fields
+  }
+}`;
+    const address = schemaNamed(src, "customer").fields[0];
+    assert.deepEqual(address.constraints, ["pii"]);
+    assert.equal(address.location.line, 2, "record keeps its declared position");
+    assert.deepEqual(
+      address.children.map((c) => c.name),
+      ["street"],
+    );
+  });
+
+  it("leaves an unresolvable nested spread visible rather than dropping the field", () => {
+    // A dangling reference must not silently become an empty record: the card
+    // renders what it is given, and a record with no children reads as a
+    // declared leaf.
+    const src = `schema customer { address record { ...nowhere } }`;
+    const address = schemaNamed(src, "customer").fields[0];
+    assert.deepEqual(address.children, []);
+    assert.equal(address.name, "address");
+  });
+});
