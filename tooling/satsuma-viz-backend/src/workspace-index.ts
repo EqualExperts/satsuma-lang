@@ -45,6 +45,19 @@ export interface FieldInfo {
   range: Range;
   /** Nested child fields for record/list_of record structures. */
   children: FieldInfo[];
+  /**
+   * Fragments spread into this field's record body (`address record {
+   * ...address_fields }`), as authored — unresolved.
+   *
+   * Recorded rather than resolved because a spread may name a fragment in
+   * another file, which is not indexed yet when this field is. Consumers expand
+   * it once the whole workspace is indexed, through core's
+   * `expandDeclaredFields`. Dropping it here is what left the editor gutter
+   * reporting `address` as one childless leaf while `satsuma coverage` reported
+   * its three spread-materialised leaves (sl-5nsv). Absent when the body
+   * declares no spread.
+   */
+  spreads?: string[];
 }
 
 export interface DefinitionEntry {
@@ -60,6 +73,12 @@ export interface DefinitionEntry {
   namespace: string | null;
   /** Declared fields for schema/fragment definitions. */
   fields: FieldInfo[];
+  /**
+   * Fragments spread into the block body itself, as authored — the
+   * schema-level counterpart of {@link FieldInfo.spreads}, and unresolved for
+   * the same reason. Absent when the block declares no spread.
+   */
+  spreads?: string[];
 }
 
 export interface ReferenceEntry {
@@ -595,6 +614,8 @@ function indexTopLevel(
       ? extractFields(child(node, "schema_body"))
       : [];
 
+  const spreads = fields.length > 0 ? extractBodySpreads(child(node, "schema_body")) : [];
+
   addDefinition(index, qualifiedName, {
     uri,
     range: nodeRange(node),
@@ -602,6 +623,7 @@ function indexTopLevel(
     kind: effectiveKind,
     namespace,
     fields,
+    ...(spreads.length > 0 ? { spreads } : {}),
   });
 
   // Extract references from mapping bodies
@@ -1151,6 +1173,11 @@ function extractFields(body: SyntaxNode | null): FieldInfo[] {
   return fieldTree.fields.map((decl, i) => fieldDeclToInfo(decl, fieldNodes[i] ?? null));
 }
 
+/** Fragments spread directly into a block body, as authored. */
+function extractBodySpreads(body: SyntaxNode | null): string[] {
+  return body ? extractFieldTree(body).spreads : [];
+}
+
 /**
  * Convert a core FieldDecl to an LSP FieldInfo, deriving the Range from
  * the parallel CST field_name node when available, otherwise from the
@@ -1181,7 +1208,12 @@ function fieldDeclToInfo(decl: FieldDecl, cstNode: SyntaxNode | null): FieldInfo
     fieldDeclToInfo(childDecl, nestedNodes[j] ?? null),
   );
 
-  return { name: decl.name, type, range, children: fieldChildren };
+  const info: FieldInfo = { name: decl.name, type, range, children: fieldChildren };
+  // Only present when authored, so a field with no spread carries no key —
+  // the index is compared structurally in places, and an empty array would
+  // read as a declaration that is not there.
+  if (decl.spreads && decl.spreads.length > 0) info.spreads = decl.spreads;
+  return info;
 }
 
 // ---------- Text extraction helpers ----------

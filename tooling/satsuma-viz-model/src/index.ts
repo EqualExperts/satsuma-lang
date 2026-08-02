@@ -80,6 +80,19 @@ export interface FieldEntry {
   comments: CommentEntry[];
   /** Non-empty when the field has record type; contains the nested field declarations. */
   children: FieldEntry[];
+  /**
+   * Fragments spread into this field's record body (`address record {
+   * ...address_fields }`), as authored.
+   *
+   * Present only while the model is being built: `buildVizModel` resolves
+   * spreads and replaces them with the fields they materialise, so a model
+   * handed to the component has this only for spreads that could not be
+   * resolved. A consumer rendering fields should not need it — it exists so the
+   * expansion pass can see a nested spread at all, which it could not before
+   * sl-5nsv, leaving `address` as a childless record on the card while the CLI
+   * reported its three leaves.
+   */
+  spreads?: string[];
   location: SourceLocation;
 }
 

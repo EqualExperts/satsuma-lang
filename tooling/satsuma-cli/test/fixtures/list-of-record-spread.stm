@@ -1,0 +1,29 @@
+// Fixture for sl-5nsv: fragment spread inside a `list_of record` body.
+//
+// The nested-spread shape that existed nowhere in the repo. It matters because
+// every consumer treats a list_of record as a container like any other record,
+// so a spread inside one must materialise leaves the same way — and a mapping
+// that populates one of them must leave the rest visibly uncovered.
+fragment line_fields {
+  sku STRING(64)
+  qty INT
+  unit_price DECIMAL(12,2)
+}
+
+schema invoice {
+  invoice_no STRING
+  lines list_of record {
+    ...line_fields
+  }
+}
+
+mapping invoice_load {
+  source { raw_invoice }
+  target { invoice }
+
+  raw_no -> invoice_no
+
+  each raw_lines -> lines {
+    .item_code -> .sku
+  }
+}

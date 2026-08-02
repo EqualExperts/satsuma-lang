@@ -6,6 +6,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
   collectFieldPaths,
+  expandDeclaredFields,
   expandEntityFields,
   expandNestedSpreads,
   makeEntityRefResolver,
@@ -138,5 +139,95 @@ describe("expandNestedSpreads()", () => {
     assert.equal(fields[0].children.length, 2);
     assert.equal(fields[0].children[0].name, "city");
     assert.equal(fields[0].hasSpreads, undefined);
+  });
+});
+
+// ── expandDeclaredFields ─────────────────────────────────────────────────────
+//
+// The whole answer to "what fields does this schema declare?", and the reason
+// it exists is that its two halves used to be sequenced by each consumer: the
+// CLI ran both, the viz ran only the schema-level pass, the LSP ran neither,
+// and the three reported different totals for one file (sl-5nsv).
+
+describe("expandDeclaredFields()", () => {
+  const addressFields = fragment("address_fields", [field("street"), field("city")]);
+  const entities = new Map([["address_fields", addressFields]]);
+  const resolveRef = makeEntityRefResolver(entities);
+  const lookup = (key) => entities.get(key) ?? null;
+
+  /** Every dotted leaf path of a field tree, the unit coverage counts in. */
+  const leaves = (fields, prefix = "") =>
+    fields.flatMap((f) =>
+      f.children?.length ? leaves(f.children, `${prefix}${f.name}.`) : [`${prefix}${f.name}`],
+    );
+
+  it("inlines a spread declared inside a record body", () => {
+    // The nested form. Expanding only the schema-level one leaves `address` a
+    // childless record, which every consumer then counts as a single leaf.
+    const schema = {
+      fields: [
+        field("id"),
+        { ...field("address", "record", []), hasSpreads: true, spreads: ["address_fields"] },
+      ],
+      hasSpreads: false,
+      spreads: [],
+    };
+    assert.deepEqual(expandDeclaredFields(schema, null, resolveRef, lookup), [
+      field("id"),
+      {
+        ...field("address", "record", [
+          { ...field("street"), fromFragment: "address_fields" },
+          { ...field("city"), fromFragment: "address_fields" },
+        ]),
+      },
+    ]);
+  });
+
+  it("appends a schema-level spread's fields after the ones written out", () => {
+    // Declaration order is part of the contract: consumers zip the expanded
+    // list against their own field entries by position.
+    const schema = { fields: [field("id")], hasSpreads: true, spreads: ["address_fields"] };
+    assert.deepEqual(leaves(expandDeclaredFields(schema, null, resolveRef, lookup)), [
+      "id",
+      "street",
+      "city",
+    ]);
+  });
+
+  it("expands both forms in one call", () => {
+    const schema = {
+      fields: [
+        { ...field("address", "record", []), hasSpreads: true, spreads: ["address_fields"] },
+      ],
+      hasSpreads: true,
+      spreads: ["address_fields"],
+    };
+    assert.deepEqual(leaves(expandDeclaredFields(schema, null, resolveRef, lookup)), [
+      "address.street",
+      "address.city",
+      "street",
+      "city",
+    ]);
+  });
+
+  it("never mutates the entity it was given", () => {
+    // Nested expansion works in place, and index records are shared with every
+    // other command in the process — expanding for coverage must not leave the
+    // index holding fields the author did not write there.
+    const address = {
+      ...field("address", "record", []),
+      hasSpreads: true,
+      spreads: ["address_fields"],
+    };
+    const schema = { fields: [address], hasSpreads: false, spreads: [] };
+    expandDeclaredFields(schema, null, resolveRef, lookup);
+    assert.deepEqual(address.children, [], "the caller's field tree is untouched");
+    assert.deepEqual(address.spreads, ["address_fields"], "and still records its spread");
+  });
+
+  it("returns nothing for an absent entity rather than throwing", () => {
+    // Resolvers hand back null for a reference they cannot resolve; coverage is
+    // not a validation pass and must carry on reporting the schemas it did find.
+    assert.deepEqual(expandDeclaredFields(null, null, resolveRef, lookup), []);
   });
 });

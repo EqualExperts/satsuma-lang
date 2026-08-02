@@ -21,10 +21,11 @@
  */
 
 import type { Tree } from "./parser-utils";
-import type { FieldInfo, WorkspaceIndex } from "./workspace-index";
+import type { DefinitionEntry, FieldInfo, WorkspaceIndex } from "./workspace-index";
 import { resolveDefinition } from "./workspace-index";
 import {
   computeMappingCoverage as computeCoverage,
+  expandDeclaredFields,
   extractMappings,
   extractNLRefData,
   resolveAllNLRefs,
@@ -33,7 +34,9 @@ import type {
   CoverageField,
   CoverageSchemaDefinition,
   DefinitionLookup,
+  FieldDecl,
   ResolvedNLRef,
+  SpreadEntity,
 } from "@satsuma/core";
 
 // Re-export shared types from core so existing LSP code that imports from
@@ -140,19 +143,73 @@ type DefinitionEntryKind = "schema" | "fragment" | "transform";
  * Only `kind === "schema"` definitions participate: a mapping's source/target
  * blocks may name something the index also knows as another kind, and coverage
  * is defined over declared schema fields.
+ *
+ * Fragment spreads are expanded first. The index records them unresolved — a
+ * spread may name a fragment in a file that was not indexed yet when the schema
+ * was — so this is the first point at which the whole workspace is available to
+ * resolve them against. Skipping it reported `address record { ...address_fields
+ * }` to the gutter as a single childless leaf, while `satsuma coverage` reported
+ * the three leaves the fragment materialises (sl-5nsv).
  */
 function resolveSchema(wsIndex: WorkspaceIndex, schemaId: string): CoverageSchemaDefinition | null {
   const defs = resolveDefinition(wsIndex, schemaId, null);
   const def = defs.find((d) => d.kind === "schema");
   if (!def) return null;
-  return { uri: def.uri, fields: def.fields.map(toCoverageField) };
+  return { uri: def.uri, fields: expandedFields(wsIndex, def).map(toCoverageField) };
 }
 
-/** Project an LSP `FieldInfo` onto core's minimal field shape. */
-function toCoverageField(field: FieldInfo): CoverageField {
+/**
+ * A definition's declared fields with every fragment spread inlined, nested
+ * and block-level alike, applying core's rule so the gutter's field tree is the
+ * one `satsuma coverage` reports on.
+ */
+function expandedFields(wsIndex: WorkspaceIndex, def: DefinitionEntry): FieldDecl[] {
+  const spreadEntity = toSpreadEntity(def);
+  const lookupFragment = (key: string): SpreadEntity | null => {
+    const entry = resolveDefinition(wsIndex, key, null).find(
+      (d) => d.kind === "fragment" || d.kind === "schema",
+    );
+    return entry ? toSpreadEntity(entry) : null;
+  };
+  const resolveRef = (ref: string, currentNs: string | null): string | null => {
+    for (const candidate of currentNs && !ref.includes("::")
+      ? [`${currentNs}::${ref}`, ref]
+      : [ref])
+      if (lookupFragment(candidate)) return candidate;
+    return null;
+  };
+  return expandDeclaredFields(spreadEntity, def.namespace, resolveRef, lookupFragment);
+}
+
+/** Project a `DefinitionEntry` onto core's spread-expansion input shape. */
+function toSpreadEntity(def: DefinitionEntry): SpreadEntity {
+  return {
+    fields: def.fields.map(toFieldDecl),
+    hasSpreads: (def.spreads?.length ?? 0) > 0,
+    spreads: def.spreads ?? [],
+  };
+}
+
+/**
+ * Project an LSP `FieldInfo` onto core's `FieldDecl`, carrying the field's own
+ * unresolved spreads so nested expansion can see them.
+ */
+function toFieldDecl(field: FieldInfo): FieldDecl {
   return {
     name: field.name,
-    line: field.range.start.line,
-    children: field.children.map(toCoverageField),
+    type: field.type ?? "",
+    startRow: field.range.start.line,
+    children: field.children.map(toFieldDecl),
+    hasSpreads: (field.spreads?.length ?? 0) > 0,
+    spreads: field.spreads ?? [],
+  };
+}
+
+/** Project a core `FieldDecl` onto core's minimal coverage field shape. */
+function toCoverageField(field: FieldDecl): CoverageField {
+  return {
+    name: field.name,
+    ...(field.startRow !== undefined ? { line: field.startRow } : {}),
+    children: (field.children ?? []).map(toCoverageField),
   };
 }

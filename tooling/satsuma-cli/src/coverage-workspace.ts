@@ -26,7 +26,7 @@ import type {
   ResolvedNLRef,
 } from "@satsuma/core";
 import { resolveScopedEntityRef } from "./index-builder.js";
-import { expandEntityFields, expandNestedSpreads } from "./spread-expand.js";
+import { expandDeclaredFields } from "./spread-expand.js";
 import { toCoverageFields } from "./field-positions.js";
 import type { ExtractedWorkspace, ParsedFile, SchemaRecord } from "./types.js";
 
@@ -87,23 +87,16 @@ export function makeSchemaResolver(
 }
 
 /**
- * A schema's fields with fragment spreads inlined.
+ * A schema's fields with fragment spreads inlined, nested and schema-level
+ * alike.
  *
- * Copies the field list before expanding: `expandNestedSpreads` mutates in
- * place, and the index's records are shared with every other command in the
- * process.
+ * Both passes and the defensive copy are core's `expandDeclaredFields`, shared
+ * with the LSP and viz adapters: this module ran its own sequence of the two
+ * until sl-5nsv, and the consumers that ran a different sequence reported
+ * different totals for the same schema.
  */
 function expandedFields(schema: SchemaRecord, index: ExtractedWorkspace) {
-  const fields = deepCopyFields(schema.fields);
-  expandNestedSpreads(fields, schema.namespace ?? null, index);
-  return [...fields, ...expandEntityFields(schema, schema.namespace ?? null, index)];
-}
-
-/** Recursive copy so in-place spread expansion cannot touch the shared index. */
-function deepCopyFields<T extends { children?: T[] }>(fields: T[]): T[] {
-  return fields.map((f) =>
-    f.children ? { ...f, children: deepCopyFields(f.children) } : { ...f },
-  );
+  return expandDeclaredFields(schema, schema.namespace ?? null, index);
 }
 
 /**

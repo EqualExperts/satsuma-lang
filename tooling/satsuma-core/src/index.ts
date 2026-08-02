@@ -118,6 +118,7 @@ export {
 export {
   collectFieldPaths,
   expandSpreads,
+  expandDeclaredFields,
   expandEntityFields,
   expandNestedSpreads,
   makeEntityRefResolver,

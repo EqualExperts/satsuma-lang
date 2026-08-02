@@ -868,3 +868,59 @@ describe("satsuma coverage — key spelling", () => {
     assert.equal(parseJson(json.stdout).mappings[0].mapping, "crm::load contacts");
   });
 });
+
+// ── Fragment spreads (sl-5nsv) ──────────────────────────────────────────────
+//
+// A spread is an authoring shorthand: `...address_fields` inside a record body
+// declares that record's fields as surely as writing them out, so coverage must
+// count them. These two fixtures are the cross-consumer parity cases — the LSP
+// suite (satsuma-lsp/test/coverage.test.js) and the viz-backend suite read the
+// same two files and must produce the same leaves, states and totals stated
+// here. If you change a figure in one place, the other two are wrong.
+
+describe("satsuma coverage — fragment spreads", () => {
+  const NESTED_SPREAD = resolve(__dirname, "fixtures/nested-record-spread.stm");
+  const LIST_OF_SPREAD = resolve(__dirname, "fixtures/list-of-record-spread.stm");
+
+  it("counts the leaves a spread materialises inside a record body", async () => {
+    // `address record { ...address_fields }` declares three leaves. Counting the
+    // record as one opaque field instead reports the schema 1/3 covered where it
+    // is 2/5 — and reports a mapped record where two of its leaves are gaps.
+    const { stdout } = await run("coverage", NESTED_SPREAD, "--json");
+    const target = schemaEntry(parseJson(stdout), "::customer_map", "target", "::customer");
+    assert.deepEqual(
+      target.fields.map((f: any) => [f.path, f.mapped]),
+      [
+        ["id", false],
+        ["name", false],
+        ["address.street", true],
+        ["address.city", true],
+        ["address.zip", false],
+      ],
+    );
+    assert.equal(target.covered, 2);
+    assert.equal(target.total, 5);
+    assert.equal(target.pct, 40);
+  });
+
+  it("counts them the same way inside a list_of record body", async () => {
+    // A list_of record is a container like any other, and a spread inside one
+    // must materialise leaves the same way — the shape that existed nowhere in
+    // the repo before this fixture. One of three line fields is mapped, so the
+    // schema is 2/4 with `lines` partly covered.
+    const { stdout } = await run("coverage", LIST_OF_SPREAD, "--json");
+    const target = schemaEntry(parseJson(stdout), "::invoice_load", "target", "::invoice");
+    assert.deepEqual(
+      target.fields.map((f: any) => [f.path, f.mapped]),
+      [
+        ["invoice_no", true],
+        ["lines.sku", true],
+        ["lines.qty", false],
+        ["lines.unit_price", false],
+      ],
+    );
+    assert.equal(target.covered, 2);
+    assert.equal(target.total, 4);
+    assert.equal(target.pct, 50);
+  });
+});

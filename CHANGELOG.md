@@ -71,6 +71,33 @@ leaves as consumed even though `out` is a scalar — a whole record was read.
 Coverage figures on schemas using whole-record arrows will rise; figures that
 were resting on an `each` header or a computed arrow to a record will fall.
 
+### Fragment spreads count towards coverage in every consumer (`sl-5nsv`)
+
+A spread is an authoring shorthand — `...address_fields` inside a record body
+declares that record's fields as surely as writing them out — but the three
+consumers expanded them at three different points, so one file produced three
+answers. For `customer { id, name, address record { ...address_fields } }` with
+two address leaves mapped, `satsuma coverage` reported **2/5 (40%)**, the VS Code
+gutter and status bar reported **1/3** with `address` a single fully covered
+leaf, and the viz card counted `address` as a childless record. The flattering
+number was the wrong one: fields a schema acquires via a spread were in neither
+numerator nor denominator.
+
+All three now materialise fields through core's new `expandDeclaredFields`, which
+owns both passes and their order — nested record-body spreads first, then
+schema-level ones appended — on a copy, so an index shared across commands is
+never mutated. The shared workspace index (LSP and viz) records spreads
+unresolved, since a spread may name a fragment in a file that is not indexed
+yet, and they are expanded once the whole workspace is available. Coverage
+figures on schemas using spreads will move, in both directions.
+
+Two things follow. Records that spread the same fragment stay independent —
+mapping `BillingAddress.Street` leaves `ShippingAddress.Street` uncovered, since
+coverage matches by path and not by name. And the parity itself is now tested:
+one fixture pair is asserted leaf for leaf, state for state, and percentage for
+percentage by the CLI, LSP, viz-backend and viz-component suites, so a future
+divergence fails a test instead of appearing as two numbers on one screen.
+
 ### Viz resolves element-relative arrow paths against their container (`3cdd-yavi`)
 
 Arrows inside `nested_arrow`, `each` and `flatten` bodies are authored relative

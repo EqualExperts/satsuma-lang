@@ -18,7 +18,7 @@ import {
   sourceRefText as coreSourceRefText,
   fieldNameText as coreFieldNameText,
   extractMetadata,
-  expandEntityFields,
+  expandDeclaredFields,
   makeEntityRefResolver,
   extractFieldTree,
   isMetricSchema,
@@ -276,16 +276,25 @@ function resolveAndStripSpreads(namespaces: NamespaceGroup[]): void {
   const resolveRef = makeEntityRefResolver(entityMap);
   const lookupFragment = (key: string) => entityMap.get(key) ?? null;
 
-  // Expand schema spreads using core and append resulting fields. The schema's
-  // own namespace is the resolution context, so a bare `...audit` inside
-  // `namespace crm` finds the fragment keyed `crm::audit` (sl-22ym).
+  // Expand both spread forms using core, which owns the ordering: nested
+  // record-body spreads first, then the schema-level ones appended. The
+  // schema's own namespace is the resolution context, so a bare `...audit`
+  // inside `namespace crm` finds the fragment keyed `crm::audit` (sl-22ym).
+  //
+  // Expanding only the schema-level form left `address record {
+  // ...address_fields }` as a childless record on the card, so the card
+  // counted it as one leaf where `satsuma coverage` counted the three the
+  // fragment materialises (sl-5nsv).
   for (const ns of namespaces) {
     for (const s of ns.schemas) {
-      if (s.spreads.length === 0) continue;
-      const spreadEntity = schemaToSpreadEntity(s);
-      const expanded = expandEntityFields(spreadEntity, ns.name, resolveRef, lookupFragment);
-      const extraFields: FieldEntry[] = expanded.map((ef) => expandedFieldToEntry(ef));
-      s.fields = [...s.fields, ...extraFields];
+      if (s.spreads.length === 0 && !declaresNestedSpread(s.fields)) continue;
+      const expanded = expandDeclaredFields(
+        schemaToSpreadEntity(s),
+        ns.name,
+        resolveRef,
+        lookupFragment,
+      );
+      s.fields = expanded.map((decl, i) => mergeExpandedField(decl, s.fields[i]));
       // Keep spreads that could not be resolved: the schema card renders them
       // as a "… spreads X" indicator, which beats silently losing the reference.
       s.spreads = s.spreads.filter((name) => resolveRef(name, ns.name) === null);
@@ -319,7 +328,45 @@ function fieldEntryToDecl(fe: FieldEntry): FieldDecl {
     name: fe.name,
     type: fe.type,
     children: fe.children.map(fieldEntryToDecl),
+    hasSpreads: (fe.spreads?.length ?? 0) > 0,
+    spreads: fe.spreads ?? [],
   };
+}
+
+/**
+ * True when any field anywhere in the tree declares a spread in its record
+ * body — the cheap test for "does this schema need the nested pass at all?".
+ */
+function declaresNestedSpread(fields: FieldEntry[]): boolean {
+  return fields.some((f) => (f.spreads?.length ?? 0) > 0 || declaresNestedSpread(f.children));
+}
+
+/**
+ * Reunite one expanded field with the viz data core's expansion does not carry.
+ *
+ * Expansion runs over core's `FieldDecl`, which has no constraints, notes,
+ * comments or source location — so a field that was already declared keeps its
+ * original entry and takes only its (possibly newly materialised) children from
+ * the expansion. Fields with no original are ones a spread introduced, and get
+ * the empty display data {@link expandedFieldToEntry} supplies.
+ *
+ * Positional matching is safe because expansion preserves declaration order and
+ * appends: index i of the result is the original field i for as long as
+ * originals last.
+ */
+function mergeExpandedField(decl: FieldDecl, original: FieldEntry | undefined): FieldEntry {
+  if (!original) return expandedFieldToEntry(decl);
+  const merged: FieldEntry = {
+    ...original,
+    children: (decl.children ?? []).map((child, i) =>
+      mergeExpandedField(child, original.children[i]),
+    ),
+  };
+  // A spread that resolved is gone from the decl; one that did not survives and
+  // stays visible on the card rather than being silently dropped.
+  if (decl.spreads && decl.spreads.length > 0) merged.spreads = decl.spreads;
+  else delete merged.spreads;
+  return merged;
 }
 
 /** Convert a core ExpandedField (FieldDecl) back to a viz FieldEntry for display. */
@@ -650,7 +697,7 @@ function fieldDeclToEntry(decl: FieldDecl, uri: string, cstNode: SyntaxNode | nu
     ? nodeLocation(uri, nameNode)
     : { uri, line: decl.startRow ?? 0, character: decl.startColumn ?? 0 };
 
-  return {
+  const entry: FieldEntry = {
     name: decl.name,
     type,
     constraints,
@@ -660,6 +707,10 @@ function fieldDeclToEntry(decl: FieldDecl, uri: string, cstNode: SyntaxNode | nu
     children: fieldChildren,
     location,
   };
+  // Carried only so resolveAndStripSpreads can expand it; a field whose body
+  // declares no spread carries no key at all.
+  if (decl.spreads && decl.spreads.length > 0) entry.spreads = decl.spreads;
+  return entry;
 }
 
 /**

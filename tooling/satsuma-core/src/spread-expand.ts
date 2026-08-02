@@ -251,6 +251,50 @@ export function expandNestedSpreads(
 }
 
 /**
+ * Every field a schema declares once its fragment spreads are inlined —
+ * the complete answer to "what fields does this schema have?".
+ *
+ * Spreads are an authoring shorthand: `...address_fields` inside a record body
+ * declares that record's fields as surely as writing them out. Any consumer
+ * reporting on declared fields — coverage, the editor gutter, the viz card —
+ * must therefore see through them, and must see through *both* forms:
+ *
+ *  - **nested**, inside a record body (`address record { ...address_fields }`),
+ *    which contributes `address.street`;
+ *  - **schema-level**, in the schema body itself, which contributes top-level
+ *    fields appended after the ones written out.
+ *
+ * Doing one and not the other is the failure this function exists to prevent
+ * (sl-5nsv): the CLI expanded both and reported `customer` at 2/5, the LSP
+ * expanded neither and reported the same schema at 1/3 with `address` as a
+ * childless leaf, and the viz expanded only the schema-level form. Three
+ * numbers, one file. Consumers now call this rather than sequencing the two
+ * passes themselves.
+ *
+ * The input is never mutated — `expandNestedSpreads` works in place, and index
+ * records are shared with every other command in the process, so the field tree
+ * is deep-copied first.
+ */
+export function expandDeclaredFields(
+  entity: SpreadEntity | null | undefined,
+  currentNs: string | null,
+  resolveRef: EntityRefResolver,
+  lookupFragment: SpreadEntityLookup,
+): FieldDecl[] {
+  if (!entity) return [];
+  const fields = deepCopyFields(entity.fields);
+  expandNestedSpreads(fields, currentNs, resolveRef, lookupFragment);
+  return [...fields, ...expandEntityFields(entity, currentNs, resolveRef, lookupFragment)];
+}
+
+/** Recursive copy, so in-place nested expansion cannot touch a shared index. */
+function deepCopyFields<T extends { children?: T[] }>(fields: T[]): T[] {
+  return fields.map((f) =>
+    f.children ? { ...f, children: deepCopyFields(f.children) } : { ...f },
+  );
+}
+
+/**
  * Namespace-aware entity reference resolver. This is the standard
  * implementation suitable for use with any `Map<string, unknown>` entity index.
  *
