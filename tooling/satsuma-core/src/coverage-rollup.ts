@@ -46,15 +46,12 @@ export interface MappingCoverageInput {
  * would count the same data twice and let a schema's nesting depth move the
  * percentage on its own. `total` is therefore the number of leaves.
  *
- * Records are excluded rather than treated as covering their subtree, because a
- * record's `mapped` flag cannot distinguish the two cases that matter:
- * `buildCoveredFieldPaths` registers ancestor prefixes, so a record reads as mapped
- * when *any single descendant* is covered just as it does when the whole record
- * is copied by one arrow. Inheriting from it would turn "one of twelve address
- * fields is mapped" into "all twelve are" — a large, silent overstatement.
- * Excluding it instead under-counts the rarer whole-record arrow
- * (`address -> address` leaves its leaves unmapped, see 3cc-iedv), which errs
- * toward reporting a gap that is not there rather than hiding one that is.
+ * Records are excluded rather than counted alongside their children: counting a
+ * record would add a unit of "data" that is really structure, letting a schema's
+ * nesting depth move the percentage without a single extra field being mapped.
+ * The exclusion is now purely that — with the tri-state (PRD 38 R2) a record's
+ * own state is *derived* from these same leaves, so counting it would be
+ * double-counting them, not a hedge against an ambiguous flag as it once was.
  */
 export interface CoverageTotals {
   /**
@@ -247,6 +244,7 @@ export function aggregateCoverage(inputs: MappingCoverageInput[]): AggregateCove
 
   const schemas = [...byRoleAndSchema.values()];
   for (const schema of schemas) {
+    recomputeContainerStates(schema.fields);
     schema.totals = summarizeFieldCoverage(schema.fields);
   }
 
@@ -267,6 +265,10 @@ export function aggregateCoverage(inputs: MappingCoverageInput[]): AggregateCove
  * seen is appended, which only happens if two mappings resolved the same schema
  * id to different definitions; keeping it is safer than dropping a declared
  * field from the report.
+ *
+ * Containers are OR-ed here too, but that answer is provisional: their real
+ * aggregate state can only be read off the unioned *leaves*, which is why
+ * {@link recomputeContainerStates} runs once afterwards.
  */
 function unionInto(accumulated: FieldCoverageEntry[], incoming: FieldCoverageEntry[]): void {
   const byPath = new Map(accumulated.map((f) => [f.path, f]));
@@ -286,6 +288,51 @@ function unionInto(accumulated: FieldCoverageEntry[], incoming: FieldCoverageEnt
     const tier = strongerTier(existing.tier, field.tier);
     if (tier !== undefined) existing.tier = tier;
     else delete existing.tier;
+  }
+}
+
+/**
+ * Recompute every container's tri-state from the unioned leaves beneath it.
+ *
+ * A container's state cannot be unioned the way a leaf's can. Two mappings that
+ * each cover half of `address` both report it `partial`; the aggregate must
+ * report `covered`, because between them every leaf is written. Taking the
+ * strongest per-mapping state would say `partial`, understating the aggregate;
+ * OR-ing `mapped` alone would lose the distinction entirely. So the union
+ * happens on leaves, where it is well defined, and containers are derived from
+ * the result — the same rule `coverageForField` applies per mapping, restated
+ * over a flat list because that is the shape the aggregate holds.
+ *
+ * Mutates `fields` in place. Leaf entries are left exactly as unioned.
+ */
+function recomputeContainerStates(fields: FieldCoverageEntry[]): void {
+  const leaves = new Set(leafFieldEntries(fields).map((f) => f.path));
+
+  // Tally each leaf against every container it sits beneath, so one pass over
+  // the leaves settles every ancestor at every depth.
+  const tallies = new Map<string, { total: number; covered: number; tier?: CoverageTier }>();
+  for (const field of fields) {
+    if (!leaves.has(field.path)) continue;
+    for (let dot = field.path.indexOf("."); dot !== -1; dot = field.path.indexOf(".", dot + 1)) {
+      const container = field.path.slice(0, dot);
+      const tally = tallies.get(container) ?? { total: 0, covered: 0 };
+      tally.total += 1;
+      if (field.mapped) {
+        tally.covered += 1;
+        tally.tier = strongerTier(tally.tier, field.tier);
+      }
+      tallies.set(container, tally);
+    }
+  }
+
+  for (const field of fields) {
+    const tally = tallies.get(field.path);
+    if (!tally) continue; // a leaf, or a record with no declared children
+    field.state =
+      tally.covered === tally.total ? "covered" : tally.covered === 0 ? "uncovered" : "partial";
+    field.mapped = field.state !== "uncovered";
+    if (tally.tier !== undefined) field.tier = tally.tier;
+    else delete field.tier;
   }
 }
 

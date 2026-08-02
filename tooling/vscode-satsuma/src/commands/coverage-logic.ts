@@ -24,13 +24,16 @@ export interface CoverageSchema {
   /**
    * Every declared field with its location and whether the mapping touches it.
    * `tier` is present exactly when `mapped` is true and says which tier covered
-   * it — a declared arrow, or a resolved NL `@ref` (ADR-036).
+   * it — a declared arrow, or a resolved NL `@ref` (ADR-036). `state` refines
+   * `mapped` for records: a record with some but not all leaves covered is
+   * `partial`, and `mapped` is defined as `state !== "uncovered"` (PRD 38 R2).
    */
   fields: Array<{
     path: string;
     uri: string;
     line: number;
     mapped: boolean;
+    state: "covered" | "partial" | "uncovered";
     tier?: "declared" | "nl";
   }>;
 }
@@ -53,6 +56,11 @@ export interface FileCoverageMarkers {
  * Group coverage fields by the file they live in, with role-appropriate
  * hover labels (source fields are "used / not used as source"; target
  * fields are "mapped / unmapped"). Keys are the URIs reported by the LSP.
+ *
+ * Buckets on `mapped`, not on `state`, so a partly covered record still gets the
+ * mapped icon — the gutter's behaviour before the tri-state existed, kept
+ * deliberately (PRD 38 R2). Rendering `partial` as its own icon is a UX change
+ * for feature 36 to make, not a side effect of the model gaining the signal.
  */
 export function groupCoverageByUri(schemas: CoverageSchema[]): Map<string, FileCoverageMarkers> {
   const byUri = new Map<string, FileCoverageMarkers>();

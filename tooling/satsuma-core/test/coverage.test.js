@@ -119,6 +119,25 @@ function assertMapped(schema, path, expected) {
   assert.equal(matches[0].mapped, expected, `"${path}" should be mapped=${expected}`);
 }
 
+/**
+ * Assert `path` reports the expected tri-state, and that `mapped` agrees with it.
+ *
+ * The `mapped === (state !== "uncovered")` check rides along on every state
+ * assertion deliberately: that equivalence is the contract keeping the VS Code
+ * gutter byte-identical across the tri-state change (sl-0pun), and a single
+ * place that broke it would otherwise go unnoticed.
+ */
+function assertState(schema, path, expected) {
+  const match = schema.fields.find((f) => f.path === path);
+  assert.ok(match, `expected a "${path}" entry in ${schema.fields.map((f) => f.path)}`);
+  assert.equal(match.state, expected, `"${path}" should be ${expected}`);
+  assert.equal(
+    match.mapped,
+    expected !== "uncovered",
+    `"${path}" is ${expected}, so mapped should be ${expected !== "uncovered"}`,
+  );
+}
+
 /** Assert `path` is covered and reported under `tier` ("declared" | "nl"). */
 function assertTier(schema, path, tier) {
   const match = schema.fields.find((f) => f.path === path);
@@ -300,14 +319,14 @@ mapping load {
     assertMapped(src, "address.line2", false);
   });
 
-  it("a whole-record arrow does not (yet) cover the record's leaves — sl-r6b0's boundary", () => {
-    // Pins the deliberate limit of the sl-fmx0 model change: `address -> address`
-    // marks the record itself covered, but its leaves stay unmapped until
-    // sl-r6b0 makes the direct set kind-aware and turns subtree inheritance on
-    // (PRD 38 R5, 3cc-iedv). When that lands, this test flips to expect true —
-    // if it starts failing WITHOUT that work, coverage has begun inheriting
-    // through kind-blind direct paths, which manufactures coverage from every
-    // `each` header.
+  it("a whole-record arrow does not (yet) cover the record or its leaves — sl-r6b0's boundary", () => {
+    // Pins the deliberate limit that sl-r6b0 closes: `address -> address` writes
+    // no leaf path, and since sl-0pun a container is judged only on its leaves,
+    // so the whole record reads uncovered. sl-r6b0 makes the direct set
+    // kind-aware and expands such an arrow into its subtree, at which point this
+    // test flips to `covered` throughout. If it starts failing WITHOUT that work,
+    // coverage has begun inheriting through kind-blind direct paths, which
+    // manufactures coverage from every `each` header (PRD 38 R5, 3cc-iedv).
     const WHOLE_RECORD = `
 schema src { address record { line1 STRING line2 STRING } }
 schema tgt { address record { line1 STRING line2 STRING } }
@@ -317,9 +336,134 @@ mapping copy {
   address -> address
 }`;
     const tgt = forRole(coverage(WHOLE_RECORD, "copy"), "target");
-    assertMapped(tgt, "address", true);
+    assertState(tgt, "address", "uncovered");
     assertMapped(tgt, "address.line1", false);
     assertMapped(tgt, "address.line2", false);
+  });
+});
+
+// ── Container tri-state (PRD 38 R2, sl-0pun) ────────────────────────────────
+
+describe("computeMappingCoverage — container tri-state", () => {
+  /** Three sibling leaves under one record, with `mapped` naming which are covered. */
+  const threeLeafRecord = (arrows) => `
+schema src { a INT b INT c INT }
+schema tgt { addr record { line1 STRING line2 STRING city STRING } }
+mapping load {
+  source { src }
+  target { tgt }
+${arrows}
+}`;
+
+  it("reports a record with some but not all leaves covered as partial", () => {
+    // The signal feature 36 R2 needs and no boolean could carry: one of three
+    // leaves mapped is neither "done" nor "untouched".
+    const tgt = forRole(coverage(threeLeafRecord("  a -> addr.line1"), "load"), "target");
+    assertState(tgt, "addr", "partial");
+    assertState(tgt, "addr.line1", "covered");
+    assertState(tgt, "addr.line2", "uncovered");
+  });
+
+  it("reports a record as covered only when every leaf is covered", () => {
+    const arrows = "  a -> addr.line1\n  b -> addr.line2\n  c -> addr.city";
+    const tgt = forRole(coverage(threeLeafRecord(arrows), "load"), "target");
+    assertState(tgt, "addr", "covered");
+  });
+
+  it("reports a record with no covered leaf as uncovered", () => {
+    const tgt = forRole(coverage(threeLeafRecord("  a -> a"), "load"), "target");
+    assertState(tgt, "addr", "uncovered");
+    assertState(tgt, "addr.line1", "uncovered");
+  });
+
+  it("never reports a leaf as partial", () => {
+    // Leaves are binary by definition — there is nothing beneath them to be
+    // partly done. A consumer branching on `state` must be able to rely on that
+    // rather than defensively handling a third case at every leaf.
+    const src = forRole(coverage(threeLeafRecord("  a -> addr.line1"), "load"), "source");
+    const tgt = forRole(coverage(threeLeafRecord("  a -> addr.line1"), "load"), "target");
+    const leafPaths = ["a", "b", "c"];
+    for (const entry of [...src.fields, ...tgt.fields]) {
+      if (!leafPaths.includes(entry.path) && !entry.path.includes(".")) continue;
+      assert.notEqual(entry.state, "partial", `leaf "${entry.path}" must not be partial`);
+    }
+  });
+
+  it("propagates partial upward through every enclosing record, but not covered", () => {
+    // PRD 38 R2 case 15. With only `a.b.x` mapped, `a.b` is partial (y is not)
+    // and so is `a` — a grandparent must not read as done because one
+    // grandchild is. Covered stops where it stops.
+    const NESTED = `
+schema src { v INT }
+schema tgt { a record { b record { x STRING y STRING } } }
+mapping load {
+  source { src }
+  target { tgt }
+  v -> a.b.x
+}`;
+    const tgt = forRole(coverage(NESTED, "load"), "target");
+    assertState(tgt, "a", "partial");
+    assertState(tgt, "a.b", "partial");
+    assertState(tgt, "a.b.x", "covered");
+    assertState(tgt, "a.b.y", "uncovered");
+  });
+
+  it("leaves a container uncovered when an each block references it with an empty body", () => {
+    // PRD 38 R2 case 16, and the invariant the whole tri-state rests on: a
+    // container *reference* must not manufacture leaf coverage. `each parcels ->
+    // .packed { }` says an iteration exists, not that anything inside it maps —
+    // and before sl-0pun `packed` read as mapped on exactly that evidence.
+    const EMPTY_EACH = `
+schema src { parcels list_of record { sku STRING } }
+schema tgt { packed list_of record { sku STRING units INT } }
+mapping load {
+  source { src }
+  target { tgt }
+  each parcels -> packed {
+  }
+}`;
+    const tgt = forRole(coverage(EMPTY_EACH, "load"), "target");
+    assertState(tgt, "packed", "uncovered");
+    assertState(tgt, "packed.sku", "uncovered");
+  });
+
+  it("leaves a container uncovered when only a computed arrow targets it", () => {
+    // PRD 38 R2 case 17, from `examples/edi-to-json`: a computed arrow whose body
+    // is prose describing a known data gap (`//! DATA GAP: containers required
+    // but no source data`). Nothing populates the leaves, and the author says so,
+    // so coverage must keep reporting the gap rather than close it on the
+    // strength of a target path being named.
+    const COMPUTED_INTO_RECORD = `
+schema src { v INT }
+schema tgt { containers list_of record { id STRING seal STRING } }
+mapping load {
+  source { src }
+  target { tgt }
+  -> containers {
+    "Required by the target schema but no source data is available."
+  }
+}`;
+    const tgt = forRole(coverage(COMPUTED_INTO_RECORD, "load"), "target");
+    assertState(tgt, "containers", "uncovered");
+    assertState(tgt, "containers.id", "uncovered");
+  });
+
+  it("reports the strongest tier among a container's covered leaves", () => {
+    // A record holding one arrow-written leaf and one only named in prose is a
+    // `declared` claim, not an inferred one (ADR-036). Reporting `nl` because it
+    // happened to be seen last would understate what the mapping declares.
+    const MIXED_TIERS = `
+schema src { addr record { line1 STRING city STRING } }
+schema tgt { out STRING }
+mapping load {
+  source { src }
+  target { tgt }
+  addr.line1 -> out { "Append @src.addr.city to it." }
+}`;
+    const src = forRole(coverage(MIXED_TIERS, "load"), "source");
+    assertTier(src, "addr.line1", "declared");
+    assertTier(src, "addr.city", "nl");
+    assertTier(src, "addr", "declared");
   });
 });
 

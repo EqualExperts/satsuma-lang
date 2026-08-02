@@ -20,21 +20,48 @@ function sampleSchemas() {
       schemaId: "customers",
       role: "source",
       fields: [
-        { path: "id", uri: "file:///ws/src.stm", line: 2, mapped: true },
-        { path: "internal_note", uri: "file:///ws/src.stm", line: 3, mapped: false },
+        { path: "id", uri: "file:///ws/src.stm", line: 2, mapped: true, state: "covered" },
+        {
+          path: "internal_note",
+          uri: "file:///ws/src.stm",
+          line: 3,
+          mapped: false,
+          state: "uncovered",
+        },
       ],
     },
     {
       schemaId: "dim_customer",
       role: "target",
       fields: [
-        { path: "customer_id", uri: "file:///ws/tgt.stm", line: 5, mapped: true, tier: "declared" },
-        { path: "segment", uri: "file:///ws/tgt.stm", line: 6, mapped: false },
+        {
+          path: "customer_id",
+          uri: "file:///ws/tgt.stm",
+          line: 5,
+          mapped: true,
+          state: "covered",
+          tier: "declared",
+        },
+        { path: "segment", uri: "file:///ws/tgt.stm", line: 6, mapped: false, state: "uncovered" },
         // `address` is a record — structure, not data — so ADR-034 counts its
         // leaf and not the record itself. Three leaf-bearing entries here yield
         // a denominator of 3: customer_id, segment, address.city.
-        { path: "address", uri: "file:///ws/tgt.stm", line: 7, mapped: true, tier: "nl" },
-        { path: "address.city", uri: "file:///ws/tgt.stm", line: 8, mapped: true, tier: "nl" },
+        {
+          path: "address",
+          uri: "file:///ws/tgt.stm",
+          line: 7,
+          mapped: true,
+          state: "covered",
+          tier: "nl",
+        },
+        {
+          path: "address.city",
+          uri: "file:///ws/tgt.stm",
+          line: 8,
+          mapped: true,
+          state: "covered",
+          tier: "nl",
+        },
       ],
     },
   ];
@@ -89,7 +116,16 @@ describe("computeTargetCoverageStats", () => {
       {
         schemaId: "t",
         role: "target",
-        fields: [{ path: "a", uri: "file:///t.stm", line: 1, mapped: true, tier: "declared" }],
+        fields: [
+          {
+            path: "a",
+            uri: "file:///t.stm",
+            line: 1,
+            mapped: true,
+            state: "covered",
+            tier: "declared",
+          },
+        ],
       },
     ];
     assert.deepEqual(computeTargetCoverageStats(declaredOnly), {

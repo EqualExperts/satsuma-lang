@@ -7,10 +7,14 @@
  * covered/uncovered status for every field of every participating schema.
  *
  * "Covered" means:
- *   - source field: its qualified path from the schema root — or a path that
+ *   - source *leaf*: its qualified path from the schema root — or a path that
  *     starts with it — appears as a src_path in at least one arrow anywhere in
  *     the mapping, **or** is named by a resolved NL `@ref` in that mapping.
- *   - target field: the same, as a tgt_path.
+ *   - target *leaf*: the same, as a tgt_path.
+ *   - *container* (a record or list-of-record field): computed from its
+ *     descendant leaves and nothing else — see {@link FieldCoverageState}. A
+ *     container never vouches for leaves nothing wrote, and never reads as
+ *     uncovered while something beneath it is covered.
  *
  * The two are reported as distinct tiers over one denominator (ADR-036): a
  * resolved `@ref` carries the same lineage weight as a declared source field
@@ -130,6 +134,24 @@ export type CoverageSchemaResolver = (schemaId: string) => CoverageSchemaDefinit
 export type CoverageTier = "declared" | "nl";
 
 /**
+ * How much of a field is covered (PRD 38 R2).
+ *
+ * `covered` — every descendant leaf is covered. For a leaf, the field itself is.
+ * `partial` — at least one descendant leaf is covered, but not all. **Containers
+ *   only**: a leaf has nothing beneath it to be partly done, so it never reports
+ *   this.
+ * `uncovered` — no descendant leaf is covered.
+ *
+ * This replaces the two contradictory booleans that were in use: the LSP gutter
+ * treated a record as mapped when *any* descendant was covered, while the CLI's
+ * review queue excluded a record only when *all* of them were. Both are right for
+ * their consumer and one boolean cannot carry both claims, so the tri-state
+ * carries both and each consumer picks its threshold — the gutter paints on
+ * `covered || partial`, the review queue lists anything not `covered`.
+ */
+export type FieldCoverageState = "covered" | "partial" | "uncovered";
+
+/**
  * Coverage status for a single field (leaf or record) in a schema.
  */
 export interface FieldCoverageEntry {
@@ -144,11 +166,26 @@ export interface FieldCoverageEntry {
    * rather than assume 0.
    */
   line?: number;
-  /** True when an arrow or a resolved `@ref` in the mapping covers this field. */
+  /**
+   * True when an arrow or a resolved `@ref` in the mapping covers this field —
+   * defined as `state !== "uncovered"`, so a partly covered record is `true`.
+   *
+   * Kept as its own field because it is the older, wider contract (the VS Code
+   * gutter and the CLI review queue both read it), and it stays byte-identical
+   * to what they have always received. New consumers that need to tell a partly
+   * covered record from a fully covered one must read {@link state}.
+   */
   mapped: boolean;
   /**
+   * How much of this field is covered. For a leaf, `covered` or `uncovered`
+   * only — never `partial`.
+   */
+  state: FieldCoverageState;
+  /**
    * Which tier covered it. Absent exactly when `mapped` is false — the two
-   * always agree, so a consumer may branch on either.
+   * always agree, so a consumer may branch on either. A container reports the
+   * strongest tier among its covered descendants, since that is the strongest
+   * claim anything beneath it makes.
    */
   tier?: CoverageTier;
 }
@@ -344,19 +381,8 @@ interface TieredCoveredPaths {
 /**
  * Recursively build the FieldCoverageEntry list for a schema's fields.
  * `prefix` is the path from the schema root to the current level; record
- * fields emit an entry of their own *and* entries for every descendant.
- *
- * A field in both models is reported as `declared`: declared coverage is the
- * stronger claim, and reporting the weaker one would let a field that an arrow
- * genuinely writes read as merely inferred from prose (ADR-036).
- *
- * Probes ask {@link isCoveredPath} — direct or ancestor-of-direct, the same
- * boolean the flat set always answered. The model's stronger query (a leaf
- * inheriting from a *directly* covered record, `hasDirectlyCoveredAncestor`)
- * is deliberately not consulted yet: the direct set still records each/flatten
- * iteration subjects as direct paths, and inheriting through those would
- * manufacture coverage from every `each` header. sl-r6b0 makes the direct set
- * kind-aware and turns the query on (PRD 38 R5, 3cc-iedv).
+ * fields emit an entry of their own *and* entries for every descendant, the
+ * record's own entry first, all in declaration order.
  */
 function buildFieldCoverage(
   fields: CoverageField[],
@@ -364,25 +390,106 @@ function buildFieldCoverage(
   prefix: string,
   covered: TieredCoveredPaths,
 ): FieldCoverageEntry[] {
-  const result: FieldCoverageEntry[] = [];
-  for (const f of fields) {
-    const path = prefix ? `${prefix}.${f.name}` : f.name;
-    const tier: CoverageTier | undefined = isCoveredPath(path, covered.declared)
-      ? "declared"
-      : isCoveredPath(path, covered.nl)
-        ? "nl"
-        : undefined;
-    const entry: FieldCoverageEntry = { path, uri, mapped: tier !== undefined };
-    if (tier !== undefined) entry.tier = tier;
-    // Omit `line` entirely when unknown rather than defaulting to 0 — see the
-    // CoverageField.line contract.
-    if (f.line !== undefined) entry.line = f.line;
-    result.push(entry);
-    if (f.children && f.children.length > 0) {
-      result.push(...buildFieldCoverage(f.children, uri, path, covered));
-    }
-  }
-  return result;
+  return fields.flatMap((f) => coverageForField(f, uri, prefix, covered).entries);
+}
+
+/**
+ * One field's coverage entry, the entries of everything beneath it, and the two
+ * roll-up values its parent needs to compute its own state.
+ *
+ * The state and tier are returned alongside the flat entry list rather than
+ * re-read from it, so the recursion never has to work out which of the returned
+ * entries were *direct* children — a distinction the flat list has lost.
+ */
+interface FieldCoverageSubtree {
+  /** This field's entry, followed by every descendant entry in declaration order. */
+  entries: FieldCoverageEntry[];
+  /** This field's coverage state. */
+  state: FieldCoverageState;
+  /** This field's tier, absent exactly when the state is `uncovered`. */
+  tier?: CoverageTier;
+}
+
+/**
+ * Coverage for one declared field and its subtree.
+ *
+ * A **leaf** is judged on its own path, by {@link isCoveredPath} — direct, or
+ * the ancestor of a direct path deeper than the schema declares. A field in
+ * both tiers is reported as `declared`: that is the stronger claim, and
+ * reporting the weaker one would let a field an arrow genuinely writes read as
+ * merely inferred from prose (ADR-036).
+ *
+ * A **container** is judged *only* on its descendant leaves — never on its own
+ * path. That is what makes the tri-state trustworthy in both directions: a
+ * container reference cannot manufacture leaf coverage (an `each parcels ->
+ * .packed { }` with an empty body leaves `packed` uncovered, PRD 38 R2), and
+ * `partial` propagates upward while `covered` does not (with only `a.b.x`
+ * mapped, `a.b` and `a` are both partial).
+ *
+ * The corollary is that a whole-record arrow (`addr -> address`) currently
+ * leaves its record `uncovered`: it writes no leaf path, and a container no
+ * longer vouches for itself. sl-r6b0 closes that by expanding such an arrow into
+ * its subtree's leaves *before* this walk begins, which is the only way a
+ * container can become covered without vouching for leaves nothing wrote.
+ */
+function coverageForField(
+  f: CoverageField,
+  uri: string,
+  prefix: string,
+  covered: TieredCoveredPaths,
+): FieldCoverageSubtree {
+  const path = prefix ? `${prefix}.${f.name}` : f.name;
+  const children = f.children ?? [];
+
+  // A record with no declared children carries data of its own as far as
+  // coverage is concerned, so it is judged as a leaf — the same rule
+  // `leafFieldEntries` applies when counting.
+  const subtrees =
+    children.length > 0 ? children.map((c) => coverageForField(c, uri, path, covered)) : null;
+
+  const { state, tier } = subtrees ? rollUpContainer(subtrees) : leafState(path, covered);
+
+  const entry: FieldCoverageEntry = { path, uri, mapped: state !== "uncovered", state };
+  if (tier !== undefined) entry.tier = tier;
+  // Omit `line` entirely when unknown rather than defaulting to 0 — see the
+  // CoverageField.line contract.
+  if (f.line !== undefined) entry.line = f.line;
+
+  const entries = [entry, ...(subtrees ?? []).flatMap((s) => s.entries)];
+  return tier !== undefined ? { entries, state, tier } : { entries, state };
+}
+
+/** Coverage of a leaf: binary, decided by its own path in the two tiers. */
+function leafState(
+  path: string,
+  covered: TieredCoveredPaths,
+): { state: FieldCoverageState; tier?: CoverageTier } {
+  if (isCoveredPath(path, covered.declared)) return { state: "covered", tier: "declared" };
+  if (isCoveredPath(path, covered.nl)) return { state: "covered", tier: "nl" };
+  return { state: "uncovered" };
+}
+
+/**
+ * Coverage of a container, rolled up from its direct children.
+ *
+ * Rolling up from direct children rather than from all descendant leaves is
+ * equivalent — each child already summarises its own leaves — and keeps the
+ * recursion single-pass.
+ */
+function rollUpContainer(subtrees: FieldCoverageSubtree[]): {
+  state: FieldCoverageState;
+  tier?: CoverageTier;
+} {
+  const state: FieldCoverageState = subtrees.every((s) => s.state === "covered")
+    ? "covered"
+    : subtrees.every((s) => s.state === "uncovered")
+      ? "uncovered"
+      : "partial";
+  if (state === "uncovered") return { state };
+  // Declared beats NL, so a record holding one arrow-written leaf among prose-
+  // referenced ones reports the stronger claim its subtree supports (ADR-036).
+  const tier: CoverageTier = subtrees.some((s) => s.tier === "declared") ? "declared" : "nl";
+  return { state, tier };
 }
 
 // ── CST helpers ─────────────────────────────────────────────────────────────

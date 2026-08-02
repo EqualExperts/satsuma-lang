@@ -113,15 +113,15 @@ describe("summarizeFieldCoverage()", () => {
     assert.deepEqual(totals, expectTotals(2, 3, 67));
   });
 
-  it("does not let a covered record vouch for its uncovered leaves", () => {
-    // A record's mapped flag is true whenever ANY descendant is covered, since
-    // buildCoveredFieldPaths registers ancestor prefixes. Inheriting from it would
-    // turn "one of two address fields is mapped" into "both are" — the
-    // overstatement 3cc-iedv records the trade-off for.
+  it("does not let a partly covered record vouch for its uncovered leaves", () => {
+    // A record marked mapped/partial because one child is covered must not lift
+    // its unmapped sibling into the count — that would turn "one of two address
+    // fields is mapped" into "both are", the overstatement 3cc-iedv records.
+    // Counting leaves only makes that impossible by construction.
     const totals = summarizeFieldCoverage([
-      { path: "address", uri: "u", mapped: true },
-      { path: "address.line1", uri: "u", mapped: true },
-      { path: "address.line2", uri: "u", mapped: false },
+      { path: "address", uri: "u", mapped: true, state: "partial" },
+      { path: "address.line1", uri: "u", mapped: true, state: "covered" },
+      { path: "address.line2", uri: "u", mapped: false, state: "uncovered" },
     ]);
     assert.deepEqual(totals, expectTotals(1, 2, 50));
   });
@@ -205,6 +205,55 @@ mapping load_memos {
     // workspace percentage for no reason.
     const { aggregate: result } = aggregate(SRC);
     assert.deepEqual(entry(result, "target", "tgt").totals, expectTotals(2, 3, 67));
+  });
+
+  it("reports a record as covered when two mappings between them write every leaf", () => {
+    // A container's state cannot be unioned the way a leaf's can: both mappings
+    // report `addr` as `partial`, and taking the strongest of those would leave
+    // the aggregate saying `partial` about a record the workspace fully
+    // populates. The union has to happen on leaves, with containers derived
+    // afterwards (sl-0pun).
+    const SPLIT_RECORD = `
+schema a { v INT }
+schema b { w INT }
+schema tgt { addr record { line1 STRING city STRING } }
+mapping load_line1 {
+  source { a }
+  target { tgt }
+  v -> addr.line1
+}
+mapping load_city {
+  source { b }
+  target { tgt }
+  w -> addr.city
+}`;
+    const { inputs, aggregate: result } = aggregate(SPLIT_RECORD);
+    for (const input of inputs) {
+      const addr = input.result.schemas
+        .find((s) => s.role === "target")
+        .fields.find((f) => f.path === "addr");
+      assert.equal(addr.state, "partial", `${input.mappingId} alone covers half of addr`);
+    }
+    const aggregated = entry(result, "target", "tgt").fields.find((f) => f.path === "addr");
+    assert.equal(aggregated.state, "covered");
+    assert.equal(aggregated.mapped, true);
+  });
+
+  it("reports a record as partial when the union still leaves a leaf unwritten", () => {
+    // The complement of the case above, and the one that would hide a real gap:
+    // a container must not round up to `covered` merely because more than one
+    // mapping contributed to it.
+    const PARTIAL_UNION = `
+schema a { v INT }
+schema tgt { addr record { line1 STRING city STRING } }
+mapping load_line1 {
+  source { a }
+  target { tgt }
+  v -> addr.line1
+}`;
+    const { aggregate: result } = aggregate(PARTIAL_UNION);
+    const addr = entry(result, "target", "tgt").fields.find((f) => f.path === "addr");
+    assert.equal(addr.state, "partial");
   });
 });
 
