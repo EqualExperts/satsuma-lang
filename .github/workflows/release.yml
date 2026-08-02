@@ -17,6 +17,12 @@ jobs:
   security:
     name: Security gate
     uses: ./.github/workflows/security.yml
+    with:
+      # Gate only. The push-triggered run of Security already publishes this
+      # commit's SARIF; uploading again from here would register a second code
+      # scanning configuration that exists on main but never on a PR, which
+      # makes the "Semgrep OSS" PR check skip instead of gate (sl-1wtv).
+      skip_sarif_upload: true
     permissions:
       contents: read
       security-events: write
