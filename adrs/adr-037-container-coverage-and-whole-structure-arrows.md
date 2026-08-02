@@ -1,6 +1,6 @@
 # ADR-037 — Container Coverage Is Derived From Leaves, and a Whole-Structure Arrow Covers Its Subtree
 
-**Status:** Accepted
+**Status:** Accepted — amended by ADR-038
 **Date:** 2026-08-02 (sl-0pun, sl-r6b0; feature 38, closes 3cc-iedv)
 
 ## Context

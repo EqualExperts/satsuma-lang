@@ -7,7 +7,13 @@
  * whose `apply` function rewrites source text deterministically.
  */
 
-import { capitalize, stripNLRefScopePrefix } from "@satsuma/core";
+import {
+  capitalize,
+  declaredFieldKind,
+  schemaLocalFieldPath,
+  stripNLRefScopePrefix,
+} from "@satsuma/core";
+import type { ArrowDeclarationKind } from "@satsuma/core";
 import {
   extractAtRefs,
   computeNLRefPosition,
@@ -35,6 +41,11 @@ export const RULES: LintRule[] = [
     id: "duplicate-definition",
     description: "Named definition is declared more than once in a namespace",
     check: checkDuplicateDefinition,
+  },
+  {
+    id: "unenumerated-record-target",
+    description: "Arrow targets a record without a record source or child arrows",
+    check: checkUnenumeratedRecordTarget,
   },
 ];
 
@@ -484,6 +495,110 @@ function checkDuplicateDefinition(index: ExtractedWorkspace): LintDiagnostic[] {
   }
 
   return diagnostics;
+}
+
+// ── unenumerated-record-target ─────────────────────────────────────────────
+
+/**
+ * Report an arrow that names a record as its target but neither carries a record
+ * nor says which of the record's fields it fills.
+ *
+ * `full_name -> address`, where `address` is a twelve-leaf record, is legal
+ * Satsuma and may well be what the author meant — but it is the one shape that
+ * leaves a reader unable to tell *which* of the twelve the arrow populates. The
+ * two shapes that do answer that are `addr -> address` (a record arrives, so the
+ * structure corresponds) and `full_name -> address { .line1 -> ... }` (the body
+ * lists what maps).
+ *
+ * **Why this rule exists at all.** Coverage refuses to credit the record's leaves
+ * for this arrow (ADR-038), which is the safe reading but a silent one: the
+ * author sees a coverage gap on twelve fields with no indication that one arrow
+ * is nearly responsible for them. This rule is the explanation for that gap.
+ * Coverage reports the number; `lint` says what to change — the split
+ * SATSUMA-CLI.md already draws when it puts policy judgements about gaps here.
+ *
+ * Not fixable: closing it means either enumerating the children or changing the
+ * source, and only the author knows which was intended.
+ */
+function checkUnenumeratedRecordTarget(index: ExtractedWorkspace): LintDiagnostic[] {
+  const diagnostics: LintDiagnostic[] = [];
+
+  for (const arrow of index.arrows) {
+    // Only declarations that would otherwise assert a whole-structure
+    // correspondence are candidates — the same first condition coverage applies
+    // (ADR-037). An `each`/`flatten` header opens an iteration and a body that
+    // lists child arrows has already said what maps, so neither is under-specified.
+    if (!WHOLE_STRUCTURE_KINDS.has(arrow.kind) || arrow.enumeratesChildren) continue;
+    if (!arrow.target || arrow.sources.length === 0) continue;
+
+    const mapping = index.mappings.get(qualifiedMappingKey(arrow));
+    if (!mapping) continue;
+
+    // A record target is the precondition; a record source is the excuse.
+    if (endpointKind(arrow.target, mapping.targets, index) !== "container") continue;
+    if (arrow.sources.some((s) => endpointKind(s, mapping.sources, index) === "container"))
+      continue;
+
+    const sources = arrow.sources.join(", ");
+    diagnostics.push({
+      file: arrow.file,
+      line: arrow.line + 1,
+      column: 1,
+      severity: "warning",
+      rule: "unenumerated-record-target",
+      message:
+        `Arrow '${sources} -> ${arrow.target}' targets a record, but ${arrow.sources.length > 1 ? "no source is" : "its source is not"} ` +
+        `a record and the body lists no child arrows — so which fields of '${arrow.target}' it populates is unstated, ` +
+        `and coverage counts them as gaps. Enumerate them (${arrow.target} { ... }) or map from a record.`,
+      fixable: false,
+    });
+  }
+
+  return diagnostics;
+}
+
+/**
+ * The declaration kinds that state a correspondence over a whole structure —
+ * kept in step with `WHOLE_STRUCTURE_KINDS` in core's coverage.ts, which gates
+ * the coverage behaviour this rule explains.
+ */
+const WHOLE_STRUCTURE_KINDS = new Set<ArrowDeclarationKind>(["map", "nested"]);
+
+/** Index key for the mapping an arrow belongs to (`ns::name`, or the bare name). */
+function qualifiedMappingKey(arrow: { mapping: string | null; namespace: string | null }): string {
+  return arrow.namespace ? `${arrow.namespace}::${arrow.mapping}` : (arrow.mapping ?? "");
+}
+
+/**
+ * What an authored arrow path names across the schemas on one side of its
+ * mapping: a container, a leaf, or null when nothing declares it.
+ *
+ * Delegates the two hard parts to core — stripping a schema prefix
+ * (`schemaLocalFieldPath`) and walking the field tree (`declaredFieldKind`) — so
+ * this rule and coverage cannot disagree about what a path names. A schema with
+ * unresolved spreads is skipped: its field list is incomplete, and reporting an
+ * arrow as under-specified because a spread has not been expanded would be a
+ * false positive.
+ */
+function endpointKind(
+  path: string,
+  schemaRefs: readonly string[],
+  index: ExtractedWorkspace,
+): "container" | "leaf" | null {
+  for (const ref of schemaRefs) {
+    const schema = index.schemas.get(resolveCanonicalKey(ref));
+    if (!schema || schema.hasSpreads) continue;
+    const local = schemaLocalFieldPath(
+      path,
+      [ref],
+      schemaRefs.filter((r) => r !== ref),
+      (name) => schema.fields.some((f) => f.name === name),
+    );
+    if (local === null) continue;
+    const kind = declaredFieldKind(local, schema.fields);
+    if (kind) return kind;
+  }
+  return null;
 }
 
 // ── Engine ─────────────────────────────────────────────────────────────────

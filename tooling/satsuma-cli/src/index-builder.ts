@@ -452,6 +452,7 @@ export function buildIndex(parsedFiles: (ParsedFile | FileData)[]): ExtractedWor
     warnings,
     questions,
     fieldArrows,
+    arrows: allArrowRecords,
     referenceGraph,
     namespaceNames,
     nlRefData: allNLRefData,

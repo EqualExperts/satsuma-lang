@@ -228,6 +228,14 @@ Examples:
                   ? nlRef.mapping.slice(nlRef.namespace.length + 2)
                   : nlRef.mapping,
               namespace: nlRef.namespace,
+              // An inferred arrow has no declaration to read a kind off, so it
+              // takes the one that asserts least. Prose naming a record is a
+              // reference to it, never a claim that everything beneath it maps
+              // (ADR-036), and `computed` is the kind that carries exactly that
+              // — the same conservative default `arrowDeclarationKind` falls back
+              // to for an unrecognised shape.
+              kind: "computed",
+              enumeratesChildren: false,
               sources: [resolvedTo],
               target: nlRef.targetField,
               transform_raw: `(NL ref)`,

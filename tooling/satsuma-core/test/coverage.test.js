@@ -368,7 +368,10 @@ mapping copy {
     // conferred coverage, `billing.line1` would read covered — turning "one of
     // twelve address fields is mapped" into "all twelve are".
     const MIXED = `
-schema src { a STRING b STRING }
+schema src {
+  a record { line1 STRING city STRING }
+  b STRING
+}
 schema tgt {
   address record { line1 STRING city STRING }
   billing record { line1 STRING city STRING }
@@ -409,7 +412,7 @@ mapping copy {
     // A subtree is a subtree. Stopping at direct children would leave the deepest
     // leaves — the ones hardest to notice missing — reported as gaps.
     const DEEP = `
-schema src { v STRING }
+schema src { v record { b record { x STRING y STRING } z STRING } }
 schema tgt { a record { b record { x STRING y STRING } z STRING } }
 mapping copy {
   source { src }
@@ -428,7 +431,7 @@ mapping copy {
     // covered set is a set, so the leaf is counted once and the percentage
     // cannot exceed 100%.
     const OVERLAP = `
-schema src { a STRING b STRING }
+schema src { a record { line1 STRING city STRING } b STRING }
 schema tgt { address record { line1 STRING city STRING } }
 mapping copy {
   source { src }
@@ -587,19 +590,19 @@ mapping load {
     assertState(src, "work.city", "covered");
   });
 
-  it("confers onto a record target even when the source is a scalar", () => {
-    // The deliberate limit of condition 1, pinned here so it is a decision
-    // rather than an accident of two tests written for other purposes.
+  it("does not confer onto a record target when the source is a scalar", () => {
+    // ADR-038, and the flip this test was written for: it previously asserted
+    // `covered` here, pinning the generous reading ADR-037 shipped, with a
+    // comment saying it would flip if 3ct-cs4y tightened the target side. It did.
     //
-    // ADR-037 gates expansion on the arrow's KIND, not on both sides being
-    // records: `coverageForSchema` reports on one schema at a time and does not
-    // hold the counterpart's field tree. On the source side that reads correctly
-    // (`addr -> out` consumes the whole of `addr` whatever receives it); here, on
-    // the target side, it is generous — one scalar credits every leaf of a
-    // record, and that is the direction ADR-034 called a silent overstatement.
+    // One scalar cannot populate two leaves, and the declaration says nothing
+    // about which leaf it would fill — so crediting both is an overstatement in
+    // the direction ADR-034 refused to risk, on the very number `--fail-under`
+    // gates. `address` still reports uncovered rather than partial: nothing
+    // beneath it is written at all.
     //
-    // Shipped knowingly. If `3ct-cs4y` decides to tighten the target side, this
-    // test flips to `uncovered` and its comment becomes the record of why.
+    // The arrow is not wrong, merely under-specified, and saying so is the
+    // CLI's `unenumerated-record-target` lint rule — not coverage's job.
     const SCALAR_INTO_RECORD = `
 schema src { full_name STRING }
 schema tgt { address record { line1 STRING city STRING } }
@@ -609,9 +612,81 @@ mapping load {
   full_name -> address
 }`;
     const tgt = forRole(coverage(SCALAR_INTO_RECORD, "load"), "target");
+    assertState(tgt, "address", "uncovered");
+    assertState(tgt, "address.line1", "uncovered");
+    assertState(tgt, "address.city", "uncovered");
+  });
+
+  it("still confers onto a record target when the source is a record", () => {
+    // The complement, and the case ADR-038 must not break: 3cc-iedv's original
+    // defect. A record arriving at a record is exactly the correspondence
+    // whole-structure expansion exists for, so tightening the scalar case must
+    // leave this one crediting every leaf.
+    const RECORD_INTO_RECORD = `
+schema src { addr record { line1 STRING city STRING } }
+schema tgt { address record { line1 STRING city STRING } }
+mapping load {
+  source { src }
+  target { tgt }
+  addr -> address
+}`;
+    const tgt = forRole(coverage(RECORD_INTO_RECORD, "load"), "target");
     assertState(tgt, "address", "covered");
     assertState(tgt, "address.line1", "covered");
+  });
+
+  it("keeps crediting a record source consumed by a scalar target", () => {
+    // ADR-038 tightens the TARGET side only. `addr -> out` reads the whole of
+    // `addr` whatever receives it, so source coverage must be unaffected —
+    // requiring records on both sides would turn every record-to-scalar arrow
+    // into a false "unconsumed source field" in the review queue.
+    const RECORD_INTO_SCALAR = `
+schema src { addr record { line1 STRING city STRING } }
+schema tgt { out STRING }
+mapping load {
+  source { src }
+  target { tgt }
+  addr -> out
+}`;
+    const src = forRole(coverage(RECORD_INTO_SCALAR, "load"), "source");
+    assertState(src, "addr", "covered");
+    assertState(src, "addr.line1", "covered");
+    assertState(src, "addr.city", "covered");
+  });
+
+  it("confers when any one source of a multi-source arrow is a record", () => {
+    // ADR-038's any-one rule. A multi-source arrow asserts a single
+    // correspondence assembled from several inputs; a record among them makes
+    // the whole-structure reading plausible, and requiring every source to be
+    // one would turn a mixed arrow into a gap.
+    const MIXED_SOURCES = `
+schema src { addr record { line1 STRING city STRING } tag STRING }
+schema tgt { address record { line1 STRING city STRING } }
+mapping load {
+  source { src }
+  target { tgt }
+  addr, tag -> address
+}`;
+    const tgt = forRole(coverage(MIXED_SOURCES, "load"), "target");
+    assertState(tgt, "address", "covered");
     assertState(tgt, "address.city", "covered");
+  });
+
+  it("does not confer when the source path names nothing the schema declares", () => {
+    // Fails closed (ADR-038). A typo'd or unresolvable source is not evidence of
+    // a record, and under-counting is the safe direction — the alternative is a
+    // gate passing because a source name was misspelled. `validate` reports the
+    // bad reference itself, via field-not-in-schema.
+    const UNKNOWN_SOURCE = `
+schema src { addr record { line1 STRING } }
+schema tgt { address record { line1 STRING city STRING } }
+mapping load {
+  source { src }
+  target { tgt }
+  nonexistent -> address
+}`;
+    const tgt = forRole(coverage(UNKNOWN_SOURCE, "load"), "target");
+    assertState(tgt, "address", "uncovered");
   });
 });
 

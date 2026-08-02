@@ -11,6 +11,8 @@ import type { ExtractedWorkspace } from "#src/types.js";
 interface MockSchema {
   name: string;
   fields: Array<{ name: string; children?: Array<{ name: string }> }>;
+  /** Set when the schema spreads a fragment that has not been expanded — its field list is then incomplete. */
+  hasSpreads?: boolean;
   file?: string;
   row?: number;
 }
@@ -36,15 +38,35 @@ interface MockNLRef {
   column: number;
 }
 
+/**
+ * Shape of a mock arrow passed to makeIndex.
+ *
+ * `kind` and `enumeratesChildren` default to the plain-arrow reading (`map`,
+ * nothing enumerated), which is the shape `unenumerated-record-target` judges;
+ * a case that needs another declaration shape states it.
+ */
+interface MockArrow {
+  mapping: string;
+  namespace?: string | null;
+  sources: string[];
+  target: string | null;
+  kind?: "map" | "computed" | "nested" | "each" | "flatten";
+  enumeratesChildren?: boolean;
+  file?: string;
+  line?: number;
+}
+
 /** Build a minimal ExtractedWorkspace for lint testing. */
 function makeIndex({
   schemas = [],
   mappings = [],
   nlRefData = [],
+  arrows = [],
 }: {
   schemas?: MockSchema[];
   mappings?: MockMapping[];
   nlRefData?: MockNLRef[];
+  arrows?: MockArrow[];
 } = {}): ExtractedWorkspace {
   const schemaMap = new Map<string, any>();
   for (const s of schemas) {
@@ -64,6 +86,18 @@ function makeIndex({
     warnings: [],
     questions: [],
     fieldArrows: new Map(),
+    arrows: arrows.map((a) => ({
+      kind: "map",
+      enumeratesChildren: false,
+      namespace: null,
+      transform_raw: "",
+      steps: [],
+      classification: "none",
+      derived: false,
+      file: "test.stm",
+      line: 0,
+      ...a,
+    })),
     referenceGraph: {
       usedByMappings: new Map(),
       fragmentsUsedIn: new Map(),
@@ -689,5 +723,112 @@ describe("lint diagnostic shape", () => {
     assert.equal(typeof d.rule, "string");
     assert.equal(typeof d.message, "string");
     assert.equal(typeof d.fixable, "boolean");
+  });
+});
+
+// ── unenumerated-record-target ─────────────────────────────────────────────
+
+describe("lint: unenumerated-record-target", () => {
+  /** src has a scalar and a record; tgt has a record. Each case varies only the arrow. */
+  const twoShapes = (arrows: MockArrow[]) =>
+    makeIndex({
+      schemas: [
+        {
+          name: "src",
+          fields: [
+            { name: "full_name" },
+            { name: "addr", children: [{ name: "line1" }, { name: "city" }] },
+          ],
+        },
+        {
+          name: "tgt",
+          fields: [{ name: "address", children: [{ name: "line1" }, { name: "city" }] }],
+        },
+      ],
+      mappings: [{ name: "load", sources: ["src"], targets: ["tgt"] }],
+      arrows,
+    });
+
+  const run = (index: ExtractedWorkspace) =>
+    runLint(index, { select: ["unenumerated-record-target"] });
+
+  it("flags an arrow from a scalar into a record that enumerates nothing", () => {
+    // The shape the rule exists for, and the one coverage refuses to credit
+    // (ADR-038): a reader cannot tell which of the record's fields the arrow
+    // fills, so the leaves report as gaps with no indication why.
+    const diags = run(twoShapes([{ mapping: "load", sources: ["full_name"], target: "address" }]));
+    assert.equal(diags.length, 1);
+    assert.equal(diags[0].severity, "warning");
+    assert.match(diags[0].message, /targets a record/);
+    assert.match(diags[0].message, /Enumerate them/);
+    assert.equal(diags[0].fixable, false);
+  });
+
+  it("stays silent when the source is itself a record", () => {
+    // `addr -> address` is the correspondence whole-structure coverage credits,
+    // so there is nothing under-specified to report.
+    assert.deepEqual(
+      run(twoShapes([{ mapping: "load", sources: ["addr"], target: "address" }])),
+      [],
+    );
+  });
+
+  it("stays silent when the body enumerates the record's children", () => {
+    // The author has said which fields map, which is the other way to answer the
+    // question the rule asks. Enumerating must not be penalised.
+    const diags = run(
+      twoShapes([
+        {
+          mapping: "load",
+          sources: ["full_name"],
+          target: "address",
+          kind: "nested",
+          enumeratesChildren: true,
+        },
+      ]),
+    );
+    assert.deepEqual(diags, []);
+  });
+
+  it("stays silent for an each header, which opens an iteration rather than a correspondence", () => {
+    // Iteration kinds assert nothing about a subtree either way, so they are
+    // outside this rule — flagging them would fire on every well-formed each block.
+    const diags = run(
+      twoShapes([{ mapping: "load", sources: ["full_name"], target: "address", kind: "each" }]),
+    );
+    assert.deepEqual(diags, []);
+  });
+
+  it("stays silent when the target is a leaf rather than a record", () => {
+    // A record target is the precondition — an ordinary scalar-to-scalar arrow
+    // has nothing unstated about it. This is the bulk of every real workspace,
+    // so a false positive here would make the rule unusable.
+    const index = makeIndex({
+      schemas: [
+        { name: "src", fields: [{ name: "full_name" }] },
+        { name: "tgt", fields: [{ name: "name" }] },
+      ],
+      mappings: [{ name: "load", sources: ["src"], targets: ["tgt"] }],
+      arrows: [{ mapping: "load", sources: ["full_name"], target: "name" }],
+    });
+    assert.deepEqual(run(index), []);
+  });
+
+  it("stays silent when the target schema has unresolved spreads", () => {
+    // The field list is incomplete, so "targets a record" cannot be established
+    // — reporting on it would blame the author for an unexpanded fragment.
+    const index = makeIndex({
+      schemas: [
+        { name: "src", fields: [{ name: "full_name" }] },
+        {
+          name: "tgt",
+          fields: [{ name: "address", children: [{ name: "line1" }] }],
+          hasSpreads: true,
+        },
+      ],
+      mappings: [{ name: "load", sources: ["src"], targets: ["tgt"] }],
+      arrows: [{ mapping: "load", sources: ["full_name"], target: "address" }],
+    });
+    assert.deepEqual(run(index), []);
   });
 });

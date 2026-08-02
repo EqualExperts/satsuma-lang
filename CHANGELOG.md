@@ -2,6 +2,35 @@
 
 ## Unreleased
 
+### A whole-record arrow must carry a record to cover one (`3ct-cs4y`)
+
+Tightens the change below, before anyone sets a `--fail-under` threshold against
+it. **No percentage in the example corpus moves** — verified by diffing
+`coverage --json` across every example — and the new lint rule is silent on all
+of them.
+
+`addr -> address` between two records still covers `address` and every leaf
+beneath it. `full_name -> address`, where a single scalar targets a twelve-leaf
+record, no longer does: one scalar cannot fill twelve leaves, and the arrow does
+not say which one it would fill, so crediting all twelve inflated the very number
+`--fail-under` gates. Those leaves now report as gaps.
+
+The **source** side is deliberately unchanged. `addr -> out` still credits
+`addr`'s leaves as consumed even though `out` is a scalar — a whole record was
+read, whatever received it. Requiring records at both ends would have turned
+every record-to-scalar arrow into a false "unconsumed source field".
+
+Two details: any one container source is enough for a multi-source arrow
+(`addr, tag -> address` still confers), and a source path that resolves to
+nothing confers nothing — the safe direction, and `validate` already reports the
+broken reference.
+
+New lint rule **`unenumerated-record-target`** (warning, not fixable) explains
+the gap: it flags an arrow that targets a record while neither carrying a record
+nor listing child arrows, so you are not left with twelve uncovered fields and no
+clue which arrow was nearly responsible for them. Close it by enumerating
+(`address { .line1 -> ... }`) or by mapping from a record. See **ADR-038**.
+
 ### Container coverage is a tri-state, and a whole-record arrow covers its subtree (`sl-0pun`, `sl-r6b0`, closes `3cc-iedv`)
 
 Two changes to what "covered" means for a `record` or `list_of record` field.
@@ -36,11 +65,8 @@ reference to it, not a claim that everything beneath it maps.
 
 Only the side being reported on is examined, so the rule is about the record the
 arrow names rather than about both ends of it. `addr -> out` credits `addr`'s
-leaves as consumed even though `out` is a scalar — a whole record was read — and,
-in the other direction, `full_name -> address` credits every leaf of `address`
-even though only one field feeds it. If you have arrows of that second shape,
-expect their targets to read as fully covered; `3ct-cs4y` tracks whether to
-tighten it.
+leaves as consumed even though `out` is a scalar — a whole record was read.
+(The target side gained a second condition before release; see `3ct-cs4y` above.)
 
 Coverage figures on schemas using whole-record arrows will rise; figures that
 were resting on an `each` header or a computed arrow to a record will fall.
