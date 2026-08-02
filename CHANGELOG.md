@@ -23,17 +23,24 @@ longer manufactures coverage for what is inside it. An `each parcels -> packed
 data gap (`-> containers { "no source data available" }`), both leave the
 container uncovered where they previously showed as mapped in the gutter.
 
-**A plain `addr -> address` arrow between two records now covers the record and
-every leaf beneath it** (3cc-iedv). Such an arrow asserts the structure maps
-across, so reporting its leaves as gaps reported a gap the author had closed. Two
-conditions gate it (ADR-037). The declaration must be a record-to-record
-correspondence — `a -> b`, with or without braces; an `each`/`flatten` header
-opens an iteration and a computed arrow (`-> containers { "..." }`) has no source,
-so neither asserts one. And its body must enumerate nothing: once a header lists
-child arrows it is claiming those and no others, so `addr -> address
-{ .street -> .line }` still leaves `zip` a gap. Resolved NL `@refs` never expand
-either — prose naming a record is a reference to it, not a claim that everything
-beneath it maps.
+**A plain `addr -> address` arrow onto a record now covers the record and every
+leaf beneath it** (3cc-iedv). Such an arrow asserts the structure maps across, so
+reporting its leaves as gaps reported a gap the author had closed. Two conditions
+gate it (ADR-037). The declaration must state a correspondence — `a -> b`, with
+or without braces; an `each`/`flatten` header opens an iteration and a computed
+arrow (`-> containers { "..." }`) has no source, so neither asserts one. And its
+body must enumerate nothing: once a header lists child arrows it is claiming
+those and no others, so `addr -> address { .street -> .line }` still leaves `zip`
+a gap. Resolved NL `@refs` never expand either — prose naming a record is a
+reference to it, not a claim that everything beneath it maps.
+
+Only the side being reported on is examined, so the rule is about the record the
+arrow names rather than about both ends of it. `addr -> out` credits `addr`'s
+leaves as consumed even though `out` is a scalar — a whole record was read — and,
+in the other direction, `full_name -> address` credits every leaf of `address`
+even though only one field feeds it. If you have arrows of that second shape,
+expect their targets to read as fully covered; `3ct-cs4y` tracks whether to
+tighten it.
 
 Coverage figures on schemas using whole-record arrows will rise; figures that
 were resting on an `each` header or a computed arrow to a record will fall.

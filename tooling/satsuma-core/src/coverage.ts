@@ -298,32 +298,47 @@ interface ArrowFieldReference {
    * (ADR-037). Two things must hold, and both are properties of the
    * declaration, not of the path.
    *
-   * **It must be a record-to-record correspondence.** `addr -> address` between
-   * two records says the structure maps across, so reporting its leaves as gaps
-   * reports a gap the author explicitly closed (3cc-iedv). A pipe-chain
-   * transform body does not change that — spec §4.4 makes it a pipeline, not a
-   * nesting scope. The other kinds name a container without asserting any such
-   * correspondence: `each items -> lines { … }` opens an iteration (the subject
-   * is registered because iterating a list consumes it, but nothing is claimed
-   * about `items.val`), and `-> containers { "no source data available" }` has
-   * no source at all — inheriting from prose is what ADR-036 forbids, and the
-   * one such arrow in the example corpus is flagged `//! DATA GAP` by its own
-   * author.
+   * **Its kind must be `map` or `nested`.** These are the two shapes that state
+   * a correspondence and nothing narrower: `addr -> address` says the structure
+   * maps across, so reporting its leaves as gaps reports a gap the author
+   * explicitly closed (3cc-iedv). A pipe-chain transform body does not change
+   * that — spec §4.4 makes it a pipeline, not a nesting scope. The other kinds
+   * name a container while asserting no correspondence at all:
+   * `each items -> lines { … }` opens an iteration (the subject is registered
+   * because iterating a list consumes it, but nothing is claimed about
+   * `items.val`), and `-> containers { "no source data available" }` has no
+   * source — inheriting from prose is what ADR-036 forbids, and the one such
+   * arrow in the example corpus is flagged `//! DATA GAP` by its own author.
    *
    * **Its body must enumerate nothing.** A header that lists child arrows
    * narrows its claim to what it lists: `addr -> address { .street -> .line }`
    * says street maps, and says nothing about `zip`. Reading the header as
    * wholesale would report `zip` as covered when nothing writes it (sl-qzy3).
    *
-   * Getting this wrong is not a rounding error: the direct set was kind-blind
-   * until sl-r6b0, and turning inheritance on without the distinction would have
-   * manufactured coverage for every leaf under every `each` header.
+   * **What is deliberately NOT checked: whether the field on the *other* side
+   * is also a record.** The flag travels with the path, and the path is judged
+   * against whichever schema is being reported on — so `crm.addr -> out` expands
+   * `addr`'s leaves on the source side even though `out` is a scalar, and
+   * `full_name -> address` expands `address`'s leaves on the target side even
+   * though `full_name` is one. `coverageForSchema` reports on a single schema
+   * and does not hold the counterpart's field tree, so a genuine
+   * record-to-record test would mean resolving every participating schema up
+   * front and pairing sides per arrow. The looser rule is the shipped one: it
+   * reads correctly on the source side (a `map` arrow off a record consumes the
+   * whole record) and generously on the target side, where a scalar-to-record
+   * arrow credits every leaf of the record. Whether to tighten the target side
+   * is `3ct-cs4y`, not something to infer from this comment.
+   *
+   * Getting the kind check wrong is not a rounding error: the direct set was
+   * kind-blind until sl-r6b0, and turning inheritance on without the distinction
+   * would have manufactured coverage for every leaf under every `each` header.
    */
   wholeStructure: boolean;
 }
 
 /**
- * The declaration kinds whose header asserts a whole-structure correspondence.
+ * The declaration kinds whose header asserts a correspondence over the whole
+ * structure it names, rather than over the parts its body lists.
  *
  * Listed positively rather than as a negation, so a declaration kind added to
  * the grammar defaults to the conservative reading — a new construct asserts

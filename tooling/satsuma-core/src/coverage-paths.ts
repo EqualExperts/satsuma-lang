@@ -20,8 +20,18 @@
  * to reason about *containers*: a record that is directly covered by a
  * whole-record arrow (`addr -> address`) has had its entire subtree asserted
  * across, while a record that is merely the ancestor of one covered leaf has
- * not (3cc-iedv). Only a model that keeps the two apart can express that —
- * see {@link hasDirectlyCoveredAncestor} for the query and its current limits.
+ * not (3cc-iedv). Keeping the two apart is what lets coverage.ts expand the
+ * first without ever inheriting from the second.
+ *
+ * The distinction is consumed at *set-build* time, not at probe time: coverage
+ * expands a whole-structure arrow into its declared subtree before building the
+ * model (`expandWholeStructureRefs` in coverage.ts, ADR-037), so the probes here
+ * stay the single "covered at all?" question every consumer already asks. A
+ * probe-time variant — "is some proper ancestor of this path *directly*
+ * covered?" — existed briefly as scaffolding for that work and was removed with
+ * it: the direct set alone cannot tell `addr -> address` from
+ * `each items -> lines { }`, so no caller holding only this model can decide
+ * subtree coverage safely.
  *
  * It also owns the rule that turns an arrow's *authored* field reference into a
  * schema-local path: in a multi-source mapping arrows name their schema
@@ -100,46 +110,6 @@ export function buildCoveredFieldPaths(paths: Iterable<string>): CoveredFieldPat
  */
 export function isCoveredPath(path: string, covered: CoveredFieldPaths): boolean {
   return covered.direct.has(path) || covered.ancestors.has(path);
-}
-
-/**
- * True when an arrow or resolved `@ref` referenced exactly this path — the
- * strong claim. A container that is only in `ancestors` returns false.
- */
-export function isDirectlyCovered(path: string, covered: CoveredFieldPaths): boolean {
-  return covered.direct.has(path);
-}
-
-/**
- * True when some proper ancestor of `path` is *directly* covered — the query
- * behind whole-subtree arrow semantics (PRD 38 R5): a leaf beneath a record
- * that an arrow wrote wholesale (`addr -> address`) is covered, while a leaf
- * beneath a record that is merely the ancestor of one covered sibling is not.
- * That second half is the trap 3cc-iedv documents: inheriting from *any*
- * covered ancestor would turn "one of twelve address fields is mapped" into
- * "all twelve are".
- *
- * **Not the route computeMappingCoverage takes.** Coverage implements R5 by
- * expanding a whole-structure arrow into its declared subtree when the set is
- * built, rather than by probing for a covered ancestor when it is read — the set
- * stays a plain set of paths, so consumers holding the flat view need no new
- * rule (sl-r6b0). This query is the same semantics expressed over the model, for
- * a caller that has the model but not the schema's field tree.
- *
- * It answers a *weaker* question than coverage does, and the gap is deliberate:
- * the direct set alone cannot tell `addr -> address` (asserts the whole subtree)
- * from `each items -> lines { }` (opens an iteration scope and asserts nothing
- * about unmentioned leaves), because both register their path directly. A caller
- * that cannot make that distinction from its own inputs must not use this query
- * to decide coverage.
- */
-export function hasDirectlyCoveredAncestor(path: string, covered: CoveredFieldPaths): boolean {
-  // Inline prefix scan (rather than properPrefixesOf) so the probe allocates
-  // nothing and short-circuits on the first directly-covered ancestor.
-  for (let dot = path.indexOf("."); dot !== -1; dot = path.indexOf(".", dot + 1)) {
-    if (covered.direct.has(path.slice(0, dot))) return true;
-  }
-  return false;
 }
 
 /** Proper dotted prefixes of a path, shortest first: "a.b.c" → ["a", "a.b"]. */

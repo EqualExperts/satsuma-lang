@@ -37,10 +37,8 @@ export type {
 export {
   buildCoveredFieldPaths,
   buildCoveredFieldSet,
-  hasDirectlyCoveredAncestor,
   isCoveredFieldPath,
   isCoveredPath,
-  isDirectlyCovered,
   schemaLocalFieldPath,
   schemaRefPrefixes,
 } from "./coverage-paths.js";

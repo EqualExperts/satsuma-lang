@@ -12,10 +12,8 @@ import { describe, it } from "node:test";
 import {
   buildCoveredFieldPaths,
   buildCoveredFieldSet,
-  hasDirectlyCoveredAncestor,
   isCoveredFieldPath,
   isCoveredPath,
-  isDirectlyCovered,
   schemaLocalFieldPath,
 } from "@satsuma/core";
 
@@ -84,14 +82,12 @@ describe("buildCoveredFieldPaths() — the direct/derived model", () => {
 
   it("separates directly-referenced paths from their ancestor prefixes", () => {
     // The core distinction: "address.city" was written; "address" only contains
-    // something that was. A flat set cannot tell these apart.
+    // something that was. A flat set cannot tell these apart, and coverage.ts
+    // needs it to decide which containers a whole-structure arrow may expand.
     const covered = buildCoveredFieldPaths(["address.city"]);
-    assert.equal(isDirectlyCovered("address.city", covered), true);
-    assert.equal(
-      isDirectlyCovered("address", covered),
-      false,
-      "'address' is an ancestor, not direct",
-    );
+    assert.equal(covered.direct.has("address.city"), true);
+    assert.equal(covered.direct.has("address"), false, "'address' is an ancestor, not direct");
+    assert.equal(covered.ancestors.has("address"), true);
     assert.equal(isCoveredPath("address", covered), true, "…but it still counts as covered");
   });
 
@@ -99,34 +95,27 @@ describe("buildCoveredFieldPaths() — the direct/derived model", () => {
     // Arrows writing both "address" and "address.city" are legal; membership in
     // ancestors must not mask the direct claim.
     const covered = buildCoveredFieldPaths(["address", "address.city"]);
-    assert.equal(isDirectlyCovered("address", covered), true);
+    assert.equal(covered.direct.has("address"), true);
+    assert.equal(covered.ancestors.has("address"), true);
     assert.equal(isCoveredPath("address", covered), true);
-  });
-
-  it("answers the whole-subtree query: a leaf beneath a DIRECTLY covered record inherits", () => {
-    // sl-fmx0 AC / PRD 38 R5: `addr -> address` writes "address" exactly, so
-    // its unmentioned leaves descend from a directly-covered container.
-    // (computeMappingCoverage does not consult this yet — see sl-r6b0.)
-    const covered = buildCoveredFieldPaths(["address"]);
-    assert.equal(hasDirectlyCoveredAncestor("address.line1", covered), true);
-    assert.equal(hasDirectlyCoveredAncestor("address.nested.deeper", covered), true);
   });
 
   it("refuses the trap 3cc-iedv documents: a merely-ancestor record confers nothing downward", () => {
     // With only "address.city" written, "address" is covered as an ancestor —
-    // but its OTHER leaves must not inherit, or "one of twelve address fields
-    // is mapped" reads as "all twelve are".
+    // but its OTHER leaves must not read as covered, or "one of twelve address
+    // fields is mapped" becomes "all twelve are". Registration never walks
+    // downward, so an unwritten sibling has no entry at all.
+    //
+    // The other half of that rule — that a record written wholesale DOES reach
+    // its leaves — is not expressible over this model, because the direct set
+    // cannot tell `addr -> address` from `each items -> lines { }`. Coverage
+    // resolves it against the declared field tree instead, before the model is
+    // built (expandWholeStructureRefs, ADR-037), and coverage.test.js's
+    // "whole-subtree arrows" suite owns those cases.
     const covered = buildCoveredFieldPaths(["address.city"]);
-    assert.equal(hasDirectlyCoveredAncestor("address.line1", covered), false);
     assert.equal(isCoveredPath("address.line1", covered), false);
-  });
-
-  it("does not report a path as its own ancestor", () => {
-    // hasDirectlyCoveredAncestor is a PROPER-ancestor query: a directly covered
-    // leaf inherits nothing from itself, so callers can compose it with
-    // isDirectlyCovered without double counting.
-    const covered = buildCoveredFieldPaths(["address"]);
-    assert.equal(hasDirectlyCoveredAncestor("address", covered), false);
+    assert.equal(covered.direct.has("address.line1"), false);
+    assert.equal(covered.ancestors.has("address.line1"), false);
   });
 
   it("ignores empty paths rather than registering an '' entry", () => {
