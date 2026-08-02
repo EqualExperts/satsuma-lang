@@ -154,4 +154,5 @@ export type {
   ExtractedQuestion,
   ExtractedImport,
   ExtractedArrow,
+  ArrowDeclarationKind,
 } from "./extract.js";

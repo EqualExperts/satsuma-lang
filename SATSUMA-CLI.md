@@ -26,38 +26,38 @@ The CLI's role is to make workspace navigation token-efficient: instead of pulli
 
 Block-level extraction — retrieve whole blocks or workspace-level summaries.
 
-| Command | Operation | Example |
-|---|---|---|
-| `summary [path]` | Workspace overview — all schemas, mappings, metrics, counts | `satsuma summary pipeline.stm` |
-| `schema <name>` | Full schema definition from parse tree | `satsuma schema hub_customer` |
-| `metric <name>` | Full definition of a schema decorated with `metric` metadata | `satsuma metric monthly_revenue` |
-| `mapping <name>` | Full mapping with all arrows and transforms | `satsuma mapping "sfdc to hub_customer"` |
-| `find --tag <token>` | Fields carrying a metadata tag | `satsuma find --tag pii` |
-| `lineage --from/--to <schema>` | Schema-level graph traversal | `satsuma lineage --from loyalty_sfdc` |
-| `where-used <name>` | All references to a schema, fragment, or transform | `satsuma where-used hub_product` |
-| `warnings` | All `//!` and `//?` comments across the workspace | `satsuma warnings` |
-| `context <query>` | Keyword-ranked block extraction (heuristic) | `satsuma context "customer mapping"` |
+| Command                        | Operation                                                    | Example                                  |
+| ------------------------------ | ------------------------------------------------------------ | ---------------------------------------- |
+| `summary [path]`               | Workspace overview — all schemas, mappings, metrics, counts  | `satsuma summary pipeline.stm`           |
+| `schema <name>`                | Full schema definition from parse tree                       | `satsuma schema hub_customer`            |
+| `metric <name>`                | Full definition of a schema decorated with `metric` metadata | `satsuma metric monthly_revenue`         |
+| `mapping <name>`               | Full mapping with all arrows and transforms                  | `satsuma mapping "sfdc to hub_customer"` |
+| `find --tag <token>`           | Fields carrying a metadata tag                               | `satsuma find --tag pii`                 |
+| `lineage --from/--to <schema>` | Schema-level graph traversal                                 | `satsuma lineage --from loyalty_sfdc`    |
+| `where-used <name>`            | All references to a schema, fragment, or transform           | `satsuma where-used hub_product`         |
+| `warnings`                     | All `//!` and `//?` comments across the workspace            | `satsuma warnings`                       |
+| `context <query>`              | Keyword-ranked block extraction (heuristic)                  | `satsuma context "customer mapping"`     |
 
 ### Structural Primitives
 
 Fine-grained extraction — slice below block level to get specific arrows, NL content, metadata, or field lists.
 
-| Command | Operation | Example |
-|---|---|---|
-| `arrows <schema.field>` | All arrows involving a field, with transform classification | `satsuma arrows loyalty_sfdc.LoyaltyTier` |
-| `field-lineage <schema.field>` | Full upstream + downstream field lineage chain in one command | `satsuma field-lineage sat_customer_demographics.loyalty_tier --json` |
-| `nl <scope>` | NL content (notes, transforms, comments) in a scope | `satsuma nl "demographics to mart"` |
-| `nl-refs [path]` | All `@ref` references in NL transform bodies, with resolution status | `satsuma nl-refs pipeline.stm --unresolved` |
-| `meta <scope>` | Metadata entries for a block or field | `satsuma meta loyalty_sfdc.Email` |
-| `fields <schema>` | Field list with types and metadata | `satsuma fields sat_customer_demographics` |
-| `match-fields --source <s> --target <t>` | Normalized name comparison between two schemas | `satsuma match-fields --source loyalty_sfdc --target sat_customer_demographics` |
+| Command                                  | Operation                                                            | Example                                                                         |
+| ---------------------------------------- | -------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| `arrows <schema.field>`                  | All arrows involving a field, with transform classification          | `satsuma arrows loyalty_sfdc.LoyaltyTier`                                       |
+| `field-lineage <schema.field>`           | Full upstream + downstream field lineage chain in one command        | `satsuma field-lineage sat_customer_demographics.loyalty_tier --json`           |
+| `nl <scope>`                             | NL content (notes, transforms, comments) in a scope                  | `satsuma nl "demographics to mart"`                                             |
+| `nl-refs [path]`                         | All `@ref` references in NL transform bodies, with resolution status | `satsuma nl-refs pipeline.stm --unresolved`                                     |
+| `meta <scope>`                           | Metadata entries for a block or field                                | `satsuma meta loyalty_sfdc.Email`                                               |
+| `fields <schema>`                        | Field list with types and metadata                                   | `satsuma fields sat_customer_demographics`                                      |
+| `match-fields --source <s> --target <t>` | Normalized name comparison between two schemas                       | `satsuma match-fields --source loyalty_sfdc --target sat_customer_demographics` |
 
 ### Workspace Graph
 
 Full workspace topology export for one-shot reasoning.
 
-| Command | Operation | Example |
-|---|---|---|
+| Command        | Operation                                                         | Example                             |
+| -------------- | ----------------------------------------------------------------- | ----------------------------------- |
 | `graph [path]` | Complete semantic graph — nodes, edges, and field-level data flow | `satsuma graph pipeline.stm --json` |
 
 Flags: `--json` (full graph), `--compact` (schema-level adjacency list), `--schema-only` (omit field-level edges), `--namespace <ns>` (filter to namespace), `--no-nl` (strip NL text from edges).
@@ -66,20 +66,20 @@ The `schema_edges` array includes edges with roles: `source`, `target`, `metric_
 
 ### Agent Setup
 
-| Command | Operation | Example |
-|---|---|---|
+| Command           | Operation                                                                             | Example                   |
+| ----------------- | ------------------------------------------------------------------------------------- | ------------------------- |
 | `agent-reference` | Print the AI Agent Reference — grammar, conventions, CLI guide, and workflow patterns | `satsuma agent-reference` |
 
 Pipe the output into your agent's instructions file (e.g., `satsuma agent-reference > .github/copilot-instructions.md`) or paste it into a conversation. The content is baked into the CLI at build time from `AI-AGENT-REFERENCE.md`.
 
 ### Formatting
 
-| Command | Operation | Example |
-|---|---|---|
-| `fmt [path]` | Format file and its imports (opinionated, zero-config) | `satsuma fmt pipeline.stm` |
-| `fmt --check` | Exit 1 if any file would change (for CI) | `satsuma fmt --check pipeline.stm` |
-| `fmt --diff` | Print unified diff without writing | `satsuma fmt --diff file.stm` |
-| `fmt --stdin` | Read from stdin, write formatted output to stdout | `cat file.stm \| satsuma fmt --stdin` |
+| Command       | Operation                                              | Example                               |
+| ------------- | ------------------------------------------------------ | ------------------------------------- |
+| `fmt [path]`  | Format file and its imports (opinionated, zero-config) | `satsuma fmt pipeline.stm`            |
+| `fmt --check` | Exit 1 if any file would change (for CI)               | `satsuma fmt --check pipeline.stm`    |
+| `fmt --diff`  | Print unified diff without writing                     | `satsuma fmt --diff file.stm`         |
+| `fmt --stdin` | Read from stdin, write formatted output to stdout      | `cat file.stm \| satsuma fmt --stdin` |
 
 The formatter is opinionated and zero-configuration — one canonical style for all Satsuma files. It walks the tree-sitter CST to produce parser-backed, semantics-preserving output. Files with parse errors are skipped with a warning.
 
@@ -89,12 +89,12 @@ Exit codes: `0` = success (or already formatted), `1` = files would change (`--c
 
 Operations that check or compare workspace structure.
 
-| Command | Operation | Example |
-|---|---|---|
-| `validate [path]` | Parse errors and semantic reference checks | `satsuma validate pipeline.stm` |
-| `lint [path]` | Policy and convention checks with optional autofix | `satsuma lint pipeline.stm --json` |
+| Command           | Operation                                                         | Example                                     |
+| ----------------- | ----------------------------------------------------------------- | ------------------------------------------- |
+| `validate [path]` | Parse errors and semantic reference checks                        | `satsuma validate pipeline.stm`             |
+| `lint [path]`     | Policy and convention checks with optional autofix                | `satsuma lint pipeline.stm --json`          |
 | `coverage [path]` | Which declared fields each mapping covers, and which nothing maps | `satsuma coverage pipeline.stm --uncovered` |
-| `diff <a> <b>` | Structural comparison of two Satsuma files | `satsuma diff v1.stm v2.stm` |
+| `diff <a> <b>`    | Structural comparison of two Satsuma files                        | `satsuma diff v1.stm v2.stm`                |
 
 ### validate vs lint
 
@@ -104,11 +104,11 @@ Operations that check or compare workspace structure.
 
 Flags: `--json` (structured output), `--fix` (apply safe fixes), `--select <rules>` / `--ignore <rules>` (filter rules), `--quiet` (exit code only), `--rules` (list available rules).
 
-| Rule | Severity | Fixable | Description |
-|---|---|---|---|
-| `hidden-source-in-nl` | error | yes | NL text references a schema not in the mapping's source/target list |
-| `unresolved-nl-ref` | warning | no | `@ref` in NL does not resolve to any known identifier |
-| `duplicate-definition` | error | no | Named definition is declared more than once in a namespace |
+| Rule                   | Severity | Fixable | Description                                                         |
+| ---------------------- | -------- | ------- | ------------------------------------------------------------------- |
+| `hidden-source-in-nl`  | error    | yes     | NL text references a schema not in the mapping's source/target list |
+| `unresolved-nl-ref`    | warning  | no      | `@ref` in NL does not resolve to any known identifier               |
+| `duplicate-definition` | error    | no      | Named definition is declared more than once in a namespace          |
 
 ### coverage
 
@@ -133,22 +133,24 @@ Flags: `--mapping <name>`, `--schema <name>`, `--role source|target`, `--uncover
 
 `--json` always carries `covered_declared` and `covered_nl`, and tags each covered field with its `tier`, so a reviewer — or an overlay — can tell a declared arrow from an inferred one. `--fail-under` gates the combined figure: an `@ref` is a declaration of intent, not a hint.
 
-Counting a resolved `@ref` is **resolution, not interpretation**: the author wrote `@` to mark a reference, and resolving it against the index reads no surrounding prose. Two things still do not count — a field prose merely *describes* without an `@ref` (use `nl-refs` to find those), and an `@ref` that resolves to nothing (that is `lint`'s `unresolved-nl-ref`; letting it count would make coverage rise when a spec breaks). Policy judgements about which gaps are acceptable remain `lint`'s. See **ADR-036**, and **ADR-013** for why an `@ref` carries the same lineage weight as a declared source field.
+Counting a resolved `@ref` is **resolution, not interpretation**: the author wrote `@` to mark a reference, and resolving it against the index reads no surrounding prose. Two things still do not count — a field prose merely _describes_ without an `@ref` (use `nl-refs` to find those), and an `@ref` that resolves to nothing (that is `lint`'s `unresolved-nl-ref`; letting it count would make coverage rise when a spec breaks). Policy judgements about which gaps are acceptable remain `lint`'s. See **ADR-036**, and **ADR-013** for why an `@ref` carries the same lineage weight as a declared source field.
 
 **Coverage matches whole paths, never bare field names.** `home_address.city` covers exactly that path — not a top-level `city`, and not `work_address.city`. Repeated leaf names across depths (`id`, `sku`, `code`, `BIC`) are normal in nested schemas, so name matching would report unmapped fields as mapped. In a multi-source mapping, an arrow's schema prefix resolves to the schema it names: `crm.consent.email_marketing` covers `consent.email_marketing` in `crm` and contributes nothing to any other source.
 
-**Percentages count leaf fields only.** A `record` is structure, not data; counting it alongside its children would count the same data twice and let a schema's nesting depth move the number on its own.
+**Percentages count leaf fields only.** A `record` is structure, not data; counting it alongside its children would count the same data twice and let a schema's nesting depth move the number on its own. A record's own coverage is _derived_ from its leaves and has three states — covered (every leaf), partial (some), uncovered (none) — which is what the editor gutter and the viz overlay render; the percentage still counts the leaves it was derived from.
+
+**A whole-record arrow covers the whole record.** `addr -> address` between two record-typed fields asserts the structure maps across, so every leaf beneath `address` counts as covered. Two conditions gate it. The arrow must be a record-to-record correspondence: an `each`/`flatten` header opens an iteration and a computed arrow (`-> containers { "..." }`) has no source, so neither one counts. And its body must enumerate nothing — once a header lists child arrows it is claiming those and no others, so `addr -> address { .street -> .line }` covers `street` and leaves `zip` a gap. A record that is merely the _ancestor_ of a covered leaf confers nothing downward either: with `address` copied wholesale and `billing` covered only by an arrow to `billing.city`, `billing.line1` is still a gap.
 
 #### Per-mapping vs aggregate
 
 The report has two sections, and they make **different claims about the same field**:
 
-| Section | "uncovered" means | Use it to |
-|---|---|---|
-| per-mapping | *this* mapping does not touch the field — another may well populate it | Review one mapping's completeness |
-| aggregate | *no* mapping in scope touches it | Decide a field is genuinely unmapped |
+| Section     | "uncovered" means                                                      | Use it to                            |
+| ----------- | ---------------------------------------------------------------------- | ------------------------------------ |
+| per-mapping | _this_ mapping does not touch the field — another may well populate it | Review one mapping's completeness    |
+| aggregate   | _no_ mapping in scope touches it                                       | Decide a field is genuinely unmapped |
 
-A target field populated by mapping A and ignored by mapping B is a gap in B's per-mapping report and covered in the aggregate. Acting on the per-mapping figure — deleting the field, or filing it as missing work — will act on a field that is already mapped. The aggregate is the claim worth acting on; the per-mapping view tells you *where* to fix it.
+A target field populated by mapping A and ignored by mapping B is a gap in B's per-mapping report and covered in the aggregate. Acting on the per-mapping figure — deleting the field, or filing it as missing work — will act on a field that is already mapped. The aggregate is the claim worth acting on; the per-mapping view tells you _where_ to fix it.
 
 Aggregate figures respect the active scope, so `--schema X --fail-under 90` gates X rather than the workspace.
 
@@ -157,9 +159,9 @@ Aggregate figures respect the active scope, so `--schema X --fail-under 90` gate
 `--json` emits a **stable contract**, consumed by the satsuma-viz coverage overlay.
 
 **Keys are spelled differently in `--json` and in human output**, deliberately.
-`--json` uses the *canonical* key, which prefixes a non-namespaced entity with
+`--json` uses the _canonical_ key, which prefixes a non-namespaced entity with
 `::` (`::load hub`) so that a consumer matching keys across commands has exactly
-one spelling per entity. Human output uses the *display* form and drops that
+one spelling per entity. Human output uses the _display_ form and drops that
 empty prefix (`load hub`), because `::` is not valid Satsuma syntax — it cannot
 be pasted back into a file — and in a workspace with no namespaces it prefixes
 every line with noise. A real namespace is information, so `crm::customers`
@@ -167,45 +169,66 @@ appears unchanged in both.
 
 ```jsonc
 {
-  "mappings": [{
-    "mapping": "::load hub",          // canonical mapping key
-    "file": "/abs/path/pipeline.stm",
-    "schemas": [{
-      "schema": "::hub_customer",     // canonical schema key
-      "role": "target",               // "source" | "target"
-      "covered": 8,                   // leaf fields covered by THIS mapping
-      "covered_declared": 6,          // of those, covered by a declared arrow
-      "covered_nl": 2,                // of those, covered only by a resolved @ref
-      "total": 11,                    // leaf fields declared
-      "pct": 73,                      // covered/total, whole-number percent
-      "fields": [
-        { "path": "email", "mapped": true, "tier": "declared",
-          "file": "/abs/path/pipeline.stm", "line": 42 }
-      ]
-    }]
-  }],
+  "mappings": [
+    {
+      "mapping": "::load hub", // canonical mapping key
+      "file": "/abs/path/pipeline.stm",
+      "schemas": [
+        {
+          "schema": "::hub_customer", // canonical schema key
+          "role": "target", // "source" | "target"
+          "covered": 8, // leaf fields covered by THIS mapping
+          "covered_declared": 6, // of those, covered by a declared arrow
+          "covered_nl": 2, // of those, covered only by a resolved @ref
+          "total": 11, // leaf fields declared
+          "pct": 73, // covered/total, whole-number percent
+          "fields": [
+            {
+              "path": "email",
+              "mapped": true,
+              "tier": "declared",
+              "file": "/abs/path/pipeline.stm",
+              "line": 42,
+            },
+          ],
+        },
+      ],
+    },
+  ],
   "aggregate": {
-    "schemas": [{
-      "schema": "::hub_customer",
-      "role": "target",
-      "mappings": ["::load hub", "::enrich hub"],   // the mappings behind the figure
-      "covered": 11, "covered_declared": 9, "covered_nl": 2, "total": 11, "pct": 100,
-      "fields": [ /* same entry shape; `mapped` is the union across `mappings` */ ]
-    }],
-    "namespaces": [{
-      "namespace": "crm",             // null for schemas at file scope
-      "source": { "covered": 3, "covered_declared": 3, "covered_nl": 0, "total": 4, "pct": 75 },
-      "target": { "covered": 3, "covered_declared": 3, "covered_nl": 0, "total": 3, "pct": 100 }
-    }],
-    "workspace": { "source": { /* … */ }, "target": { /* … */ } }
+    "schemas": [
+      {
+        "schema": "::hub_customer",
+        "role": "target",
+        "mappings": ["::load hub", "::enrich hub"], // the mappings behind the figure
+        "covered": 11,
+        "covered_declared": 9,
+        "covered_nl": 2,
+        "total": 11,
+        "pct": 100,
+        "fields": [/* same entry shape; `mapped` is the union across `mappings` */],
+      },
+    ],
+    "namespaces": [
+      {
+        "namespace": "crm", // null for schemas at file scope
+        "source": { "covered": 3, "covered_declared": 3, "covered_nl": 0, "total": 4, "pct": 75 },
+        "target": { "covered": 3, "covered_declared": 3, "covered_nl": 0, "total": 3, "pct": 100 },
+      },
+    ],
+    "workspace": { "source": {/* … */}, "target": {/* … */} },
   },
-  "gate": {                           // present only with --fail-under
-    "role": "target", "threshold": 90, "pct": 100, "met": true
-  }
+  "gate": {
+    // present only with --fail-under
+    "role": "target",
+    "threshold": 90,
+    "pct": 100,
+    "met": true,
+  },
 }
 ```
 
-`fields` lists leaf fields only, matching the counts, so the paths shown and the number beside them are always the same population. `tier` is present exactly when `mapped` is true, and says which tier covered the field — consumers differentiate declared from NL-derived coverage from this key rather than reconstructing it. `line` is 1-indexed and **omitted** when the declaration position is unknown — never 0, which would send an editor-jump link to line 1 of the wrong file. Fields arriving via a fragment spread report the *consuming* schema's position, not the fragment's.
+`fields` lists leaf fields only, matching the counts, so the paths shown and the number beside them are always the same population. `tier` is present exactly when `mapped` is true, and says which tier covered the field — consumers differentiate declared from NL-derived coverage from this key rather than reconstructing it. `line` is 1-indexed and **omitted** when the declaration position is unknown — never 0, which would send an editor-jump link to line 1 of the wrong file. Fields arriving via a fragment spread report the _consuming_ schema's position, not the fragment's.
 
 `covered_declared` and `covered_nl` are the two tiers of `covered` and always sum to it: a field covered both ways is reported as declared, so they are disjoint. They appear on every counts object — per-mapping schema, aggregate schema, namespace subtotal and workspace total.
 
@@ -217,35 +240,35 @@ Anonymous mappings are not reported: coverage is looked up by mapping label and 
 
 `coverage` adds a code to the CLI's standard set, so a CI gate can be told apart from a broken invocation:
 
-| Code | Meaning |
-|---|---|
-| 0 | Report produced — and the `--fail-under` threshold met, if one was given |
-| 1 | `--mapping`/`--schema` named something that does not exist, nothing matched the scope, or the gated role has no coverage to measure |
-| 2 | Parse or filesystem error |
-| 3 | `--fail-under` threshold not met |
+| Code | Meaning                                                                                                                             |
+| ---- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| 0    | Report produced — and the `--fail-under` threshold met, if one was given                                                            |
+| 1    | `--mapping`/`--schema` named something that does not exist, nothing matched the scope, or the gated role has no coverage to measure |
+| 2    | Parse or filesystem error                                                                                                           |
+| 3    | `--fail-under` threshold not met                                                                                                    |
 
-3 is distinct from 1 deliberately. `coverage --fail-under 90 --mapping "typo"` can fail because the name is misspelled *or* because the spec is genuinely incomplete; sharing a code would leave CI unable to tell "fix the pipeline" from "finish the mapping". (`fmt --check` avoids this only because it takes no scope arguments that can fail to resolve.)
+3 is distinct from 1 deliberately. `coverage --fail-under 90 --mapping "typo"` can fail because the name is misspelled _or_ because the spec is genuinely incomplete; sharing a code would leave CI unable to tell "fix the pipeline" from "finish the mapping". (`fmt --check` avoids this only because it takes no scope arguments that can fail to resolve.)
 
-An invalid flag *value* (`--role banana`, `--fail-under 150`) is a usage error: it reports the problem with help and exits 1, as everywhere else in the CLI.
+An invalid flag _value_ (`--role banana`, `--fail-under 150`) is a usage error: it reports the problem with help and exits 1, as everywhere else in the CLI.
 
 #### coverage vs fields --unmapped-by
 
 Both answer coverage questions and are the **same computation** — `fields --unmapped-by` delegates to it, so the two cannot disagree. Choose by shape of question:
 
-| Reach for | When |
-|---|---|
+| Reach for                                 | When                                                                               |
+| ----------------------------------------- | ---------------------------------------------------------------------------------- |
 | `fields <schema> --unmapped-by <mapping>` | One schema against one mapping, and you want the answer as a field tree with types |
-| `coverage` | Anything workspace-wide, aggregated across mappings, percentage-based, or CI-gated |
+| `coverage`                                | Anything workspace-wide, aggregated across mappings, percentage-based, or CI-gated |
 
 ## Transform Classification
 
 Every arrow the CLI returns carries a classification:
 
-| Classification | Meaning |
-|---|---|
-| `none` | No transform body (bare `src -> tgt`) |
-| `nl` | Transform body present — all pipe step content is natural language |
-| `nl-derived` | Implicit arrow inferred from an `@ref` in NL — not declared in any mapping |
+| Classification | Meaning                                                                    |
+| -------------- | -------------------------------------------------------------------------- |
+| `none`         | No transform body (bare `src -> tgt`)                                      |
+| `nl`           | Transform body present — all pipe step content is natural language         |
+| `nl-derived`   | Implicit arrow inferred from an `@ref` in NL — not declared in any mapping |
 
 All pipe steps — bare tokens like `trim`, quoted strings, and map literals — are natural language interpreted by a human or LLM. The classification is a simple presence check: any transform body → `nl`, no body → `none`. `nl-derived` arrows are synthetic: they are created when an NL `@ref` (e.g., `@schema.field`) resolves to a known field, and they carry `derived: true` with `transform_raw: "(NL ref)"`.
 
@@ -278,24 +301,24 @@ Cycles are handled gracefully — each field is visited at most once. NL-derived
 
 ## Common Flags
 
-| Flag | Purpose |
-|---|---|
+| Flag     | Purpose                                              |
+| -------- | ---------------------------------------------------- |
 | `--json` | Structured JSON output — the primary agent interface |
-| `--help` | What the command does and what it does not do |
+| `--help` | What the command does and what it does not do        |
 
 ### Per-command flags
 
-| Flag | Available on | Purpose |
-|---|---|---|
+| Flag        | Available on                                                                    | Purpose                                                          |
+| ----------- | ------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
 | `--compact` | `summary`, `schema`, `metric`, `mapping`, `find`, `lineage`, `context`, `graph` | Minimal output, omitting notes, NL strings, and transform bodies |
 
 ## Exit Codes
 
-| Code | Meaning |
-|---|---|
-| 0 | Success |
-| 1 | Not found or no results |
-| 2 | Parse error or filesystem error |
+| Code | Meaning                         |
+| ---- | ------------------------------- |
+| 0    | Success                         |
+| 1    | Not found or no results         |
+| 2    | Parse error or filesystem error |
 
 ## How Agents Use the CLI
 
@@ -331,7 +354,7 @@ satsuma coverage pipeline.stm --schema mart_customer_360 --uncovered --json
 
 Read `aggregate.schemas[].fields[]` for fields **no** mapping covers — that is the claim worth acting on. Read `mappings[].schemas[].fields[]` to see which mapping to edit. The two are not interchangeable: a field mapping A populates appears as a gap in mapping B's section.
 
-The CLI performs the aggregation because that is where callers composing it by hand went wrong — treating a field as unmapped because one mapping ignores it, when another populates it. What remains an agent judgement is *whether a gap matters*: read the arrow classification (`satsuma arrows`) and any NL notes. Note that a field a note references with an `@ref` is already counted, in the `nl` tier — the gaps left are fields nothing references at all, plus any whose `@ref` does not resolve (`satsuma lint`).
+The CLI performs the aggregation because that is where callers composing it by hand went wrong — treating a field as unmapped because one mapping ignores it, when another populates it. What remains an agent judgement is _whether a gap matters_: read the arrow classification (`satsuma arrows`) and any NL notes. Note that a field a note references with an `@ref` is already counted, in the `nl` tier — the gaps left are fields nothing references at all, plus any whose `@ref` does not resolve (`satsuma lint`).
 
 ### PII audit
 
@@ -397,7 +420,7 @@ satsuma arrows changed_schema.changed_field --as-source --json
 ## What the CLI Does Not Do
 
 - **Does not interpret NL.** Transform strings, notes, and comments are extracted verbatim. The CLI never assesses whether an NL transform is correct, complete, or semantically equivalent to another.
-- **Does not compose analysis workflows.** There are no `impact`, `audit`, `scaffold`, or `inventory` commands. These are agent workflows built from primitives — their correctness depends on NL interpretation that the CLI cannot perform. `coverage` is a command rather than a workflow precisely because it needs no NL *interpretation*: which fields an arrow references is a fact about the parse tree, resolving an `@ref` is structural resolution of a marked reference rather than a reading of prose, and the aggregation across mappings is arithmetic. Judging whether a given gap *matters* stays with the agent.
+- **Does not compose analysis workflows.** There are no `impact`, `audit`, `scaffold`, or `inventory` commands. These are agent workflows built from primitives — their correctness depends on NL interpretation that the CLI cannot perform. `coverage` is a command rather than a workflow precisely because it needs no NL _interpretation_: which fields an arrow references is a fact about the parse tree, resolving an `@ref` is structural resolution of a marked reference rather than a reading of prose, and the aggregation across mappings is arithmetic. Judging whether a given gap _matters_ stays with the agent.
 - **Does not call language models.** The CLI is deterministic, fast, and reproducible. Same input, same output, every time.
 - **Does not accept NL queries.** Commands take explicit structural arguments. The agent decides which commands to call based on the user's question.
 

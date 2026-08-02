@@ -1,6 +1,6 @@
 ---
 id: sl-r6b0
-status: open
+status: closed
 deps: [sl-fmx0]
 links: [3cc-iedv]
 created: 2026-07-31T14:43:38Z
@@ -30,3 +30,9 @@ addr -> address between records with three leaves reports all three leaves cover
 **2026-08-01T19:05:38Z**
 
 Sequencing note from sl-fmx0: the CoveredFieldPaths model and hasDirectlyCoveredAncestor are in place, but the direct set is still kind-blind — extraction registers each/flatten iteration subjects as direct paths, so subtree inheritance must not be turned on until the direct set distinguishes plain arrows from iteration headers (ExtractedArrow currently carries no such kind). Otherwise 'each parcels -> .packed { }' manufactures coverage for every leaf of parcels, the exact case sl-0pun's empty-each AC forbids. A test in coverage.test.js ("sl-r6b0's boundary") pins current behaviour and must be flipped by this ticket.
+
+**2026-08-02T15:42:49Z**
+
+Cause: an arrow onto a record registered only that one path, so all of the record's leaves reported as gaps (3cc-iedv). The obvious fix was blocked because the direct set was kind-blind — extraction emitted an identical record for a plain arrow and for an each/flatten header, so subtree inheritance would have manufactured coverage for every leaf under every each block.
+Fix: ExtractedArrow now carries `kind` (map/computed/nested/each/flatten) and `enumeratesChildren`. Coverage confers subtree coverage only when the declaration is a record-to-record correspondence (map or nested) AND its body enumerates no child arrows; each/flatten headers, computed arrows and resolved NL @refs never confer. Expansion runs at set-build time (expandWholeStructureRefs) against the resolver's declared field tree, so the covered set stays a plain set of paths and consumers need no new query. Recorded as ADR-037, amending ADR-034.
+Note on scope: the empty-body condition was the user's decision after I flagged that conferring from any nested_arrow header would reverse sl-qzy3's invariant (addr -> address { .street -> .line } must leave zip a gap). Example-corpus percentages are unchanged — it contains no whole-structure arrow onto a record.

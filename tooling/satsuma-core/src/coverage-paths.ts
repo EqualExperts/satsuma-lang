@@ -119,14 +119,19 @@ export function isDirectlyCovered(path: string, covered: CoveredFieldPaths): boo
  * covered ancestor would turn "one of twelve address fields is mapped" into
  * "all twelve are".
  *
- * **Not yet consulted by computeMappingCoverage.** The direct set is currently
- * kind-blind: an `each`/`flatten` header registers its iteration subject as a
- * direct path ("iterating a list consumes it"), so this query cannot yet tell
- * `addr -> address` (asserts the whole subtree) from `each items -> lines { }`
- * (opens an iteration scope and asserts nothing about unmentioned leaves).
- * Wiring it in without that distinction would manufacture coverage from every
- * each header. sl-r6b0 makes the direct set kind-aware and flips the
- * behaviour; until then this is a model-level query with model-level tests.
+ * **Not the route computeMappingCoverage takes.** Coverage implements R5 by
+ * expanding a whole-structure arrow into its declared subtree when the set is
+ * built, rather than by probing for a covered ancestor when it is read — the set
+ * stays a plain set of paths, so consumers holding the flat view need no new
+ * rule (sl-r6b0). This query is the same semantics expressed over the model, for
+ * a caller that has the model but not the schema's field tree.
+ *
+ * It answers a *weaker* question than coverage does, and the gap is deliberate:
+ * the direct set alone cannot tell `addr -> address` (asserts the whole subtree)
+ * from `each items -> lines { }` (opens an iteration scope and asserts nothing
+ * about unmentioned leaves), because both register their path directly. A caller
+ * that cannot make that distinction from its own inputs must not use this query
+ * to decide coverage.
  */
 export function hasDirectlyCoveredAncestor(path: string, covered: CoveredFieldPaths): boolean {
   // Inline prefix scan (rather than properPrefixesOf) so the probe allocates
