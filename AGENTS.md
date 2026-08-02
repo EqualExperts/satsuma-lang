@@ -80,7 +80,7 @@ Write code in the spirit of Literate Programming and Clean Code: code should rea
 
 - Every task must end with the relevant automated tests run locally and passing before picking up the next task.
 - Each task implementation must expand or update test coverage to match the behavior it adds or changes.
-- Keep the repo commit hooks installed and passing; they should block commits when required validation or tests fail.
+- Keep the repo commit hooks installed and passing; they should block commits when required validation or tests fail. See [Installing the pre-commit hook](#installing-the-pre-commit-hook) — **check it is installed before your first commit in any clone or worktree**.
 - New parser or tooling work must include targeted tests and fixture coverage.
 - Valid syntax changes should add or update canonical examples or corpus fixtures.
 - Invalid or recovery-sensitive behavior should include malformed input tests.
@@ -298,6 +298,9 @@ Expected workflow:
   root to install all dependencies, build the WASM parser, and compile the LSP
   server. Without this step, pre-commit hooks will fail on vscode-satsuma and
   tree-sitter tests.
+- **Check the pre-commit hook is installed before your first commit** in any clone
+  or worktree — see [Installing the pre-commit hook](#installing-the-pre-commit-hook).
+  If it isn't installed, install it. Do not just note it in the PR body.
 - Read the relevant feature doc in `features/` before implementing planned work.
 - Inspect existing examples and docs before making syntax or tooling assumptions.
 - Keep changes scoped and directly tied to the current task.
@@ -307,6 +310,32 @@ Expected workflow:
 - For work in `tooling/tree-sitter-satsuma/`, treat corpus tests in `tooling/tree-sitter-satsuma/test/corpus/` and generated parser artifacts as part of the implementation surface.
 - When changing the tree-sitter grammar, update the grammar source, regenerate parser outputs as needed, and verify the corpus fixtures.
 - **Before opening a PR**, review the commits on the branch and ask: *does this change represent an architectural decision that should be recorded?* Use `/adr-draft` to assess and draft. If an ADR is warranted, check with the user, draft it in `adrs/`, and mark any superseded ADRs (Status line only — ADR bodies are immutable). Include the ADR files in the PR commit. See `skills/adr-draft/SKILL.md` for the full assessment criteria and format.
+
+### Installing the pre-commit hook
+
+The repo's checks live in `.githooks/pre-commit`, which runs
+`scripts/run-repo-checks.sh`. Git only fires them if `core.hooksPath` points at
+`.githooks`. That setting is **local config, not tracked in the repo**, so it is
+missing in every fresh clone and every new worktree until someone sets it — and
+when it is missing, commits sail through with no checks at all and nothing warns
+you.
+
+Check it before your first commit in a clone or worktree:
+
+```bash
+git config core.hooksPath        # must print: .githooks
+```
+
+If it prints `.git/hooks`, prints nothing, or the hook is otherwise not firing,
+install it yourself — this is a one-line local fix, not something to defer or
+merely flag in the PR body:
+
+```bash
+git config core.hooksPath .githooks
+```
+
+Then confirm your commit actually runs the checks. A commit that completes
+instantly with no check output is the signature of an uninstalled hook.
 
 ## Adding a New Feature
 

@@ -37,6 +37,9 @@
     // Playwright failure artifacts (gitignored, but markdownlint scans the
     // working tree) — a failed browser run must not block later commits
     "!**/test-results/**",
-    "!**/playwright-report/**"
+    "!**/playwright-report/**",
+    // Local scratch space (gitignored) — untracked working files must not
+    // block commits
+    "!tmp/**"
   ]
 }
