@@ -109,6 +109,7 @@ Flags: `--json` (structured output), `--fix` (apply safe fixes), `--select <rule
 | `hidden-source-in-nl`  | error    | yes     | NL text references a schema not in the mapping's source/target list |
 | `unresolved-nl-ref`    | warning  | no      | `@ref` in NL does not resolve to any known identifier               |
 | `duplicate-definition` | error    | no      | Named definition is declared more than once in a namespace          |
+| `unenumerated-record-target` | warning | no | Arrow targets a record without a record source or child arrows |
 
 ### coverage
 
@@ -141,7 +142,9 @@ Counting a resolved `@ref` is **resolution, not interpretation**: the author wro
 
 **A whole-record arrow covers the whole record.** `addr -> address` onto a record-typed field asserts the structure maps across, so every leaf beneath `address` counts as covered. Two conditions gate it. The arrow must state a correspondence: an `each`/`flatten` header opens an iteration and a computed arrow (`-> containers { "..." }`) has no source, so neither one counts. And its body must enumerate nothing — once a header lists child arrows it is claiming those and no others, so `addr -> address { .street -> .line }` covers `street` and leaves `zip` a gap. A record that is merely the _ancestor_ of a covered leaf confers nothing downward either: with `address` copied wholesale and `billing` covered only by an arrow to `billing.city`, `billing.line1` is still a gap.
 
-Only the record the arrow names is examined — not the field opposite it. `addr -> out` credits `addr`'s leaves as consumed even though `out` is a scalar, which is the right reading of a whole record being read; `full_name -> address` credits every leaf of `address` even though one field feeds it, which is the generous one. Both ship deliberately (ADR-037); `3ct-cs4y` carries the question of tightening the second.
+**On the target side the arrow must also carry a record** (ADR-038). `addr -> address` covers `address` wholesale because a record arrives; `full_name -> address` does not, because one scalar cannot fill twelve leaves and the arrow does not say which one it would fill — so those leaves stay gaps, and `lint`'s `unenumerated-record-target` tells you which arrow left them that way. Any one container source is enough for a multi-source arrow, and a source path that resolves to nothing confers nothing.
+
+The **source** side has no such condition, deliberately: `addr -> out` credits `addr`'s leaves as consumed even though `out` is a scalar, because a whole record was read whatever received it.
 
 #### Per-mapping vs aggregate
 

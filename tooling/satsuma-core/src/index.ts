@@ -23,7 +23,7 @@ export { initParser, getParser, getLanguage, createQuery } from "./parser.js";
 export type { ParserInitOptions } from "./parser.js";
 export { collectParseErrors } from "./parse-errors.js";
 export type { ParseErrorEntry } from "./parse-errors.js";
-export { computeMappingCoverage } from "./coverage.js";
+export { computeMappingCoverage, declaredFieldKind } from "./coverage.js";
 export type {
   CoverageTier,
   FieldCoverageState,

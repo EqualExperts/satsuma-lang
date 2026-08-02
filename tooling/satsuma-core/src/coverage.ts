@@ -257,31 +257,76 @@ export function computeMappingCoverage(
   // list consumes it, and writing into one populates it. Whether that reference
   // reaches the container's *leaves* depends on the declaration kind — see
   // {@link ArrowFieldReference}.
+  // Schemas are resolved once, up front, rather than inside the two report loops
+  // below. The target side's whole-structure test has to ask what the *source*
+  // path names (ADR-038), so the source field trees must be in hand before
+  // `declaredTgt` is built.
+  const sources = resolveParticipants(sourceIds, resolveSchema);
+  const targets = resolveParticipants(targetIds, resolveSchema);
+
   const arrows = extractMappingArrowRecords(found.node);
-  const declaredSrc = arrows.flatMap((a) => a.sources.map((path) => arrowReference(path, a)));
+  const declaredSrc = arrows.flatMap((a) =>
+    a.sources.map((path) => ({ path, wholeStructure: declaresCorrespondence(a) })),
+  );
   const declaredTgt = arrows
     .filter((a) => a.target !== null)
-    .map((a) => arrowReference(a.target as string, a));
+    .map((a) => ({
+      path: a.target as string,
+      // Target-side only: a record is populated wholesale by an arrow that
+      // carries a record, not by one carrying a single scalar (ADR-038).
+      wholeStructure: declaresCorrespondence(a) && namesAContainer(a.sources, sources),
+    }));
 
   const nl = nlRefFieldPaths(nlRefs, found.mappingKey);
 
   const schemas: SchemaCoverageResult[] = [];
 
-  for (const schemaId of sourceIds) {
-    const def = resolveSchema(schemaId);
-    if (!def) continue;
-    schemas.push(coverageForSchema(def, schemaId, "source", sourceIds, declaredSrc, nl.anyContext));
+  for (const participant of sources) {
+    schemas.push(coverageForSchema(participant, "source", sourceIds, declaredSrc, nl.anyContext));
   }
 
-  for (const schemaId of targetIds) {
-    const def = resolveSchema(schemaId);
-    if (!def) continue;
+  for (const participant of targets) {
     schemas.push(
-      coverageForSchema(def, schemaId, "target", targetIds, declaredTgt, nl.arrowBodyOnly),
+      coverageForSchema(participant, "target", targetIds, declaredTgt, nl.arrowBodyOnly),
     );
   }
 
   return { schemas };
+}
+
+/**
+ * One schema a mapping names, paired with the definition the resolver returned.
+ *
+ * `writtenRef` is the form the mapping used; `def.schemaId` may canonicalise it,
+ * and a reference can legitimately use either — so both are kept and both are
+ * matched when a path's schema prefix is stripped.
+ */
+interface ParticipatingSchema {
+  /** Schema id exactly as written in the mapping's `source{}`/`target{}` block. */
+  writtenRef: string;
+  /** The resolved field tree and its uri. */
+  def: CoverageSchemaDefinition;
+}
+
+/**
+ * Resolve the schemas on one side of a mapping, dropping any the resolver cannot
+ * find.
+ *
+ * An unresolvable schema is omitted rather than reported: coverage is not a
+ * validation pass, and `validate` owns missing-reference diagnostics. The
+ * omission is also what makes an unresolvable *source* fail closed for
+ * whole-structure expansion — see {@link namesAContainer}.
+ */
+function resolveParticipants(
+  schemaIds: readonly string[],
+  resolveSchema: CoverageSchemaResolver,
+): ParticipatingSchema[] {
+  const resolved: ParticipatingSchema[] = [];
+  for (const writtenRef of schemaIds) {
+    const def = resolveSchema(writtenRef);
+    if (def) resolved.push({ writtenRef, def });
+  }
+  return resolved;
 }
 
 // ── Whole-structure arrows (PRD 38 R5, 3cc-iedv) ────────────────────────────
@@ -346,12 +391,51 @@ interface ArrowFieldReference {
  */
 const WHOLE_STRUCTURE_KINDS: readonly ArrowDeclarationKind[] = ["map", "nested"];
 
-/** Tag an authored path with what its declaration asserts about it. */
-function arrowReference(path: string, arrow: ExtractedArrow): ArrowFieldReference {
-  return {
-    path,
-    wholeStructure: WHOLE_STRUCTURE_KINDS.includes(arrow.kind) && !arrow.enumeratesChildren,
-  };
+/**
+ * True when the declaration states a correspondence over the whole structure it
+ * names, rather than over the parts its body lists — condition 1 AND condition 2
+ * of ADR-037, which are properties of the declaration alone.
+ *
+ * This is the whole test on the **source** side. The target side adds
+ * {@link namesAContainer} on top of it (ADR-038).
+ */
+function declaresCorrespondence(arrow: ExtractedArrow): boolean {
+  return WHOLE_STRUCTURE_KINDS.includes(arrow.kind) && !arrow.enumeratesChildren;
+}
+
+/**
+ * True when at least one of these authored paths names a declared container in
+ * one of the schemas on that side of the mapping.
+ *
+ * This is ADR-038's target-side condition: `addr -> address` populates the whole
+ * of `address` because a record arrives; `full_name -> address` does not,
+ * because one scalar cannot fill twelve leaves and the declaration says nothing
+ * about which leaf it would fill. Without the test, coverage credits all twelve
+ * — an overstatement in exactly the direction ADR-034 refused to risk, since it
+ * is `covered` that `--fail-under` gates.
+ *
+ * **Any one container source is enough.** A multi-source arrow
+ * (`addr, meta -> address`) asserts one correspondence built from several
+ * inputs, and a record among them makes the whole-structure reading plausible.
+ * Requiring all of them would turn a mixed arrow into a gap.
+ *
+ * **Fails closed.** A path naming nothing declared, or naming a schema the
+ * resolver could not resolve (so absent from `schemas` entirely), is not
+ * evidence of a record — so it does not confer. Under-counting is the safe
+ * direction (ADR-034), and a source path that resolves to nothing is already
+ * reported by `validate`'s `field-not-in-schema`.
+ */
+function namesAContainer(
+  paths: readonly string[],
+  schemas: readonly ParticipatingSchema[],
+): boolean {
+  const participatingRefs = schemas.map((s) => s.writtenRef);
+  return paths.some((path) =>
+    schemas.some((schema) => {
+      const local = schemaLocalPath(path, schema, participatingRefs);
+      return local !== null && declaredFieldKind(local, schema.def.fields) === "container";
+    }),
+  );
 }
 
 /**
@@ -392,13 +476,8 @@ function expandWholeStructureRefs(
  * consistent with the model for consumers that only hold the set.
  */
 function descendantPathsOf(path: string, fields: CoverageField[]): string[] {
-  let level: CoverageField[] | undefined = fields;
-  let found: CoverageField | undefined;
-  for (const segment of path.split(".")) {
-    found = level?.find((f) => f.name === segment);
-    if (!found) return [];
-    level = found.children;
-  }
+  const found = findDeclaredField(path, fields);
+  if (!found) return [];
 
   const paths: string[] = [];
   const collect = (children: CoverageField[], prefix: string): void => {
@@ -408,8 +487,77 @@ function descendantPathsOf(path: string, fields: CoverageField[]): string[] {
       if (child.children) collect(child.children, childPath);
     }
   };
-  collect(found?.children ?? [], path);
+  collect(found.children ?? [], path);
   return paths;
+}
+
+/**
+ * The declared field a schema-local dotted path names, or null when the schema
+ * declares no such path.
+ *
+ * The single walk of a {@link CoverageField} tree — {@link descendantPathsOf}
+ * and {@link declaredFieldKind} both go through it, so "what does this path
+ * name?" has one answer rather than one per caller.
+ */
+function findDeclaredField(path: string, fields: CoverageField[]): CoverageField | null {
+  let level: CoverageField[] | undefined = fields;
+  let found: CoverageField | undefined;
+  for (const segment of path.split(".")) {
+    found = level?.find((f) => f.name === segment);
+    if (!found) return null;
+    level = found.children;
+  }
+  return found ?? null;
+}
+
+/**
+ * What a schema-local dotted path names in a declared field tree: a `container`
+ * (a field with declared children — `record` or `list_of record`), a `leaf`, or
+ * `null` when this schema declares no such path.
+ *
+ * Exported because "is this arrow endpoint a record?" is asked in two places
+ * that must agree: coverage gates target-side subtree expansion on it
+ * (ADR-038), and the CLI's `unenumerated-record-target` lint rule reports the
+ * arrows that gate turns away. A second implementation would let the number and
+ * the explanation for it drift apart.
+ *
+ * A container with no declared children reads as a `leaf`, matching the rule
+ * `coverageForField` and `leafFieldEntries` apply when counting: as far as
+ * coverage is concerned a record nothing is declared inside carries data of its
+ * own.
+ */
+export function declaredFieldKind(
+  path: string,
+  fields: CoverageField[],
+): "container" | "leaf" | null {
+  const found = findDeclaredField(path, fields);
+  if (!found) return null;
+  return found.children && found.children.length > 0 ? "container" : "leaf";
+}
+
+/**
+ * Reduce an authored arrow path to one local to `schema`, or null when it names
+ * a different participating schema.
+ *
+ * Wraps {@link schemaLocalFieldPath} with the three inputs every caller has to
+ * assemble the same way: the schema's two legitimate spellings (as written in
+ * the mapping, and the id the resolver canonicalised it to), the other schemas
+ * on that side, and whether the schema shadows a prefix with a top-level field
+ * of the same name. Sharing it keeps `coverageForSchema` and
+ * {@link namesAContainer} resolving prefixes identically — if they diverged, a
+ * qualified arrow could confer a subtree in one and not the other.
+ */
+function schemaLocalPath(
+  ref: string,
+  schema: ParticipatingSchema,
+  participatingRefs: readonly string[],
+): string | null {
+  const canonicalRef = schema.def.schemaId ?? schema.writtenRef;
+  const ownRefs =
+    canonicalRef === schema.writtenRef ? [schema.writtenRef] : [schema.writtenRef, canonicalRef];
+  const otherRefs = participatingRefs.filter((r) => r !== schema.writtenRef);
+  const topLevelNames = new Set(schema.def.fields.map((f) => f.name));
+  return schemaLocalFieldPath(ref, ownRefs, otherRefs, (name) => topLevelNames.has(name));
 }
 
 // ── Resolved NL @ref paths (ADR-036) ────────────────────────────────────────
@@ -459,23 +607,17 @@ function nlRefFieldPaths(nlRefs: readonly ResolvedNLRef[], mappingKey: string): 
  * because the tier a field is reported under depends on which set matched.
  */
 function coverageForSchema(
-  def: CoverageSchemaDefinition,
-  writtenRef: string,
+  schema: ParticipatingSchema,
   role: "source" | "target",
   participatingRefs: readonly string[],
   declaredRefs: readonly ArrowFieldReference[],
   nlRefPaths: readonly string[],
 ): SchemaCoverageResult {
+  const { def } = schema;
   // A reference may name this schema by the form written in the mapping or by the
   // id the resolver canonicalised it to, so both must resolve.
-  const canonicalRef = def.schemaId ?? writtenRef;
-  const ownRefs = canonicalRef === writtenRef ? [writtenRef] : [writtenRef, canonicalRef];
-  const otherRefs = participatingRefs.filter((ref) => ref !== writtenRef);
-
-  const topLevelNames = new Set(def.fields.map((f) => f.name));
-  const declaresTopLevel = (name: string): boolean => topLevelNames.has(name);
-  const toLocal = (ref: string): string | null =>
-    schemaLocalFieldPath(ref, ownRefs, otherRefs, declaresTopLevel);
+  const canonicalRef = def.schemaId ?? schema.writtenRef;
+  const toLocal = (ref: string): string | null => schemaLocalPath(ref, schema, participatingRefs);
 
   const declaredLocal: ArrowFieldReference[] = [];
   for (const ref of declaredRefs) {

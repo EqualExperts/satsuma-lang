@@ -130,6 +130,17 @@ export type Classification = "none" | "nl" | "nl-derived";
 export interface ArrowRecord {
   mapping: string | null;
   namespace: string | null;
+  /**
+   * Which declaration shape produced this record, straight from core's
+   * `ExtractedArrow`. Consumers asking what an arrow *asserts* about a container
+   * — rather than merely which paths it names — branch on this.
+   */
+  kind: import("@satsuma/core").ArrowDeclarationKind;
+  /**
+   * True when this declaration's braces enumerate further arrows, so its claim
+   * is narrowed to the children it lists. See `ExtractedArrow` for the contract.
+   */
+  enumeratesChildren: boolean;
   sources: string[];
   target: string | null;
   transform_raw: string;
@@ -203,6 +214,14 @@ export interface ExtractedWorkspace {
   warnings: WarningRecord[];
   questions: QuestionRecord[];
   fieldArrows: Map<string, ArrowRecord[]>;
+  /**
+   * Every arrow in the workspace, once each, in file order.
+   *
+   * {@link fieldArrows} indexes the same records under many keys for lookup by
+   * field, so a rule that must visit each arrow exactly once — rather than each
+   * *reference* to one — reads this instead of de-duplicating that map.
+   */
+  arrows: ArrowRecord[];
   referenceGraph: ReferenceGraph;
   namespaceNames: Set<string>;
   nlRefData: NLRefData[];
