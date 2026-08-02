@@ -61,6 +61,7 @@ import { child, children, labelText, sourceRefStructuralText } from "./cst-utils
 import { buildCoveredFieldPaths, isCoveredPath, schemaLocalFieldPath } from "./coverage-paths.js";
 import type { CoveredFieldPaths } from "./coverage-paths.js";
 import { extractMappingArrowRecords } from "./extract.js";
+import type { ArrowDeclarationKind, ExtractedArrow } from "./extract.js";
 import type { ResolvedNLRef } from "./nl-ref.js";
 import type { SyntaxNode, Tree } from "./types.js";
 
@@ -253,10 +254,14 @@ export function computeMappingCoverage(
   //
   // The `each`/`flatten`/`nested_arrow` container itself yields a record too, so
   // a container's own source and target are registered as touched: iterating a
-  // list consumes it, and writing into one populates it.
+  // list consumes it, and writing into one populates it. Whether that reference
+  // reaches the container's *leaves* depends on the declaration kind — see
+  // {@link ArrowFieldReference}.
   const arrows = extractMappingArrowRecords(found.node);
-  const declaredSrc = arrows.flatMap((a) => a.sources);
-  const declaredTgt = arrows.map((a) => a.target).filter((t): t is string => t !== null);
+  const declaredSrc = arrows.flatMap((a) => a.sources.map((path) => arrowReference(path, a)));
+  const declaredTgt = arrows
+    .filter((a) => a.target !== null)
+    .map((a) => arrowReference(a.target as string, a));
 
   const nl = nlRefFieldPaths(nlRefs, found.mappingKey);
 
@@ -277,6 +282,119 @@ export function computeMappingCoverage(
   }
 
   return { schemas };
+}
+
+// ── Whole-structure arrows (PRD 38 R5, 3cc-iedv) ────────────────────────────
+
+/**
+ * One path a mapping's arrows reference, tagged with how much of it the
+ * declaration asserts.
+ */
+interface ArrowFieldReference {
+  /** Path as authored — absolute, but still carrying any schema prefix. */
+  path: string;
+  /**
+   * True when the declaration asserts the *whole* structure at this path maps
+   * (ADR-037). Two things must hold, and both are properties of the
+   * declaration, not of the path.
+   *
+   * **It must be a record-to-record correspondence.** `addr -> address` between
+   * two records says the structure maps across, so reporting its leaves as gaps
+   * reports a gap the author explicitly closed (3cc-iedv). A pipe-chain
+   * transform body does not change that — spec §4.4 makes it a pipeline, not a
+   * nesting scope. The other kinds name a container without asserting any such
+   * correspondence: `each items -> lines { … }` opens an iteration (the subject
+   * is registered because iterating a list consumes it, but nothing is claimed
+   * about `items.val`), and `-> containers { "no source data available" }` has
+   * no source at all — inheriting from prose is what ADR-036 forbids, and the
+   * one such arrow in the example corpus is flagged `//! DATA GAP` by its own
+   * author.
+   *
+   * **Its body must enumerate nothing.** A header that lists child arrows
+   * narrows its claim to what it lists: `addr -> address { .street -> .line }`
+   * says street maps, and says nothing about `zip`. Reading the header as
+   * wholesale would report `zip` as covered when nothing writes it (sl-qzy3).
+   *
+   * Getting this wrong is not a rounding error: the direct set was kind-blind
+   * until sl-r6b0, and turning inheritance on without the distinction would have
+   * manufactured coverage for every leaf under every `each` header.
+   */
+  wholeStructure: boolean;
+}
+
+/**
+ * The declaration kinds whose header asserts a whole-structure correspondence.
+ *
+ * Listed positively rather than as a negation, so a declaration kind added to
+ * the grammar defaults to the conservative reading — a new construct asserts
+ * nothing about a subtree until someone decides it does.
+ */
+const WHOLE_STRUCTURE_KINDS: readonly ArrowDeclarationKind[] = ["map", "nested"];
+
+/** Tag an authored path with what its declaration asserts about it. */
+function arrowReference(path: string, arrow: ExtractedArrow): ArrowFieldReference {
+  return {
+    path,
+    wholeStructure: WHOLE_STRUCTURE_KINDS.includes(arrow.kind) && !arrow.enumeratesChildren,
+  };
+}
+
+/**
+ * Expand every whole-structure reference into the subtree it asserts, and return
+ * the flat list of paths the covered-path model is built from.
+ *
+ * Expansion happens here, at set-build time, rather than as a wildcard probe
+ * during the walk. The covered set stays a plain set of paths, so every existing
+ * query over it — and every consumer holding the flat view — keeps working
+ * without learning a new rule.
+ *
+ * A reference is expanded only if it resolves to a declared container: a path
+ * naming a leaf, or naming nothing in this schema, contributes just itself.
+ *
+ * @param refs   Schema-local references, already stripped of any schema prefix.
+ * @param fields This schema's declared field tree, the authority on what a
+ *               subtree contains.
+ */
+function expandWholeStructureRefs(
+  refs: readonly ArrowFieldReference[],
+  fields: CoverageField[],
+): string[] {
+  const paths: string[] = [];
+  for (const ref of refs) {
+    paths.push(ref.path);
+    if (!ref.wholeStructure) continue;
+    paths.push(...descendantPathsOf(ref.path, fields));
+  }
+  return paths;
+}
+
+/**
+ * Every path beneath `path` in the declared field tree, dotted from the schema
+ * root — empty when the path names a leaf or is not declared here.
+ *
+ * Both records and their leaves are returned. The leaves are what coverage
+ * counts; the intermediate records keep the flat set view (`buildCoveredFieldSet`)
+ * consistent with the model for consumers that only hold the set.
+ */
+function descendantPathsOf(path: string, fields: CoverageField[]): string[] {
+  let level: CoverageField[] | undefined = fields;
+  let found: CoverageField | undefined;
+  for (const segment of path.split(".")) {
+    found = level?.find((f) => f.name === segment);
+    if (!found) return [];
+    level = found.children;
+  }
+
+  const paths: string[] = [];
+  const collect = (children: CoverageField[], prefix: string): void => {
+    for (const child of children) {
+      const childPath = `${prefix}.${child.name}`;
+      paths.push(childPath);
+      if (child.children) collect(child.children, childPath);
+    }
+  };
+  collect(found?.children ?? [], path);
+  return paths;
 }
 
 // ── Resolved NL @ref paths (ADR-036) ────────────────────────────────────────
@@ -330,7 +448,7 @@ function coverageForSchema(
   writtenRef: string,
   role: "source" | "target",
   participatingRefs: readonly string[],
-  declaredRefs: readonly string[],
+  declaredRefs: readonly ArrowFieldReference[],
   nlRefPaths: readonly string[],
 ): SchemaCoverageResult {
   // A reference may name this schema by the form written in the mapping or by the
@@ -344,16 +462,19 @@ function coverageForSchema(
   const toLocal = (ref: string): string | null =>
     schemaLocalFieldPath(ref, ownRefs, otherRefs, declaresTopLevel);
 
-  const declaredLocal: string[] = [];
+  const declaredLocal: ArrowFieldReference[] = [];
   for (const ref of declaredRefs) {
-    const local = toLocal(ref);
-    if (local !== null) declaredLocal.push(local);
+    const local = toLocal(ref.path);
+    if (local !== null) declaredLocal.push({ path: local, wholeStructure: ref.wholeStructure });
   }
 
   // A resolved @ref is always fully schema-qualified, so it belongs to this
   // schema only if the prefix actually came off. Requiring that — rather than
   // accepting the fall-through — keeps another schema's refs out of this set
   // instead of parking unmatchable paths in it.
+  //
+  // NL refs never expand into a subtree: prose naming a record is a reference to
+  // it, not a claim that every leaf beneath it maps (ADR-036).
   const nlLocal: string[] = [];
   for (const ref of nlRefPaths) {
     const local = toLocal(ref);
@@ -364,7 +485,7 @@ function coverageForSchema(
     schemaId: canonicalRef,
     role,
     fields: buildFieldCoverage(def.fields, def.uri, "", {
-      declared: buildCoveredFieldPaths(declaredLocal),
+      declared: buildCoveredFieldPaths(expandWholeStructureRefs(declaredLocal, def.fields)),
       nl: buildCoveredFieldPaths(nlLocal),
     }),
   };
@@ -426,11 +547,10 @@ interface FieldCoverageSubtree {
  * `partial` propagates upward while `covered` does not (with only `a.b.x`
  * mapped, `a.b` and `a` are both partial).
  *
- * The corollary is that a whole-record arrow (`addr -> address`) currently
- * leaves its record `uncovered`: it writes no leaf path, and a container no
- * longer vouches for itself. sl-r6b0 closes that by expanding such an arrow into
- * its subtree's leaves *before* this walk begins, which is the only way a
- * container can become covered without vouching for leaves nothing wrote.
+ * A whole-record arrow (`addr -> address`) still covers the record and all of
+ * its leaves — but it does so by having been expanded into those leaves before
+ * this walk began ({@link expandWholeStructureRefs}), which is the only way a
+ * container can read as covered without vouching for leaves nothing wrote.
  */
 function coverageForField(
   f: CoverageField,

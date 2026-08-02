@@ -2,6 +2,42 @@
 
 ## Unreleased
 
+### Container coverage is a tri-state, and a whole-record arrow covers its subtree (`sl-0pun`, `sl-r6b0`, closes `3cc-iedv`)
+
+Two changes to what "covered" means for a `record` or `list_of record` field.
+Leaf coverage is unchanged, so **no percentage in the example corpus moves** —
+but figures on your own files can move in both directions, and the editor gutter
+changes on the cases below.
+
+**A container's coverage is now computed from its leaves, and has three states.**
+`covered` means every descendant leaf is covered, `partial` means some are,
+`uncovered` means none are. `FieldCoverageEntry` carries this as a new `state`
+field; `mapped` is kept and redefined as `state !== "uncovered"`, so the VS Code
+gutter and `fields --unmapped-by` behave exactly as before. This replaces two
+contradictory definitions — the gutter painted a record when _any_ descendant was
+covered, the CLI review queue excluded one only when _all_ children were.
+
+Because a container is now judged only on its leaves, a container _reference_ no
+longer manufactures coverage for what is inside it. An `each parcels -> packed
+{ }` with an empty body, and a computed arrow whose body is prose describing a
+data gap (`-> containers { "no source data available" }`), both leave the
+container uncovered where they previously showed as mapped in the gutter.
+
+**A plain `addr -> address` arrow between two records now covers the record and
+every leaf beneath it** (3cc-iedv). Such an arrow asserts the structure maps
+across, so reporting its leaves as gaps reported a gap the author had closed. Two
+conditions gate it (ADR-037). The declaration must be a record-to-record
+correspondence — `a -> b`, with or without braces; an `each`/`flatten` header
+opens an iteration and a computed arrow (`-> containers { "..." }`) has no source,
+so neither asserts one. And its body must enumerate nothing: once a header lists
+child arrows it is claiming those and no others, so `addr -> address
+{ .street -> .line }` still leaves `zip` a gap. Resolved NL `@refs` never expand
+either — prose naming a record is a reference to it, not a claim that everything
+beneath it maps.
+
+Coverage figures on schemas using whole-record arrows will rise; figures that
+were resting on an `each` header or a computed arrow to a record will fall.
+
 ### Prettier and `ruff format` are now formatting gates (`pfg-9dk8`)
 
 JS/TS had no formatting gate at all (ESLint 10 ships no formatting rules) and
@@ -59,7 +95,7 @@ A resolved `@ref` now counts, as a **distinct tier** over the same denominator:
 - `--json` gains `covered_declared` and `covered_nl` on every counts object, and a
   `tier` on every covered field. Both are additive; `covered`, `total` and `pct`
   keep their meaning, and `covered` is still the figure `--fail-under` gates.
-- Only *resolved* refs count, so coverage cannot rise when a spec breaks. A field
+- Only _resolved_ refs count, so coverage cannot rise when a spec breaks. A field
   prose merely describes without an `@ref` stays uncovered. A ref in a
   `source {}` join or filter counts toward source coverage only — it names no
   target field.
@@ -78,7 +114,7 @@ tooltip reports how much of the figure came from `@refs`.
 directions.** Anyone tracking a coverage number, or gating CI with
 `coverage --fail-under`, should re-baseline it.
 
-Field coverage resolved by field *name* rather than by *path*. Every segment of
+Field coverage resolved by field _name_ rather than by _path_. Every segment of
 a covered path was registered as a standalone name, so a field whose own path
 matched a segment of any other covered path in the same schema read as mapped.
 Coverage now matches whole paths only:
@@ -90,7 +126,7 @@ Coverage now matches whole paths only:
   never mapped — this is the correction, not a regression.
 - **Some figures rise.** Schema-qualified arrows in multi-source mappings
   (`crm.consent.email_marketing -> consent_email`) previously matched only the
-  trailing leaf name, so they never matched a *nested* declared path and were
+  trailing leaf name, so they never matched a _nested_ declared path and were
   under-counted. The prefix is now resolved against the schema it names.
 
 Affects `satsuma coverage` (including `--fail-under`), `satsuma fields

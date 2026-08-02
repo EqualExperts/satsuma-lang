@@ -851,9 +851,45 @@ export function canonicalPipeChainText(pipeSteps: SyntaxNode[]): string {
   return pipeSteps.map((s) => canonicalPipeStepText(s.namedChildren[0], s.text)).join(" | ");
 }
 
+/**
+ * Which declaration produced an arrow record — spec §4.4's three shapes plus the
+ * two list operators.
+ *
+ * `map` — a plain `a -> b`, optionally with a pipe-chain transform body. It
+ *   names a path and nothing narrows the claim.
+ * `computed` — `-> b { ... }`, no source; the body is a transform pipeline or
+ *   prose, so nothing is asserted to flow into `b` from anywhere declared.
+ * `nested` — `a -> b { ... }` whose braces hold further arrows. The body is a
+ *   nesting scope that enumerates what maps.
+ * `each` / `flatten` — a list operator; its src/tgt are the iteration subject
+ *   and its body enumerates what maps per element.
+ *
+ * The distinction matters to any consumer asking what an arrow *asserts* about a
+ * container, because only `map` asserts anything about the whole of one — the
+ * other four name a container and then say, in their body, exactly which parts
+ * of it map. Coverage is the first such consumer (PRD 38 R5).
+ */
+export type ArrowDeclarationKind = "map" | "computed" | "nested" | "each" | "flatten";
+
 export interface ExtractedArrow {
   mapping: string | null;
   namespace: string | null;
+  /** The declaration shape this record came from — see {@link ArrowDeclarationKind}. */
+  kind: ArrowDeclarationKind;
+  /**
+   * True when this declaration's braces enumerate further arrow declarations.
+   *
+   * Only the three nesting kinds can: a `map` or `computed` body is a transform
+   * pipeline, not a scope (spec §4.4), so both are always false. A nesting kind
+   * with an empty body is false too — `addr -> address { }` opens a scope and
+   * puts nothing in it.
+   *
+   * Consumers use it to tell a header that *narrows* its claim to the fields it
+   * lists from one that makes no such narrowing. Coverage is the first
+   * (ADR-037): `addr -> address { }` asserts the whole structure maps, while
+   * `addr -> address { .street -> .line }` asserts only what it enumerates.
+   */
+  enumeratesChildren: boolean;
   sources: string[];
   target: string | null;
   transform_raw: string;
@@ -1007,6 +1043,8 @@ function extractSingleArrow(
   const record: ExtractedArrow = {
     mapping: mappingName,
     namespace,
+    kind: arrowDeclarationKind(arrow.type),
+    enumeratesChildren: arrow.namedChildren.some((c) => ARROW_DECLARATION_TYPES.has(c.type)),
     sources,
     target,
     transform_raw: transformRaw,
@@ -1022,6 +1060,42 @@ function extractSingleArrow(
   }
 
   return record;
+}
+
+/**
+ * Every CST node type that is an arrow declaration — grammar.js's `_arrow_decl`
+ * choice plus the two list operators, which `_nested_block_item` adds inside
+ * `each`/`flatten` bodies. Kept in step with those two grammar rules.
+ */
+const ARROW_DECLARATION_TYPES = new Set([
+  "map_arrow",
+  "computed_arrow",
+  "nested_arrow",
+  "each_block",
+  "flatten_block",
+]);
+
+/**
+ * Map an arrow-declaration CST node type onto its {@link ArrowDeclarationKind}.
+ *
+ * Total over the node types `collectArrowRecords` dispatches on; anything else
+ * would be a caller bug, and `map` is the reading that asserts the most, so
+ * falling back to it would be the dangerous default. `computed` is the
+ * conservative one, and is what an unrecognised shape gets.
+ */
+function arrowDeclarationKind(nodeType: string): ArrowDeclarationKind {
+  switch (nodeType) {
+    case "map_arrow":
+      return "map";
+    case "nested_arrow":
+      return "nested";
+    case "each_block":
+      return "each";
+    case "flatten_block":
+      return "flatten";
+    default:
+      return "computed";
+  }
 }
 
 /**

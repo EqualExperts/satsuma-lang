@@ -24,6 +24,7 @@ import {
   extractMappings,
   extractNLRefData,
   resolveAllNLRefs,
+  summarizeFieldCoverage,
 } from "@satsuma/core";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -319,14 +320,11 @@ mapping load {
     assertMapped(src, "address.line2", false);
   });
 
-  it("a whole-record arrow does not (yet) cover the record or its leaves — sl-r6b0's boundary", () => {
-    // Pins the deliberate limit that sl-r6b0 closes: `address -> address` writes
-    // no leaf path, and since sl-0pun a container is judged only on its leaves,
-    // so the whole record reads uncovered. sl-r6b0 makes the direct set
-    // kind-aware and expands such an arrow into its subtree, at which point this
-    // test flips to `covered` throughout. If it starts failing WITHOUT that work,
-    // coverage has begun inheriting through kind-blind direct paths, which
-    // manufactures coverage from every `each` header (PRD 38 R5, 3cc-iedv).
+  it("a whole-record arrow covers the record and every leaf beneath it", () => {
+    // The case 3cc-iedv was raised for: `address -> address` between two records
+    // asserts the structure maps across, so reporting its leaves as gaps reports
+    // a gap the author explicitly closed. This test previously pinned the
+    // opposite (sl-r6b0's boundary) — the flip is the acceptance signal.
     const WHOLE_RECORD = `
 schema src { address record { line1 STRING line2 STRING } }
 schema tgt { address record { line1 STRING line2 STRING } }
@@ -336,9 +334,195 @@ mapping copy {
   address -> address
 }`;
     const tgt = forRole(coverage(WHOLE_RECORD, "copy"), "target");
-    assertState(tgt, "address", "uncovered");
-    assertMapped(tgt, "address.line1", false);
-    assertMapped(tgt, "address.line2", false);
+    assertState(tgt, "address", "covered");
+    assertState(tgt, "address.line1", "covered");
+    assertState(tgt, "address.line2", "covered");
+  });
+});
+
+// ── Whole-subtree arrows (PRD 38 R5, sl-r6b0, closes 3cc-iedv) ──────────────
+
+describe("computeMappingCoverage — whole-subtree arrows", () => {
+  it("counts every leaf of a wholesale-copied record toward the total", () => {
+    // The headline R5 number: three leaves in, three leaves covered, 3/3.
+    // Counting the record's leaves as gaps was the under-count 3cc-iedv records.
+    const THREE_LEAVES = `
+schema src { address record { line1 STRING line2 STRING city STRING } }
+schema tgt { address record { line1 STRING line2 STRING city STRING } }
+mapping copy {
+  source { src }
+  target { tgt }
+  address -> address
+}`;
+    const tgt = forRole(coverage(THREE_LEAVES, "copy"), "target");
+    const covered = tgt.fields.filter((f) => f.path.startsWith("address.") && f.mapped);
+    assert.equal(covered.length, 3, "all three leaves are covered");
+    assertState(tgt, "address", "covered");
+  });
+
+  it("does not let a record that is merely an ancestor confer coverage downward", () => {
+    // The distinction R1's direct/derived split exists for, and the exact fix
+    // 3cc-iedv says a naive "inherit from any covered ancestor" would break:
+    // `address` is covered wholesale, `billing` only via one leaf. If ancestry
+    // conferred coverage, `billing.line1` would read covered — turning "one of
+    // twelve address fields is mapped" into "all twelve are".
+    const MIXED = `
+schema src { a STRING b STRING }
+schema tgt {
+  address record { line1 STRING city STRING }
+  billing record { line1 STRING city STRING }
+}
+mapping copy {
+  source { src }
+  target { tgt }
+  a -> address
+  b -> billing.city
+}`;
+    const tgt = forRole(coverage(MIXED, "copy"), "target");
+    assertState(tgt, "address", "covered");
+    assertState(tgt, "address.line1", "covered");
+    assertState(tgt, "billing", "partial");
+    assertState(tgt, "billing.city", "covered");
+    assertState(tgt, "billing.line1", "uncovered");
+  });
+
+  it("expands a whole-subtree arrow onto a list_of record the same way", () => {
+    // A list of records is a container like any other — the arrow asserts the
+    // element structure maps across. Treating list_of differently would make the
+    // rule depend on cardinality, which coverage has no view on.
+    const LIST = `
+schema src { lines list_of record { sku STRING qty INT } }
+schema tgt { lines list_of record { sku STRING qty INT } }
+mapping copy {
+  source { src }
+  target { tgt }
+  lines -> lines
+}`;
+    const tgt = forRole(coverage(LIST, "copy"), "target");
+    assertState(tgt, "lines", "covered");
+    assertState(tgt, "lines.sku", "covered");
+    assertState(tgt, "lines.qty", "covered");
+  });
+
+  it("expands nested records to their full depth, not one level", () => {
+    // A subtree is a subtree. Stopping at direct children would leave the deepest
+    // leaves — the ones hardest to notice missing — reported as gaps.
+    const DEEP = `
+schema src { v STRING }
+schema tgt { a record { b record { x STRING y STRING } z STRING } }
+mapping copy {
+  source { src }
+  target { tgt }
+  v -> a
+}`;
+    const tgt = forRole(coverage(DEEP, "copy"), "target");
+    assertState(tgt, "a", "covered");
+    assertState(tgt, "a.b", "covered");
+    assertState(tgt, "a.b.x", "covered");
+    assertState(tgt, "a.z", "covered");
+  });
+
+  it("does not double count when a whole-subtree arrow overlaps a sibling arrow", () => {
+    // Two arrows can name the same leaf — one wholesale, one specifically. The
+    // covered set is a set, so the leaf is counted once and the percentage
+    // cannot exceed 100%.
+    const OVERLAP = `
+schema src { a STRING b STRING }
+schema tgt { address record { line1 STRING city STRING } }
+mapping copy {
+  source { src }
+  target { tgt }
+  a -> address
+  b -> address.city
+}`;
+    const tgt = forRole(coverage(OVERLAP, "copy"), "target");
+    const totals = summarizeFieldCoverage(tgt.fields);
+    assert.deepEqual(
+      { covered: totals.covered, total: totals.total, pct: totals.pct },
+      { covered: 2, total: 2, pct: 100 },
+    );
+  });
+
+  it("does not confer subtree coverage from an each block's iteration subject", () => {
+    // The constraint that made this ticket depend on kind-awareness. `items` is
+    // registered as a direct path because iterating a list consumes it — but the
+    // block's body says only `id` maps, so `val` must stay a gap. Inheriting here
+    // would manufacture coverage for every leaf under every `each` header.
+    const EACH = `
+schema src { items list_of record { id INT val STRING } }
+schema tgt { lines list_of record { item_id INT } }
+mapping load {
+  source { src }
+  target { tgt }
+  each items -> lines {
+    id -> item_id
+  }
+}`;
+    const src = forRole(coverage(EACH, "load"), "source");
+    assertState(src, "items", "partial");
+    assertState(src, "items.id", "covered");
+    assertState(src, "items.val", "uncovered");
+  });
+
+  it("confers subtree coverage from a nested arrow whose body enumerates nothing", () => {
+    // ADR-037's second condition. `customer -> cust { }` is a record-to-record
+    // correspondence that lists no child, so it narrows nothing and reads as
+    // wholesale — the same claim as `customer -> cust` written without braces.
+    // The paired case below is what happens once the body does list a child.
+    const EMPTY_BODY = `
+schema src { customer record { name STRING email STRING } }
+schema tgt { cust record { name STRING } }
+mapping load {
+  source { src }
+  target { tgt }
+  customer -> cust {
+  }
+}`;
+    const src = forRole(coverage(EMPTY_BODY, "load"), "source");
+    assertState(src, "customer", "covered");
+    assertState(src, "customer.email", "covered");
+  });
+
+  it("stops conferring once a nested arrow's body enumerates a child", () => {
+    // The narrowing rule, and the invariant sl-qzy3 established: a header that
+    // says which fields map is claiming those and no others, so `email` — named
+    // nowhere — stays a gap. Without this, adding one child arrow to a wholesale
+    // copy would be the only way to *lose* coverage, which is backwards.
+    const ENUMERATED = `
+schema src { customer record { name STRING email STRING } }
+schema tgt { cust record { name STRING } }
+mapping load {
+  source { src }
+  target { tgt }
+  customer -> cust {
+    .name -> .name
+  }
+}`;
+    const src = forRole(coverage(ENUMERATED, "load"), "source");
+    assertState(src, "customer", "partial");
+    assertState(src, "customer.name", "covered");
+    assertState(src, "customer.email", "uncovered");
+  });
+
+  it("expands a whole-subtree arrow written with a schema prefix", () => {
+    // In a multi-source mapping arrows name their schema. Expansion runs after
+    // the prefix is resolved away, so `crm.address -> address` must reach the
+    // leaves of `crm`'s address — and contribute nothing to the other source.
+    const QUALIFIED = `
+schema crm { address record { line1 STRING city STRING } }
+schema ops { address record { line1 STRING city STRING } }
+schema tgt { out STRING }
+mapping load {
+  source { crm, ops }
+  target { tgt }
+  crm.address -> out
+}`;
+    const result = coverage(QUALIFIED, "load");
+    const crm = result.schemas.find((s) => s.schemaId === "crm");
+    const ops = result.schemas.find((s) => s.schemaId === "ops");
+    assertState(crm, "address", "covered");
+    assertState(crm, "address.city", "covered");
+    assertState(ops, "address", "uncovered");
   });
 });
 

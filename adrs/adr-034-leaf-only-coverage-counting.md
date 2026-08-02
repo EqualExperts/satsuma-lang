@@ -1,6 +1,6 @@
 # ADR-034 — Leaf-Only Coverage Counting on a Field's Own Flag
 
-**Status:** Accepted
+**Status:** Accepted — amended by ADR-037
 **Date:** 2026-07-31 (sl-4qvp, feature 35)
 
 ## Context
@@ -22,7 +22,7 @@ Counting every entry is not an option — a record and its children describe the
 same data, so a nested schema would be counted at two levels, and a schema's
 nesting depth alone would move its percentage. Both existing consumers already
 recognised this and solved it differently.
-`vscode-satsuma/src/commands/coverage-logic.ts:82` counts *top-level* fields
+`vscode-satsuma/src/commands/coverage-logic.ts:82` counts _top-level_ fields
 only, filtering `!f.path.includes(".")`. That avoids double-counting but reports
 a twelve-field `address` record as a single unit, so one mapped leaf reads as a
 fully covered record.
@@ -61,8 +61,7 @@ The known cost is accepted deliberately: a whole-record arrow under-reports,
 because its leaves are never individually referenced. Correcting it requires
 `computeMappingCoverage()` to track directly-covered paths separately from
 prefix-registered ancestors, which changes the per-mapping contract the VS Code
-gutter consumes. That work is tracked as `3cc-iedv` and was kept out of feature
-35.
+gutter consumes. That work is tracked as `3cc-iedv` and was kept out of feature 35.
 
 ## Consequences
 
@@ -72,7 +71,7 @@ gutter consumes. That work is tracked as `3cc-iedv` and was kept out of feature
   viz overlay figure cannot disagree, because none of them computes its own.
 - Percentages measure data, not structure. Re-nesting a schema's fields into
   records without changing a single arrow leaves every percentage unchanged.
-- The error direction is safe. A whole-record arrow makes coverage look *worse*
+- The error direction is safe. A whole-record arrow makes coverage look _worse_
   than it is, so the failure mode is a reviewer investigating a gap that turns
   out to be filled — not a gate passing a spec with twelve unmapped fields.
 - Field lists and counts are guaranteed consistent, because both derive from
