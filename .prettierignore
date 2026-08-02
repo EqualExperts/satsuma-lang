@@ -1,0 +1,32 @@
+# Prettier ignore list (pfg-9dk8).
+#
+# Mirrors the `ignores` block in eslint.config.mjs: generated or tool-managed
+# surfaces are not ours to format. Prettier is scoped to JS/TS via the glob in
+# the lint:js script, so markdown/YAML/JSON are untouched (they have their own
+# linters: markdownlint-cli2 and yamllint).
+
+# Dependencies and worktrees
+node_modules/
+.worktrees/
+
+# Agent/tool state
+.claude/
+.tickets/
+
+# Local scratch space (gitignored)
+tmp/
+
+# Generated parser artifacts (tree-sitter output, not hand-written)
+tooling/tree-sitter-satsuma/src/
+tooling/tree-sitter-satsuma/bindings/
+tooling/satsuma-cli/src/generated/
+
+# Build output
+build/
+dist/
+
+# Minified or vendored site assets
+*.min.js
+site/js/tailwind.js
+site/_site/
+site/playground/
