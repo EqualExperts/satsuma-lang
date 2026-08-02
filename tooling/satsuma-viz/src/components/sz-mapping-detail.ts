@@ -10,8 +10,15 @@ import type {
   NestedArrowBlock,
 } from "../model.js";
 import { SzNavigateEvent, SzFieldHoverEvent } from "../satsuma-viz.js";
-import { forEachMappingArrow, resolveSchemaLocalFieldPath } from "../field-coverage.js";
+import {
+  MAPPING_BODY_SCOPE,
+  forEachMappingArrow,
+  resolveSchemaLocalFieldPath,
+  scopeWithin,
+} from "../field-coverage.js";
+import type { ContainerScope } from "../field-coverage.js";
 import { highlightAtRefs } from "../markdown.js";
+import { qualifyChildArrowPath } from "@satsuma/core/extract";
 
 function sanitizeTestIdSegment(value: string): string {
   const lowered = value.toLowerCase();
@@ -441,14 +448,14 @@ export class SzMappingDetail extends LitElement {
     // hand-rolled loops over the top-level collections missed nested-each arrows
     // (sl-fm0q), and nestedEach-only recursion missed flatten-inside-each
     // (sl-vu22).
-    forEachMappingArrow(m, (a) => {
+    forEachMappingArrow(m, ({ sourceFields, targetField: arrowTarget }) => {
       const targetSchema = this.targetSchema;
       const localTargetPath = targetSchema
-        ? resolveSchemaLocalFieldPath(a.targetField, targetSchema, [m.targetRef])
+        ? resolveSchemaLocalFieldPath(arrowTarget, targetSchema, [m.targetRef])
         : null;
       if (localTargetPath === targetField) {
         for (const sourceSchema of this.sourceSchemas) {
-          for (const sf of a.sourceFields) {
+          for (const sf of sourceFields) {
             const localSourcePath = resolveSchemaLocalFieldPath(sf, sourceSchema, m.sourceRefs);
             if (!localSourcePath) continue;
             if (!result.has(sourceSchema.qualifiedId))
@@ -475,13 +482,13 @@ export class SzMappingDetail extends LitElement {
     // hand-rolled loops over the top-level collections missed nested-each arrows
     // (sl-fm0q), and nestedEach-only recursion missed flatten-inside-each
     // (sl-vu22).
-    forEachMappingArrow(m, (a) => {
-      const sourceMatches = a.sourceFields.some((sf) => {
+    forEachMappingArrow(m, ({ sourceFields, targetField }) => {
+      const sourceMatches = sourceFields.some((sf) => {
         const localSourcePath = resolveSchemaLocalFieldPath(sf, sourceSchema, m.sourceRefs);
         return localSourcePath === sourceField;
       });
       if (sourceMatches) {
-        const localTargetPath = resolveSchemaLocalFieldPath(a.targetField, targetSchema, [
+        const localTargetPath = resolveSchemaLocalFieldPath(targetField, targetSchema, [
           m.targetRef,
         ]);
         if (localTargetPath) result.add(localTargetPath);
@@ -491,11 +498,15 @@ export class SzMappingDetail extends LitElement {
   }
 
   /** Check if an arrow row should be highlighted. */
-  private _isArrowHighlighted(a: ArrowEntry): boolean {
+  private _isArrowHighlighted(a: ArrowEntry, scope: ContainerScope): boolean {
     if (this._hoveredArrow === a) return true;
     if (!this._hoveredCardField || !this._hoveredCardSchema) return false;
 
     const m = this.mapping!;
+    // Card fields are declared paths, so the arrow's authored path has to be
+    // qualified against its container before the two can be compared — without
+    // it, hovering `parcels.line1` never lit the `.line1 -> .line1` row that
+    // populates it (3cdd-yavi).
     if (m.sourceRefs.includes(this._hoveredCardSchema)) {
       const sourceSchema = this.sourceSchemas.find(
         (schema) => schema.qualifiedId === this._hoveredCardSchema,
@@ -503,16 +514,23 @@ export class SzMappingDetail extends LitElement {
       return (
         !!sourceSchema &&
         a.sourceFields.some((sf) => {
-          const localSourcePath = resolveSchemaLocalFieldPath(sf, sourceSchema, m.sourceRefs);
+          const qualified = qualifyChildArrowPath(sf, scope.source);
+          const localSourcePath = resolveSchemaLocalFieldPath(
+            qualified,
+            sourceSchema,
+            m.sourceRefs,
+          );
           return localSourcePath === this._hoveredCardField;
         })
       );
     } else if (this._hoveredCardSchema === m.targetRef) {
       const targetSchema = this.targetSchema;
       if (!targetSchema) return false;
-      const localTargetPath = resolveSchemaLocalFieldPath(a.targetField, targetSchema, [
-        m.targetRef,
-      ]);
+      const localTargetPath = resolveSchemaLocalFieldPath(
+        qualifyChildArrowPath(a.targetField, scope.target),
+        targetSchema,
+        [m.targetRef],
+      );
       return localTargetPath === this._hoveredCardField;
     }
     return false;
@@ -655,10 +673,12 @@ export class SzMappingDetail extends LitElement {
             </tr>
           </thead>
           <tbody>
-            ${m.arrows.map((a) => this._renderArrowRow(a, ""))}
-            ${m.eachBlocks.map((eb) => this._renderEachSection(eb, ""))}
-            ${m.flattenBlocks.map((fb) => this._renderFlattenSection(fb, ""))}
-            ${m.nestedArrows.map((na) => this._renderNestedArrowSection(na, ""))}
+            ${m.arrows.map((a) => this._renderArrowRow(a, "", MAPPING_BODY_SCOPE))}
+            ${m.eachBlocks.map((eb) => this._renderEachSection(eb, "", MAPPING_BODY_SCOPE))}
+            ${m.flattenBlocks.map((fb) => this._renderFlattenSection(fb, "", MAPPING_BODY_SCOPE))}
+            ${m.nestedArrows.map((na) =>
+              this._renderNestedArrowSection(na, "", MAPPING_BODY_SCOPE),
+            )}
           </tbody>
         </table>
       </div>
@@ -667,8 +687,17 @@ export class SzMappingDetail extends LitElement {
 
   // sectionPrefix disambiguates arrow rows that share a target field across
   // nested each/flatten sections (sl-eikr). Empty string for top-level rows.
-  private _renderArrowRow(a: ArrowEntry, sectionPrefix: string): TemplateResult {
-    const hl = this._isArrowHighlighted(a) ? "hl" : "";
+  //
+  // `scope` is the container the row sits in. The row *renders* the paths as
+  // authored — `.line1` under its `each` heading is what the author wrote — but
+  // deciding whether it lights up when a card field is hovered is a resolution
+  // question, and resolution needs the absolute path (3cdd-yavi).
+  private _renderArrowRow(
+    a: ArrowEntry,
+    sectionPrefix: string,
+    scope: ContainerScope,
+  ): TemplateResult {
+    const hl = this._isArrowHighlighted(a, scope) ? "hl" : "";
     const noteEntry = a.metadata.find((m) => m.key === "note");
     const targetId = sanitizeTestIdSegment(a.targetField);
     const rowTestId = sectionPrefix
@@ -724,9 +753,14 @@ export class SzMappingDetail extends LitElement {
     return html`<span class="transform-nl">${unsafeHTML(highlightAtRefs(t.text))}</span>`;
   }
 
-  private _renderEachSection(eb: EachBlock, parentPrefix: string): TemplateResult {
+  private _renderEachSection(
+    eb: EachBlock,
+    parentPrefix: string,
+    parentScope: ContainerScope,
+  ): TemplateResult {
     const sectionId = sanitizeTestIdSegment(`each-${eb.targetField}`);
     const sectionPrefix = parentPrefix ? `${parentPrefix}-${sectionId}` : sectionId;
+    const scope = scopeWithin(parentScope, eb);
     return html`
       <tr class="scope-section" data-testid=${`${this.testIdPrefix}-${sectionPrefix}`}>
         <td colspan="4">
@@ -736,16 +770,21 @@ export class SzMappingDetail extends LitElement {
           </div>
         </td>
       </tr>
-      ${eb.arrows.map((a) => this._renderArrowRow(a, sectionPrefix))}
-      ${eb.nestedEach.map((ne) => this._renderEachSection(ne, sectionPrefix))}
-      ${eb.nestedFlatten.map((nf) => this._renderFlattenSection(nf, sectionPrefix))}
-      ${eb.nestedArrows.map((na) => this._renderNestedArrowSection(na, sectionPrefix))}
+      ${eb.arrows.map((a) => this._renderArrowRow(a, sectionPrefix, scope))}
+      ${eb.nestedEach.map((ne) => this._renderEachSection(ne, sectionPrefix, scope))}
+      ${eb.nestedFlatten.map((nf) => this._renderFlattenSection(nf, sectionPrefix, scope))}
+      ${eb.nestedArrows.map((na) => this._renderNestedArrowSection(na, sectionPrefix, scope))}
     `;
   }
 
-  private _renderFlattenSection(fb: FlattenBlock, parentPrefix: string): TemplateResult {
+  private _renderFlattenSection(
+    fb: FlattenBlock,
+    parentPrefix: string,
+    parentScope: ContainerScope,
+  ): TemplateResult {
     const sectionId = sanitizeTestIdSegment(`flatten-${fb.sourceField}`);
     const sectionPrefix = parentPrefix ? `${parentPrefix}-${sectionId}` : sectionId;
+    const scope = scopeWithin(parentScope, fb);
     return html`
       <tr class="scope-section" data-testid=${`${this.testIdPrefix}-${sectionPrefix}`}>
         <td colspan="4">
@@ -757,10 +796,10 @@ export class SzMappingDetail extends LitElement {
           </div>
         </td>
       </tr>
-      ${fb.arrows.map((a) => this._renderArrowRow(a, sectionPrefix))}
-      ${fb.nestedEach.map((ne) => this._renderEachSection(ne, sectionPrefix))}
-      ${fb.nestedFlatten.map((nf) => this._renderFlattenSection(nf, sectionPrefix))}
-      ${fb.nestedArrows.map((na) => this._renderNestedArrowSection(na, sectionPrefix))}
+      ${fb.arrows.map((a) => this._renderArrowRow(a, sectionPrefix, scope))}
+      ${fb.nestedEach.map((ne) => this._renderEachSection(ne, sectionPrefix, scope))}
+      ${fb.nestedFlatten.map((nf) => this._renderFlattenSection(nf, sectionPrefix, scope))}
+      ${fb.nestedArrows.map((na) => this._renderNestedArrowSection(na, sectionPrefix, scope))}
     `;
   }
 
@@ -768,9 +807,14 @@ export class SzMappingDetail extends LitElement {
   // arrows the way each/flatten group a list's, so it renders as the same kind
   // of scope section. Before svdfe-s6we these blocks were absent from the model
   // and their arrows simply missing from this table.
-  private _renderNestedArrowSection(na: NestedArrowBlock, parentPrefix: string): TemplateResult {
+  private _renderNestedArrowSection(
+    na: NestedArrowBlock,
+    parentPrefix: string,
+    parentScope: ContainerScope,
+  ): TemplateResult {
     const sectionId = sanitizeTestIdSegment(`nested-${na.targetField}`);
     const sectionPrefix = parentPrefix ? `${parentPrefix}-${sectionId}` : sectionId;
+    const scope = scopeWithin(parentScope, na);
     return html`
       <tr class="scope-section" data-testid=${`${this.testIdPrefix}-${sectionPrefix}`}>
         <td colspan="4">
@@ -780,10 +824,10 @@ export class SzMappingDetail extends LitElement {
           </div>
         </td>
       </tr>
-      ${na.arrows.map((a) => this._renderArrowRow(a, sectionPrefix))}
-      ${na.nestedEach.map((ne) => this._renderEachSection(ne, sectionPrefix))}
-      ${na.nestedFlatten.map((nf) => this._renderFlattenSection(nf, sectionPrefix))}
-      ${na.nestedArrows.map((nn) => this._renderNestedArrowSection(nn, sectionPrefix))}
+      ${na.arrows.map((a) => this._renderArrowRow(a, sectionPrefix, scope))}
+      ${na.nestedEach.map((ne) => this._renderEachSection(ne, sectionPrefix, scope))}
+      ${na.nestedFlatten.map((nf) => this._renderFlattenSection(nf, sectionPrefix, scope))}
+      ${na.nestedArrows.map((nn) => this._renderNestedArrowSection(nn, sectionPrefix, scope))}
     `;
   }
 

@@ -71,6 +71,27 @@ leaves as consumed even though `out` is a scalar — a whole record was read.
 Coverage figures on schemas using whole-record arrows will rise; figures that
 were resting on an `each` header or a computed arrow to a record will fall.
 
+### Viz resolves element-relative arrow paths against their container (`3cdd-yavi`)
+
+Arrows inside `nested_arrow`, `each` and `flatten` bodies are authored relative
+to the container — `.line1 -> .line1` under `addr -> address` (spec §4.6) — and
+the viz model stores that text as written. Nothing made it absolute before
+matching it against a declared field, so `.line1` split to `["", "line1"]`,
+matched nothing, and **every relative-path arrow was invisible** to three
+surfaces at once: mapping-detail coverage highlighting, hover
+cross-highlighting, and overview edges (the missing port was skipped silently,
+so a nested-iteration mapping simply drew no lines). Arrow counts and the detail
+table were already correct and are unchanged.
+
+All three now qualify paths through core's `qualifyChildArrowPath`, the same rule
+`extractArrowRecords` applies, accumulating one container level per nesting step
+so a `flatten` inside an `each` resolves to `orders.parcels.sku`. The rule is
+applied at _resolution_ time, not in the model: the mapping-detail table still
+shows `.line1 -> .line1` under its scope heading, because that is what the author
+wrote and the heading already supplies the context. Coverage figures on
+workspaces using nested iteration will rise — they were understated by every
+arrow inside a container.
+
 ### The viz schema card counts coverage in leaves, like every other surface (`sl-hcan`)
 
 The card computed its own coverage figures and counted every node — records

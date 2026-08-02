@@ -14,7 +14,13 @@ import assert from "node:assert/strict";
 import { describe, it, before } from "node:test";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { initParser, getParser, extractArrowRecords, extractMappings } from "@satsuma/core";
+import {
+  initParser,
+  getParser,
+  extractArrowRecords,
+  extractMappings,
+  qualifyChildArrowPath,
+} from "@satsuma/core";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const WASM_PATH = resolve(__dirname, "../../tree-sitter-satsuma/tree-sitter-satsuma.wasm");
@@ -143,5 +149,36 @@ describe("extractArrowRecords — nested arrow recursion (sl-zl55)", () => {
     const [mapping] = extractMappings(root);
     const EACH_FLATTEN_BLOCKS = 2;
     assert.equal(records.length, mapping.arrowCount + EACH_FLATTEN_BLOCKS);
+  });
+});
+
+// ── The qualification rule on its own (3cdd-yavi) ────────────────────────────
+//
+// The prefixing above is now an exported function, because the viz has to apply
+// the identical rule to the paths *its* model stores. These cases pin the two
+// boundaries a caller outside extraction can hit and the CST path cannot,
+// since the parser never hands extraction a container with no path.
+
+describe("qualifyChildArrowPath()", () => {
+  it("returns the path untouched when there is no container, dot and all", () => {
+    // Mapping-body level. A stray leading dot there names no declared field and
+    // must stay unresolvable: stripping it would make a malformed path match a
+    // top-level field and raise coverage on a broken spec.
+    assert.equal(qualifyChildArrowPath(".orders", null), ".orders");
+    assert.equal(qualifyChildArrowPath("orders.id", null), "orders.id");
+  });
+
+  it("leaves an empty path empty rather than producing a dangling dot", () => {
+    // A malformed block can reach a consumer with no path on one side; joining
+    // it would yield "parcels." — a path that matches nothing but looks like a
+    // real one in any output that prints it.
+    assert.equal(qualifyChildArrowPath("", "parcels"), "");
+  });
+
+  it("prefixes with or without the authored dot, since the container is the only frame", () => {
+    // `each lines -> .lines` in examples/nested-iteration/pipeline.stm writes
+    // one side dotted and the other not; both mean the same thing.
+    assert.equal(qualifyChildArrowPath(".sku", "parcels"), "parcels.sku");
+    assert.equal(qualifyChildArrowPath("sku", "parcels"), "parcels.sku");
   });
 });

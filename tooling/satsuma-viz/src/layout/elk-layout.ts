@@ -18,7 +18,14 @@ import type {
   FlattenBlock,
   NestedArrowBlock,
 } from "../model.js";
-import { resolveSchemaLocalFieldPath, type FieldPathCard } from "../field-coverage.js";
+import {
+  MAPPING_BODY_SCOPE,
+  resolveSchemaLocalFieldPath,
+  scopeWithin,
+  type ContainerScope,
+  type FieldPathCard,
+} from "../field-coverage.js";
+import { qualifyChildArrowPath } from "@satsuma/core/extract";
 import { metricFieldEntries } from "../metric-adapter.js";
 import {
   HEADER_HEIGHT,
@@ -710,10 +717,23 @@ function addMappingEdges(mappings: MappingBlock[], edges: ElkEdge[], ctx: GraphC
   };
 
   for (const m of mappings) {
-    const addArrowEdges = (arrows: ArrowEntry[], prefix: string, scope?: EdgeScope) => {
+    const addArrowEdges = (
+      arrows: ArrowEntry[],
+      prefix: string,
+      container: ContainerScope,
+      scope?: EdgeScope,
+    ) => {
       for (let i = 0; i < arrows.length; i++) {
         const a = arrows[i];
-        const sourceField = a.sourceFields[0] ?? a.targetField;
+        // Ports are keyed by declared field path, so an arrow authored
+        // element-relative inside a container (`.line1 -> .line1`) has to be
+        // qualified against that container before findPort can match it. Until
+        // 3cdd-yavi every such arrow resolved to no port and its edge was
+        // silently skipped, so nested-iteration mappings drew no lines at all.
+        const targetField = qualifyChildArrowPath(a.targetField, container.target);
+        const sourceField = a.sourceFields[0]
+          ? qualifyChildArrowPath(a.sourceFields[0], container.source)
+          : targetField;
         const edgeId = `${prefix}:${i}`;
 
         // Attach the edge to the first source ref whose card actually
@@ -728,7 +748,7 @@ function addMappingEdges(mappings: MappingBlock[], edges: ElkEdge[], ctx: GraphC
             break;
           }
         }
-        const tgtPort = findPort(m.targetRef, a.targetField, "tgt", [m.targetRef]);
+        const tgtPort = findPort(m.targetRef, targetField, "tgt", [m.targetRef]);
 
         // Skip edges with missing ports — ELK throws if a port doesn't exist
         if (!sourceNode || !srcPort || !tgtPort) continue;
@@ -743,14 +763,14 @@ function addMappingEdges(mappings: MappingBlock[], edges: ElkEdge[], ctx: GraphC
           sourceNode,
           targetNode: m.targetRef,
           sourceField,
-          targetField: a.targetField,
+          targetField,
           arrow: a,
           scope,
         });
       }
     };
 
-    addArrowEdges(m.arrows, `${m.id}:arrow`);
+    addArrowEdges(m.arrows, `${m.id}:arrow`, MAPPING_BODY_SCOPE);
 
     // One recursion over all three container kinds, mirroring
     // forEachMappingArrow. Separate per-kind loops here walked nestedEach only,
@@ -762,10 +782,15 @@ function addMappingEdges(mappings: MappingBlock[], edges: ElkEdge[], ctx: GraphC
     const collectBlockEdges = (
       blocks: Array<[EachBlock | FlattenBlock | NestedArrowBlock, EdgeScope | undefined]>,
       prefix: string,
+      outer: ContainerScope,
     ) => {
       for (let j = 0; j < blocks.length; j++) {
         const [block, scope] = blocks[j];
-        addArrowEdges(block.arrows, `${prefix}:${j}`, scope);
+        // The block header is itself relative to the block enclosing it, so its
+        // qualified form — not its authored text — is what its children resolve
+        // against. This is core's accumulation rule, one level per recursion.
+        const container = scopeWithin(outer, block);
+        addArrowEdges(block.arrows, `${prefix}:${j}`, container, scope);
         collectBlockEdges(
           [
             ...block.nestedEach.map((b): [EachBlock, EdgeScope] => [b, "each"]),
@@ -773,20 +798,24 @@ function addMappingEdges(mappings: MappingBlock[], edges: ElkEdge[], ctx: GraphC
             ...block.nestedArrows.map((b): [NestedArrowBlock, EdgeScope | undefined] => [b, scope]),
           ],
           `${prefix}:${j}:nested`,
+          container,
         );
       }
     };
     collectBlockEdges(
       m.eachBlocks.map((b): [EachBlock, EdgeScope] => [b, "each"]),
       `${m.id}:eb`,
+      MAPPING_BODY_SCOPE,
     );
     collectBlockEdges(
       m.flattenBlocks.map((b): [FlattenBlock, EdgeScope] => [b, "flatten"]),
       `${m.id}:flat`,
+      MAPPING_BODY_SCOPE,
     );
     collectBlockEdges(
       m.nestedArrows.map((b): [NestedArrowBlock, EdgeScope | undefined] => [b, undefined]),
       `${m.id}:na`,
+      MAPPING_BODY_SCOPE,
     );
   }
 }
