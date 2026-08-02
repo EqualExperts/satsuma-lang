@@ -5,7 +5,7 @@
  * Metrics (`schema X (metric, …)`) live in ns.metrics, not ns.schemas. The
  * detail view used to resolve mapping endpoints only against schemas, so a
  * mapping targeting a metric rendered a completely EMPTY target column
- * (metric-target-missing.jpg in features/34-live-editor-ux). These tests pin
+ * (metric-target-missing.jpg in archive/features/34-live-editor-ux). These tests pin
  * both directions: a pipeline mapping writing INTO a metric shows the metric
  * card as the target, and a downstream mapping reading FROM a metric shows
  * it as a source — fields, metric metadata pills, and coverage intact.

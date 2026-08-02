@@ -407,4 +407,4 @@ satsuma arrows changed_schema.changed_field --as-source --json
 - Tree-sitter grammar: `tooling/tree-sitter-satsuma/`
 - Feature 09 (workspace extractors): `features/09-stm-cli-llm-context/`
 - Feature 10 (structural primitives): `features/10-stm-cli-enhancements/`
-- Feature 35 (`coverage` command): `features/35-coverage-command/`
+- Feature 35 (`coverage` command): `archive/features/35-coverage-command/`

@@ -1,6 +1,12 @@
 # Feature 35 — Workspace Coverage Command (`satsuma coverage`)
 
-> **Status: PROPOSED** (2026-07-31) — not yet started. Motivated by recurring
+> **Status: IMPLEMENTED** (2026-08-01) — all eleven tickets delivered under
+> epic `sl-ce11`. Archived 2026-08-02. The coverage-correctness defects found
+> while implementing this feature (nested records, whole-subtree arrows,
+> disagreeing percentage conventions across consumers) are out of scope here
+> and are tracked as Feature 38, which is still in flight.
+>
+> Original motivation, retained as context — motivated by recurring
 > engagements where mapping specs are reverse-engineered from spreadsheet
 > workbooks and the first question every reviewer asks is "which fields are
 > not mapped yet?". Today that question is answerable only inside VS Code

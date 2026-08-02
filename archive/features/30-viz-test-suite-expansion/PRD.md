@@ -1,6 +1,9 @@
 # Feature 30 - Viz Test Suite Expansion
 
-> **Status: PLANNED** (2026-04-07)
+> **Status: IMPLEMENTED** (2026-04-09) — all thirteen tasks delivered under
+> epic `sl-0jva`. Archived 2026-08-02. The dense-lineage edge-routing defect
+> the expanded suite surfaced is tracked separately as `f3vt-qb8u`; it is a
+> renderer bug, not outstanding scope for this feature.
 
 ## Goal
 

@@ -113,3 +113,7 @@ Fix: Reframed this ticket from a P1 anchoring bug to a P3 routing-quality follow
 - Originally filed during sl-zowz verification.
 - Screenshot workflow that surfaced the visual issue: sl-mm7v.
 - Parent epic: sl-0jva.
+
+**2026-08-02T15:44:02Z**
+
+Feature 30 archived to archive/features/30-viz-test-suite-expansion/ on 2026-08-02. This ticket stays open: it is a renderer defect the expanded suite surfaced, not outstanding Feature 30 scope, and its tags already say so (feature-30-followup, not feature-30). Parent sl-0jva retained as provenance even though that epic is closed. Still needs the user's edge-routing strategy decision before implementation.

@@ -43,7 +43,7 @@ The primary success criteria are:
 
 ## Background
 
-Feature 33 (`features/33-live-editor/PRD.md`) turned the viz harness into a
+Feature 33 (`archive/features/33-live-editor/PRD.md`) turned the viz harness into a
 client-only live editor published on the site as "Try it Live!". The harness
 chrome, however, still carries its Feature 29/30 heritage as an internal
 fixture viewer and Playwright host: developer-facing toggles, an automation

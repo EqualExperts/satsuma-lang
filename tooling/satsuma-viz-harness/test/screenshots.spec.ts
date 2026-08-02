@@ -15,7 +15,7 @@
  *
  * Output is *intentionally* gitignored (see .gitignore in this package). The
  * screenshots are review artifacts, not golden baselines — semantic pass/fail
- * lives in harness.test.ts. See features/30-viz-test-suite-expansion/PRD.md
+ * lives in harness.test.ts. See archive/features/30-viz-test-suite-expansion/PRD.md
  * §"Screenshot artifacts for human and VLM review" and ticket sl-mm7v.
  *
  * Run via the screenshots Playwright project:
