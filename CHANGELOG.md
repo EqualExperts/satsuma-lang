@@ -71,6 +71,30 @@ leaves as consumed even though `out` is a scalar — a whole record was read.
 Coverage figures on schemas using whole-record arrows will rise; figures that
 were resting on an `each` header or a computed arrow to a record will fall.
 
+### The viz schema card counts coverage in leaves, like every other surface (`sl-hcan`)
+
+The card computed its own coverage figures and counted every node — records
+included — in both halves of the ratio, so one covered leaf lifted the numerator
+once per ancestor level. A schema of `amount` plus `address record { city, line1,
+postcode }` with only `address.city` mapped read as **2/5 (40%)** on the card
+while `satsuma coverage` reported **1/4 (25%)** for the same file. The card now
+delegates to core's `summarizeFieldCoverage`, which counts leaves only on each
+leaf's own flag (ADR-034), so the two agree. A card's percentage is now
+depth-invariant: re-nesting a schema without changing its leaves or the arrows
+into it cannot move the number.
+
+Records stay out of the ratio but are no longer silent — the header count's
+tooltip reads `1/4 leaf fields mapped (25%) — 1 record partly mapped`, so a
+reviewer can see which records need attention without a number that
+double-counts their children. Compact cards count leaves too, so one card no
+longer answers "how many fields?" two ways depending on its form.
+
+Consumers holding a covered-path set rather than a mapping's CST — the viz card
+is the first — build their entries through core's new
+`fieldCoverageFromCoveredPaths`, which applies the same container tri-state and
+leaf rules as `computeMappingCoverage`. `countContainerStates` reports the
+per-state container tally that sits beside a percentage.
+
 ### Prettier and `ruff format` are now formatting gates (`pfg-9dk8`)
 
 JS/TS had no formatting gate at all (ESLint 10 ships no formatting rules) and
