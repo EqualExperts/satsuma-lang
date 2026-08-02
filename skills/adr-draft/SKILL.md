@@ -73,12 +73,24 @@ Read each existing ADR in `adrs/`. For each, ask:
 
 If yes, note the ADR number — you will mark it Superseded in Step 5.
 
-ADRs are **immutable**. Never edit the body of an existing ADR. The only
-permitted edit is adding a supersession line to the Status field:
+ADRs are **immutable**. Never edit the body of an existing ADR. The permitted
+edits are:
 
-```
-**Status:** Superseded by ADR-XXX
-```
+1. Adding a supersession line to the Status field:
+
+   ```
+   **Status:** Superseded by ADR-XXX
+   ```
+
+2. Repointing a file path that moved, when the referenced file still exists at
+   a new location — most often a feature spec moving from `features/` to
+   `archive/features/`. This is a link repair, not a revision: the path names
+   the same artifact and the ADR's reasoning is untouched. A dead link makes an
+   ADR harder to audit, which is the opposite of what immutability protects.
+   Never use this as cover for editing the surrounding prose.
+
+Anything else — reasoning, alternatives, consequences — stays as written, even
+when later events prove it wrong. A superseding ADR is how the record changes.
 
 ---
 

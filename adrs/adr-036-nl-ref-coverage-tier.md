@@ -17,7 +17,7 @@ auto-fix edits the mapping's `source {}` block to match.
 
 Feature 35 then introduced `satsuma coverage`, and excluded `@refs` from it —
 "NL interpretation: a field populated *implicitly* by prose in a note block is
-uncovered by definition" (`features/35-coverage-command/PRD.md:233`), restated
+uncovered by definition" (`archive/features/35-coverage-command/PRD.md:233`), restated
 in `features/38-hierarchical-coverage/PRD.md:576`, in the `coverage.ts` module
 comment ("deliberately *structural only*"), in `coverage --help`, and in
 `SATSUMA-CLI.md:126`. That carve-out was never recorded as an amendment to
