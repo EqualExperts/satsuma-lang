@@ -66,10 +66,10 @@ prose describing a data gap.
 **A whole-structure arrow covers its entire declared subtree.** An arrow
 reference confers subtree coverage when both conditions hold:
 
-1. **The declaration is a record-to-record correspondence** — `ExtractedArrow.kind`
-   is `map` or `nested`. `each`/`flatten` headers open an iteration and assert no
-   field-by-field correspondence; a `computed` arrow has no source at all, and
-   inheriting from prose is what ADR-036 forbids.
+1. **The declaration states a correspondence, not an iteration** —
+   `ExtractedArrow.kind` is `map` or `nested`. `each`/`flatten` headers open an
+   iteration and assert no field-by-field correspondence; a `computed` arrow has
+   no source at all, and inheriting from prose is what ADR-036 forbids.
 2. **Its body enumerates no child arrows** — `ExtractedArrow.enumeratesChildren`
    is false. A header that lists child arrows is claiming those and no others, so
    `addr -> address { .street -> .line }` covers `street` and leaves `zip` a gap
@@ -77,6 +77,21 @@ reference confers subtree coverage when both conditions hold:
    `addr -> address { }` both confer; a pipe-chain transform body does not count
    as enumeration, because spec §4.4 makes it a pipeline rather than a nesting
    scope.
+
+**Whether the field on the other side of the arrow is also a container is not
+checked**, and the omission is load-bearing enough to state rather than imply.
+The flag travels with the path, and each path is judged against whichever schema
+is being reported on — `coverageForSchema` holds one schema's field tree and not
+its counterpart's. So `crm.addr -> out` expands `addr`'s leaves on the source
+side though `out` is a scalar, and `full_name -> address` expands `address`'s
+leaves on the target side though `full_name` is one. On the source side that is
+the right reading: a `map` arrow off a record consumes the whole record whatever
+receives it. On the target side it is the generous one, and it is generous in the
+direction ADR-034 named a silent overstatement — one scalar crediting twelve
+leaves. Both are shipped deliberately, because a genuine both-sides test means
+resolving every participating schema up front and pairing sides per arrow, which
+is a larger change than the shape justifies until someone shows it occurring.
+`3ct-cs4y` carries that question with the source/target asymmetry written down.
 
 `ExtractedArrow` carries `kind` and `enumeratesChildren` so that consumers read
 these properties from extraction rather than re-deriving them from the CST —
@@ -129,6 +144,17 @@ unchanged: percentages still count leaf fields only, on each leaf's own flag.
   now have two ways to ask "is this covered?". `mapped` is kept as the wider,
   older contract; a consumer that wants the container distinction must know to
   read `state`.
+- A scalar-to-record arrow credits every leaf of the record, because the
+  counterpart's shape is not checked. That is an overstatement in the same
+  direction ADR-034 refused to risk, arriving through a different door — reached
+  by a shape nobody has yet been shown writing, which is why it is accepted here
+  rather than designed around (`3ct-cs4y`).
+- The direct/ancestor model gained the distinction this change needed but is not
+  the thing that consumes it: expansion happens against the declared field tree
+  before the model is built, so the probe-time query `sl-fmx0` added as
+  scaffolding (`hasDirectlyCoveredAncestor`) turned out to be unusable — it
+  cannot tell `addr -> address` from `each items -> lines { }` — and was deleted
+  with this change rather than shipped as a public API no caller may safely use.
 - `satsuma-viz`'s own `field-coverage.ts` still mirrors extraction rather than
   calling core, so the viz card's ratio does not yet reflect either change. That
   divergence is `sl-hcan`.

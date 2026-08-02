@@ -23,6 +23,7 @@ import {
   extractSchemas,
   extractMappings,
   extractNLRefData,
+  leafFieldEntries,
   resolveAllNLRefs,
   summarizeFieldCoverage,
 } from "@satsuma/core";
@@ -524,6 +525,94 @@ mapping load {
     assertState(crm, "address.city", "covered");
     assertState(ops, "address", "uncovered");
   });
+
+  it("does not confer subtree coverage from a flatten header, even with an empty body", () => {
+    // `flatten` is the second iteration kind, and it reaches its
+    // ArrowDeclarationKind through its own switch arm — so nothing in the `each`
+    // test above would notice if `flatten_block` were mapped to a conferring
+    // kind. The body is empty deliberately: with no child arrows to narrow the
+    // claim, the ONLY thing standing between this header and a fully covered
+    // subtree is the kind check, so a regression there fails here and nowhere
+    // else.
+    const EMPTY_FLATTEN = `
+schema src { parcels list_of record { sku STRING qty INT } }
+schema tgt { rows list_of record { sku STRING } }
+mapping load {
+  source { src }
+  target { tgt }
+  flatten parcels -> rows {
+  }
+}`;
+    const src = forRole(coverage(EMPTY_FLATTEN, "load"), "source");
+    assertState(src, "parcels", "uncovered");
+    assertState(src, "parcels.sku", "uncovered");
+    assertState(src, "parcels.qty", "uncovered");
+  });
+
+  it("still confers when the body is a pipe-chain transform rather than child arrows", () => {
+    // ADR-037's second condition turns on *enumeration*, not on the presence of
+    // braces. Spec §4.4 makes a pipe-chain body a transform pipeline rather than
+    // a nesting scope, so it narrows nothing and the whole record is still read.
+    // Were `enumeratesChildren` ever loosened to "has a braced body", this is the
+    // case that would silently start reporting `addr`'s leaves as gaps.
+    const PIPE_BODY = `
+schema src { addr record { line1 STRING city STRING } }
+schema tgt { out STRING }
+mapping load {
+  source { src }
+  target { tgt }
+  addr -> out { "join the parts" | "uppercase" }
+}`;
+    const src = forRole(coverage(PIPE_BODY, "load"), "source");
+    assertState(src, "addr", "covered");
+    assertState(src, "addr.line1", "covered");
+    assertState(src, "addr.city", "covered");
+  });
+
+  it("expands every source of a multi-source arrow, not just the first", () => {
+    // A multi-source arrow asserts the same correspondence once per source, and
+    // `sources` is a list precisely because more than one may be named. Expanding
+    // only the first would leave the later records reporting as unconsumed while
+    // the mapping demonstrably reads them.
+    const MULTI_SOURCE = `
+schema src { home record { city STRING } work record { city STRING } }
+schema tgt { summary STRING }
+mapping load {
+  source { src }
+  target { tgt }
+  home, work -> summary
+}`;
+    const src = forRole(coverage(MULTI_SOURCE, "load"), "source");
+    assertState(src, "home.city", "covered");
+    assertState(src, "work.city", "covered");
+  });
+
+  it("confers onto a record target even when the source is a scalar", () => {
+    // The deliberate limit of condition 1, pinned here so it is a decision
+    // rather than an accident of two tests written for other purposes.
+    //
+    // ADR-037 gates expansion on the arrow's KIND, not on both sides being
+    // records: `coverageForSchema` reports on one schema at a time and does not
+    // hold the counterpart's field tree. On the source side that reads correctly
+    // (`addr -> out` consumes the whole of `addr` whatever receives it); here, on
+    // the target side, it is generous — one scalar credits every leaf of a
+    // record, and that is the direction ADR-034 called a silent overstatement.
+    //
+    // Shipped knowingly. If `3ct-cs4y` decides to tighten the target side, this
+    // test flips to `uncovered` and its comment becomes the record of why.
+    const SCALAR_INTO_RECORD = `
+schema src { full_name STRING }
+schema tgt { address record { line1 STRING city STRING } }
+mapping load {
+  source { src }
+  target { tgt }
+  full_name -> address
+}`;
+    const tgt = forRole(coverage(SCALAR_INTO_RECORD, "load"), "target");
+    assertState(tgt, "address", "covered");
+    assertState(tgt, "address.line1", "covered");
+    assertState(tgt, "address.city", "covered");
+  });
 });
 
 // ── Container tri-state (PRD 38 R2, sl-0pun) ────────────────────────────────
@@ -564,13 +653,26 @@ ${arrows}
     // Leaves are binary by definition — there is nothing beneath them to be
     // partly done. A consumer branching on `state` must be able to rely on that
     // rather than defensively handling a third case at every leaf.
+    //
+    // Leafness comes from `leafFieldEntries` — the same definition the counting
+    // rule uses — rather than from a hand-written list of this fixture's paths,
+    // so the invariant is asserted over whatever the walk emits and a fixture
+    // that grew a nested container would not turn this into a false failure.
+    // The assertion is positive (state is one of the two legal values) so that
+    // dropping `state` altogether fails here rather than passing on undefined.
     const src = forRole(coverage(threeLeafRecord("  a -> addr.line1"), "load"), "source");
     const tgt = forRole(coverage(threeLeafRecord("  a -> addr.line1"), "load"), "target");
-    const leafPaths = ["a", "b", "c"];
-    for (const entry of [...src.fields, ...tgt.fields]) {
-      if (!leafPaths.includes(entry.path) && !entry.path.includes(".")) continue;
-      assert.notEqual(entry.state, "partial", `leaf "${entry.path}" must not be partial`);
+    const leaves = [...leafFieldEntries(src.fields), ...leafFieldEntries(tgt.fields)];
+    assert.ok(leaves.length > 0, "fixture must produce leaves for this to assert anything");
+    for (const entry of leaves) {
+      assert.ok(
+        entry.state === "covered" || entry.state === "uncovered",
+        `leaf "${entry.path}" reported ${JSON.stringify(entry.state)}; leaves are binary`,
+      );
     }
+    // …and the fixture does contain a container that IS partial, so the check
+    // above is discriminating rather than vacuously true of every entry.
+    assertState(tgt, "addr", "partial");
   });
 
   it("propagates partial upward through every enclosing record, but not covered", () => {
