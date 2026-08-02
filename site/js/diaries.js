@@ -11,10 +11,10 @@
   "use strict";
 
   const entryButtons = document.querySelectorAll(".diary-entry-btn");
-  const contentEl    = document.getElementById("diary-content");
-  const loadingEl    = document.getElementById("diary-loading");
-  const errorEl      = document.getElementById("diary-error");
-  const emptyEl      = document.getElementById("diary-empty");
+  const contentEl = document.getElementById("diary-content");
+  const loadingEl = document.getElementById("diary-loading");
+  const errorEl = document.getElementById("diary-error");
+  const emptyEl = document.getElementById("diary-empty");
 
   if (!entryButtons.length || !contentEl) return;
 
@@ -23,16 +23,16 @@
   function showState(state) {
     contentEl.classList.toggle("hidden", state !== "content");
     loadingEl.classList.toggle("hidden", state !== "loading");
-    errorEl.classList.toggle("hidden",   state !== "error");
-    emptyEl.classList.toggle("hidden",   state !== "empty");
+    errorEl.classList.toggle("hidden", state !== "error");
+    emptyEl.classList.toggle("hidden", state !== "empty");
   }
 
   function setActiveButton(date) {
     entryButtons.forEach(function (btn) {
       const isActive = btn.dataset.date === date;
-      btn.classList.toggle("bg-peach",          isActive);
-      btn.classList.toggle("text-orange-dark",   isActive);
-      btn.classList.toggle("font-semibold",      isActive);
+      btn.classList.toggle("bg-peach", isActive);
+      btn.classList.toggle("text-orange-dark", isActive);
+      btn.classList.toggle("font-semibold", isActive);
     });
   }
 
@@ -72,7 +72,9 @@
   // Load from URL hash on page open, or default to the first (most recent) entry
   const hashDate = window.location.hash.replace("#", "");
   const target = hashDate
-    ? Array.from(entryButtons).find(function (b) { return b.dataset.date === hashDate; })
+    ? Array.from(entryButtons).find(function (b) {
+        return b.dataset.date === hashDate;
+      })
     : entryButtons[0];
 
   if (target) {
@@ -80,4 +82,4 @@
   } else {
     showState("empty");
   }
-}());
+})();

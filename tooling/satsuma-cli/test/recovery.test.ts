@@ -51,10 +51,7 @@ describe("CLI error recovery — broken .stm input", () => {
   it("summary degrades gracefully on an unterminated schema body", async () => {
     // Closing brace of `customers` is missing; tree-sitter will recover with
     // a MISSING `}` node. summary should still print the section headings.
-    const file = writeBroken(
-      "summary",
-      "schema customers {\n  id UUID\n  name VARCHAR\n",
-    );
+    const file = writeBroken("summary", "schema customers {\n  id UUID\n  name VARCHAR\n");
     const result = await satsuma("summary", file);
     assertGraceful(result);
     // The recovered tree still contains a `customers` schema definition.
@@ -79,8 +76,9 @@ describe("CLI error recovery — broken .stm input", () => {
     // structured error message — both are acceptable. What is *not* acceptable
     // is an unhandled crash.
     if (result.stdout.trim().length > 0) {
-      assert.doesNotThrow(() => { JSON.parse(result.stdout); },
-        "stdout should be valid JSON when produced");
+      assert.doesNotThrow(() => {
+        JSON.parse(result.stdout);
+      }, "stdout should be valid JSON when produced");
     } else {
       assert.notEqual(result.code, 0, "empty stdout must coincide with non-zero exit");
       assert.ok(result.stderr.length > 0, "non-zero exit must report a reason on stderr");

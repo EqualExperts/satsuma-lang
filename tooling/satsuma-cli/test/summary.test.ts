@@ -55,10 +55,10 @@ describe("satsuma summary", () => {
     assert.equal(code, 0);
     const data = JSON.parse(stdout);
     assert.equal(data.fileCount, 2);
-    assert.deepEqual(
-      data.schemas.map((schema: { name: string }) => schema.name).sort(),
-      ["mart::dim_customers", "src::customers"],
-    );
+    assert.deepEqual(data.schemas.map((schema: { name: string }) => schema.name).sort(), [
+      "mart::dim_customers",
+      "src::customers",
+    ]);
     assert.equal(data.mappings[0].name, "::build dim_customers");
     assert.deepEqual(data.mappings[0].sources, ["src::customers"]);
     assert.deepEqual(data.mappings[0].targets, ["mart::dim_customers"]);
@@ -104,7 +104,10 @@ describe("satsuma summary", () => {
     assert.ok(data.metrics.length > 0, "metrics-platform example should yield metric entries");
     const schemaNames = new Set(data.schemas.map((s: { name: string }) => s.name));
     for (const metric of data.metrics) {
-      assert.ok(!schemaNames.has(metric.name), `metric '${metric.name}' must not also be listed as a schema`);
+      assert.ok(
+        !schemaNames.has(metric.name),
+        `metric '${metric.name}' must not also be listed as a schema`,
+      );
     }
   });
 });
@@ -125,7 +128,10 @@ describe("summary nl-derived coverage with same-line arrows (sl-201z)", () => {
     const mapping = (data.mappings as any[]).find((m) => m.name === "::m");
     assert.ok(mapping, "mapping ::m should be reported");
     assert.equal(mapping.arrowCount, 2, "only the two declared arrows should be counted");
-    assert.equal(mapping.nlDerivedArrowCount, undefined,
-      "@b annotates its own declared arrow and must not count as nl-derived");
+    assert.equal(
+      mapping.nlDerivedArrowCount,
+      undefined,
+      "@b annotates its own declared arrow and must not count as nl-derived",
+    );
   });
 });

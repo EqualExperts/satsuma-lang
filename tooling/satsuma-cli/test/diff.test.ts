@@ -13,7 +13,17 @@ import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { diffIndex } from "#src/diff-engine.js";
 
-function makeIndex(schemas: any = {}, mappings: any = {}, { metrics = {}, fragments = {}, transforms = {}, notes = [] as any[], fieldArrows = {} }: any = {}) {
+function makeIndex(
+  schemas: any = {},
+  mappings: any = {},
+  {
+    metrics = {},
+    fragments = {},
+    transforms = {},
+    notes = [] as any[],
+    fieldArrows = {},
+  }: any = {},
+) {
   return {
     schemas: new Map(Object.entries(schemas)),
     mappings: new Map(Object.entries(mappings)),
@@ -91,8 +101,29 @@ describe("diffIndex", () => {
   // ── Metric metadata detection (sl-1meq) ─────────────────────────────────
 
   it("detects metric source changes (sl-1meq)", () => {
-    const a = makeIndex({}, {}, { metrics: { rev: { sources: ["fact_orders"], grain: "monthly", slices: ["region"], fields: [] } } });
-    const b = makeIndex({}, {}, { metrics: { rev: { sources: ["fact_orders", "dim_date"], grain: "monthly", slices: ["region"], fields: [] } } });
+    const a = makeIndex(
+      {},
+      {},
+      {
+        metrics: {
+          rev: { sources: ["fact_orders"], grain: "monthly", slices: ["region"], fields: [] },
+        },
+      },
+    );
+    const b = makeIndex(
+      {},
+      {},
+      {
+        metrics: {
+          rev: {
+            sources: ["fact_orders", "dim_date"],
+            grain: "monthly",
+            slices: ["region"],
+            fields: [],
+          },
+        },
+      },
+    );
     const delta = diffIndex(a, b);
     assert.equal(delta.metrics.changed.length, 1);
     assert.equal(delta.metrics.changed[0].changes[0].kind, "source-changed");
@@ -101,16 +132,36 @@ describe("diffIndex", () => {
   });
 
   it("detects metric grain changes (sl-1meq)", () => {
-    const a = makeIndex({}, {}, { metrics: { rev: { sources: ["s"], grain: "monthly", slices: [], fields: [] } } });
-    const b = makeIndex({}, {}, { metrics: { rev: { sources: ["s"], grain: "quarterly", slices: [], fields: [] } } });
+    const a = makeIndex(
+      {},
+      {},
+      { metrics: { rev: { sources: ["s"], grain: "monthly", slices: [], fields: [] } } },
+    );
+    const b = makeIndex(
+      {},
+      {},
+      { metrics: { rev: { sources: ["s"], grain: "quarterly", slices: [], fields: [] } } },
+    );
     const delta = diffIndex(a, b);
     assert.equal(delta.metrics.changed.length, 1);
     assert.equal(delta.metrics.changed[0].changes[0].kind, "grain-changed");
   });
 
   it("detects metric slices changes (sl-1meq)", () => {
-    const a = makeIndex({}, {}, { metrics: { rev: { sources: ["s"], grain: null, slices: ["region"], fields: [] } } });
-    const b = makeIndex({}, {}, { metrics: { rev: { sources: ["s"], grain: null, slices: ["region", "channel"], fields: [] } } });
+    const a = makeIndex(
+      {},
+      {},
+      { metrics: { rev: { sources: ["s"], grain: null, slices: ["region"], fields: [] } } },
+    );
+    const b = makeIndex(
+      {},
+      {},
+      {
+        metrics: {
+          rev: { sources: ["s"], grain: null, slices: ["region", "channel"], fields: [] },
+        },
+      },
+    );
     const delta = diffIndex(a, b);
     assert.equal(delta.metrics.changed.length, 1);
     assert.equal(delta.metrics.changed[0].changes[0].kind, "slices-changed");
@@ -121,14 +172,28 @@ describe("diffIndex", () => {
   it("detects arrow transform changes via transform_raw (sl-edrw)", () => {
     /** Verifies that diffIndex compares arrow transform bodies, not just endpoints. */
     const arrowA = {
-      mapping: "m1", namespace: null, sources: ["src.name"], target: "tgt.name",
-      transform_raw: "trim | upper", steps: [], classification: "nl",
-      derived: false, line: 5, file: "a.stm",
+      mapping: "m1",
+      namespace: null,
+      sources: ["src.name"],
+      target: "tgt.name",
+      transform_raw: "trim | upper",
+      steps: [],
+      classification: "nl",
+      derived: false,
+      line: 5,
+      file: "a.stm",
     };
     const arrowB = {
-      mapping: "m1", namespace: null, sources: ["src.name"], target: "tgt.name",
-      transform_raw: "trim | lower", steps: [], classification: "nl",
-      derived: false, line: 5, file: "b.stm",
+      mapping: "m1",
+      namespace: null,
+      sources: ["src.name"],
+      target: "tgt.name",
+      transform_raw: "trim | lower",
+      steps: [],
+      classification: "nl",
+      derived: false,
+      line: 5,
+      file: "b.stm",
     };
     const a = makeIndex(
       {},
@@ -142,7 +207,9 @@ describe("diffIndex", () => {
     );
     const delta = diffIndex(a, b);
     assert.equal(delta.mappings.changed.length, 1);
-    const transformChange = delta.mappings.changed[0].changes.find((c) => c.kind === "arrow-transform-changed");
+    const transformChange = delta.mappings.changed[0].changes.find(
+      (c) => c.kind === "arrow-transform-changed",
+    );
     assert.ok(transformChange, "expected an arrow-transform-changed change");
     assert.equal(transformChange.from, "trim | upper");
     assert.equal(transformChange.to, "trim | lower");
@@ -150,9 +217,16 @@ describe("diffIndex", () => {
 
   it("reports no arrow changes when transform bodies are identical (sl-edrw)", () => {
     const arrow = {
-      mapping: "m1", namespace: null, sources: ["src.name"], target: "tgt.name",
-      transform_raw: "trim | upper", steps: [], classification: "nl",
-      derived: false, line: 5, file: "a.stm",
+      mapping: "m1",
+      namespace: null,
+      sources: ["src.name"],
+      target: "tgt.name",
+      transform_raw: "trim | upper",
+      steps: [],
+      classification: "nl",
+      derived: false,
+      line: 5,
+      file: "a.stm",
     };
     const idx = makeIndex(
       {},
@@ -183,22 +257,36 @@ describe("diffIndex", () => {
   });
 
   it("mapping notes do not appear as top-level note changes (sl-van1)", () => {
-    const a = makeIndex({}, { m1: { sources: ["a"], targets: ["b"], arrowCount: 1 } }, { notes: [] });
+    const a = makeIndex(
+      {},
+      { m1: { sources: ["a"], targets: ["b"], arrowCount: 1 } },
+      { notes: [] },
+    );
     const b = makeIndex(
       {},
       { m1: { sources: ["a"], targets: ["b"], arrowCount: 1 } },
       { notes: [{ text: "Block note.", parent: "m1", file: "x.stm", row: 5, namespace: null }] },
     );
     const delta = diffIndex(a, b);
-    assert.equal(delta.notes.added.length, 0, "block-owned notes should not appear in top-level notes");
+    assert.equal(
+      delta.notes.added.length,
+      0,
+      "block-owned notes should not appear in top-level notes",
+    );
   });
 
   it("detects standalone top-level note additions (sl-van1)", () => {
     /** Top-level notes (parent === null) should appear in delta.notes. */
     const a = makeIndex({}, {}, { notes: [] });
-    const b = makeIndex({}, {}, {
-      notes: [{ text: "New standalone note.", parent: null, file: "x.stm", row: 1, namespace: null }],
-    });
+    const b = makeIndex(
+      {},
+      {},
+      {
+        notes: [
+          { text: "New standalone note.", parent: null, file: "x.stm", row: 1, namespace: null },
+        ],
+      },
+    );
     const delta = diffIndex(a, b);
     assert.deepEqual(delta.notes.added, ["New standalone note."]);
     assert.deepEqual(delta.notes.removed, []);
@@ -206,12 +294,20 @@ describe("diffIndex", () => {
 
   it("detects standalone top-level note text changes (sl-van1)", () => {
     /** When a standalone note's text changes, both the old and new appear. */
-    const a = makeIndex({}, {}, {
-      notes: [{ text: "Original note.", parent: null, file: "x.stm", row: 1, namespace: null }],
-    });
-    const b = makeIndex({}, {}, {
-      notes: [{ text: "Updated note.", parent: null, file: "x.stm", row: 1, namespace: null }],
-    });
+    const a = makeIndex(
+      {},
+      {},
+      {
+        notes: [{ text: "Original note.", parent: null, file: "x.stm", row: 1, namespace: null }],
+      },
+    );
+    const b = makeIndex(
+      {},
+      {},
+      {
+        notes: [{ text: "Updated note.", parent: null, file: "x.stm", row: 1, namespace: null }],
+      },
+    );
     const delta = diffIndex(a, b);
     assert.deepEqual(delta.notes.added, ["Updated note."]);
     assert.deepEqual(delta.notes.removed, ["Original note."]);
@@ -220,8 +316,12 @@ describe("diffIndex", () => {
   // ── Schema note detection (sl-fkwb) ─────────────────────────────────────
 
   it("detects schema-level note text changes via note tag (sl-4gio)", () => {
-    const a = makeIndex({ foo: { note: "Raw source data", fields: [{ name: "id", type: "INT" }] } });
-    const b = makeIndex({ foo: { note: "Updated description", fields: [{ name: "id", type: "INT" }] } });
+    const a = makeIndex({
+      foo: { note: "Raw source data", fields: [{ name: "id", type: "INT" }] },
+    });
+    const b = makeIndex({
+      foo: { note: "Updated description", fields: [{ name: "id", type: "INT" }] },
+    });
     const delta = diffIndex(a, b);
     assert.equal(delta.schemas.changed.length, 1);
     assert.equal(delta.schemas.changed[0].changes[0].kind, "note-changed");
@@ -246,12 +346,36 @@ describe("diffIndex", () => {
 
   it("detects schema note block changes attributed under schema (sl-fkwb)", () => {
     /** Note blocks inside schema body should produce note-added/note-removed under the schema. */
-    const a = makeIndex({ data: { note: null, fields: [{ name: "id", type: "INT" }] } }, {}, {
-      notes: [{ text: "This schema holds customer data.", parent: "data", file: "a.stm", row: 1, namespace: null }],
-    });
-    const b = makeIndex({ data: { note: null, fields: [{ name: "id", type: "INT" }] } }, {}, {
-      notes: [{ text: "This schema holds updated customer data with PII.", parent: "data", file: "b.stm", row: 1, namespace: null }],
-    });
+    const a = makeIndex(
+      { data: { note: null, fields: [{ name: "id", type: "INT" }] } },
+      {},
+      {
+        notes: [
+          {
+            text: "This schema holds customer data.",
+            parent: "data",
+            file: "a.stm",
+            row: 1,
+            namespace: null,
+          },
+        ],
+      },
+    );
+    const b = makeIndex(
+      { data: { note: null, fields: [{ name: "id", type: "INT" }] } },
+      {},
+      {
+        notes: [
+          {
+            text: "This schema holds updated customer data with PII.",
+            parent: "data",
+            file: "b.stm",
+            row: 1,
+            namespace: null,
+          },
+        ],
+      },
+    );
     const delta = diffIndex(a, b);
     assert.equal(delta.schemas.changed.length, 1);
     assert.equal(delta.schemas.changed[0].name, "data");
@@ -276,7 +400,11 @@ describe("diffIndex", () => {
 
   it("detects transform body text changes (sl-7ow3)", () => {
     const a = makeIndex({}, {}, { transforms: { "clean address": { body: "trim | lowercase" } } });
-    const b = makeIndex({}, {}, { transforms: { "clean address": { body: "trim | lowercase | capitalize" } } });
+    const b = makeIndex(
+      {},
+      {},
+      { transforms: { "clean address": { body: "trim | lowercase | capitalize" } } },
+    );
     const delta = diffIndex(a, b);
     assert.equal(delta.transforms.changed.length, 1);
     assert.equal(delta.transforms.changed[0].name, "clean address");
@@ -286,8 +414,8 @@ describe("diffIndex", () => {
   });
 
   it("identical transform bodies produce no change", () => {
-    const a = makeIndex({}, {}, { transforms: { "clean": { body: "trim" } } });
-    const b = makeIndex({}, {}, { transforms: { "clean": { body: "trim" } } });
+    const a = makeIndex({}, {}, { transforms: { clean: { body: "trim" } } });
+    const b = makeIndex({}, {}, { transforms: { clean: { body: "trim" } } });
     const delta = diffIndex(a, b);
     assert.equal(delta.transforms.changed.length, 0);
   });
@@ -295,14 +423,22 @@ describe("diffIndex", () => {
   // ── Metric note detection ────────────────────────────────────────────────
 
   it("detects metric note changes attributed under metric, not top-level (sl-kf76)", () => {
-    const a = makeIndex({}, {}, {
-      metrics: { rev: { sources: ["s"], grain: null, slices: [], fields: [] } },
-      notes: [{ text: "Old note.", parent: "rev", file: "x.stm", row: 3, namespace: null }],
-    });
-    const b = makeIndex({}, {}, {
-      metrics: { rev: { sources: ["s"], grain: null, slices: [], fields: [] } },
-      notes: [{ text: "New note.", parent: "rev", file: "x.stm", row: 3, namespace: null }],
-    });
+    const a = makeIndex(
+      {},
+      {},
+      {
+        metrics: { rev: { sources: ["s"], grain: null, slices: [], fields: [] } },
+        notes: [{ text: "Old note.", parent: "rev", file: "x.stm", row: 3, namespace: null }],
+      },
+    );
+    const b = makeIndex(
+      {},
+      {},
+      {
+        metrics: { rev: { sources: ["s"], grain: null, slices: [], fields: [] } },
+        notes: [{ text: "New note.", parent: "rev", file: "x.stm", row: 3, namespace: null }],
+      },
+    );
     const delta = diffIndex(a, b);
     // Should appear under metrics, not top-level notes
     assert.equal(delta.metrics.changed.length, 1);
@@ -328,14 +464,28 @@ describe("diffIndex", () => {
   it("detects added and removed arrows", () => {
     /** Verifies that added/removed arrows are detected by source->target key. */
     const arrowA = {
-      mapping: "m1", namespace: null, sources: ["src.id"], target: "tgt.id",
-      transform_raw: "", steps: [], classification: "nl",
-      derived: false, line: 5, file: "a.stm",
+      mapping: "m1",
+      namespace: null,
+      sources: ["src.id"],
+      target: "tgt.id",
+      transform_raw: "",
+      steps: [],
+      classification: "nl",
+      derived: false,
+      line: 5,
+      file: "a.stm",
     };
     const arrowB = {
-      mapping: "m1", namespace: null, sources: ["src.name"], target: "tgt.name",
-      transform_raw: "", steps: [], classification: "nl",
-      derived: false, line: 5, file: "b.stm",
+      mapping: "m1",
+      namespace: null,
+      sources: ["src.name"],
+      target: "tgt.name",
+      transform_raw: "",
+      steps: [],
+      classification: "nl",
+      derived: false,
+      line: 5,
+      file: "b.stm",
     };
     const a = makeIndex(
       {},
@@ -400,20 +550,24 @@ describe("diffIndex", () => {
   it("detects changes in nested child fields", () => {
     const a = makeIndex({
       s1: {
-        fields: [{
-          name: "address",
-          type: "record",
-          children: [{ name: "city", type: "VARCHAR" }],
-        }],
+        fields: [
+          {
+            name: "address",
+            type: "record",
+            children: [{ name: "city", type: "VARCHAR" }],
+          },
+        ],
       },
     });
     const b = makeIndex({
       s1: {
-        fields: [{
-          name: "address",
-          type: "record",
-          children: [{ name: "city", type: "TEXT" }],
-        }],
+        fields: [
+          {
+            name: "address",
+            type: "record",
+            children: [{ name: "city", type: "TEXT" }],
+          },
+        ],
       },
     });
     const delta = diffIndex(a, b);
@@ -431,7 +585,13 @@ describe("diffIndex", () => {
 
 describe("diffIndex anonymous mappings (sl-ndtz)", () => {
   /** Build a minimal anonymous MappingRecord stored under its internal positional key. */
-  const anonMapping = (file: string, row: number, sources: string[], targets: string[], arrowCount = 1) => ({
+  const anonMapping = (
+    file: string,
+    row: number,
+    sources: string[],
+    targets: string[],
+    arrowCount = 1,
+  ) => ({
     [`<anon>@${file}:${row}`]: { name: null, sources, targets, arrowCount, file, row },
   });
 
@@ -466,7 +626,10 @@ describe("diffIndex anonymous mappings (sl-ndtz)", () => {
       ...anonMapping(file, 2, ["src"], ["tgt"]),
       ...anonMapping(file, 9, ["src"], ["tgt"]),
     });
-    const delta = diffIndex(makeIndex({}, twoAnon("/v1/pipe.stm")), makeIndex({}, twoAnon("/v2/pipe.stm")));
+    const delta = diffIndex(
+      makeIndex({}, twoAnon("/v1/pipe.stm")),
+      makeIndex({}, twoAnon("/v2/pipe.stm")),
+    );
 
     assert.equal(delta.mappings.added.length, 0);
     assert.equal(delta.mappings.removed.length, 0);
@@ -476,8 +639,32 @@ describe("diffIndex anonymous mappings (sl-ndtz)", () => {
   it("preserves the namespace prefix on normalized anonymous mapping ids", () => {
     // Namespaced anon mappings are keyed `ns::<anon>@path:row`; the structural
     // id must stay namespace-qualified so scoped blocks do not cross-match.
-    const a = makeIndex({}, { "crm::<anon>@/v1/p.stm:4": { name: null, sources: ["s"], targets: ["t"], arrowCount: 1, file: "/v1/p.stm", row: 4 } });
-    const b = makeIndex({}, { "crm::<anon>@/v2/p.stm:4": { name: null, sources: ["s"], targets: ["t"], arrowCount: 2, file: "/v2/p.stm", row: 4 } });
+    const a = makeIndex(
+      {},
+      {
+        "crm::<anon>@/v1/p.stm:4": {
+          name: null,
+          sources: ["s"],
+          targets: ["t"],
+          arrowCount: 1,
+          file: "/v1/p.stm",
+          row: 4,
+        },
+      },
+    );
+    const b = makeIndex(
+      {},
+      {
+        "crm::<anon>@/v2/p.stm:4": {
+          name: null,
+          sources: ["s"],
+          targets: ["t"],
+          arrowCount: 2,
+          file: "/v2/p.stm",
+          row: 4,
+        },
+      },
+    );
 
     const delta = diffIndex(a, b);
     assert.equal(delta.mappings.changed.length, 1);
@@ -515,7 +702,10 @@ describe("fmt-roundtrip structural identity (sl-dxjh)", () => {
       const s = delta[section];
       for (const name of s.added) lines.push(`${section} added: ${name}`);
       for (const name of s.removed) lines.push(`${section} removed: ${name}`);
-      for (const c of s.changed) lines.push(`${section} changed: ${c.name} (${c.changes.map((ch: any) => ch.kind).join(", ")})`);
+      for (const c of s.changed)
+        lines.push(
+          `${section} changed: ${c.name} (${c.changes.map((ch: any) => ch.kind).join(", ")})`,
+        );
     }
     for (const t of delta.notes.added) lines.push(`note added: ${t.slice(0, 40)}`);
     for (const t of delta.notes.removed) lines.push(`note removed: ${t.slice(0, 40)}`);
@@ -541,7 +731,11 @@ describe("fmt-roundtrip structural identity (sl-dxjh)", () => {
 
       const delta = diffIndex(indexA, indexB);
       const differences = describeDelta(delta);
-      assert.deepEqual(differences, [], `fmt-only changes reported as structural:\n  ${differences.join("\n  ")}`);
+      assert.deepEqual(
+        differences,
+        [],
+        `fmt-only changes reported as structural:\n  ${differences.join("\n  ")}`,
+      );
     });
   }
 });

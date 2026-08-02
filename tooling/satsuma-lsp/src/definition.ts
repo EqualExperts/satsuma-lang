@@ -2,11 +2,7 @@ import { Location } from "vscode-languageserver";
 import { createAtRefRegex, fieldNameText, qualifiedNameText, sourceRefText } from "@satsuma/core";
 import type { SyntaxNode, Tree } from "./parser-utils";
 import { child, children, labelText, nodeAtPosition } from "./parser-utils";
-import {
-  WorkspaceIndex,
-  resolveDefinition,
-  FieldInfo,
-} from "./workspace-index";
+import { WorkspaceIndex, resolveDefinition, FieldInfo } from "./workspace-index";
 
 /**
  * Compute go-to-definition for the node at the given position.
@@ -268,10 +264,7 @@ function resolveContext(
       if (blockDefs.length > 0) return defsToLocations(blockDefs);
 
       // Try as a field name in the enclosing mapping's source/target schemas
-      const allSchemas = [
-        ...(ctx.mappingSources ?? []),
-        ...(ctx.mappingTargets ?? []),
-      ];
+      const allSchemas = [...(ctx.mappingSources ?? []), ...(ctx.mappingTargets ?? [])];
       const fieldLoc = resolveFieldInSchemas(index, allSchemas, ctx.name, ctx.namespace);
       if (fieldLoc) return fieldLoc;
 
@@ -463,11 +456,7 @@ const AT_REF_RE = createAtRefRegex();
  * Check if the cursor is on an @ref reference inside an NL string.
  * Returns a NodeContext with kind "nl_ref" if so.
  */
-function tryNlRefContext(
-  node: SyntaxNode,
-  line: number,
-  character: number,
-): NodeContext | null {
+function tryNlRefContext(node: SyntaxNode, line: number, character: number): NodeContext | null {
   // The node itself might be the nl_string, or it might be a descendant.
   // Walk up to find the nl_string or multiline_string node.
   let nlNode: SyntaxNode | null = node;
@@ -517,8 +506,6 @@ function tryNlRefContext(
       };
     }
   }
-
-
 
   return null;
 }

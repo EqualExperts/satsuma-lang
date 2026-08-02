@@ -3,7 +3,9 @@ const assert = require("node:assert/strict");
 const { initTestParser, parse } = require("./helper");
 const { computeFoldingRanges } = require("../dist/folding");
 
-before(async () => { await initTestParser(); });
+before(async () => {
+  await initTestParser();
+});
 
 describe("computeFoldingRanges", () => {
   it("returns fold ranges for schema blocks", () => {
@@ -34,8 +36,13 @@ mapping \`baz\` {
 }`);
     const ranges = computeFoldingRanges(tree);
     // At least 3 top-level blocks
-    const topLevelFolds = ranges.filter((r) => r.startLine === 0 || r.startLine === 4 || r.startLine === 8);
-    assert.ok(topLevelFolds.length >= 3, `Expected 3+ top-level folds, got ${topLevelFolds.length}`);
+    const topLevelFolds = ranges.filter(
+      (r) => r.startLine === 0 || r.startLine === 4 || r.startLine === 8,
+    );
+    assert.ok(
+      topLevelFolds.length >= 3,
+      `Expected 3+ top-level folds, got ${topLevelFolds.length}`,
+    );
   });
 
   it("returns fold ranges for nested structures", () => {

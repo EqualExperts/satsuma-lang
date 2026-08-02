@@ -44,9 +44,7 @@ export function registerSummaryCommand(
             label: "Schemas",
             format: (s) => {
               const fields =
-                s.fieldCount === 1
-                  ? `[${s.fieldCount} field]`
-                  : `[${s.fieldCount} fields]`;
+                s.fieldCount === 1 ? `[${s.fieldCount} field]` : `[${s.fieldCount} fields]`;
               const note = s.note ? ` — ${s.note}` : "";
               return `  ${s.name}  ${fields}${note}`;
             },
@@ -98,9 +96,7 @@ export function registerSummaryCommand(
         for (const section of sections) {
           const items = data[section.key];
           if (Array.isArray(items) && items.length > 0) {
-            outputChannel.appendLine(
-              `${section.label} (${items.length}):`,
-            );
+            outputChannel.appendLine(`${section.label} (${items.length}):`);
             for (const item of items) {
               outputChannel.appendLine(section.format(item));
             }

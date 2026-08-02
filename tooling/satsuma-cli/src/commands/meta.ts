@@ -31,7 +31,9 @@ export function register(program: Command): void {
     .description("Extract metadata for a schema, field, mapping, or metric")
     .option("--tags-only", "only output tag tokens, one per line")
     .option("--json", "structured JSON output")
-    .addHelpText("after", `
+    .addHelpText(
+      "after",
+      `
 Scope formats:
   <block-name>     metadata on a schema, mapping, metric, or transform
   <schema.field>   metadata on a specific field (type, tags, constraints)
@@ -49,62 +51,78 @@ Examples:
   satsuma meta hub_customer.email            # field-level metadata
   satsuma meta 'load hub_store'              # mapping metadata
   satsuma meta hub_customer --tags-only      # just tag tokens
-  satsuma meta pos::stores.STORE_ID --json   # namespace-qualified`)
-    .action(runCommand(async (scope: string, pathArg: string | undefined, opts: { tagsOnly?: boolean; json?: boolean }) => {
-      const { files: parsedFiles, index } = await loadWorkspace(pathArg);
+  satsuma meta pos::stores.STORE_ID --json   # namespace-qualified`,
+    )
+    .action(
+      runCommand(
+        async (
+          scope: string,
+          pathArg: string | undefined,
+          opts: { tagsOnly?: boolean; json?: boolean },
+        ) => {
+          const { files: parsedFiles, index } = await loadWorkspace(pathArg);
 
-      let result: MetaResult;
-      if (scope.includes(".")) {
-        result = extractFieldMeta(scope, parsedFiles, index);
-      } else {
-        result = extractBlockMeta(scope, parsedFiles, index);
-      }
+          let result: MetaResult;
+          if (scope.includes(".")) {
+            result = extractFieldMeta(scope, parsedFiles, index);
+          } else {
+            result = extractBlockMeta(scope, parsedFiles, index);
+          }
 
-      if (opts.tagsOnly) {
-        const tags = result.entries
-          .filter((e): e is Extract<MetaEntry, { kind: "tag" }> => e.kind === "tag")
-          .map((e) => e.tag);
-        if (tags.length === 0) {
-          console.log("No tags found.");
-          return;
-        }
-        for (const tag of tags) {
-          console.log(tag);
-        }
-        return;
-      }
+          if (opts.tagsOnly) {
+            const tags = result.entries
+              .filter((e): e is Extract<MetaEntry, { kind: "tag" }> => e.kind === "tag")
+              .map((e) => e.tag);
+            if (tags.length === 0) {
+              console.log("No tags found.");
+              return;
+            }
+            for (const tag of tags) {
+              console.log(tag);
+            }
+            return;
+          }
 
-      if (opts.json) {
-        console.log(JSON.stringify(result, null, 2));
-        return;
-      }
+          if (opts.json) {
+            console.log(JSON.stringify(result, null, 2));
+            return;
+          }
 
-      printDefault(result);
-    }));
+          printDefault(result);
+        },
+      ),
+    );
 }
 
-function extractBlockMeta(blockName: string, parsedFiles: ParsedFile[], index: ExtractedWorkspace): MetaResult {
+function extractBlockMeta(
+  blockName: string,
+  parsedFiles: ParsedFile[],
+  index: ExtractedWorkspace,
+): MetaResult {
   // Determine block type, resolving namespace-qualified keys
   const blockTypes: string[] = [];
   let resolvedName = blockName;
   const schemaResolved = resolveIndexKey(blockName, index.schemas);
   const mappingResolved = resolveIndexKey(blockName, index.mappings);
   const metricResolved = resolveIndexKey(blockName, index.metrics);
-  if (schemaResolved) { blockTypes.push("schema_block"); resolvedName = schemaResolved.key; }
-  if (mappingResolved) { blockTypes.push("mapping_block"); resolvedName = mappingResolved.key; }
+  if (schemaResolved) {
+    blockTypes.push("schema_block");
+    resolvedName = schemaResolved.key;
+  }
+  if (mappingResolved) {
+    blockTypes.push("mapping_block");
+    resolvedName = mappingResolved.key;
+  }
   // Metrics are schema_block nodes decorated with the `metric` tag — look up by schema_block.
   // A metric name may coincide with a schema name (they ARE the same node), so only add once.
-  if (metricResolved && !schemaResolved) { blockTypes.push("schema_block"); resolvedName = metricResolved.key; }
+  if (metricResolved && !schemaResolved) {
+    blockTypes.push("schema_block");
+    resolvedName = metricResolved.key;
+  }
 
   if (blockTypes.length === 0) {
-    const allNames = [
-      ...index.schemas.keys(),
-      ...index.mappings.keys(),
-      ...index.metrics.keys(),
-    ];
-    const close = allNames.find(
-      (k) => k.toLowerCase() === blockName.toLowerCase(),
-    );
+    const allNames = [...index.schemas.keys(), ...index.mappings.keys(), ...index.metrics.keys()];
+    const close = allNames.find((k) => k.toLowerCase() === blockName.toLowerCase());
     const lines = [`'${blockName}' not found as a schema, mapping, or metric.`];
     if (close) lines.push(`Did you mean '${close}'?`);
     throw new CommandError(lines.join("\n"), EXIT_NOT_FOUND);
@@ -113,16 +131,12 @@ function extractBlockMeta(blockName: string, parsedFiles: ParsedFile[], index: E
   const resolvedEntry =
     schemaResolved?.entry ?? mappingResolved?.entry ?? metricResolved?.entry ?? null;
 
-  const parsed = resolvedEntry
-    ? parsedFiles.find((p) => p.filePath === resolvedEntry.file)
-    : null;
+  const parsed = resolvedEntry ? parsedFiles.find((p) => p.filePath === resolvedEntry.file) : null;
   if (parsed) {
     for (const blockType of blockTypes) {
       const node = findBlockNode(parsed.tree.rootNode, blockType, resolvedName);
       if (!node) continue;
-      const metaNode = node.namedChildren.find(
-        (c) => c.type === "metadata_block",
-      );
+      const metaNode = node.namedChildren.find((c) => c.type === "metadata_block");
       const entries = extractMetadata(metaNode);
 
       // Also extract note blocks from the body (mapping_body or schema_body for metric schemas).
@@ -136,10 +150,12 @@ function extractBlockMeta(blockName: string, parsedFiles: ParsedFile[], index: E
               (x: SyntaxNode) => x.type === "nl_string" || x.type === "multiline_string",
             );
             if (strNodes.length > 0) {
-              const text = strNodes.map((s: SyntaxNode) => {
-                if (s.type === "multiline_string") return s.text.slice(3, -3).trim();
-                return s.text.slice(1, -1);
-              }).join("\n");
+              const text = strNodes
+                .map((s: SyntaxNode) => {
+                  if (s.type === "multiline_string") return s.text.slice(3, -3).trim();
+                  return s.text.slice(1, -1);
+                })
+                .join("\n");
               entries.push({ kind: "note" as const, text });
             }
           }
@@ -156,7 +172,11 @@ function extractBlockMeta(blockName: string, parsedFiles: ParsedFile[], index: E
   return { scope: resolvedName, entries: [] };
 }
 
-function extractFieldMeta(fieldRef: string, parsedFiles: ParsedFile[], index: ExtractedWorkspace): MetaResult {
+function extractFieldMeta(
+  fieldRef: string,
+  parsedFiles: ParsedFile[],
+  index: ExtractedWorkspace,
+): MetaResult {
   const dot = fieldRef.indexOf(".");
   const entityName = fieldRef.slice(0, dot);
   const fieldPath = fieldRef.slice(dot + 1);
@@ -167,7 +187,10 @@ function extractFieldMeta(fieldRef: string, parsedFiles: ParsedFile[], index: Ex
   const fieldName = pathSegments[pathSegments.length - 1]!;
 
   // Search schemas, then fragments, then metrics
-  type ResolvedEntity = { key: string; entry: { fields: FieldDecl[]; file: string; namespace?: string } };
+  type ResolvedEntity = {
+    key: string;
+    entry: { fields: FieldDecl[]; file: string; namespace?: string };
+  };
   let resolved: ResolvedEntity | null = resolveIndexKey(entityName, index.schemas);
   let blockType = "schema_block";
   let bodyType = "schema_body";
@@ -195,7 +218,11 @@ function extractFieldMeta(fieldRef: string, parsedFiles: ParsedFile[], index: Ex
 
   // If field not found directly, try expanded spread fields
   if (!field && blockType === "schema_block") {
-    const expanded = expandEntityFields(entity as Parameters<typeof expandEntityFields>[0], entity.namespace ?? null, index);
+    const expanded = expandEntityFields(
+      entity as Parameters<typeof expandEntityFields>[0],
+      entity.namespace ?? null,
+      index,
+    );
     const expandedField = expanded.find((f) => f.name === pathSegments[0]);
     if (expandedField) {
       field = expandedField;
@@ -204,10 +231,7 @@ function extractFieldMeta(fieldRef: string, parsedFiles: ParsedFile[], index: Ex
   }
 
   if (!field) {
-    throw new CommandError(
-      `Field '${fieldPath}' not found in '${entityName}'.`,
-      EXIT_NOT_FOUND,
-    );
+    throw new CommandError(`Field '${fieldPath}' not found in '${entityName}'.`, EXIT_NOT_FOUND);
   }
 
   // If the field came from a fragment spread, look up metadata from the fragment's CST
@@ -220,9 +244,7 @@ function extractFieldMeta(fieldRef: string, parsedFiles: ParsedFile[], index: Ex
         const fragBody = fragNode?.namedChildren.find((c) => c.type === "schema_body");
         if (fragBody) {
           for (const fieldDecl of findFieldDecls(fragBody, fieldName)) {
-            const metaNode = fieldDecl.namedChildren.find(
-              (c) => c.type === "metadata_block",
-            );
+            const metaNode = fieldDecl.namedChildren.find((c) => c.type === "metadata_block");
             const entries = extractMetadata(metaNode);
             return { scope: fieldRef, type: displayType(field), entries };
           }
@@ -239,16 +261,14 @@ function extractFieldMeta(fieldRef: string, parsedFiles: ParsedFile[], index: Ex
     const targetBody = navigateToNestedBody(body, pathSegments.slice(0, -1));
     if (targetBody) {
       for (const fieldDecl of findFieldDecls(targetBody, fieldName)) {
-        const metaNode = fieldDecl.namedChildren.find(
-          (c) => c.type === "metadata_block",
-        );
+        const metaNode = fieldDecl.namedChildren.find((c) => c.type === "metadata_block");
         const entries = extractMetadata(metaNode);
         return {
-            scope: fieldRef,
-            type: displayType(field),
-            entries,
-          };
-        }
+          scope: fieldRef,
+          type: displayType(field),
+          entries,
+        };
+      }
     }
   }
 
@@ -261,9 +281,7 @@ function displayType(field: FieldDecl): string | null {
 }
 
 function getFieldDeclName(fieldDecl: SyntaxNode): string | null {
-  const nameNode = fieldDecl.namedChildren.find(
-    (c) => c.type === "field_name",
-  );
+  const nameNode = fieldDecl.namedChildren.find((c) => c.type === "field_name");
   const inner = nameNode?.namedChildren[0];
   if (!inner) return null;
   if (inner.type === "backtick_name") return inner.text.slice(1, -1);
@@ -317,8 +335,11 @@ function navigateToNestedBody(body: SyntaxNode, intermediateSegments: string[]):
   return current;
 }
 
-
-function findFieldDecls(bodyNode: SyntaxNode, fieldName: string, acc: SyntaxNode[] = []): SyntaxNode[] {
+function findFieldDecls(
+  bodyNode: SyntaxNode,
+  fieldName: string,
+  acc: SyntaxNode[] = [],
+): SyntaxNode[] {
   for (const child of bodyNode.namedChildren) {
     if (child.type === "field_decl") {
       if (getFieldDeclName(child) === fieldName) {

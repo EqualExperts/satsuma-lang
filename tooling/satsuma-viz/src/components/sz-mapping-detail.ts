@@ -179,7 +179,9 @@ export class SzMappingDetail extends LitElement {
 
     .arrow-table tr {
       cursor: pointer;
-      transition: opacity 0.15s ease, background 0.15s ease;
+      transition:
+        opacity 0.15s ease,
+        background 0.15s ease;
     }
 
     .arrow-table tr:hover {
@@ -397,10 +399,7 @@ export class SzMappingDetail extends LitElement {
       if (this._hoveredCardSchema === m.targetRef) {
         return this._findSourceFieldsForTarget(this._hoveredCardField, m);
       } else if (m.sourceRefs.includes(this._hoveredCardSchema)) {
-        result.set(
-          this._hoveredCardSchema,
-          new Set([this._hoveredCardField])
-        );
+        result.set(this._hoveredCardSchema, new Set([this._hoveredCardField]));
       }
     }
 
@@ -415,21 +414,15 @@ export class SzMappingDetail extends LitElement {
 
     if (this._hoveredArrow) {
       if (!targetSchema) return new Set();
-      const localPath = resolveSchemaLocalFieldPath(
-        this._hoveredArrow.targetField,
-        targetSchema,
-        [m.targetRef],
-      );
+      const localPath = resolveSchemaLocalFieldPath(this._hoveredArrow.targetField, targetSchema, [
+        m.targetRef,
+      ]);
       return localPath ? new Set([localPath]) : new Set();
     }
 
     if (this._hoveredCardField && this._hoveredCardSchema) {
       if (m.sourceRefs.includes(this._hoveredCardSchema)) {
-        return this._findTargetFieldsForSource(
-          this._hoveredCardField,
-          this._hoveredCardSchema,
-          m,
-        );
+        return this._findTargetFieldsForSource(this._hoveredCardField, this._hoveredCardSchema, m);
       } else if (this._hoveredCardSchema === m.targetRef) {
         return new Set([this._hoveredCardField]);
       }
@@ -439,7 +432,10 @@ export class SzMappingDetail extends LitElement {
   }
 
   /** Find source fields that map to a given target field, grouped by schema id. */
-  private _findSourceFieldsForTarget(targetField: string, m: MappingBlock): Map<string, Set<string>> {
+  private _findSourceFieldsForTarget(
+    targetField: string,
+    m: MappingBlock,
+  ): Map<string, Set<string>> {
     const result = new Map<string, Set<string>>();
     // forEachMappingArrow recurses into every nested each/flatten combination —
     // hand-rolled loops over the top-level collections missed nested-each arrows
@@ -455,7 +451,8 @@ export class SzMappingDetail extends LitElement {
           for (const sf of a.sourceFields) {
             const localSourcePath = resolveSchemaLocalFieldPath(sf, sourceSchema, m.sourceRefs);
             if (!localSourcePath) continue;
-            if (!result.has(sourceSchema.qualifiedId)) result.set(sourceSchema.qualifiedId, new Set());
+            if (!result.has(sourceSchema.qualifiedId))
+              result.set(sourceSchema.qualifiedId, new Set());
             result.get(sourceSchema.qualifiedId)!.add(localSourcePath);
           }
         }
@@ -465,7 +462,11 @@ export class SzMappingDetail extends LitElement {
   }
 
   /** Find target fields that a given source field maps to. */
-  private _findTargetFieldsForSource(sourceField: string, sourceSchemaId: string, m: MappingBlock): Set<string> {
+  private _findTargetFieldsForSource(
+    sourceField: string,
+    sourceSchemaId: string,
+    m: MappingBlock,
+  ): Set<string> {
     const result = new Set<string>();
     const sourceSchema = this.sourceSchemas.find((schema) => schema.qualifiedId === sourceSchemaId);
     const targetSchema = this.targetSchema;
@@ -480,7 +481,9 @@ export class SzMappingDetail extends LitElement {
         return localSourcePath === sourceField;
       });
       if (sourceMatches) {
-        const localTargetPath = resolveSchemaLocalFieldPath(a.targetField, targetSchema, [m.targetRef]);
+        const localTargetPath = resolveSchemaLocalFieldPath(a.targetField, targetSchema, [
+          m.targetRef,
+        ]);
         if (localTargetPath) result.add(localTargetPath);
       }
     });
@@ -494,15 +497,22 @@ export class SzMappingDetail extends LitElement {
 
     const m = this.mapping!;
     if (m.sourceRefs.includes(this._hoveredCardSchema)) {
-      const sourceSchema = this.sourceSchemas.find((schema) => schema.qualifiedId === this._hoveredCardSchema);
-      return !!sourceSchema && a.sourceFields.some((sf) => {
-        const localSourcePath = resolveSchemaLocalFieldPath(sf, sourceSchema, m.sourceRefs);
-        return localSourcePath === this._hoveredCardField;
-      });
+      const sourceSchema = this.sourceSchemas.find(
+        (schema) => schema.qualifiedId === this._hoveredCardSchema,
+      );
+      return (
+        !!sourceSchema &&
+        a.sourceFields.some((sf) => {
+          const localSourcePath = resolveSchemaLocalFieldPath(sf, sourceSchema, m.sourceRefs);
+          return localSourcePath === this._hoveredCardField;
+        })
+      );
     } else if (this._hoveredCardSchema === m.targetRef) {
       const targetSchema = this.targetSchema;
       if (!targetSchema) return false;
-      const localTargetPath = resolveSchemaLocalFieldPath(a.targetField, targetSchema, [m.targetRef]);
+      const localTargetPath = resolveSchemaLocalFieldPath(a.targetField, targetSchema, [
+        m.targetRef,
+      ]);
       return localTargetPath === this._hoveredCardField;
     }
     return false;
@@ -525,36 +535,39 @@ export class SzMappingDetail extends LitElement {
       <div class="layout" data-testid=${this.testIdPrefix}>
         <div class="column" data-testid=${`${this.testIdPrefix}-source-column`}>
           <div class="column-header">Sources</div>
-          ${this.sourceSchemas.map((s) => html`
-            <sz-schema-card
-              .schema=${s}
-              .mappedFields=${this.sourceMappedFields.get(s.qualifiedId) ?? new Set()}
-              .highlightFields=${sourceHL.get(s.qualifiedId) ?? new Set()}
-              highlightColor="source"
-              test-id-prefix=${`${sourcePrefix}-${sanitizeTestIdSegment(s.qualifiedId)}`}
-              content-width
-            ></sz-schema-card>
-          `)}
+          ${this.sourceSchemas.map(
+            (s) => html`
+              <sz-schema-card
+                .schema=${s}
+                .mappedFields=${this.sourceMappedFields.get(s.qualifiedId) ?? new Set()}
+                .highlightFields=${sourceHL.get(s.qualifiedId) ?? new Set()}
+                highlightColor="source"
+                test-id-prefix=${`${sourcePrefix}-${sanitizeTestIdSegment(s.qualifiedId)}`}
+                content-width
+              ></sz-schema-card>
+            `,
+          )}
         </div>
 
         <div class="column" data-testid=${`${this.testIdPrefix}-mapping-column`}>
           <div class="column-header">Mapping</div>
-          ${this._renderMappingHeader(m)}
-          ${this._renderArrowTable(m)}
+          ${this._renderMappingHeader(m)} ${this._renderArrowTable(m)}
         </div>
 
         <div class="column" data-testid=${`${this.testIdPrefix}-target-column`}>
           <div class="column-header">Target</div>
-          ${this.targetSchema
-            ? html`<sz-schema-card
-                .schema=${this.targetSchema}
-                .mappedFields=${this.targetMappedFields}
-                .highlightFields=${targetHL}
-                highlightColor="target"
-                test-id-prefix=${`${targetPrefix}-${sanitizeTestIdSegment(this.targetSchema.qualifiedId)}`}
-                content-width
-              ></sz-schema-card>`
-            : nothing}
+          ${
+            this.targetSchema
+              ? html`<sz-schema-card
+                  .schema=${this.targetSchema}
+                  .mappedFields=${this.targetMappedFields}
+                  .highlightFields=${targetHL}
+                  highlightColor="target"
+                  test-id-prefix=${`${targetPrefix}-${sanitizeTestIdSegment(this.targetSchema.qualifiedId)}`}
+                  content-width
+                ></sz-schema-card>`
+              : nothing
+          }
         </div>
       </div>
     `;
@@ -565,47 +578,65 @@ export class SzMappingDetail extends LitElement {
 
     return html`
       <div class="mapping-header" data-testid=${`${this.testIdPrefix}-header`}>
-        ${this.namespaceLabel
-          ? html`<div style="padding: 8px 12px 0; background: var(--sz-orange);">
-              <span
-                class="meta-tag"
-                data-testid=${`${this.testIdPrefix}-namespace-label`}
-                style="display:inline-block;font-size:10px;font-weight:700;padding:1px 8px;border-radius:999px;background:var(--sz-namespace-pill-chip-bg);color:var(--sz-orange-dark);"
-              >${this.namespaceLabel}</span>
-            </div>`
-          : nothing}
+        ${
+          this.namespaceLabel
+            ? html`<div style="padding: 8px 12px 0; background: var(--sz-orange);">
+                <span
+                  class="meta-tag"
+                  data-testid=${`${this.testIdPrefix}-namespace-label`}
+                  style="display:inline-block;font-size:10px;font-weight:700;padding:1px 8px;border-radius:999px;background:var(--sz-namespace-pill-chip-bg);color:var(--sz-orange-dark);"
+                  >${this.namespaceLabel}</span
+                >
+              </div>`
+            : nothing
+        }
         <div class="mapping-title" @click=${() => this._navigate(m.location)}>
           <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
-            <path d="M2 4h5l2 2h5v8H2V4z" opacity="0.9"/>
+            <path d="M2 4h5l2 2h5v8H2V4z" opacity="0.9" />
           </svg>
           ${m.id}
         </div>
         <div class="mapping-meta">
-          ${m.sourceRefs.map((s) => html`
-            <div class="mapping-meta-row">
-              <span class="meta-tag"><span class="label">source</span> ${s}</span>
-            </div>
-          `)}
+          ${m.sourceRefs.map(
+            (s) => html`
+              <div class="mapping-meta-row">
+                <span class="meta-tag"><span class="label">source</span> ${s}</span>
+              </div>
+            `,
+          )}
           <div class="mapping-meta-row">
             <span class="meta-tag"><span class="label">target</span> ${m.targetRef}</span>
           </div>
-          ${sb?.joinDescription
-            ? html`
-                <div class="mapping-meta-row">
-                  <span class="meta-tag wrap"><span class="label">join</span> ${sb.joinDescription}</span>
-                </div>
-              `
-            : nothing}
-          ${(sb?.filters ?? []).map((f) => html`
-            <div class="mapping-meta-row">
-              <span class="meta-tag wrap"><span class="label">filter</span> ${f}</span>
-            </div>
-          `)}
-          ${m.metadata.map((entry) => html`
-            <div class="mapping-meta-row" data-testid=${`${this.testIdPrefix}-meta-${sanitizeTestIdSegment(entry.key)}`}>
-              <span class="meta-tag wrap"><span class="label">${entry.key}</span> ${entry.value}</span>
-            </div>
-          `)}
+          ${
+            sb?.joinDescription
+              ? html`
+                  <div class="mapping-meta-row">
+                    <span class="meta-tag wrap"
+                      ><span class="label">join</span> ${sb.joinDescription}</span
+                    >
+                  </div>
+                `
+              : nothing
+          }
+          ${(sb?.filters ?? []).map(
+            (f) => html`
+              <div class="mapping-meta-row">
+                <span class="meta-tag wrap"><span class="label">filter</span> ${f}</span>
+              </div>
+            `,
+          )}
+          ${m.metadata.map(
+            (entry) => html`
+              <div
+                class="mapping-meta-row"
+                data-testid=${`${this.testIdPrefix}-meta-${sanitizeTestIdSegment(entry.key)}`}
+              >
+                <span class="meta-tag wrap"
+                  ><span class="label">${entry.key}</span> ${entry.value}</span
+                >
+              </div>
+            `,
+          )}
         </div>
       </div>
     `;
@@ -649,26 +680,36 @@ export class SzMappingDetail extends LitElement {
         class="arrow-row ${hl}"
         data-testid=${rowTestId}
         @click=${() => this._navigate(a.location)}
-        @mouseenter=${() => { this._hoveredArrow = a; this._hoveredCardField = null; }}
-        @mouseleave=${() => { this._hoveredArrow = null; }}
+        @mouseenter=${() => {
+          this._hoveredArrow = a;
+          this._hoveredCardField = null;
+        }}
+        @mouseleave=${() => {
+          this._hoveredArrow = null;
+        }}
       >
         <td>
           <div class="source-ref-list">
-            ${a.sourceFields.map((sourceField) => html`
-              <span class="field-ref source-ref-item">${sourceField}</span>
-            `)}
+            ${a.sourceFields.map(
+              (sourceField) => html`
+                <span class="field-ref source-ref-item">${sourceField}</span>
+              `,
+            )}
           </div>
         </td>
         <td><span class="arrow-icon">&#x2192;</span></td>
         <td class="transform-cell">${this._renderTransform(a)}</td>
         <td><span class="field-ref">${a.targetField}</span></td>
       </tr>
-      ${noteEntry
-        ? html`<tr
-            class="arrow-note-row"
-            data-testid=${`${rowTestId}-note`}
-          ><td colspan="4"><span class="arrow-note">${unsafeHTML(highlightAtRefs(noteEntry.value))}</span></td></tr>`
-        : ""}
+      ${
+        noteEntry
+          ? html`<tr class="arrow-note-row" data-testid=${`${rowTestId}-note`}>
+              <td colspan="4">
+                <span class="arrow-note">${unsafeHTML(highlightAtRefs(noteEntry.value))}</span>
+              </td>
+            </tr>`
+          : ""
+      }
     `;
   }
 
@@ -687,10 +728,7 @@ export class SzMappingDetail extends LitElement {
     const sectionId = sanitizeTestIdSegment(`each-${eb.targetField}`);
     const sectionPrefix = parentPrefix ? `${parentPrefix}-${sectionId}` : sectionId;
     return html`
-      <tr
-        class="scope-section"
-        data-testid=${`${this.testIdPrefix}-${sectionPrefix}`}
-      >
+      <tr class="scope-section" data-testid=${`${this.testIdPrefix}-${sectionPrefix}`}>
         <td colspan="4">
           <div class="scope-label">
             <span class="scope-tag">each</span>
@@ -709,10 +747,7 @@ export class SzMappingDetail extends LitElement {
     const sectionId = sanitizeTestIdSegment(`flatten-${fb.sourceField}`);
     const sectionPrefix = parentPrefix ? `${parentPrefix}-${sectionId}` : sectionId;
     return html`
-      <tr
-        class="scope-section"
-        data-testid=${`${this.testIdPrefix}-${sectionPrefix}`}
-      >
+      <tr class="scope-section" data-testid=${`${this.testIdPrefix}-${sectionPrefix}`}>
         <td colspan="4">
           <div class="scope-label">
             <span class="scope-tag">flatten</span>
@@ -737,10 +772,7 @@ export class SzMappingDetail extends LitElement {
     const sectionId = sanitizeTestIdSegment(`nested-${na.targetField}`);
     const sectionPrefix = parentPrefix ? `${parentPrefix}-${sectionId}` : sectionId;
     return html`
-      <tr
-        class="scope-section"
-        data-testid=${`${this.testIdPrefix}-${sectionPrefix}`}
-      >
+      <tr class="scope-section" data-testid=${`${this.testIdPrefix}-${sectionPrefix}`}>
         <td colspan="4">
           <div class="scope-label">
             <span class="scope-tag">nested</span>

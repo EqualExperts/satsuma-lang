@@ -13,10 +13,7 @@
  * the concrete Node type used by other LSP server code.
  */
 
-import {
-  Range,
-  Position,
-} from "vscode-languageserver";
+import { Range, Position } from "vscode-languageserver";
 import type { Parser, Language, Tree, Node } from "web-tree-sitter";
 
 // Re-export web-tree-sitter types under the names the rest of the server uses.

@@ -64,9 +64,9 @@ async function openWithBuffer(page: Page, text: string): Promise<void> {
     { timeout: 20_000 },
   );
   await page.locator("#source-input").fill(text);
-  await expect(
-    page.locator("[data-testid='overview-mapping-card-load-1']"),
-  ).toBeVisible({ timeout: 10_000 });
+  await expect(page.locator("[data-testid='overview-mapping-card-load-1']")).toBeVisible({
+    timeout: 10_000,
+  });
 }
 
 test.describe("Minimap visibility and contents", () => {
@@ -83,19 +83,15 @@ test.describe("Minimap visibility and contents", () => {
     await expect(minimap).toBeInViewport();
   });
 
-  test("mapping detail minimap shows the detail content, not the file canvas", async ({
-    page,
-  }) => {
+  test("mapping detail minimap shows the detail content, not the file canvas", async ({ page }) => {
     await openWithBuffer(page, tallDoc(1));
 
     // dispatchEvent rather than a pointer click: opening the mapping is the
     // precondition here, not the subject (see view-persistence.test.ts).
-    await page
-      .locator("[data-testid='overview-mapping-card-load-1']")
-      .dispatchEvent("click");
-    await expect(
-      page.locator("[data-testid='mapping-detail-load-1']").first(),
-    ).toBeVisible({ timeout: 10_000 });
+    await page.locator("[data-testid='overview-mapping-card-load-1']").dispatchEvent("click");
+    await expect(page.locator("[data-testid='mapping-detail-load-1']").first()).toBeVisible({
+      timeout: 10_000,
+    });
 
     const minimap = page.locator("[data-testid='viz-minimap']");
     await expect(minimap).toBeVisible({ timeout: 10_000 });

@@ -75,7 +75,11 @@ describe("view-state reconciliation across model updates", () => {
     viz._reconcileViewState(model(namespace(null, { mappings: [newMapping] })));
 
     assert.equal(viz._viewMode, "detail");
-    assert.equal(viz._selectedMapping, newMapping, "selection must point at the NEW model's object");
+    assert.equal(
+      viz._selectedMapping,
+      newMapping,
+      "selection must point at the NEW model's object",
+    );
   });
 
   it("falls back to the overview when the selected mapping was renamed or deleted", async () => {

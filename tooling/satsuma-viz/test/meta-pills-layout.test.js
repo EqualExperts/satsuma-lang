@@ -41,10 +41,7 @@ describe("metadata pill geometry in the overview layout", () => {
     const { computeOverviewLayout } = await import("../dist/satsuma-viz.js");
     const longUri = "namespace http://example.com/commerce/order/v2/with/a/really/long/path";
     const layout = await computeOverviewLayout(
-      model(
-        schema("plain"),
-        schema("pilled", [{ key: "namespace", value: longUri }]),
-      ),
+      model(schema("plain"), schema("pilled", [{ key: "namespace", value: longUri }])),
     );
 
     // Same id-length headers → identical widths; the URI pill must not
@@ -60,8 +57,7 @@ describe("metadata pill geometry in the overview layout", () => {
       METADATA_PILLS_CHROME,
     } = await import("../dist/satsuma-viz.js");
 
-    const pills = (n) =>
-      Array.from({ length: n }, (_, i) => ({ key: `k${i}`, value: `v${i}` }));
+    const pills = (n) => Array.from({ length: n }, (_, i) => ({ key: `k${i}`, value: `v${i}` }));
     const layout = await computeOverviewLayout(
       model(schema("none"), schema("one", pills(1)), schema("three", pills(3))),
     );
@@ -71,9 +67,6 @@ describe("metadata pill geometry in the overview layout", () => {
     assert.equal(h("one") - h("none"), METADATA_PILLS_CHROME + META_PILL_ROW_HEIGHT);
     // …each further pill exactly one row + one gap. The card CSS pins these
     // same constants, so renderer and layout cannot drift.
-    assert.equal(
-      h("three") - h("one"),
-      2 * (META_PILL_ROW_HEIGHT + META_PILL_ROW_GAP),
-    );
+    assert.equal(h("three") - h("one"), 2 * (META_PILL_ROW_HEIGHT + META_PILL_ROW_GAP));
   });
 });

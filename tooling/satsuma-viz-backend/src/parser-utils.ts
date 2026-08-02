@@ -11,17 +11,8 @@
 // than the top-level vscode-languageserver, whose JSON-RPC server pulls in
 // Node-only modules. This keeps the package bundleable for --platform=browser
 // (feature 33: the playground runs this code in the browser).
-import {
-  Position,
-  Range,
-} from "vscode-languageserver-types";
-import {
-  child,
-  children,
-  labelText,
-  stringText,
-  walkDescendants,
-} from "@satsuma/core";
+import { Position, Range } from "vscode-languageserver-types";
+import { child, children, labelText, stringText, walkDescendants } from "@satsuma/core";
 import type { SyntaxNode } from "@satsuma/core";
 
 export type { SyntaxNode, Tree } from "@satsuma/core";

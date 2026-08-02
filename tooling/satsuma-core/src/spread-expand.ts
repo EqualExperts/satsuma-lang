@@ -23,18 +23,13 @@ import type { FieldDecl } from "./types.js";
  * 2. Try `${currentNs}::${name}` if a current namespace is provided.
  * 3. Try the unqualified name directly as a fallback.
  */
-export type EntityRefResolver = (
-  ref: string,
-  currentNs: string | null,
-) => string | null;
+export type EntityRefResolver = (ref: string, currentNs: string | null) => string | null;
 
 /**
  * Look up a spread entity (schema or fragment) by its resolved canonical key.
  * Returns null/undefined if not found.
  */
-export type SpreadEntityLookup = (
-  key: string,
-) => SpreadEntity | null | undefined;
+export type SpreadEntityLookup = (key: string) => SpreadEntity | null | undefined;
 
 export interface SpreadEntity {
   fields: FieldDecl[];
@@ -110,7 +105,18 @@ export function expandSpreads(
   for (const key of schemaKeys) {
     const schema = lookupSchema ? lookupSchema(key) : null;
     if (!schema?.hasSpreads) continue;
-    if (!expandEntitySpreads(schema, currentNs, resolveRef, lookupFragment, fieldPaths, visited, diagnostics, [])) {
+    if (
+      !expandEntitySpreads(
+        schema,
+        currentNs,
+        resolveRef,
+        lookupFragment,
+        fieldPaths,
+        visited,
+        diagnostics,
+        [],
+      )
+    ) {
       hasUnresolved = true;
     }
     // Also expand nested record-level spreads into fieldPaths
@@ -143,7 +149,14 @@ function expandNestedFieldPaths(
       }
     }
     if (field.children) {
-      expandNestedFieldPaths(field.children, prefix + field.name + ".", currentNs, resolveRef, lookupFragment, fieldPaths);
+      expandNestedFieldPaths(
+        field.children,
+        prefix + field.name + ".",
+        currentNs,
+        resolveRef,
+        lookupFragment,
+        fieldPaths,
+      );
     }
   }
 }
@@ -198,7 +211,10 @@ function collectExpandedFields(
     }
 
     if (fragment.hasSpreads) {
-      collectExpandedFields(fragment, currentNs, resolveRef, lookupFragment, fields, visited, [...chain, resolvedKey]);
+      collectExpandedFields(fragment, currentNs, resolveRef, lookupFragment, fields, visited, [
+        ...chain,
+        resolvedKey,
+      ]);
     }
   }
 }
@@ -305,7 +321,18 @@ function expandEntitySpreads(
     }
     collectFieldPaths(fragment.fields, "", fieldPaths);
     if (fragment.hasSpreads) {
-      if (!expandEntitySpreads(fragment, currentNs, resolveRef, lookupFragment, fieldPaths, expanded, diagnostics, [...chain, resolvedKey])) {
+      if (
+        !expandEntitySpreads(
+          fragment,
+          currentNs,
+          resolveRef,
+          lookupFragment,
+          fieldPaths,
+          expanded,
+          diagnostics,
+          [...chain, resolvedKey],
+        )
+      ) {
         allResolved = false;
       }
     }

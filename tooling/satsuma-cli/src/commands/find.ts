@@ -41,7 +41,9 @@ export function register(program: Command): void {
     .option("--in <scope>", "scope: schema|metric|fragment|all", "all")
     .option("--compact", "one match per line")
     .option("--json", "output JSON")
-    .addHelpText("after", `
+    .addHelpText(
+      "after",
+      `
 Searches all field metadata for the given tag token or key-value key.
 Common tags: pk, required, unique, pii, encrypt, indexed, measure, ref, enum.
 
@@ -61,36 +63,44 @@ Examples:
   satsuma find --tag pii                     # all PII-tagged fields
   satsuma find --tag measure --in metric     # measure fields in metrics only
   satsuma find --tag ref --json              # all foreign key refs as JSON
-  satsuma find --tag enum --compact          # compact one-per-line output`)
-    .action(runCommand(async (pathArg: string | undefined, opts: { tag: string; in?: string; compact?: boolean; json?: boolean }) => {
-      const { files: parsedFiles, index } = await loadWorkspace(pathArg);
+  satsuma find --tag enum --compact          # compact one-per-line output`,
+    )
+    .action(
+      runCommand(
+        async (
+          pathArg: string | undefined,
+          opts: { tag: string; in?: string; compact?: boolean; json?: boolean },
+        ) => {
+          const { files: parsedFiles, index } = await loadWorkspace(pathArg);
 
-      const tag = opts.tag.toLowerCase();
-      const scope = opts.in ?? "all";
-      const validScopes = ["all", "schema", "metric", "fragment"];
-      if (!validScopes.includes(scope)) {
-        throw new CommandError(
-          `Invalid scope '${scope}'. Valid scopes: ${validScopes.join(", ")}`,
-          EXIT_NOT_FOUND,
-        );
-      }
-      const matches = searchTag(index, parsedFiles, tag, scope);
+          const tag = opts.tag.toLowerCase();
+          const scope = opts.in ?? "all";
+          const validScopes = ["all", "schema", "metric", "fragment"];
+          if (!validScopes.includes(scope)) {
+            throw new CommandError(
+              `Invalid scope '${scope}'. Valid scopes: ${validScopes.join(", ")}`,
+              EXIT_NOT_FOUND,
+            );
+          }
+          const matches = searchTag(index, parsedFiles, tag, scope);
 
-      if (opts.json) {
-        console.log(JSON.stringify(matches, null, 2));
-      } else if (opts.compact) {
-        for (const m of matches) {
-          console.log(`${m.file}:${m.line}  ${m.block}.${m.field}  [${m.tag}]`);
-        }
-      } else {
-        printDefault(matches);
-      }
+          if (opts.json) {
+            console.log(JSON.stringify(matches, null, 2));
+          } else if (opts.compact) {
+            for (const m of matches) {
+              console.log(`${m.file}:${m.line}  ${m.block}.${m.field}  [${m.tag}]`);
+            }
+          } else {
+            printDefault(matches);
+          }
 
-      // "No matches" is a non-zero exit so shell pipelines can use
-      // `if satsuma find … --tag pii; then` to detect coverage. The
-      // body output (or `[]` JSON) has already been emitted above.
-      if (matches.length === 0) return EXIT_NOT_FOUND;
-    }));
+          // "No matches" is a non-zero exit so shell pipelines can use
+          // `if satsuma find … --tag pii; then` to detect coverage. The
+          // body output (or `[]` JSON) has already been emitted above.
+          if (matches.length === 0) return EXIT_NOT_FOUND;
+        },
+      ),
+    );
 }
 
 // ── Search logic ──────────────────────────────────────────────────────────────
@@ -120,11 +130,21 @@ function isMetricTwin(index: ExtractedWorkspace, name: string, entry: { row: num
 /**
  * Search for fields whose metadata contains the given tag/key.
  */
-function searchTag(index: ExtractedWorkspace, parsedFiles: ParsedFile[], tag: string, scope: string): Match[] {
+function searchTag(
+  index: ExtractedWorkspace,
+  parsedFiles: ParsedFile[],
+  tag: string,
+  scope: string,
+): Match[] {
   const matches: Match[] = [];
   const fileMap = new Map<string, ParsedFile>(parsedFiles.map((p) => [p.filePath, p]));
 
-  const search = (blockType: string, blockName: string, blockEntry: { file: string; row: number; line?: number }, bodyType: string) => {
+  const search = (
+    blockType: string,
+    blockName: string,
+    blockEntry: { file: string; row: number; line?: number },
+    bodyType: string,
+  ) => {
     if (scope !== "all" && scope !== blockType) return;
     const parsed = fileMap.get(blockEntry.file);
     if (!parsed) return;
@@ -191,7 +211,14 @@ function searchTag(index: ExtractedWorkspace, parsedFiles: ParsedFile[], tag: st
  *
  * Exported for unit tests; not part of the command's public surface.
  */
-export function collectFieldMatches(bodyNode: SyntaxNode, blockType: string, blockName: string, file: string, tag: string, acc: Match[]): void {
+export function collectFieldMatches(
+  bodyNode: SyntaxNode,
+  blockType: string,
+  blockName: string,
+  file: string,
+  tag: string,
+  acc: Match[],
+): void {
   for (const c of bodyNode.namedChildren) {
     if (c.type === "field_decl") {
       const nameNode = c.namedChildren.find((x) => x.type === "field_name");
@@ -206,7 +233,11 @@ export function collectFieldMatches(bodyNode: SyntaxNode, blockType: string, blo
         const matched = findTagInMeta(meta, tag);
         if (matched) {
           const allTags = collectAllTags(meta);
-          const isListOf = c.text.trimStart().replace(/^`[^`]*`\s*/, "").replace(/^\S+\s*/, "").startsWith("list_of");
+          const isListOf = c.text
+            .trimStart()
+            .replace(/^`[^`]*`\s*/, "")
+            .replace(/^\S+\s*/, "")
+            .startsWith("list_of");
           let fieldType: string | undefined;
           if (isListOf) {
             fieldType = typeNode ? `list_of ${typeNode.text}` : "list_of record";
@@ -275,10 +306,11 @@ function collectAllTags(metaNode: SyntaxNode): string[] {
       const valueText = renderMetadataValue(val);
       tags.push(valueText ? `${key?.text} ${valueText}` : (key?.text ?? ""));
     } else if (c.type === "note_tag") {
-      const strNode = c.namedChildren.find((x) => x.type === "nl_string" || x.type === "multiline_string");
+      const strNode = c.namedChildren.find(
+        (x) => x.type === "nl_string" || x.type === "multiline_string",
+      );
       tags.push(strNode ? `note ${strNode.text}` : "note");
-    }
-    else if (c.type === "enum_body") tags.push("enum {...}");
+    } else if (c.type === "enum_body") tags.push("enum {...}");
     else if (c.type === "slice_body") tags.push("slice {...}");
   }
   return tags;
@@ -305,8 +337,7 @@ function renderMetadataValue(valueNode: SyntaxNode | undefined): string {
   const text = valueNode.text;
   if (
     text.length >= 2 &&
-    ((text.startsWith("\"") && text.endsWith("\"")) ||
-      (text.startsWith("`") && text.endsWith("`")))
+    ((text.startsWith('"') && text.endsWith('"')) || (text.startsWith("`") && text.endsWith("`")))
   ) {
     return text.slice(1, -1);
   }
@@ -383,10 +414,14 @@ function printDefault(matches: Match[]): void {
   }
 
   // Group by block
-  const byBlock = new Map<string, { blockType: string; block: string; file: string; fields: Match[] }>();
+  const byBlock = new Map<
+    string,
+    { blockType: string; block: string; file: string; fields: Match[] }
+  >();
   for (const m of matches) {
     const key = `${m.blockType}:${m.block}`;
-    if (!byBlock.has(key)) byBlock.set(key, { blockType: m.blockType, block: m.block, file: m.file, fields: [] });
+    if (!byBlock.has(key))
+      byBlock.set(key, { blockType: m.blockType, block: m.block, file: m.file, fields: [] });
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- Safe: key initialized on previous line
     byBlock.get(key)!.fields.push(m);
   }

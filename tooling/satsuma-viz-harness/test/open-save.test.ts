@@ -85,9 +85,7 @@ test.describe("Open a local file (client-only)", () => {
     await page.locator("#fixture-picker-btn").click();
     const userSection = page.locator(".fixture-section-header", { hasText: "Your documents" });
     await expect(userSection).toBeVisible();
-    await expect(
-      page.locator(".fixture-item", { hasText: OPENED_FILENAME }),
-    ).toBeVisible();
+    await expect(page.locator(".fixture-item", { hasText: OPENED_FILENAME })).toBeVisible();
   });
 });
 

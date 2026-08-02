@@ -25,43 +25,56 @@ export function register(program: Command): void {
     .option("--compact", "omit transform bodies and notes")
     .option("--arrows-only", "print src → tgt table")
     .option("--json", "output JSON")
-    .addHelpText("after", `
+    .addHelpText(
+      "after",
+      `
 Names can be namespace-qualified (e.g. warehouse::'load hub_store').
 Quote names with spaces (e.g. 'load hub_customer').
 
 Examples:
   satsuma mapping 'load hub_customer'                # full mapping
   satsuma mapping 'load hub_customer' --arrows-only  # just src → tgt
-  satsuma mapping 'load hub_customer' --json         # structured output`)
-    .action(runCommand(async (name: string, pathArg: string | undefined, opts: { compact?: boolean; arrowsOnly?: boolean; json?: boolean }) => {
-      const { files: parsedFiles, index } = await loadWorkspace(pathArg);
+  satsuma mapping 'load hub_customer' --json         # structured output`,
+    )
+    .action(
+      runCommand(
+        async (
+          name: string,
+          pathArg: string | undefined,
+          opts: { compact?: boolean; arrowsOnly?: boolean; json?: boolean },
+        ) => {
+          const { files: parsedFiles, index } = await loadWorkspace(pathArg);
 
-      const resolved = resolveIndexKey(name, index.mappings);
-      if (!resolved) {
-        const keys = [...index.mappings.keys()];
-        const close = keys.find((k) => k.toLowerCase() === name.toLowerCase());
-        const lines: string[] = [];
-        if (close) {
-          lines.push(`Mapping '${name}' not found. Did you mean '${close}'?`);
-        } else {
-          lines.push(`Mapping '${name}' not found.`);
-          if (keys.length > 0) lines.push(`Available: ${keys.join(", ")}`);
-        }
-        throw new CommandError(lines.join("\n"), EXIT_NOT_FOUND);
-      }
-      const entry = resolved.entry;
+          const resolved = resolveIndexKey(name, index.mappings);
+          if (!resolved) {
+            const keys = [...index.mappings.keys()];
+            const close = keys.find((k) => k.toLowerCase() === name.toLowerCase());
+            const lines: string[] = [];
+            if (close) {
+              lines.push(`Mapping '${name}' not found. Did you mean '${close}'?`);
+            } else {
+              lines.push(`Mapping '${name}' not found.`);
+              if (keys.length > 0) lines.push(`Available: ${keys.join(", ")}`);
+            }
+            throw new CommandError(lines.join("\n"), EXIT_NOT_FOUND);
+          }
+          const entry = resolved.entry;
 
-      const parsed = parsedFiles.find((p) => p.filePath === entry.file);
-      const mappingNode = parsed ? findBlockNode(parsed.tree.rootNode, "mapping_block", resolved.key) : null;
+          const parsed = parsedFiles.find((p) => p.filePath === entry.file);
+          const mappingNode = parsed
+            ? findBlockNode(parsed.tree.rootNode, "mapping_block", resolved.key)
+            : null;
 
-      if (opts.json) {
-        printJson(entry, mappingNode, opts.compact);
-      } else if (opts.arrowsOnly) {
-        printArrowsOnly(entry, mappingNode);
-      } else {
-        printDefault(entry, mappingNode, opts.compact);
-      }
-    }));
+          if (opts.json) {
+            printJson(entry, mappingNode, opts.compact);
+          } else if (opts.arrowsOnly) {
+            printArrowsOnly(entry, mappingNode);
+          } else {
+            printDefault(entry, mappingNode, opts.compact);
+          }
+        },
+      ),
+    );
 }
 
 // ── CST helpers ───────────────────────────────────────────────────────────────
@@ -92,26 +105,56 @@ function collectArrows(bodyNode: SyntaxNode | undefined): ArrowInfo[] {
       const tgt = c.namedChildren.find((x) => x.type === "tgt_path");
       const hasBody = c.namedChildren.some((x) => x.type === "pipe_chain");
       const meta = c.namedChildren.find((x) => x.type === "metadata_block");
-      arrows.push({ kind: "map", src: pathText(src), tgt: pathText(tgt), hasBody, metaNode: meta, node: c });
+      arrows.push({
+        kind: "map",
+        src: pathText(src),
+        tgt: pathText(tgt),
+        hasBody,
+        metaNode: meta,
+        node: c,
+      });
     } else if (c.type === "computed_arrow") {
       const tgt = c.namedChildren.find((x) => x.type === "tgt_path");
       const hasBody = c.namedChildren.some((x) => x.type === "pipe_chain");
       const meta = c.namedChildren.find((x) => x.type === "metadata_block");
-      arrows.push({ kind: "computed", src: null, tgt: pathText(tgt), hasBody, metaNode: meta, node: c });
+      arrows.push({
+        kind: "computed",
+        src: null,
+        tgt: pathText(tgt),
+        hasBody,
+        metaNode: meta,
+        node: c,
+      });
     } else if (c.type === "nested_arrow") {
       const src = c.namedChildren.find((x) => x.type === "src_path");
       const tgt = c.namedChildren.find((x) => x.type === "tgt_path");
       const meta = c.namedChildren.find((x) => x.type === "metadata_block");
       const children = collectArrows(c);
       const hasChildren = children.length > 0;
-      arrows.push({ kind: hasChildren ? "nested" : "map", src: pathText(src), tgt: pathText(tgt), hasBody: hasChildren, metaNode: meta, node: c, children: hasChildren ? children : undefined });
+      arrows.push({
+        kind: hasChildren ? "nested" : "map",
+        src: pathText(src),
+        tgt: pathText(tgt),
+        hasBody: hasChildren,
+        metaNode: meta,
+        node: c,
+        children: hasChildren ? children : undefined,
+      });
     } else if (c.type === "flatten_block" || c.type === "each_block") {
       const blockKind = c.type === "flatten_block" ? "flatten" : "each";
       const src = c.namedChildren.find((x) => x.type === "src_path");
       const tgt = c.namedChildren.find((x) => x.type === "tgt_path");
       const meta = c.namedChildren.find((x) => x.type === "metadata_block");
       const children = collectArrows(c);
-      arrows.push({ kind: blockKind, src: pathText(src), tgt: pathText(tgt), hasBody: true, metaNode: meta, node: c, children: children.length > 0 ? children : undefined });
+      arrows.push({
+        kind: blockKind,
+        src: pathText(src),
+        tgt: pathText(tgt),
+        hasBody: true,
+        metaNode: meta,
+        node: c,
+        children: children.length > 0 ? children : undefined,
+      });
     }
   }
   return arrows;
@@ -138,7 +181,9 @@ function printJson(entry: MappingRecord, mappingNode: SyntaxNode | null, compact
   function arrowToJson(info: ArrowInfo): Record<string, unknown> {
     const { kind, src, tgt, hasBody, metaNode: arrowMeta, node: arrowNode, children } = info;
     const pipeChain = arrowNode.namedChildren.find((x) => x.type === "pipe_chain");
-    const pipeSteps = pipeChain ? [...pipeChain.namedChildren].filter((x) => x.type === "pipe_step") : [];
+    const pipeSteps = pipeChain
+      ? [...pipeChain.namedChildren].filter((x) => x.type === "pipe_step")
+      : [];
     const classification = classifyTransform(pipeSteps.length > 0 ? pipeSteps : null);
     const hasTransform = hasBody && pipeChain != null;
     const arrowObj: Record<string, unknown> = { kind, src, tgt, hasTransform, classification };
@@ -204,7 +249,9 @@ function printArrowNode(c: SyntaxNode, compact: boolean | undefined, indent: str
   const srcPart = srcStr ? `${srcStr} -> ` : "-> ";
 
   // Check if this is a nested arrow with children
-  const childArrows = c.namedChildren.filter((x) => x.type === "map_arrow" || x.type === "computed_arrow" || x.type === "nested_arrow");
+  const childArrows = c.namedChildren.filter(
+    (x) => x.type === "map_arrow" || x.type === "computed_arrow" || x.type === "nested_arrow",
+  );
 
   if (childArrows.length > 0) {
     console.log(`${indent}${srcPart}${tgtStr}${metaSuffix} {`);
@@ -231,14 +278,22 @@ function printBlockNode(c: SyntaxNode, compact: boolean | undefined, indent: str
   const metaSuffix = meta && !compact ? ` ${meta.text}` : "";
   console.log(`${indent}${keyword} ${srcStr} -> ${tgtStr}${metaSuffix} {`);
   for (const child of c.namedChildren) {
-    if (child.type === "map_arrow" || child.type === "computed_arrow" || child.type === "nested_arrow") {
+    if (
+      child.type === "map_arrow" ||
+      child.type === "computed_arrow" ||
+      child.type === "nested_arrow"
+    ) {
       printArrowNode(child, compact, indent + "  ");
     }
   }
   console.log(`${indent}}`);
 }
 
-function printDefault(entry: MappingRecord, mappingNode: SyntaxNode | null, compact: boolean | undefined): void {
+function printDefault(
+  entry: MappingRecord,
+  mappingNode: SyntaxNode | null,
+  compact: boolean | undefined,
+): void {
   // Use canonicalEntityName so the header includes the namespace prefix, e.g.
   // "mapping 'warehouse::load hub_store'" not "mapping 'load hub_store'" (sl-qofc).
   const nameStr = entry.name ? ` '${canonicalEntityName(entry)}'` : "";
@@ -251,8 +306,10 @@ function printDefault(entry: MappingRecord, mappingNode: SyntaxNode | null, comp
     // source / target blocks
     const srcBlock = body.namedChildren.find((c) => c.type === "source_block");
     const tgtBlock = body.namedChildren.find((c) => c.type === "target_block");
-    if (srcBlock) console.log(`  source { ${srcBlock.namedChildren.map((c) => c.text).join(", ")} }`);
-    if (tgtBlock) console.log(`  target { ${tgtBlock.namedChildren.map((c) => c.text).join(", ")} }`);
+    if (srcBlock)
+      console.log(`  source { ${srcBlock.namedChildren.map((c) => c.text).join(", ")} }`);
+    if (tgtBlock)
+      console.log(`  target { ${tgtBlock.namedChildren.map((c) => c.text).join(", ")} }`);
 
     // Arrows and notes
     for (const c of body.namedChildren) {

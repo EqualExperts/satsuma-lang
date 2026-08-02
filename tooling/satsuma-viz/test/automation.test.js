@@ -118,14 +118,22 @@ describe("viz automation helpers", () => {
         { key: "note", value: "Unique key across ORDERS tables" },
         { key: "sensitivity", value: "internal" },
       ],
-      notes: [{ text: "Unique key across ORDERS tables", isMultiline: false,
-        location: { uri: "file:///t.stm", line: 1, character: 0 } }],
+      notes: [
+        {
+          text: "Unique key across ORDERS tables",
+          isMultiline: false,
+          location: { uri: "file:///t.stm", line: 1, character: 0 },
+        },
+      ],
       comments: [],
       children: [],
       location: { uri: "file:///t.stm", line: 1, character: 0 },
     };
     const pills = card._fieldMetaPills(field);
-    assert.deepEqual(pills.map((p) => p.key), ["sensitivity"]);
+    assert.deepEqual(
+      pills.map((p) => p.key),
+      ["sensitivity"],
+    );
 
     // The note text must still reach the rendered output via the field-note row.
     const serialize = (t) => {
@@ -199,16 +207,18 @@ describe("viz automation helpers", () => {
       qualifiedId: "customers",
       kind: "schema",
       label: null,
-      fields: [{
-        name: "customer_id",
-        type: "UUID",
-        constraints: [],
-        metadata: [],
-        notes: [],
-        comments: [],
-        children: [],
-        location: { uri: "file:///test.stm", line: 1, character: 0 },
-      }],
+      fields: [
+        {
+          name: "customer_id",
+          type: "UUID",
+          constraints: [],
+          metadata: [],
+          notes: [],
+          comments: [],
+          children: [],
+          location: { uri: "file:///test.stm", line: 1, character: 0 },
+        },
+      ],
       notes: [],
       comments: [],
       metadata: [],

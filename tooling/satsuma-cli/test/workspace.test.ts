@@ -146,7 +146,10 @@ describe("loadWorkspace", () => {
     // namespace qualification so downstream commands can resolve scoped names.
     const { files, index } = await loadWorkspace(IMPORT_ENTRY);
 
-    assert.deepEqual(files.map((file) => file.filePath), [IMPORT_ENTRY, IMPORT_SOURCE].sort());
+    assert.deepEqual(
+      files.map((file) => file.filePath),
+      [IMPORT_ENTRY, IMPORT_SOURCE].sort(),
+    );
     assert.ok(index.schemas.has("src::customers"));
     assert.ok(index.schemas.has("mart::dim_customers"));
     assert.ok(index.mappings.has("build dim_customers"));

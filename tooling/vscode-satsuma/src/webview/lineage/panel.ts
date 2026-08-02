@@ -9,11 +9,7 @@ export class LineagePanel {
   private readonly cliPath: string;
   private disposables: vscode.Disposable[] = [];
 
-  static createOrShow(
-    extensionUri: vscode.Uri,
-    cliPath: string,
-    fieldPath: string,
-  ): void {
+  static createOrShow(extensionUri: vscode.Uri, cliPath: string, fieldPath: string): void {
     if (LineagePanel.currentPanel) {
       LineagePanel.currentPanel.panel.reveal(vscode.ViewColumn.Beside);
       LineagePanel.currentPanel.refresh(fieldPath);
@@ -69,9 +65,25 @@ export class LineagePanel {
   private async traceLineage(
     fieldPath: string,
     maxHops: number,
-  ): Promise<Array<{ source: string; target: string; classification: string; transform: string; file: string; line: number }>> {
+  ): Promise<
+    Array<{
+      source: string;
+      target: string;
+      classification: string;
+      transform: string;
+      file: string;
+      line: number;
+    }>
+  > {
     const visited = new Set<string>();
-    const allArrows: Array<{ source: string; target: string; classification: string; transform: string; file: string; line: number }> = [];
+    const allArrows: Array<{
+      source: string;
+      target: string;
+      classification: string;
+      transform: string;
+      file: string;
+      line: number;
+    }> = [];
     const queue = [fieldPath];
 
     for (let hop = 0; hop < maxHops && queue.length > 0; hop++) {
@@ -79,12 +91,7 @@ export class LineagePanel {
       if (visited.has(current)) continue;
       visited.add(current);
 
-      const result = await runCli(this.cliPath, [
-        "arrows",
-        current,
-        "--as-source",
-        "--json",
-      ]);
+      const result = await runCli(this.cliPath, ["arrows", current, "--as-source", "--json"]);
 
       if (result.exitCode !== 0 || !result.stdout.trim()) continue;
 

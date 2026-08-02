@@ -109,21 +109,21 @@ export function highlightSatsuma(source: string): string {
     const g = m.groups ?? {};
     const text = m[0];
 
-    if (g.triple)        html += wrap("tok-string-triple", text);
-    else if (g.string)   html += highlightStringContents(text);
+    if (g.triple) html += wrap("tok-string-triple", text);
+    else if (g.string) html += highlightStringContents(text);
     else if (g.comment_warn) html += wrap("tok-comment-warn", text);
-    else if (g.comment_q)    html += wrap("tok-comment-q",    text);
-    else if (g.comment)      html += wrap("tok-comment",       text);
-    else if (g.arrow)    html += wrap("tok-arrow",    text);
-    else if (g.spread)   html += wrap("tok-spread",   text);
-    else if (g.pipe)     html += wrap("tok-pipe",     text);
+    else if (g.comment_q) html += wrap("tok-comment-q", text);
+    else if (g.comment) html += wrap("tok-comment", text);
+    else if (g.arrow) html += wrap("tok-arrow", text);
+    else if (g.spread) html += wrap("tok-spread", text);
+    else if (g.pipe) html += wrap("tok-pipe", text);
     else if (g.backtick) html += wrap("tok-backtick", text);
-    else if (g.kw)       html += wrap("tok-kw",       text);
-    else if (g.type)     html += wrap("tok-type",     text);
+    else if (g.kw) html += wrap("tok-kw", text);
+    else if (g.type) html += wrap("tok-type", text);
     else if (g.pipeline) html += wrap("tok-pipeline", text);
-    else if (g.boolean)  html += wrap("tok-boolean",  text);
-    else if (g.number)   html += wrap("tok-number",   text);
-    else                 html += esc(text);
+    else if (g.boolean) html += wrap("tok-boolean", text);
+    else if (g.number) html += wrap("tok-number", text);
+    else html += esc(text);
 
     last = (m.index ?? 0) + text.length;
   }

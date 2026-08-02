@@ -297,7 +297,11 @@ export class DocumentLibrary {
 
   /** Derive a user-document name that no existing user document already uses. */
   private uniqueUserName(name: string): string {
-    const taken = new Set(this.list().filter((d) => d.kind === "user").map((d) => d.name));
+    const taken = new Set(
+      this.list()
+        .filter((d) => d.kind === "user")
+        .map((d) => d.name),
+    );
     if (!taken.has(name)) return name;
     // Split "pipeline.stm" into "pipeline" + ".stm" so the counter lands before
     // the extension; a name with no dot gets the counter appended directly.

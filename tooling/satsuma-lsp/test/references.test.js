@@ -4,7 +4,9 @@ const { initTestParser, parse } = require("./helper");
 const { computeReferences } = require("../dist/references");
 const { createWorkspaceIndex, indexFile } = require("../dist/workspace-index");
 
-before(async () => { await initTestParser(); });
+before(async () => {
+  await initTestParser();
+});
 
 function buildIndex(files) {
   const idx = createWorkspaceIndex();
@@ -188,7 +190,8 @@ mapping \`a\` {
     const result = refs(
       {
         "file:///a.stm": "schema customers {\n  id UUID\n}",
-        "file:///b.stm": 'import { customers } from "a.stm"\nmapping x {\n  source { customers }\n  target { d }\n  id -> id\n}',
+        "file:///b.stm":
+          'import { customers } from "a.stm"\nmapping x {\n  source { customers }\n  target { d }\n  id -> id\n}',
       },
       "file:///a.stm",
       0,

@@ -36,7 +36,9 @@ const {
   extractMetadataEntries,
 } = _testInternals;
 
-before(async () => { await initTestParser(); });
+before(async () => {
+  await initTestParser();
+});
 
 const URI = "file:///b.stm";
 
@@ -178,7 +180,8 @@ describe("extractMapping (direct)", () => {
   // Pins the MappingBlock defaults (empty each/flatten/note/comments arrays
   // and structured sourceBlock) for the simplest possible mapping shape.
   it("returns the canonical MappingBlock shape for a one-arrow mapping", () => {
-    const src = "schema s { a INT }\nschema t { b INT }\n" +
+    const src =
+      "schema s { a INT }\nschema t { b INT }\n" +
       "mapping m {\n  source { s }\n  target { t }\n  a -> b\n}";
     const { ws, tree } = singleFileIndex(src);
     const node = findNode(tree.rootNode, "mapping_block");
@@ -213,7 +216,8 @@ describe("extractMapping (direct)", () => {
   // tags like `airflow` and the note text — was dropped at extraction, so the
   // detail view's header could never show it.
   it("extracts the mapping's own metadata block (bare tags and note)", () => {
-    const src = "schema s { a INT }\nschema t { b INT }\n" +
+    const src =
+      "schema s { a INT }\nschema t { b INT }\n" +
       'mapping export_to_csv (airflow, note "All fields to CSV") {\n' +
       "  source { s }\n  target { t }\n  a -> b\n}";
     const { ws, tree } = singleFileIndex(src);
@@ -237,16 +241,16 @@ describe("extractMetric (direct)", () => {
   // (extractMetricFields → extractMeasure).
   it("returns the canonical MetricCard shape for a basic metric", () => {
     const src =
-      'schema mrr (\n' +
-      '  metric,\n' +
+      "schema mrr (\n" +
+      "  metric,\n" +
       '  metric_name "MRR",\n' +
-      '  source subs,\n' +
-      '  grain monthly,\n' +
-      '  slice {region, plan},\n' +
+      "  source subs,\n" +
+      "  grain monthly,\n" +
+      "  slice {region, plan},\n" +
       '  filter "active"\n' +
-      ') {\n' +
-      '  value DECIMAL (measure additive)\n' +
-      '}';
+      ") {\n" +
+      "  value DECIMAL (measure additive)\n" +
+      "}";
     const node = findNode(root(src), "schema_block");
     const card = extractMetric(URI, node, null);
 
@@ -280,19 +284,25 @@ describe("extractMetricMetadata (direct)", () => {
   // correct out-parameter.
   it("populates source / grain / slices / filter from metadata_block", () => {
     const src =
-      'schema m (\n' +
-      '  metric,\n' +
-      '  source orders,\n' +
-      '  grain daily,\n' +
-      '  slice {country},\n' +
+      "schema m (\n" +
+      "  metric,\n" +
+      "  source orders,\n" +
+      "  grain daily,\n" +
+      "  slice {country},\n" +
       '  filter "paid = true"\n' +
-      ') { v INT (measure) }';
+      ") { v INT (measure) }";
     const meta = findNode(root(src), "metadata_block");
     const source = [];
     const slices = [];
     let grain = null;
     let filter = null;
-    extractMetricMetadata(meta, source, slices, (g) => (grain = g), (f) => (filter = f));
+    extractMetricMetadata(
+      meta,
+      source,
+      slices,
+      (g) => (grain = g),
+      (f) => (filter = f),
+    );
     assert.deepStrictEqual(source, ["orders"]);
     assert.deepStrictEqual(slices, ["country"]);
     assert.equal(grain, "daily");
@@ -306,13 +316,13 @@ describe("extractMetricFields (direct)", () => {
   // a non-measure field that yields measure: null.
   it("returns one MetricFieldEntry per field with the correct measure value", () => {
     const src =
-      'schema m (metric, source s) {\n' +
-      '  add_v DECIMAL (measure additive)\n' +
-      '  na_v  DECIMAL (measure non_additive)\n' +
-      '  sa_v  DECIMAL (measure semi_additive)\n' +
-      '  bare  INT (measure)\n' +
-      '  none  INT\n' +
-      '}';
+      "schema m (metric, source s) {\n" +
+      "  add_v DECIMAL (measure additive)\n" +
+      "  na_v  DECIMAL (measure non_additive)\n" +
+      "  sa_v  DECIMAL (measure semi_additive)\n" +
+      "  bare  INT (measure)\n" +
+      "  none  INT\n" +
+      "}";
     const body = findNode(root(src), "schema_body");
     const fields = extractMetricFields(URI, body);
     assert.equal(fields.length, 5);
@@ -333,22 +343,16 @@ describe("extractMeasure (direct)", () => {
   // The bare `measure` tag (no value) defaults to "additive" — this rule is
   // codified in extractMeasure and checked here in isolation.
   it("returns 'additive' for a bare measure tag", () => {
-    const src = 'schema m (metric, source s) { v INT (measure) }';
-    const fieldMeta = findNode(
-      findNode(root(src), "field_decl"),
-      "metadata_block",
-    );
+    const src = "schema m (metric, source s) { v INT (measure) }";
+    const fieldMeta = findNode(findNode(root(src), "field_decl"), "metadata_block");
     assert.equal(extractMeasure(fieldMeta), "additive");
   });
 
   // A field whose metadata block has no measure tag yields null — separate
   // from the "additive default" path above.
   it("returns null when no measure tag is present", () => {
-    const src = 'schema s { v INT (pk) }';
-    const fieldMeta = findNode(
-      findNode(root(src), "field_decl"),
-      "metadata_block",
-    );
+    const src = "schema s { v INT (pk) }";
+    const fieldMeta = findNode(findNode(root(src), "field_decl"), "metadata_block");
     assert.equal(extractMeasure(fieldMeta), null);
   });
 });
@@ -363,13 +367,13 @@ describe("extractFieldEntries (direct)", () => {
   // common field flavours in one canonical assertion.
   it("returns the canonical FieldEntry shape for nested + list + constraint fields", () => {
     const src =
-      'schema events {\n' +
-      '  id UUID (pk)\n' +
-      '  data record {\n' +
-      '    name STRING\n' +
-      '  }\n' +
-      '  tags list_of STRING\n' +
-      '}';
+      "schema events {\n" +
+      "  id UUID (pk)\n" +
+      "  data record {\n" +
+      "    name STRING\n" +
+      "  }\n" +
+      "  tags list_of STRING\n" +
+      "}";
     const body = findNode(root(src), "schema_body");
     const fields = extractFieldEntries(URI, body);
 
@@ -445,11 +449,7 @@ describe("extractSpreads (direct)", () => {
   // module exposes is "return the spread names in declaration order".
   it("returns spread names in declaration order", () => {
     const src =
-      'schema s {\n' +
-      '  ...common::base\n' +
-      '  ...common::audit\n' +
-      '  id INT\n' +
-      '}';
+      "schema s {\n" + "  ...common::base\n" + "  ...common::audit\n" + "  id INT\n" + "}";
     const body = findNode(root(src), "schema_body");
     assert.deepStrictEqual(extractSpreads(body), ["common::base", "common::audit"]);
   });
@@ -457,7 +457,7 @@ describe("extractSpreads (direct)", () => {
   // Empty schema bodies must return [] (not undefined) so the SchemaCard
   // shape is uniform.
   it("returns an empty array for a schema body with no spreads", () => {
-    const src = 'schema s { id INT }';
+    const src = "schema s { id INT }";
     const body = findNode(root(src), "schema_body");
     assert.deepStrictEqual(extractSpreads(body), []);
   });
@@ -483,7 +483,7 @@ describe("extractSchemaLabel (direct)", () => {
 
   // Metadata block exists but contains no note tag → null.
   it("returns null when no note tag is present", () => {
-    const src = 'schema foo (key) { id INT }';
+    const src = "schema foo (key) { id INT }";
     const meta = findNode(root(src), "metadata_block");
     assert.equal(extractSchemaLabel(meta), null);
   });
@@ -518,8 +518,8 @@ describe("extractArrow (direct)", () => {
   // A bare-copy arrow with no transform pins the ArrowEntry default shape:
   // empty metadata, empty comments, transform: null.
   it("returns the canonical ArrowEntry shape for a bare-copy arrow", () => {
-    const src = "schema s { a INT }\nschema t { b INT }\n" +
-      "mapping m { source { s } target { t } a -> b }";
+    const src =
+      "schema s { a INT }\nschema t { b INT }\n" + "mapping m { source { s } target { t } a -> b }";
     const node = findNode(root(src), "map_arrow");
     const arrow = extractArrow(URI, node);
     assert.deepStrictEqual(arrow, {
@@ -535,7 +535,8 @@ describe("extractArrow (direct)", () => {
 
   // Multi-source arrows produce sourceFields with one entry per src_path.
   it("captures every src_path in sourceFields for a multi-source arrow", () => {
-    const src = "schema s { a STRING\n b STRING }\nschema t { c STRING }\n" +
+    const src =
+      "schema s { a STRING\n b STRING }\nschema t { c STRING }\n" +
       'mapping m { source { s } target { t } a, b -> c { "concat" } }';
     const node = findNode(root(src), "map_arrow");
     const arrow = extractArrow(URI, node);
@@ -550,7 +551,8 @@ describe("extractComputedArrow (direct)", () => {
   // Computed arrows have no source fields but still carry the same
   // ArrowEntry shape (sourceFields: []).
   it("returns sourceFields: [] and a non-null transform for a computed arrow", () => {
-    const src = "schema s { a INT }\nschema t { b INT }\n" +
+    const src =
+      "schema s { a INT }\nschema t { b INT }\n" +
       'mapping m { source { s } target { t } -> b { "compute" } }';
     const node = findNode(root(src), "computed_arrow");
     const arrow = extractComputedArrow(URI, node);
@@ -571,7 +573,8 @@ describe("extractTransform (direct)", () => {
   // A pipe chain with bare-token steps yields kind "nl" and one entry per
   // pipe_text in steps. text is the raw source of the pipe_chain.
   it("returns kind 'nl' with one step per pipe_text", () => {
-    const src = "schema s { a INT }\nschema t { b INT }\n" +
+    const src =
+      "schema s { a INT }\nschema t { b INT }\n" +
       "mapping m { source { s } target { t } a -> b { trim | lowercase } }";
     const pipeChain = findNode(root(src), "pipe_chain");
     const tf = extractTransform(pipeChain);
@@ -582,7 +585,8 @@ describe("extractTransform (direct)", () => {
 
   // A standalone map literal flips kind to "map" — the only non-nl variant.
   it("returns kind 'map' when the chain contains a map_literal", () => {
-    const src = "schema s { a STRING }\nschema t { b STRING }\n" +
+    const src =
+      "schema s { a STRING }\nschema t { b STRING }\n" +
       'mapping m { source { s } target { t } a -> b { map { A: "x" } } }';
     const pipeChain = findNode(root(src), "pipe_chain");
     const tf = extractTransform(pipeChain);
@@ -652,7 +656,8 @@ describe("each and flatten nesting (sl-vu22)", () => {
   // a flatten inside an each (examples/nested-iteration/pipeline.stm:100) was
   // dropped from the model entirely, taking its arrows with it.
 
-  const NESTED = "schema s { orders list_of record {\n" +
+  const NESTED =
+    "schema s { orders list_of record {\n" +
     "  parcels list_of record { contents list_of record { sku STRING } }\n" +
     "} }\n" +
     "schema t { orders list_of record { packed_items list_of record { sku STRING } } }\n" +
@@ -789,10 +794,9 @@ describe("extractNotes (direct)", () => {
     assert.equal(notes[0].text, "Tag note");
   });
 
-
   // No notes at all yields the empty array, not undefined.
   it("returns an empty array when there are no notes", () => {
-    const src = 'schema s { id INT }';
+    const src = "schema s { id INT }";
     const node = findNode(root(src), "schema_block");
     assert.deepStrictEqual(extractNotes(URI, node), []);
   });

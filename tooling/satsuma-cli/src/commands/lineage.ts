@@ -49,7 +49,9 @@ export function register(program: Command): void {
     .option("--depth <n>", "maximum recursion depth", parsePositiveInt, 10)
     .option("--compact", "print names only")
     .option("--json", "emit {nodes, edges} DAG")
-    .addHelpText("after", `
+    .addHelpText(
+      "after",
+      `
 One of --from or --to is required (not both).
   --from  traces downstream: schema → mappings → target schemas → metrics
   --to    traces upstream: BFS path from any source back to the target
@@ -66,65 +68,77 @@ Examples:
   satsuma lineage --from hub_customer              # what does hub_customer feed?
   satsuma lineage --to mart_customer_360           # what feeds mart_customer_360?
   satsuma lineage --from pos::stores --depth 3     # namespace-qualified, limited depth
-  satsuma lineage --from hub_customer --json       # DAG as JSON`)
-    .action(runCommand(async (pathArg: string | undefined, opts: { from?: string; to?: string; depth: number; compact?: boolean; json?: boolean }) => {
-      if (!opts.from && !opts.to) {
-        throw new CommandError("Provide --from <name> or --to <name>.", EXIT_NOT_FOUND);
-      }
+  satsuma lineage --from hub_customer --json       # DAG as JSON`,
+    )
+    .action(
+      runCommand(
+        async (
+          pathArg: string | undefined,
+          opts: { from?: string; to?: string; depth: number; compact?: boolean; json?: boolean },
+        ) => {
+          if (!opts.from && !opts.to) {
+            throw new CommandError("Provide --from <name> or --to <name>.", EXIT_NOT_FOUND);
+          }
 
-      if (opts.from && opts.to) {
-        throw new CommandError(
-          "Cannot specify both --from and --to. Use one at a time.",
-          EXIT_NOT_FOUND,
-        );
-      }
+          if (opts.from && opts.to) {
+            throw new CommandError(
+              "Cannot specify both --from and --to. Use one at a time.",
+              EXIT_NOT_FOUND,
+            );
+          }
 
-      const { index } = await loadWorkspace(pathArg);
-      const graph = buildFullGraph(index);
+          const { index } = await loadWorkspace(pathArg);
+          const graph = buildFullGraph(index);
 
-      // Build a "node not found" CommandError that respects the JSON
-      // contract: JSON callers receive `{"error": ...}` on stdout so the
-      // payload still parses; text callers get the message on stderr.
-      const nodeNotFound = (queried: string): CommandError => {
-        const msg = `Node '${queried}' not found.`;
-        if (opts.json) {
-          return new CommandError(JSON.stringify({ error: msg }, null, 2), EXIT_NOT_FOUND, "stdout");
-        }
-        return new CommandError(msg, EXIT_NOT_FOUND);
-      };
+          // Build a "node not found" CommandError that respects the JSON
+          // contract: JSON callers receive `{"error": ...}` on stdout so the
+          // payload still parses; text callers get the message on stderr.
+          const nodeNotFound = (queried: string): CommandError => {
+            const msg = `Node '${queried}' not found.`;
+            if (opts.json) {
+              return new CommandError(
+                JSON.stringify({ error: msg }, null, 2),
+                EXIT_NOT_FOUND,
+                "stdout",
+              );
+            }
+            return new CommandError(msg, EXIT_NOT_FOUND);
+          };
 
-      if (opts.from) {
-        const resolved = resolveIndexKey(opts.from, graph.nodes);
-        if (!resolved) throw nodeNotFound(opts.from);
-        const start = resolved.key;
-        const dag = buildDownstream(graph, start, opts.depth);
-        if (opts.json) {
-          console.log(JSON.stringify(dag, null, 2));
-        } else if (opts.compact) {
-          printCompact(dag, start);
-        } else {
-          printTree(dag, start, 0);
-        }
-      } else {
-        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- Safe: guarded by opts.to existence check in enclosing branch
-        const resolvedTo = resolveIndexKey(opts.to!, graph.nodes);
-        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- Safe: same guard
-        if (!resolvedTo) throw nodeNotFound(opts.to!);
-        const target = resolvedTo.key;
-        const dag = buildUpstream(graph, target, opts.depth);
-        if (dag.nodes.length === 0) {
-          console.log(`No upstream path found to '${target}'.`);
-          return EXIT_NOT_FOUND;
-        }
-        if (opts.json) {
-          console.log(JSON.stringify(dag, null, 2));
-        } else if (opts.compact) {
-          for (const n of dag.nodes) console.log(displayKey(n.name));
-        } else {
-          printUpstreamFlat(dag, target);
-        }
-      }
-    }));
+          if (opts.from) {
+            const resolved = resolveIndexKey(opts.from, graph.nodes);
+            if (!resolved) throw nodeNotFound(opts.from);
+            const start = resolved.key;
+            const dag = buildDownstream(graph, start, opts.depth);
+            if (opts.json) {
+              console.log(JSON.stringify(dag, null, 2));
+            } else if (opts.compact) {
+              printCompact(dag, start);
+            } else {
+              printTree(dag, start, 0);
+            }
+          } else {
+            // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- Safe: guarded by opts.to existence check in enclosing branch
+            const resolvedTo = resolveIndexKey(opts.to!, graph.nodes);
+            // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- Safe: same guard
+            if (!resolvedTo) throw nodeNotFound(opts.to!);
+            const target = resolvedTo.key;
+            const dag = buildUpstream(graph, target, opts.depth);
+            if (dag.nodes.length === 0) {
+              console.log(`No upstream path found to '${target}'.`);
+              return EXIT_NOT_FOUND;
+            }
+            if (opts.json) {
+              console.log(JSON.stringify(dag, null, 2));
+            } else if (opts.compact) {
+              for (const n of dag.nodes) console.log(displayKey(n.name));
+            } else {
+              printUpstreamFlat(dag, target);
+            }
+          }
+        },
+      ),
+    );
 }
 
 /**

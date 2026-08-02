@@ -10,7 +10,9 @@ import { describe, it } from "node:test";
 function n(type: string, namedChildren: any[] = [], text = "") {
   return { type, text, startPosition: { row: 0, column: 0 }, namedChildren };
 }
-function ident(t: string) { return n("identifier", [], t); }
+function ident(t: string) {
+  return n("identifier", [], t);
+}
 
 // ── Inline extractMetaEntries (mirrors metric.js) ─────────────────────────────
 
@@ -39,7 +41,8 @@ function extractMetaEntries(metaNode: any) {
 
 function formatMeta(entries: { key: string; value: string | null }[]) {
   if (entries.length === 0) return "";
-  const format = (e: { key: string; value: string | null }) => (e.value !== null ? `${e.key} ${e.value}` : e.key);
+  const format = (e: { key: string; value: string | null }) =>
+    e.value !== null ? `${e.key} ${e.value}` : e.key;
   if (entries.length <= 2) {
     return ` (${entries.map(format).join(", ")})`;
   }
@@ -62,7 +65,11 @@ describe("extractMetaEntries", () => {
   });
 
   it("strips nl_string quotes from values", () => {
-    const kvVal = n("value_text", [n("nl_string", [], '"status = \'active\'"')], '"status = \'active\'"');
+    const kvVal = n(
+      "value_text",
+      [n("nl_string", [], "\"status = 'active'\"")],
+      "\"status = 'active'\"",
+    );
     const kv = n("tag_with_value", [ident("filter"), kvVal]);
     const meta = n("metadata_block", [kv]);
 

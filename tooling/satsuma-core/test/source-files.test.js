@@ -8,11 +8,7 @@
 
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import {
-  SATSUMA_FILE_EXTENSIONS,
-  SATSUMA_FILE_GLOB,
-  isSatsumaFilePath,
-} from "@satsuma/core";
+import { SATSUMA_FILE_EXTENSIONS, SATSUMA_FILE_GLOB, isSatsumaFilePath } from "@satsuma/core";
 
 describe("isSatsumaFilePath", () => {
   it("recognises both registered extensions, on paths and on URIs (sl-v215)", () => {
@@ -46,9 +42,6 @@ describe("SATSUMA_FILE_GLOB", () => {
     // Watchers built from the glob and indexers built from the predicate must
     // agree on the file set, or watched .satsuma edits would be dropped again.
     const globExts = /\{(.+)\}/.exec(SATSUMA_FILE_GLOB)?.[1].split(",") ?? [];
-    assert.deepEqual(
-      globExts.map((e) => `.${e}`).sort(),
-      [...SATSUMA_FILE_EXTENSIONS].sort(),
-    );
+    assert.deepEqual(globExts.map((e) => `.${e}`).sort(), [...SATSUMA_FILE_EXTENSIONS].sort());
   });
 });

@@ -42,9 +42,10 @@ export function computeActionContext(
  * Walk up the CST from the cursor node to find an enclosing named mapping_block,
  * then extract the mapping name and the first target schema reference.
  */
-function inferMappingContext(
-  node: SyntaxNode,
-): { mappingName: string | null; targetSchema: string | null } {
+function inferMappingContext(node: SyntaxNode): {
+  mappingName: string | null;
+  targetSchema: string | null;
+} {
   let current: SyntaxNode | null = node;
   while (current) {
     if (current.type === "mapping_block") {
@@ -123,31 +124,20 @@ function inferSchemaFromNlRef(name: string): string | null {
   return parts.length >= 2 ? parts.slice(0, -1).join(".") : null;
 }
 
-function inferArrowFieldPath(
-  schemas: string[],
-  rawPath: string | null,
-): string | null {
+function inferArrowFieldPath(schemas: string[], rawPath: string | null): string | null {
   const normalizedPath = normalizeArrowPath(rawPath);
   if (!normalizedPath) return null;
 
   for (const schema of schemas) {
-    if (
-      normalizedPath === schema ||
-      normalizedPath.startsWith(`${schema}.`)
-    ) {
+    if (normalizedPath === schema || normalizedPath.startsWith(`${schema}.`)) {
       return normalizedPath;
     }
   }
 
-  return schemas.length === 1 && schemas[0]
-    ? `${schemas[0]}.${normalizedPath}`
-    : null;
+  return schemas.length === 1 && schemas[0] ? `${schemas[0]}.${normalizedPath}` : null;
 }
 
-function inferSchemaFromPath(
-  schemas: string[],
-  rawPath: string | null,
-): string | null {
+function inferSchemaFromPath(schemas: string[], rawPath: string | null): string | null {
   const fullPath = inferArrowFieldPath(schemas, rawPath);
   if (!fullPath) {
     return schemas.length === 1 ? (schemas[0] ?? null) : null;

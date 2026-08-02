@@ -79,16 +79,14 @@ test.describe("Live editor — editing and highlighting", () => {
     const input = page.locator("#source-input");
     await input.fill(SINGLE_SCHEMA_DOC);
 
-    await expect.poll(async () =>
-      page.locator("#source-highlight").evaluate((el) => el.textContent),
-    ).toBe(SINGLE_SCHEMA_DOC);
+    await expect
+      .poll(async () => page.locator("#source-highlight").evaluate((el) => el.textContent))
+      .toBe(SINGLE_SCHEMA_DOC);
 
     // `schema` is a keyword; `ID` and `STRING` are data types — all must be
     // tokenized into their respective token classes (not left as plain text).
     await expect(page.locator("#source-highlight .tok-kw").first()).toHaveText("schema");
-    await expect(
-      page.locator("#source-highlight .tok-type", { hasText: "STRING" }),
-    ).toHaveCount(1);
+    await expect(page.locator("#source-highlight .tok-type", { hasText: "STRING" })).toHaveCount(1);
   });
 
   test("wide lines scroll horizontally with the highlight layer locked to the caret", async ({
@@ -107,11 +105,7 @@ test.describe("Live editor — editing and highlighting", () => {
     // setting scrollLeft before layout has grown the scrollable overflow
     // silently clamps it (observed flake: 120 requested, 10 applied).
     await expect
-      .poll(() =>
-        page.locator("#source-input").evaluate(
-          (el) => el.scrollWidth - el.clientWidth,
-        ),
-      )
+      .poll(() => page.locator("#source-input").evaluate((el) => el.scrollWidth - el.clientWidth))
       .toBeGreaterThan(SCROLL_BY);
 
     const token = page.locator("#source-highlight .tok-comment").first();

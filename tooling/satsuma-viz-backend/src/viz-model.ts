@@ -78,11 +78,7 @@ import { CONSTRAINT_TAGS } from "@satsuma/viz-model";
 
 // ---------- VizModel builder ----------
 
-export function buildVizModel(
-  uri: string,
-  tree: Tree,
-  wsIndex: WorkspaceIndex,
-): VizModel {
+export function buildVizModel(uri: string, tree: Tree, wsIndex: WorkspaceIndex): VizModel {
   const root = tree.rootNode;
   const fileNotes: NoteBlock[] = [];
   const globalNs: NamespaceGroup = {
@@ -342,10 +338,7 @@ function expandedFieldToEntry(decl: FieldDecl): FieldEntry {
 
 // ---------- Top-level processing ----------
 
-function getOrCreateNamespace(
-  map: Map<string, NamespaceGroup>,
-  name: string,
-): NamespaceGroup {
+function getOrCreateNamespace(map: Map<string, NamespaceGroup>, name: string): NamespaceGroup {
   let ns = map.get(name);
   if (!ns) {
     ns = { name, schemas: [], mappings: [], metrics: [], fragments: [] };
@@ -422,11 +415,7 @@ function collectTopLevelComments(
 
 /** Attach each standalone //! and //? among `siblings` to the nearest
  *  preceding block found in `group`. */
-function collectSiblingComments(
-  uri: string,
-  siblings: SyntaxNode[],
-  group: NamespaceGroup,
-): void {
+function collectSiblingComments(uri: string, siblings: SyntaxNode[], group: NamespaceGroup): void {
   for (let i = 0; i < siblings.length; i++) {
     const node = siblings[i]!;
     if (node.type !== "warning_comment" && node.type !== "question_comment") {
@@ -637,11 +626,7 @@ function extractFieldEntries(uri: string, body: SyntaxNode): FieldEntry[] {
  * Convert a core FieldDecl to a viz FieldEntry, enriching with CST-derived
  * notes, comments, constraints, and location from the parallel CST node.
  */
-function fieldDeclToEntry(
-  decl: FieldDecl,
-  uri: string,
-  cstNode: SyntaxNode | null,
-): FieldEntry {
+function fieldDeclToEntry(decl: FieldDecl, uri: string, cstNode: SyntaxNode | null): FieldEntry {
   // Derive constraints from core's metadata entries
   const constraints = extractConstraintsFromMeta(decl.metadata ?? []);
 
@@ -694,31 +679,43 @@ function extractConstraintsFromMeta(entries: MetaEntry[]): string[] {
   return constraints;
 }
 
-
 // ---------- Mapping extraction ----------
 
 /** Build a DefinitionLookup from the LSP WorkspaceIndex for NL @-ref resolution. */
 function makeVizLookup(wsIndex: WorkspaceIndex): DefinitionLookup {
   return {
-    hasSchema: (key) => (wsIndex.definitions.get(key)?.some((d) => d.kind === "schema") ?? false),
+    hasSchema: (key) => wsIndex.definitions.get(key)?.some((d) => d.kind === "schema") ?? false,
     getSchema: (key) => {
       const def = wsIndex.definitions.get(key)?.find((d) => d.kind === "schema");
       if (!def) return null;
-      return { fields: def.fields.map((f) => ({ name: f.name, type: f.type ?? "" })), hasSpreads: false };
+      return {
+        fields: def.fields.map((f) => ({ name: f.name, type: f.type ?? "" })),
+        hasSpreads: false,
+      };
     },
-    hasFragment: (key) => (wsIndex.definitions.get(key)?.some((d) => d.kind === "fragment") ?? false),
+    hasFragment: (key) => wsIndex.definitions.get(key)?.some((d) => d.kind === "fragment") ?? false,
     getFragment: (key) => {
       const def = wsIndex.definitions.get(key)?.find((d) => d.kind === "fragment");
       if (!def) return null;
-      return { fields: def.fields.map((f) => ({ name: f.name, type: f.type ?? "" })), hasSpreads: false };
+      return {
+        fields: def.fields.map((f) => ({ name: f.name, type: f.type ?? "" })),
+        hasSpreads: false,
+      };
     },
-    hasTransform: (key) => (wsIndex.definitions.get(key)?.some((d) => d.kind === "transform") ?? false),
+    hasTransform: (key) =>
+      wsIndex.definitions.get(key)?.some((d) => d.kind === "transform") ?? false,
     getMapping: () => null,
     iterateSchemas: function* () {
       for (const [key, defs] of wsIndex.definitions) {
         const schemaDef = defs.find((d) => d.kind === "schema");
         if (schemaDef) {
-          yield [key, { fields: schemaDef.fields.map((f) => ({ name: f.name, type: f.type ?? "" })), hasSpreads: false }] as [string, { fields: { name: string; type: string }[]; hasSpreads: boolean }];
+          yield [
+            key,
+            {
+              fields: schemaDef.fields.map((f) => ({ name: f.name, type: f.type ?? "" })),
+              hasSpreads: false,
+            },
+          ] as [string, { fields: { name: string; type: string }[]; hasSpreads: boolean }];
         }
       }
     },
@@ -768,9 +765,7 @@ function resolveMappingRef(
   if (!schemaDef) return refName;
 
   // Qualify with the definition's namespace if it has one
-  return schemaDef.namespace
-    ? `${schemaDef.namespace}::${refName}`
-    : refName;
+  return schemaDef.namespace ? `${schemaDef.namespace}::${refName}` : refName;
 }
 
 /**
@@ -820,7 +815,7 @@ function extractMapping(
           sourceBlock = extractSourceBlock(ch);
           if (sourceBlock.schemas.length > 0) {
             const resolvedSchemas = sourceBlock.schemas.map((ref) =>
-              resolveMappingRef(ref, namespace, wsIndex)
+              resolveMappingRef(ref, namespace, wsIndex),
             );
             sourceBlock = { ...sourceBlock, schemas: resolvedSchemas };
             sourceRefs.push(...resolvedSchemas);
@@ -865,7 +860,13 @@ function extractMapping(
   const targets = targetRef ? [targetRef] : [];
   for (const arrow of arrows) {
     if (arrow.transform && arrow.transform.kind === "nl") {
-      const atRefs = resolveTransformAtRefs(arrow.transform, sourceRefs, targets, namespace, wsIndex);
+      const atRefs = resolveTransformAtRefs(
+        arrow.transform,
+        sourceRefs,
+        targets,
+        namespace,
+        wsIndex,
+      );
       if (atRefs.length > 0) arrow.transform.atRefs = atRefs;
     }
   }
@@ -910,7 +911,12 @@ function extractSourceBlock(node: SyntaxNode): SourceBlockInfo {
     if (ch.type === "source_ref") {
       // An NL string inside a source_ref is a join description, not a schema name
       const nlChild = child(ch, "nl_string") ?? child(ch, "multiline_string");
-      if (nlChild && !child(ch, "identifier") && !child(ch, "backtick_name") && !child(ch, "qualified_name")) {
+      if (
+        nlChild &&
+        !child(ch, "identifier") &&
+        !child(ch, "backtick_name") &&
+        !child(ch, "qualified_name")
+      ) {
         joinDescription = stringText(nlChild);
       } else {
         const name = sourceRefText(ch);
@@ -1023,7 +1029,12 @@ interface NestedBlockContents {
 }
 
 function extractNestedBlockContents(uri: string, node: SyntaxNode): NestedBlockContents {
-  const contents: NestedBlockContents = { arrows: [], nestedEach: [], nestedFlatten: [], nestedArrows: [] };
+  const contents: NestedBlockContents = {
+    arrows: [],
+    nestedEach: [],
+    nestedFlatten: [],
+    nestedArrows: [],
+  };
 
   for (const ch of node.namedChildren) {
     if (ch.type === "map_arrow") {
@@ -1120,11 +1131,7 @@ function extractNestedArrowBlock(uri: string, node: SyntaxNode): NestedArrowBloc
  * which is why metric fields go through `extractMetricFields` instead of the
  * normal `extractFieldEntries` path.
  */
-function extractMetric(
-  uri: string,
-  node: SyntaxNode,
-  namespace: string | null,
-): MetricCard {
+function extractMetric(uri: string, node: SyntaxNode, namespace: string | null): MetricCard {
   const name = labelText(node) ?? "unknown";
   const qualifiedId = namespace ? `${namespace}::${name}` : name;
   const meta = child(node, "metadata_block");
@@ -1136,10 +1143,7 @@ function extractMetric(
   let label: string | null = null;
   if (meta) {
     for (const ch of meta.namedChildren) {
-      if (
-        ch.type === "tag_with_value" &&
-        ch.namedChildren[0]?.text === "metric_name"
-      ) {
+      if (ch.type === "tag_with_value" && ch.namedChildren[0]?.text === "metric_name") {
         const val = ch.namedChildren[1];
         const strNode = val?.namedChildren.find(
           (c) => c.type === "nl_string" || c.type === "multiline_string",
@@ -1156,7 +1160,13 @@ function extractMetric(
   let filter: string | null = null;
 
   if (meta) {
-    extractMetricMetadata(meta, source, slices, (g) => (grain = g), (f) => (filter = f));
+    extractMetricMetadata(
+      meta,
+      source,
+      slices,
+      (g) => (grain = g),
+      (f) => (filter = f),
+    );
   }
 
   return {
@@ -1284,9 +1294,7 @@ function extractMetricFields(uri: string, body: SyntaxNode): MetricFieldEntry[] 
  * is still treated as a measure; `null` is reserved for fields that have no
  * `measure` tag at all (i.e. dimension fields).
  */
-function extractMeasure(
-  meta: SyntaxNode,
-): MetricFieldEntry["measure"] {
+function extractMeasure(meta: SyntaxNode): MetricFieldEntry["measure"] {
   for (const ch of meta.namedChildren) {
     // Bare "measure" tag appears as tag_token in the CST
     if (ch.type === "tag_token") {
@@ -1299,10 +1307,13 @@ function extractMeasure(
         const val = ch.namedChildren[1];
         if (val) {
           // value_text wraps the actual value identifier
-          const valueText = val.type === "value_text"
-            ? (val.namedChildren[0]?.text ?? val.text)
-            : val.text;
-          if (valueText === "additive" || valueText === "non_additive" || valueText === "semi_additive") {
+          const valueText =
+            val.type === "value_text" ? (val.namedChildren[0]?.text ?? val.text) : val.text;
+          if (
+            valueText === "additive" ||
+            valueText === "non_additive" ||
+            valueText === "semi_additive"
+          ) {
             return valueText;
           }
         }
@@ -1414,7 +1425,10 @@ function extractComments(uri: string, node: SyntaxNode): CommentEntry[] {
             text: extractCommentText(sib),
             location: nodeLocation(uri, sib),
           });
-        } else if (sib.type === "question_comment" && sib.startPosition.row === node.endPosition.row) {
+        } else if (
+          sib.type === "question_comment" &&
+          sib.startPosition.row === node.endPosition.row
+        ) {
           comments.push({
             kind: "question",
             text: extractCommentText(sib),
@@ -1509,8 +1523,10 @@ function pathText(node: SyntaxNode): string {
  * (e.g. from value_text nodes), strips quotes manually.
  */
 function stripQuotes(text: string): string {
-  if ((text.startsWith('"') && text.endsWith('"')) ||
-      (text.startsWith("'") && text.endsWith("'"))) {
+  if (
+    (text.startsWith('"') && text.endsWith('"')) ||
+    (text.startsWith("'") && text.endsWith("'"))
+  ) {
     return text.slice(1, -1);
   }
   return text;
@@ -1548,10 +1564,7 @@ function nodeLocation(uri: string, node: SyntaxNode): SourceLocation {
  * @param primaryUri - The file URI that anchors the lineage view.
  * @param models     - One VizModel per import-reachable file (including the primary).
  */
-export function mergeVizModels(
-  primaryUri: string,
-  models: VizModel[],
-): VizModel {
+export function mergeVizModels(primaryUri: string, models: VizModel[]): VizModel {
   if (models.length === 0) {
     return { uri: primaryUri, fileNotes: [], namespaces: [] };
   }
@@ -1631,13 +1644,23 @@ export function mergeVizModels(
   // Build ordered namespace list: global first (if present), then named.
   const namespaces: NamespaceGroup[] = [];
   const globalNs = nsMap.get(null);
-  if (globalNs && (globalNs.schemas.length > 0 || globalNs.mappings.length > 0 ||
-      globalNs.metrics.length > 0 || globalNs.fragments.length > 0)) {
+  if (
+    globalNs &&
+    (globalNs.schemas.length > 0 ||
+      globalNs.mappings.length > 0 ||
+      globalNs.metrics.length > 0 ||
+      globalNs.fragments.length > 0)
+  ) {
     namespaces.push(globalNs);
   }
   for (const [name, ns] of nsMap) {
-    if (name !== null && (ns.schemas.length > 0 || ns.mappings.length > 0 ||
-        ns.metrics.length > 0 || ns.fragments.length > 0)) {
+    if (
+      name !== null &&
+      (ns.schemas.length > 0 ||
+        ns.mappings.length > 0 ||
+        ns.metrics.length > 0 ||
+        ns.fragments.length > 0)
+    ) {
       namespaces.push(ns);
     }
   }

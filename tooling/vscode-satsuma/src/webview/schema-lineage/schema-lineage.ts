@@ -152,7 +152,10 @@ function buildHeader(payload: Payload): HTMLDivElement {
 
   const legend = document.createElement("div");
   legend.className = "legend";
-  for (const [cls, label] of [["schema", "schema"], ["mapping", "mapping"]] as const) {
+  for (const [cls, label] of [
+    ["schema", "schema"],
+    ["mapping", "mapping"],
+  ] as const) {
     const pill = document.createElement("span");
     pill.className = `legend-pill ${cls}`;
     pill.textContent = label;
@@ -184,7 +187,12 @@ function buildCanvas(
   // Build ELK id → position lookup
   const nodePos = new Map<string, NodePos>();
   for (const n of (laid.children ?? []) as ElkNode[]) {
-    nodePos.set(n.id!, { x: n.x ?? 0, y: n.y ?? 0, width: n.width ?? PILL_W, height: n.height ?? PILL_H });
+    nodePos.set(n.id!, {
+      x: n.x ?? 0,
+      y: n.y ?? 0,
+      width: n.width ?? PILL_W,
+      height: n.height ?? PILL_H,
+    });
   }
 
   // Reverse lookup: elk id → LineageNode
@@ -300,7 +308,6 @@ function buildArrowMarker(): SVGMarkerElement {
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────
-
 
 // Minimal ELK type stubs for the @ts-nocheck context
 interface ElkNode {

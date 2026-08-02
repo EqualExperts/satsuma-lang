@@ -13,7 +13,9 @@ const {
   createScopedIndex,
 } = require("../dist/workspace-index");
 
-before(async () => { await initTestParser(); });
+before(async () => {
+  await initTestParser();
+});
 
 /** Build an index from a map of { uri: source }. */
 function buildIndex(files) {
@@ -49,7 +51,8 @@ describe("indexFile", () => {
 
   it("indexes fragment definitions", () => {
     const idx = buildIndex({
-      "file:///a.stm": "fragment `audit fields` {\n  created_at TIMESTAMP\n  updated_at TIMESTAMP\n}",
+      "file:///a.stm":
+        "fragment `audit fields` {\n  created_at TIMESTAMP\n  updated_at TIMESTAMP\n}",
     });
     const defs = idx.definitions.get("audit fields");
     assert.ok(defs);
@@ -180,7 +183,8 @@ describe("indexFile", () => {
 
   it("indexes backtick source references", () => {
     const idx = buildIndex({
-      "file:///a.stm": "mapping `test` {\n  source { `raw_customers` }\n  target { dim_customers }\n  id -> id\n}",
+      "file:///a.stm":
+        "mapping `test` {\n  source { `raw_customers` }\n  target { dim_customers }\n  id -> id\n}",
     });
     const refs = idx.references.get("raw_customers");
     assert.ok(refs);
@@ -189,7 +193,8 @@ describe("indexFile", () => {
 
   it("indexes qualified name source references", () => {
     const idx = buildIndex({
-      "file:///a.stm": "mapping `test` {\n  source { crm::customers }\n  target { dim_customers }\n  id -> id\n}",
+      "file:///a.stm":
+        "mapping `test` {\n  source { crm::customers }\n  target { dim_customers }\n  id -> id\n}",
     });
     const refs = idx.references.get("crm::customers");
     assert.ok(refs);
@@ -376,7 +381,9 @@ describe("findReferences", () => {
   it("does not return bare refs that resolve in a different namespace (sl-p256)", () => {
     const idx = buildIndex({ "file:///a.stm": TWO_NAMESPACES });
     // b's source { foo } binds to b::foo, so a::foo has no references.
-    const aRefs = findReferences(idx, "a::foo").filter((r) => r.context === "source" || r.context === "target");
+    const aRefs = findReferences(idx, "a::foo").filter(
+      (r) => r.context === "source" || r.context === "target",
+    );
     assert.equal(aRefs.length, 0, "a::foo must not inherit namespace b's refs");
     const bRefs = findReferences(idx, "b::foo").filter((r) => r.context === "source");
     assert.equal(bRefs.length, 1, "b::foo keeps its own bare source ref");
@@ -390,7 +397,9 @@ describe("findReferences", () => {
     });
     // namespace b declares its own foo, so b's refs bind there — the global
     // schema foo is unreferenced.
-    const refs = findReferences(idx, "foo").filter((r) => r.context === "source" || r.context === "target");
+    const refs = findReferences(idx, "foo").filter(
+      (r) => r.context === "source" || r.context === "target",
+    );
     assert.equal(refs.length, 0, "shadowed bare refs must not count against the global name");
   });
 
@@ -413,7 +422,9 @@ describe("findReferences", () => {
     });
     // source { x::foo } binds to x::foo; only the bare target ref binds to
     // the global foo.
-    const refs = findReferences(idx, "foo").filter((r) => r.context === "source" || r.context === "target");
+    const refs = findReferences(idx, "foo").filter(
+      (r) => r.context === "source" || r.context === "target",
+    );
     assert.equal(refs.length, 1);
     assert.equal(refs[0].context, "target");
     const qualified = findReferences(idx, "x::foo").filter((r) => r.context === "source");
@@ -455,7 +466,8 @@ describe("getFields", () => {
 
   it("returns nested fields", () => {
     const idx = buildIndex({
-      "file:///a.stm": "schema customers {\n  address record {\n    street VARCHAR\n    city VARCHAR\n  }\n}",
+      "file:///a.stm":
+        "schema customers {\n  address record {\n    street VARCHAR\n    city VARCHAR\n  }\n}",
     });
     const fields = getFields(idx, "customers", null);
     assert.equal(fields[0].name, "address");
@@ -613,7 +625,9 @@ describe("reference range precision (sl-xf3f)", () => {
     assert.equal(textAt(source, bareRefs[0].range), "address");
     // Full-path entry is keyed without the ns:: prefix, so its range must
     // exclude the prefix too.
-    const pathRefs = (idx.references.get("address.street") || []).filter((r) => r.context === "arrow");
+    const pathRefs = (idx.references.get("address.street") || []).filter(
+      (r) => r.context === "arrow",
+    );
     assert.equal(pathRefs.length, 1);
     assert.equal(textAt(source, pathRefs[0].range), "address.street");
   });
@@ -703,7 +717,8 @@ describe("NL string reference indexing", () => {
 
   it("indexes @refs with backtick-delimited names", () => {
     const idx = buildIndex({
-      "file:///a.stm": "mapping test {\n  source { customers }\n  target { dim }\n  -> name { \"Use @`first name` here\" }\n}",
+      "file:///a.stm":
+        'mapping test {\n  source { customers }\n  target { dim }\n  -> name { "Use @`first name` here" }\n}',
     });
     const refs = (idx.references.get("first name") || []).filter((r) => r.context === "nl");
     assert.ok(refs.length >= 1, "expected nl ref for @`first name`");
@@ -797,7 +812,7 @@ describe("NL string reference indexing", () => {
   // find-references/rename skipped bare-text refs entirely.
 
   it("indexes a bare @ref in unquoted pipe text, range excluding the @ sigil", () => {
-    const line = '  a -> b { derived from @customers }';
+    const line = "  a -> b { derived from @customers }";
     const source = `mapping test {\n  source { customers }\n  target { dim }\n${line}\n}`;
     const idx = buildIndex({ "file:///a.stm": source });
     const refs = (idx.references.get("customers") || []).filter((r) => r.context === "nl");
@@ -813,7 +828,8 @@ describe("NL string reference indexing", () => {
     // Backtick delimiters are stripped from the keyed name, mirroring the
     // quoted-string regex path, so lookups by the plain name find it.
     const idx = buildIndex({
-      "file:///a.stm": "mapping test {\n  source { customers }\n  target { dim }\n  a -> b { lookup @`order id` }\n}",
+      "file:///a.stm":
+        "mapping test {\n  source { customers }\n  target { dim }\n  a -> b { lookup @`order id` }\n}",
     });
     const refs = (idx.references.get("order id") || []).filter((r) => r.context === "nl");
     assert.equal(refs.length, 1);
@@ -823,7 +839,8 @@ describe("NL string reference indexing", () => {
 describe("transform spread indexing in arrows", () => {
   it("indexes transform spread references in arrows", () => {
     const idx = buildIndex({
-      "file:///a.stm": "transform `clean email` {\n  trim | lowercase\n}\nmapping test {\n  source { customers }\n  target { dim }\n  email -> email { ...`clean email` }\n}",
+      "file:///a.stm":
+        "transform `clean email` {\n  trim | lowercase\n}\nmapping test {\n  source { customers }\n  target { dim }\n  email -> email { ...`clean email` }\n}",
     });
     const refs = idx.references.get("clean email");
     assert.ok(refs);

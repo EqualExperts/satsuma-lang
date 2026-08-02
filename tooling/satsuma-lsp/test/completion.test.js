@@ -4,7 +4,9 @@ const { initTestParser, parse } = require("./helper");
 const { computeCompletions } = require("../dist/completion");
 const { createWorkspaceIndex, indexFile } = require("../dist/workspace-index");
 
-before(async () => { await initTestParser(); });
+before(async () => {
+  await initTestParser();
+});
 
 function buildIndex(files) {
   const idx = createWorkspaceIndex();
@@ -231,15 +233,17 @@ mapping \`test\` {
     // be confusing because schemas are not callable in a pipe.
     const items = complete(
       {
-        "file:///a.stm":
-          "schema customers { id UUID }\ntransform `clean` {\n  trim | lowercase\n}",
+        "file:///a.stm": "schema customers { id UUID }\ntransform `clean` {\n  trim | lowercase\n}",
       },
       "file:///a.stm",
       2,
       10,
     );
     const labels = items.map((i) => i.label);
-    assert.ok(labels.includes("trim"), "expected pipe-chain context to surface transform functions");
+    assert.ok(
+      labels.includes("trim"),
+      "expected pipe-chain context to surface transform functions",
+    );
     assert.ok(!labels.includes("customers"), "schema names must not leak into pipe completions");
   });
 
@@ -264,8 +268,7 @@ mapping \`test\` {
     // block names; namespace-qualified blocks should be discoverable too.
     const items = complete(
       {
-        "file:///defs.stm":
-          "namespace crm {\n  schema customers { id UUID }\n}\n",
+        "file:///defs.stm": "namespace crm {\n  schema customers { id UUID }\n}\n",
         "file:///entry.stm": 'import { c } from "defs.stm"',
       },
       "file:///entry.stm",
@@ -285,8 +288,7 @@ mapping \`test\` {
     // of detectCompletionContext.
     const items = complete(
       {
-        "file:///a.stm":
-          `schema src {
+        "file:///a.stm": `schema src {
   id UUID
   name VARCHAR
 }
@@ -325,7 +327,10 @@ mapping \`m\` {
       12,
     );
     assert.ok(items.length >= 2);
-    assert.ok(items.every((i) => i.kind === 7), "every schema completion must use CompletionItemKind.Class");
+    assert.ok(
+      items.every((i) => i.kind === 7),
+      "every schema completion must use CompletionItemKind.Class",
+    );
   });
 
   // ── MISSING-node (parser recovery) cases ─────────────────────────────────────

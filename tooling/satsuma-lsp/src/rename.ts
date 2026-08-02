@@ -1,8 +1,4 @@
-import {
-  Range,
-  WorkspaceEdit,
-  TextEdit,
-} from "vscode-languageserver";
+import { Range, WorkspaceEdit, TextEdit } from "vscode-languageserver";
 import type { Tree } from "./parser-utils";
 import { nodeRange, nodeAtPosition } from "./parser-utils";
 import { findNodeContext, NodeContext } from "./definition";

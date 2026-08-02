@@ -37,7 +37,10 @@ export function canonicalRef(
  *   canonicalEntityName({ name: "customers" })                     → "::customers"
  *   canonicalEntityName({ name: null })                            → "::"
  */
-export function canonicalEntityName(entity: { namespace?: string | null; name: string | null }): string {
+export function canonicalEntityName(entity: {
+  namespace?: string | null;
+  name: string | null;
+}): string {
   return canonicalRef(entity.namespace, entity.name ?? "");
 }
 
@@ -81,7 +84,11 @@ export function qualifyField(field: string, schemas: string[]): string {
  *
  * Returns the canonical key that exists in the map, or null when unresolvable.
  */
-export function resolveScopedEntityRef(ref: string, currentNs: string | null, entityMap: Map<string, unknown>): string | null {
+export function resolveScopedEntityRef(
+  ref: string,
+  currentNs: string | null,
+  entityMap: Map<string, unknown>,
+): string | null {
   if (ref.includes("::")) {
     return entityMap.has(ref) ? ref : null;
   }

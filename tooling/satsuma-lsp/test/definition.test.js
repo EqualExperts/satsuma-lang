@@ -4,7 +4,9 @@ const { initTestParser, parse } = require("./helper");
 const { computeDefinition } = require("../dist/definition");
 const { createWorkspaceIndex, indexFile } = require("../dist/workspace-index");
 
-before(async () => { await initTestParser(); });
+before(async () => {
+  await initTestParser();
+});
 
 /** Build an index from { uri: source } and return { index, trees }. */
 function buildIndex(files) {
@@ -130,7 +132,8 @@ schema customers {
     const result = definition(
       {
         "file:///a.stm": "schema customers {\n  id UUID\n}",
-        "file:///b.stm": "mapping `test` {\n  source { customers }\n  target { dim }\n  id -> id\n}",
+        "file:///b.stm":
+          "mapping `test` {\n  source { customers }\n  target { dim }\n  id -> id\n}",
       },
       "file:///b.stm",
       1,
@@ -183,7 +186,8 @@ mapping \`test\` {
   it("returns null for unresolvable reference", () => {
     const result = definition(
       {
-        "file:///a.stm": "mapping `test` {\n  source { nonexistent }\n  target { dim }\n  id -> id\n}",
+        "file:///a.stm":
+          "mapping `test` {\n  source { nonexistent }\n  target { dim }\n  id -> id\n}",
       },
       "file:///a.stm",
       1,

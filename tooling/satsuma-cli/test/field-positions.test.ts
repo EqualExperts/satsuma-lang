@@ -54,7 +54,12 @@ describe("fieldDeclarationRow()", () => {
     // startRow here is row 3 of the *fragment's* file. Reporting it alongside
     // the consuming schema's file would send a jump link into the wrong file at
     // a plausible-looking line, so the consuming entity's row wins.
-    const field: ExpandedField = { name: "email", type: "STRING", startRow: 3, fromFragment: "contact" };
+    const field: ExpandedField = {
+      name: "email",
+      type: "STRING",
+      startRow: 3,
+      fromFragment: "contact",
+    };
     assert.equal(fieldDeclarationRow(field, CONSUMER, false), CONSUMER.row);
   });
 
@@ -105,13 +110,8 @@ schema customer {
     const root = parse(source).rootNode;
     const schema = extractSchemas(root).find((s) => s.name === "customer");
     assert.ok(schema, "expected the customer schema to be extracted");
-    const index = buildIndex([
-      parsedFile(SCHEMA_FILE, source),
-    ]);
-    const fields = [
-      ...schema.fields,
-      ...expandEntityFields(schema, null, index),
-    ];
+    const index = buildIndex([parsedFile(SCHEMA_FILE, source)]);
+    const fields = [...schema.fields, ...expandEntityFields(schema, null, index)];
     const projected = toCoverageFields(fields, { file: SCHEMA_FILE, row: schema.row });
     assert.deepEqual(projected, [
       // `id` is declared at row 5 of this file, so it keeps its own position.
@@ -140,9 +140,7 @@ schema place {
     const root = parse(source).rootNode;
     const schema = extractSchemas(root).find((s) => s.name === "place");
     assert.ok(schema, "expected the place schema to be extracted");
-    const index = buildIndex([
-      parsedFile(SCHEMA_FILE, source),
-    ]);
+    const index = buildIndex([parsedFile(SCHEMA_FILE, source)]);
     expandNestedSpreads(schema.fields, null, index);
     const projected = toCoverageFields(schema.fields, { file: SCHEMA_FILE, row: schema.row });
     const location = projected[0];
@@ -166,14 +164,15 @@ describe("FieldDecl positions through the index", () => {
   id INT
   name STRING
 }`;
-    const index = buildIndex([
-      parsedFile(SCHEMA_FILE, source),
-    ]);
+    const index = buildIndex([parsedFile(SCHEMA_FILE, source)]);
     const schema = index.schemas.get("src");
     assert.ok(schema, "expected schema 'src' in the index");
     assert.deepEqual(
       schema.fields.map((f) => [f.name, f.startRow, f.startColumn]),
-      [["id", 1, 2], ["name", 2, 2]],
+      [
+        ["id", 1, 2],
+        ["name", 2, 2],
+      ],
     );
   });
 
@@ -188,10 +187,7 @@ describe("FieldDecl positions through the index", () => {
 
   extra STRING
 }`;
-    const index = buildIndex([
-      parsedFile(SCHEMA_FILE, fileA),
-      parsedFile(SECOND_FILE, fileB),
-    ]);
+    const index = buildIndex([parsedFile(SCHEMA_FILE, fileA), parsedFile(SECOND_FILE, fileB)]);
     const schema = index.schemas.get("src");
     assert.ok(schema, "expected schema 'src' in the index");
     const extra = schema.fields.find((f) => f.name === "extra");
@@ -204,9 +200,11 @@ describe("extracted fragments carry positions too", () => {
     // The spread rule exists precisely because fragment fields have real rows
     // in the wrong file. If fragments carried no rows the rule would be moot,
     // so this pins the premise the rule rests on.
-    const [fragment] = extractFragments(parse(`fragment contact {
+    const [fragment] = extractFragments(
+      parse(`fragment contact {
   email STRING
-}`).rootNode);
+}`).rootNode,
+    );
     assert.equal(fragment.fields[0]?.startRow, 1);
   });
 });

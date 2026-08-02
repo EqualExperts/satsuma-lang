@@ -29,7 +29,9 @@ export function register(program: Command): void {
     .description("Extract NL content (notes, transforms, comments) from a scope")
     .option("--kind <type>", "filter by kind: note, warning, question, transform")
     .option("--json", "structured JSON output")
-    .addHelpText("after", `
+    .addHelpText(
+      "after",
+      `
 Scope formats:
   <block-name>     NL in a schema, mapping, metric, or transform by name
   <schema.field>   NL on a specific field and arrows referencing it
@@ -50,35 +52,44 @@ Examples:
   satsuma nl mart_customer_360.email         # NL on a field
   satsuma nl all pipeline.stm                # all NL in file and imports
   satsuma nl all pipeline.stm --kind warning # only //! warnings
-  satsuma nl hub_customer --json             # structured output`)
-    .action(runCommand(async (scope: string, pathArg: string | undefined, opts: { kind?: string; json?: boolean }) => {
-      const { files: parsedFiles, index } = await loadWorkspace(pathArg);
+  satsuma nl hub_customer --json             # structured output`,
+    )
+    .action(
+      runCommand(
+        async (
+          scope: string,
+          pathArg: string | undefined,
+          opts: { kind?: string; json?: boolean },
+        ) => {
+          const { files: parsedFiles, index } = await loadWorkspace(pathArg);
 
-      let items: NLItemWithFile[];
-      if (scope === "all") {
-        items = extractFromAll(parsedFiles);
-      } else if (scope.includes(".")) {
-        items = extractFromField(scope, parsedFiles, index);
-      } else {
-        items = extractFromBlock(scope, parsedFiles, index);
-      }
+          let items: NLItemWithFile[];
+          if (scope === "all") {
+            items = extractFromAll(parsedFiles);
+          } else if (scope.includes(".")) {
+            items = extractFromField(scope, parsedFiles, index);
+          } else {
+            items = extractFromBlock(scope, parsedFiles, index);
+          }
 
-      if (opts.kind) {
-        items = items.filter((i) => i.kind === opts.kind);
-      }
+          if (opts.kind) {
+            items = items.filter((i) => i.kind === opts.kind);
+          }
 
-      if (opts.json) {
-        console.log(JSON.stringify(items, null, 2));
-        return;
-      }
+          if (opts.json) {
+            console.log(JSON.stringify(items, null, 2));
+            return;
+          }
 
-      if (items.length === 0) {
-        console.log(`No NL content found for scope '${scope}'.`);
-        return;
-      }
+          if (items.length === 0) {
+            console.log(`No NL content found for scope '${scope}'.`);
+            return;
+          }
 
-      printDefault(items);
-    }));
+          printDefault(items);
+        },
+      ),
+    );
 }
 
 function extractFromAll(parsedFiles: ParsedFile[]): NLItemWithFile[] {
@@ -91,7 +102,11 @@ function extractFromAll(parsedFiles: ParsedFile[]): NLItemWithFile[] {
   return items;
 }
 
-function extractFromBlock(blockName: string, parsedFiles: ParsedFile[], index: ExtractedWorkspace): NLItemWithFile[] {
+function extractFromBlock(
+  blockName: string,
+  parsedFiles: ParsedFile[],
+  index: ExtractedWorkspace,
+): NLItemWithFile[] {
   // Check if it's a schema, mapping, metric, or transform (resolving namespace-qualified keys)
   const schemaResolved = resolveIndexKey(blockName, index.schemas);
   const mappingResolved = resolveIndexKey(blockName, index.mappings);
@@ -105,9 +120,7 @@ function extractFromBlock(blockName: string, parsedFiles: ParsedFile[], index: E
       ...index.metrics.keys(),
       ...index.transforms.keys(),
     ];
-    const close = allNames.find(
-      (k) => k.toLowerCase() === blockName.toLowerCase(),
-    );
+    const close = allNames.find((k) => k.toLowerCase() === blockName.toLowerCase());
     const lines = [`'${blockName}' not found as a schema, mapping, metric, or transform.`];
     if (close) lines.push(`Did you mean '${close}'?`);
     throw new CommandError(lines.join("\n"), EXIT_NOT_FOUND);
@@ -117,11 +130,31 @@ function extractFromBlock(blockName: string, parsedFiles: ParsedFile[], index: E
   // to handle ambiguous names where a schema and mapping share a name
   const items: NLItemWithFile[] = [];
   const matches: Array<{ key: string; entry: { file: string }; blockType: string }> = [];
-  if (schemaResolved) matches.push({ key: schemaResolved.key, entry: schemaResolved.entry, blockType: "schema_block" });
-  if (mappingResolved) matches.push({ key: mappingResolved.key, entry: mappingResolved.entry, blockType: "mapping_block" });
+  if (schemaResolved)
+    matches.push({
+      key: schemaResolved.key,
+      entry: schemaResolved.entry,
+      blockType: "schema_block",
+    });
+  if (mappingResolved)
+    matches.push({
+      key: mappingResolved.key,
+      entry: mappingResolved.entry,
+      blockType: "mapping_block",
+    });
   // Metrics are schema_block nodes — look up by schema_block. Skip if already added via schemaResolved.
-  if (metricResolved && !schemaResolved) matches.push({ key: metricResolved.key, entry: metricResolved.entry, blockType: "schema_block" });
-  if (transformResolved) matches.push({ key: transformResolved.key, entry: transformResolved.entry, blockType: "transform_block" });
+  if (metricResolved && !schemaResolved)
+    matches.push({
+      key: metricResolved.key,
+      entry: metricResolved.entry,
+      blockType: "schema_block",
+    });
+  if (transformResolved)
+    matches.push({
+      key: transformResolved.key,
+      entry: transformResolved.entry,
+      blockType: "transform_block",
+    });
 
   for (const { key, entry, blockType } of matches) {
     const parsed = parsedFiles.find((p) => p.filePath === entry.file);
@@ -139,7 +172,11 @@ function extractFromBlock(blockName: string, parsedFiles: ParsedFile[], index: E
   return items;
 }
 
-function extractFromField(fieldRef: string, parsedFiles: ParsedFile[], index: ExtractedWorkspace): NLItemWithFile[] {
+function extractFromField(
+  fieldRef: string,
+  parsedFiles: ParsedFile[],
+  index: ExtractedWorkspace,
+): NLItemWithFile[] {
   const dot = fieldRef.indexOf(".");
   const schemaName = fieldRef.slice(0, dot);
   const fieldPath = fieldRef.slice(dot + 1);
@@ -155,9 +192,10 @@ function extractFromField(fieldRef: string, parsedFiles: ParsedFile[], index: Ex
 
   const schema = resolvedSchema.entry;
   // For multi-segment paths, require exact path match; for single-segment, use flat search
-  const fieldExists = pathSegments.length > 1
-    ? schemaHasFieldByPath(schema.fields, pathSegments)
-    : schemaHasField(schema.fields, leafName);
+  const fieldExists =
+    pathSegments.length > 1
+      ? schemaHasFieldByPath(schema.fields, pathSegments)
+      : schemaHasField(schema.fields, leafName);
   if (!fieldExists) {
     throw new CommandError(
       `Field '${fieldPath}' not found in schema '${schemaName}'.`,
@@ -167,7 +205,9 @@ function extractFromField(fieldRef: string, parsedFiles: ParsedFile[], index: Ex
 
   const items: NLItemWithFile[] = [];
   const parsed = parsedFiles.find((p) => p.filePath === schema.file);
-  const schemaNode = parsed ? findBlockNode(parsed.tree.rootNode, "schema_block", resolvedSchema.key) : null;
+  const schemaNode = parsed
+    ? findBlockNode(parsed.tree.rootNode, "schema_block", resolvedSchema.key)
+    : null;
   const body = schemaNode?.namedChildren.find((c) => c.type === "schema_body");
   if (body) {
     // Navigate to the nested body for intermediate path segments, then find the leaf field
@@ -186,8 +226,7 @@ function extractFromField(fieldRef: string, parsedFiles: ParsedFile[], index: Ex
     const mappingSources = mapping.sources ?? [];
     const mappingTargets = mapping.targets ?? [];
     const schemaIsRelevant =
-      mappingSources.includes(resolvedSchemaKey) ||
-      mappingTargets.includes(resolvedSchemaKey);
+      mappingSources.includes(resolvedSchemaKey) || mappingTargets.includes(resolvedSchemaKey);
     if (!schemaIsRelevant) continue;
 
     const mappingParsed = parsedFiles.find((p) => p.filePath === mapping.file);
@@ -199,9 +238,7 @@ function extractFromField(fieldRef: string, parsedFiles: ParsedFile[], index: Ex
     const mappingNode = findBlockNode(mappingParsed.tree.rootNode, "mapping_block", mappingKey);
     if (!mappingNode) continue;
 
-    const mBody = mappingNode.namedChildren.find(
-      (c) => c.type === "mapping_body",
-    );
+    const mBody = mappingNode.namedChildren.find((c) => c.type === "mapping_body");
     if (!mBody) continue;
 
     const parentName = labelText(mappingNode) ?? "?";
@@ -225,8 +262,7 @@ function collectFieldArrowNL(
       collectFieldArrowNL(child.namedChildren, leafName, parentName, file, items);
       continue;
     }
-    if (child.type !== "map_arrow" && child.type !== "computed_arrow")
-      continue;
+    if (child.type !== "map_arrow" && child.type !== "computed_arrow") continue;
     const src = child.namedChildren.find((c) => c.type === "src_path");
     const tgt = child.namedChildren.find((c) => c.type === "tgt_path");
     const srcText = src?.namedChildren[0]?.text?.replace(/^\./, "") ?? null;
@@ -253,9 +289,7 @@ function collectFieldArrowNL(
 }
 
 function getFieldDeclName(fieldDecl: SyntaxNode): string | null {
-  const nameNode = fieldDecl.namedChildren.find(
-    (c) => c.type === "field_name",
-  );
+  const nameNode = fieldDecl.namedChildren.find((c) => c.type === "field_name");
   const inner = nameNode?.namedChildren[0];
   if (!inner) return null;
   if (inner.type === "backtick_name") return inner.text.slice(1, -1);
@@ -303,7 +337,11 @@ function navigateToNestedBody(body: SyntaxNode, intermediateSegments: string[]):
   return current;
 }
 
-function findFieldDecls(bodyNode: SyntaxNode, fieldName: string, acc: SyntaxNode[] = []): SyntaxNode[] {
+function findFieldDecls(
+  bodyNode: SyntaxNode,
+  fieldName: string,
+  acc: SyntaxNode[] = [],
+): SyntaxNode[] {
   for (const child of bodyNode.namedChildren) {
     if (child.type === "field_decl") {
       if (getFieldDeclName(child) === fieldName) {
@@ -320,10 +358,14 @@ function findFieldDecls(bodyNode: SyntaxNode, fieldName: string, acc: SyntaxNode
 
 function printDefault(items: NLItemWithFile[]): void {
   for (const item of items) {
-    const prefix = item.kind === "warning" ? "//! " :
-      item.kind === "question" ? "//? " :
-        item.kind === "transform" ? "[transform] " :
-          "[note] ";
+    const prefix =
+      item.kind === "warning"
+        ? "//! "
+        : item.kind === "question"
+          ? "//? "
+          : item.kind === "transform"
+            ? "[transform] "
+            : "[note] ";
     const parent = item.parent ? ` (${item.parent})` : "";
     console.log(`${prefix}${item.text}${parent}`);
   }

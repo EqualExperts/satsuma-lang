@@ -37,7 +37,11 @@ describe("parsePositiveInt", () => {
     // All must now raise Commander's usage error instead of silently
     // changing behaviour.
     for (const bad of ["banana", "-1", "0", "12abc", "3.5", ""]) {
-      assert.throws(() => parsePositiveInt(bad), InvalidArgumentError, `expected "${bad}" to be rejected`);
+      assert.throws(
+        () => parsePositiveInt(bad),
+        InvalidArgumentError,
+        `expected "${bad}" to be rejected`,
+      );
     }
   });
 });
@@ -45,7 +49,14 @@ describe("parsePositiveInt", () => {
 describe("numeric options reject garbage as a usage error", () => {
   it("lineage --depth banana exits non-zero with an invalid-argument message", async () => {
     // Before sl-bvd0 this printed only the start node and exited 0.
-    const { stderr, code } = await run("lineage", "--from", "source_a", "--depth", "banana", LINEAGE_CHAIN);
+    const { stderr, code } = await run(
+      "lineage",
+      "--from",
+      "source_a",
+      "--depth",
+      "banana",
+      LINEAGE_CHAIN,
+    );
 
     assert.notEqual(code, 0);
     assert.match(stderr, /option '--depth <n>' argument 'banana' is invalid/);
@@ -53,7 +64,13 @@ describe("numeric options reject garbage as a usage error", () => {
 
   it("field-lineage --depth -1 exits non-zero with an invalid-argument message", async () => {
     // Negative depths previously walked nothing and annotated the start node [?].
-    const { stderr, code } = await run("field-lineage", "schema_b.field_b", "--depth", "-1", LINEAGE_CHAIN);
+    const { stderr, code } = await run(
+      "field-lineage",
+      "schema_b.field_b",
+      "--depth",
+      "-1",
+      LINEAGE_CHAIN,
+    );
 
     assert.notEqual(code, 0);
     assert.match(stderr, /option '--depth <n>' argument '-1' is invalid/);
@@ -87,7 +104,11 @@ describe("parsePercentage", () => {
     // Bare parseInt would turn "90.5" into 90 and "ninety" into NaN, silently
     // gating on a threshold the caller never asked for (the sl-bvd0 shape).
     for (const bad of ["90.5", "ninety", "-1", "", "90abc"]) {
-      assert.throws(() => parsePercentage(bad), InvalidArgumentError, `expected "${bad}" to be rejected`);
+      assert.throws(
+        () => parsePercentage(bad),
+        InvalidArgumentError,
+        `expected "${bad}" to be rejected`,
+      );
     }
   });
 });

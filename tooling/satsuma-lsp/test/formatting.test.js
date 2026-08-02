@@ -41,7 +41,8 @@ describe("computeFormatting", () => {
   });
 
   it("handles mapping with arrows", () => {
-    const src = "mapping test {\n  source { s }\n  target { t }\n  s.x -> t.x { trim | lowercase }\n}";
+    const src =
+      "mapping test {\n  source { s }\n  target { t }\n  s.x -> t.x { trim | lowercase }\n}";
     const tree = parse(src);
     const edits = computeFormatting(tree, src);
     const result = edits.length > 0 ? edits[0].newText : src;

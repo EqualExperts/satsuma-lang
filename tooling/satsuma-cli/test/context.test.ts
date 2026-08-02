@@ -36,9 +36,9 @@ function scoreAll(index: any, terms: string[]) {
     if (entry.targets) for (const t of entry.targets) score += scoreText(t, terms);
     if (score > 0) results.push({ name, type, score, file: entry.file ?? "", row: entry.row ?? 0 });
   };
-  for (const [name, e] of (index.schemas ?? new Map())) scoreEntry(name, "schema", e);
-  for (const [name, e] of (index.metrics ?? new Map())) scoreEntry(name, "metric", e);
-  for (const [name, e] of (index.mappings ?? new Map())) scoreEntry(name, "mapping", e);
+  for (const [name, e] of index.schemas ?? new Map()) scoreEntry(name, "schema", e);
+  for (const [name, e] of index.metrics ?? new Map()) scoreEntry(name, "metric", e);
+  for (const [name, e] of index.mappings ?? new Map()) scoreEntry(name, "mapping", e);
   return results;
 }
 
@@ -103,8 +103,14 @@ describe("scoreAll", () => {
   it("scores field name match (×5)", () => {
     const index = {
       schemas: new Map([
-        ["orders", { fields: [{ name: "email", type: "VARCHAR(255)" }], note: null, file: "a.stm", row: 0 }],
-        ["products", { fields: [{ name: "sku", type: "STRING(20)" }], note: null, file: "a.stm", row: 5 }],
+        [
+          "orders",
+          { fields: [{ name: "email", type: "VARCHAR(255)" }], note: null, file: "a.stm", row: 0 },
+        ],
+        [
+          "products",
+          { fields: [{ name: "sku", type: "STRING(20)" }], note: null, file: "a.stm", row: 5 },
+        ],
       ]),
     };
     const terms = ["email"];
@@ -125,8 +131,22 @@ describe("scoreAll", () => {
   it("surfaces the correct block for PII query", () => {
     const index = {
       schemas: new Map([
-        ["customer", { fields: [{ name: "email", type: "VARCHAR(255)" }, { name: "tax_id", type: "VARCHAR(20)" }], note: "Customer PII data", file: "c.stm", row: 0 }],
-        ["products", { fields: [{ name: "sku", type: "STRING" }], note: null, file: "p.stm", row: 0 }],
+        [
+          "customer",
+          {
+            fields: [
+              { name: "email", type: "VARCHAR(255)" },
+              { name: "tax_id", type: "VARCHAR(20)" },
+            ],
+            note: "Customer PII data",
+            file: "c.stm",
+            row: 0,
+          },
+        ],
+        [
+          "products",
+          { fields: [{ name: "sku", type: "STRING" }], note: null, file: "p.stm", row: 0 },
+        ],
       ]),
     };
     const terms = tokenize("add a PII field to the customer schema");
@@ -160,7 +180,13 @@ describe("satsuma context metric deduplication (sl-s2mh)", () => {
     // Metric schemas live in both index.schemas and index.metrics; scoring
     // both rendered the same block twice and wasted the token budget the
     // command exists to manage.
-    const { stdout, code } = await runCli(CLI, "context", "monthly recurring revenue", "--json", METRICS_EXAMPLE);
+    const { stdout, code } = await runCli(
+      CLI,
+      "context",
+      "monthly recurring revenue",
+      "--json",
+      METRICS_EXAMPLE,
+    );
 
     assert.equal(code, 0);
     const candidates = JSON.parse(stdout) as Array<{ name: string; type: string }>;

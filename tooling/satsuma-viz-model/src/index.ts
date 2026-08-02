@@ -336,6 +336,4 @@ export interface SourceLocation {
  * Constraints are rendered as badges in the viz component; arbitrary tags are not.
  * Source: Satsuma v2 spec §4.2 (field metadata).
  */
-export const CONSTRAINT_TAGS = new Set([
-  "pk", "required", "pii", "indexed", "unique", "encrypt",
-]);
+export const CONSTRAINT_TAGS = new Set(["pk", "required", "pii", "indexed", "unique", "encrypt"]);

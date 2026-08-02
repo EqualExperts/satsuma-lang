@@ -32,11 +32,7 @@ describe("collectFieldPaths()", () => {
 
   it("collects nested fields with dotted paths", () => {
     const paths = new Set();
-    collectFieldPaths(
-      [field("address", "record", [field("city"), field("zip")])],
-      "",
-      paths,
-    );
+    collectFieldPaths([field("address", "record", [field("city"), field("zip")])], "", paths);
     assert.deepEqual([...paths].sort(), ["address", "address.city", "address.zip"]);
   });
 });
@@ -83,7 +79,7 @@ describe("expandEntityFields()", () => {
     const frag = fragment("::audit_fields", [field("created_at"), field("updated_at")]);
     const entity = { fields: [field("id")], hasSpreads: true, spreads: ["::audit_fields"] };
     const resolve = (ref) => ref;
-    const lookup = (key) => key === "::audit_fields" ? frag : null;
+    const lookup = (key) => (key === "::audit_fields" ? frag : null);
 
     const result = expandEntityFields(entity, null, resolve, lookup);
     assert.equal(result.length, 2);
@@ -97,7 +93,7 @@ describe("expandEntityFields()", () => {
     const fragB = { fields: [field("x")], hasSpreads: true, spreads: ["::fragA"] };
     const entity = { fields: [], hasSpreads: true, spreads: ["::fragA"] };
     const resolve = (ref) => ref;
-    const lookup = (key) => key === "::fragA" ? fragA : key === "::fragB" ? fragB : null;
+    const lookup = (key) => (key === "::fragA" ? fragA : key === "::fragB" ? fragB : null);
 
     // Should not throw or loop
     const result = expandEntityFields(entity, null, resolve, lookup);
@@ -116,7 +112,7 @@ describe("expandEntityFields()", () => {
       key === "::fragA" ? fragA : key === "::fragB" ? fragB : key === "::fragC" ? fragC : null;
 
     const result = expandEntityFields(entity, null, resolve, lookup);
-    assert.equal(result.filter(f => f.name === "shared").length, 1);
+    assert.equal(result.filter((f) => f.name === "shared").length, 1);
   });
 });
 
@@ -135,7 +131,7 @@ describe("expandNestedSpreads()", () => {
     };
     const fields = [nestedField];
     const resolve = (ref) => ref;
-    const lookup = (key) => key === "::addr_frag" ? frag : null;
+    const lookup = (key) => (key === "::addr_frag" ? frag : null);
 
     expandNestedSpreads(fields, null, resolve, lookup);
 

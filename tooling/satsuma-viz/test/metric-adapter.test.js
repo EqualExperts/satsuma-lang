@@ -48,7 +48,10 @@ describe("metric → schema-card adaptation", () => {
     assert.equal(fields.length, 2);
     assert.deepEqual(
       fields.map((f) => [f.name, f.type]),
-      [["won_count", "INT64"], ["win_rate", "DECIMAL(5,2)"]],
+      [
+        ["won_count", "INT64"],
+        ["win_rate", "DECIMAL(5,2)"],
+      ],
     );
     // Lean MetricFieldEntry has no constraints/comments/children — the
     // adaptation must supply the empty collections schema consumers expect.

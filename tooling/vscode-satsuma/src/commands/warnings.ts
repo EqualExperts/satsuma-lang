@@ -2,10 +2,7 @@ import * as vscode from "vscode";
 import { runCli } from "./cli-runner";
 import { resolveEntryFile } from "./entry-file";
 
-export function registerWarningsCommand(
-  context: vscode.ExtensionContext,
-  cliPath: string,
-): void {
+export function registerWarningsCommand(context: vscode.ExtensionContext, cliPath: string): void {
   const diagnostics = vscode.languages.createDiagnosticCollection("satsuma-warnings-cmd");
   context.subscriptions.push(diagnostics);
 
@@ -43,9 +40,7 @@ export function registerWarningsCommand(
           diagnostics.set(vscode.Uri.parse(uriStr), diags);
         }
 
-        vscode.window.showInformationMessage(
-          `Satsuma: ${data.count} warning(s) found.`,
-        );
+        vscode.window.showInformationMessage(`Satsuma: ${data.count} warning(s) found.`);
       } catch {
         if (result.stderr) {
           vscode.window.showWarningMessage(result.stderr.trim());

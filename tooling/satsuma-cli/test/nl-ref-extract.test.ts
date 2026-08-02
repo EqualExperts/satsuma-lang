@@ -30,12 +30,10 @@ describe("extractAtRefs", () => {
       "Lookup @department from @source::hr_employees using @posted_by -> @employee_id",
     );
     assert.equal(refs.length, 4);
-    assert.deepEqual(refs.map((r) => r.ref), [
-      "department",
-      "source::hr_employees",
-      "posted_by",
-      "employee_id",
-    ]);
+    assert.deepEqual(
+      refs.map((r) => r.ref),
+      ["department", "source::hr_employees", "posted_by", "employee_id"],
+    );
   });
 
   it("returns empty array for text without @refs", () => {
@@ -78,11 +76,12 @@ describe("classifyRef", () => {
 // ── resolveRef ──────────────────────────────────────────────────────────────
 
 describe("resolveRef", () => {
-  const makeIndex = (schemas: any = {}, transforms: any = {}, fragments: any = {}) => ({
-    schemas: new Map(Object.entries(schemas)),
-    transforms: new Map(Object.entries(transforms)),
-    fragments: new Map(Object.entries(fragments)),
-  } as any);
+  const makeIndex = (schemas: any = {}, transforms: any = {}, fragments: any = {}) =>
+    ({
+      schemas: new Map(Object.entries(schemas)),
+      transforms: new Map(Object.entries(transforms)),
+      fragments: new Map(Object.entries(fragments)),
+    }) as any;
 
   it("resolves namespace-qualified schema", () => {
     const index = makeIndex({
@@ -220,13 +219,17 @@ describe("resolveRef", () => {
   it("resolves deeply nested path (4+ segments)", () => {
     const index = makeIndex({
       "src::msg": {
-        fields: [{
-          name: "header",
-          children: [{
-            name: "sender",
-            children: [{ name: "name" }],
-          }],
-        }],
+        fields: [
+          {
+            name: "header",
+            children: [
+              {
+                name: "sender",
+                children: [{ name: "name" }],
+              },
+            ],
+          },
+        ],
       },
     });
     const result = resolveRef("src::msg.header.sender.name", {} as any, index);
@@ -251,11 +254,12 @@ describe("resolveRef", () => {
 // ── resolveRef with fragment spreads ─────────────────────────────────────────
 
 describe("resolveRef — fragment spread expansion", () => {
-  const makeIndex = (schemas: any = {}, transforms: any = {}, fragments: any = {}) => ({
-    schemas: new Map(Object.entries(schemas)),
-    transforms: new Map(Object.entries(transforms)),
-    fragments: new Map(Object.entries(fragments)),
-  } as any);
+  const makeIndex = (schemas: any = {}, transforms: any = {}, fragments: any = {}) =>
+    ({
+      schemas: new Map(Object.entries(schemas)),
+      transforms: new Map(Object.entries(transforms)),
+      fragments: new Map(Object.entries(fragments)),
+    }) as any;
 
   it("resolves namespace-qualified field via fragment spread", () => {
     const index = makeIndex(
@@ -384,7 +388,10 @@ describe("resolveRef — fragment spread expansion", () => {
 
 describe("isSchemaInMappingSources", () => {
   it("returns true when schema is in sources", () => {
-    const mapping = { sources: ["source::hr_employees"], targets: ["staging::stg_employees"] } as any;
+    const mapping = {
+      sources: ["source::hr_employees"],
+      targets: ["staging::stg_employees"],
+    } as any;
     assert.equal(isSchemaInMappingSources("source::hr_employees", mapping), true);
   });
 
@@ -413,29 +420,37 @@ describe("resolveAllNLRefs", () => {
         ["source::finance_gl", { fields: [{ name: "posted_by" }] }],
       ]),
       mappings: new Map([
-        ["staging::stage gl entries", {
-          sources: ["source::finance_gl", "source::hr_employees"],
-          targets: ["staging::stg_gl_entries"],
-        }],
+        [
+          "staging::stage gl entries",
+          {
+            sources: ["source::finance_gl", "source::hr_employees"],
+            targets: ["staging::stg_gl_entries"],
+          },
+        ],
       ]),
       transforms: new Map(),
       fragments: new Map(),
-      nlRefData: [{
-        text: "Lookup @department from @source::hr_employees using @posted_by -> @employee_id",
-        mapping: "stage gl entries",
-        namespace: "staging",
-        targetField: "department",
-        file: "namespaces/ns-merging.stm",
-        line: 99,
-        column: 6,
-      }],
+      nlRefData: [
+        {
+          text: "Lookup @department from @source::hr_employees using @posted_by -> @employee_id",
+          mapping: "stage gl entries",
+          namespace: "staging",
+          targetField: "department",
+          file: "namespaces/ns-merging.stm",
+          line: 99,
+          column: 6,
+        },
+      ],
     };
 
     const results = resolveAllNLRefs(index as any);
     assert.equal(results.length, 4);
 
     // All should resolve
-    assert.ok(results.every((r: any) => r.resolved), "all refs should resolve");
+    assert.ok(
+      results.every((r: any) => r.resolved),
+      "all refs should resolve",
+    );
 
     // Check specific resolutions
     const deptRef = results.find((r: any) => r.ref === "department") as any;

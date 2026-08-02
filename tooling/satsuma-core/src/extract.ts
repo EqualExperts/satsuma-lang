@@ -9,7 +9,17 @@
 import { canonicalRef } from "./canonical-ref.js";
 import { classifyTransform, classifyArrow } from "./classify.js";
 import { extractMetadata } from "./meta-extract.js";
-import { child, children, allDescendants, labelText, stringText, entryText, qualifiedNameText, sourceRefStructuralText, isPresent } from "./cst-utils.js";
+import {
+  child,
+  children,
+  allDescendants,
+  labelText,
+  stringText,
+  entryText,
+  qualifiedNameText,
+  sourceRefStructuralText,
+  isPresent,
+} from "./cst-utils.js";
 import type { Classification, FieldDecl, MetaEntry, PipeStep, SyntaxNode } from "./types.js";
 
 // ── Internal field tree ────────────────────────────────────────────────────
@@ -229,9 +239,18 @@ export function extractNamespaces(rootNode: SyntaxNode): ExtractedNamespace[] {
     const meta = child(node, "metadata_block");
     const noteTag = meta ? child(meta, "note_tag") : null;
     const noteStr = noteTag
-      ? stringText(noteTag.namedChildren.find((c) => c.type === "nl_string" || c.type === "multiline_string"))
+      ? stringText(
+          noteTag.namedChildren.find(
+            (c) => c.type === "nl_string" || c.type === "multiline_string",
+          ),
+        )
       : null;
-    return { name, note: noteStr, row: node.startPosition.row, startColumn: node.startPosition.column };
+    return {
+      name,
+      note: noteStr,
+      row: node.startPosition.row,
+      startColumn: node.startPosition.column,
+    };
   });
 }
 
@@ -258,10 +277,16 @@ export function extractSchemas(rootNode: SyntaxNode): ExtractedSchema[] {
     const meta = child(node, "metadata_block");
     const noteTag = meta ? child(meta, "note_tag") : null;
     const noteStr = noteTag
-      ? stringText(noteTag.namedChildren.find((c) => c.type === "nl_string" || c.type === "multiline_string"))
+      ? stringText(
+          noteTag.namedChildren.find(
+            (c) => c.type === "nl_string" || c.type === "multiline_string",
+          ),
+        )
       : null;
     const body = child(node, "schema_body");
-    const fieldTree = body ? extractFieldTree(body) : { fields: [], hasSpreads: false, spreads: [] };
+    const fieldTree = body
+      ? extractFieldTree(body)
+      : { fields: [], hasSpreads: false, spreads: [] };
     const blockMeta = meta ? extractMetadata(meta) : [];
     const result: ExtractedSchema = {
       name,
@@ -332,7 +357,9 @@ function extractMetricMeta(meta: SyntaxNode | null): {
       const key = entry.namedChildren[0];
       const val = entry.namedChildren[1];
       if (key?.text === "metric_name") {
-        if (val) displayName = stringText(val.namedChildren.find((c) => c.type === "nl_string")) ?? entryText(val);
+        if (val)
+          displayName =
+            stringText(val.namedChildren.find((c) => c.type === "nl_string")) ?? entryText(val);
       } else if (key?.text === "source") {
         if (!val) continue;
         for (const item of val.namedChildren) {
@@ -372,7 +399,17 @@ export function extractMetrics(rootNode: SyntaxNode): ExtractedMetric[] {
       const { displayName, sources, grain, slices } = extractMetricMeta(meta);
       const body = child(node, "schema_body");
       const fields = body ? extractDirectFields(body) : [];
-      return { name, namespace, displayName, sources, grain, slices, fields, row: node.startPosition.row, startColumn: node.startPosition.column };
+      return {
+        name,
+        namespace,
+        displayName,
+        sources,
+        grain,
+        slices,
+        fields,
+        row: node.startPosition.row,
+        startColumn: node.startPosition.column,
+      };
     });
 }
 
@@ -431,7 +468,15 @@ export function extractMappings(rootNode: SyntaxNode): ExtractedMapping[] {
       namespace && !t.includes("::") ? `${namespace}::${t}` : t,
     );
 
-    return { name, namespace, sources, targets: qualifiedTargets, arrowCount, row: node.startPosition.row, startColumn: node.startPosition.column };
+    return {
+      name,
+      namespace,
+      sources,
+      targets: qualifiedTargets,
+      arrowCount,
+      row: node.startPosition.row,
+      startColumn: node.startPosition.column,
+    };
   });
 }
 
@@ -454,7 +499,9 @@ export function extractFragments(rootNode: SyntaxNode): ExtractedFragment[] {
   return collectFromNamespaces(rootNode, "fragment_block").map(({ node, namespace }) => {
     const name = labelText(node);
     const body = child(node, "schema_body");
-    const fieldTree = body ? extractFieldTree(body) : { fields: [], hasSpreads: false, spreads: [] };
+    const fieldTree = body
+      ? extractFieldTree(body)
+      : { fields: [], hasSpreads: false, spreads: [] };
     return {
       name,
       namespace,
@@ -503,10 +550,7 @@ export function extractTransforms(rootNode: SyntaxNode): ExtractedTransform[] {
   });
 }
 
-const BLOCK_TYPES = new Set([
-  "schema_block", "mapping_block",
-  "fragment_block", "transform_block",
-]);
+const BLOCK_TYPES = new Set(["schema_block", "mapping_block", "fragment_block", "transform_block"]);
 
 function findParentBlock(node: SyntaxNode): { name: string | null; blockType: string | null } {
   let current = node.parent;
@@ -714,11 +758,14 @@ export function extractImports(rootNode: SyntaxNode): ExtractedImport[] {
       .filter((n): n is string => n != null);
 
     const pathNode = child(node, "import_path");
-    const pathStr = pathNode
-      ? stringText(pathNode.namedChildren[0])
-      : null;
+    const pathStr = pathNode ? stringText(pathNode.namedChildren[0]) : null;
 
-    return { names, path: pathStr, row: node.startPosition.row, startColumn: node.startPosition.column };
+    return {
+      names,
+      path: pathStr,
+      row: node.startPosition.row,
+      startColumn: node.startPosition.column,
+    };
   });
 }
 
@@ -737,7 +784,11 @@ function pathText(pathNode: SyntaxNode | null): string | null {
     if (ids.length >= 2) {
       const ns = ids[0]!.text;
       const schema = ids[1]!.text;
-      const field = ids.slice(2).map((c) => c.text).join(".") || null;
+      const field =
+        ids
+          .slice(2)
+          .map((c) => c.text)
+          .join(".") || null;
       return canonicalRef(ns, schema, field);
     }
   }
@@ -797,9 +848,7 @@ function canonicalPipeStepText(inner: SyntaxNode | undefined, fallback: string):
  * text, so fmt-only changes never register as structural differences.
  */
 export function canonicalPipeChainText(pipeSteps: SyntaxNode[]): string {
-  return pipeSteps
-    .map((s) => canonicalPipeStepText(s.namedChildren[0], s.text))
-    .join(" | ");
+  return pipeSteps.map((s) => canonicalPipeStepText(s.namedChildren[0], s.text)).join(" | ");
 }
 
 export interface ExtractedArrow {
@@ -896,8 +945,12 @@ function collectArrowRecords(
         // nested_arrow / each / flatten declare exactly one src_path, so the
         // container's single (already absolute) source is the child prefix.
         collectArrowRecords(
-          node.namedChildren, mappingName, namespace,
-          container.sources[0] ?? null, container.target, records,
+          node.namedChildren,
+          mappingName,
+          namespace,
+          container.sources[0] ?? null,
+          container.target,
+          records,
         );
         break;
       }

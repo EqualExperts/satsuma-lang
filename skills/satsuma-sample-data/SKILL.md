@@ -241,6 +241,7 @@ with open(f"{schema_name}.sql", "w") as f:
 ```python
 import pyarrow as pa
 import pyarrow.parquet as pq
+
 table = pa.Table.from_pylist(rows)
 pq.write_table(table, f"{schema_name}.parquet")
 ```

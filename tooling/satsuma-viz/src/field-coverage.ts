@@ -152,7 +152,9 @@ export function buildMappingCoveredFields(
 
   forEachMappingArrow(mapping, (arrow) => {
     if (targetSchema) {
-      const targetPath = resolveSchemaLocalFieldPath(arrow.targetField, targetSchema, [mapping.targetRef]);
+      const targetPath = resolveSchemaLocalFieldPath(arrow.targetField, targetSchema, [
+        mapping.targetRef,
+      ]);
       if (targetPath) targetFieldRefs.push(targetPath);
     }
 
@@ -181,7 +183,9 @@ export function buildMappingCoveredFields(
 export function buildMappedFieldsIndex(model: VizModel): Map<string, Set<string>> {
   const index = new Map<string, Set<string>>();
   const allSchemas = new Map(
-    model.namespaces.flatMap((ns) => ns.schemas.map((schema) => [schema.qualifiedId, schema] as const)),
+    model.namespaces.flatMap((ns) =>
+      ns.schemas.map((schema) => [schema.qualifiedId, schema] as const),
+    ),
   );
 
   for (const ns of model.namespaces) {
@@ -190,7 +194,11 @@ export function buildMappedFieldsIndex(model: VizModel): Map<string, Set<string>
         .map((schemaId) => allSchemas.get(schemaId))
         .filter((schema): schema is SchemaCard => schema != null);
       const targetSchema = allSchemas.get(mapping.targetRef) ?? null;
-      const { sourceMapped, targetMapped } = buildMappingCoveredFields(mapping, sourceSchemas, targetSchema);
+      const { sourceMapped, targetMapped } = buildMappingCoveredFields(
+        mapping,
+        sourceSchemas,
+        targetSchema,
+      );
 
       for (const [schemaId, covered] of sourceMapped) {
         if (!index.has(schemaId)) index.set(schemaId, new Set());

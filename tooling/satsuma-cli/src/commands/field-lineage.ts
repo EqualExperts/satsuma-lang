@@ -24,7 +24,7 @@ import type { ExtractedWorkspace } from "../types.js";
 
 interface FieldEdgeEntry {
   from: string | null; // canonical field path or null for derived/no-source
-  to: string;          // canonical field path
+  to: string; // canonical field path
   via_mapping: string; // canonical mapping key
   classification: string;
 }
@@ -43,7 +43,9 @@ export function register(program: Command): void {
     .option("--downstream", "only downstream chain")
     .option("--depth <n>", "maximum traversal depth", parsePositiveInt, 10)
     .option("--json", "structured JSON output")
-    .addHelpText("after", `
+    .addHelpText(
+      "after",
+      `
 Traces all fields that flow into (upstream) and out of (downstream) the given
 field, following declared arrows and NL-derived references. Detects cycles.
 
@@ -61,79 +63,91 @@ Examples:
   satsuma field-lineage s2.a                     # full upstream + downstream
   satsuma field-lineage s2.a --upstream          # only upstream chain
   satsuma field-lineage s2.a --json              # structured output
-  satsuma field-lineage ns::s2.a --downstream    # namespace-qualified`)
-    .action(runCommand(async (fieldRef: string, pathArg: string | undefined, opts: {
-      upstream?: boolean;
-      downstream?: boolean;
-      depth: number;
-      json?: boolean;
-    }) => {
-      const dot = fieldRef.indexOf(".");
-      if (dot === -1) {
-        throw new CommandError(
-          `Invalid field reference '${fieldRef}'. Expected format: schema.field`,
-          EXIT_PARSE_ERROR,
-        );
-      }
+  satsuma field-lineage ns::s2.a --downstream    # namespace-qualified`,
+    )
+    .action(
+      runCommand(
+        async (
+          fieldRef: string,
+          pathArg: string | undefined,
+          opts: {
+            upstream?: boolean;
+            downstream?: boolean;
+            depth: number;
+            json?: boolean;
+          },
+        ) => {
+          const dot = fieldRef.indexOf(".");
+          if (dot === -1) {
+            throw new CommandError(
+              `Invalid field reference '${fieldRef}'. Expected format: schema.field`,
+              EXIT_PARSE_ERROR,
+            );
+          }
 
-      const schemaName = fieldRef.slice(0, dot);
-      const fieldName = fieldRef.slice(dot + 1);
+          const schemaName = fieldRef.slice(0, dot);
+          const fieldName = fieldRef.slice(dot + 1);
 
-      const { index } = await loadWorkspace(pathArg);
+          const { index } = await loadWorkspace(pathArg);
 
-      // Resolve the schema
-      const resolvedSchema = resolveIndexKey(schemaName, index.schemas);
-      if (!resolvedSchema) {
-        throw new CommandError(`Schema '${schemaName}' not found.`, EXIT_NOT_FOUND);
-      }
+          // Resolve the schema
+          const resolvedSchema = resolveIndexKey(schemaName, index.schemas);
+          if (!resolvedSchema) {
+            throw new CommandError(`Schema '${schemaName}' not found.`, EXIT_NOT_FOUND);
+          }
 
-      // Validate field exists (including spread fields)
-      const schema = resolvedSchema.entry;
-      const spreadFields = expandEntityFields(schema, schema.namespace ?? null, index);
-      const allFields = [...schema.fields, ...spreadFields];
-      const fieldExists = findFieldByPath(allFields, fieldName) !== null ||
-        collectFieldNames(allFields).includes(fieldName);
-      if (!fieldExists) {
-        throw new CommandError(
-          `Field '${fieldName}' not found in schema '${schemaName}'.`,
-          EXIT_NOT_FOUND,
-        );
-      }
+          // Validate field exists (including spread fields)
+          const schema = resolvedSchema.entry;
+          const spreadFields = expandEntityFields(schema, schema.namespace ?? null, index);
+          const allFields = [...schema.fields, ...spreadFields];
+          const fieldExists =
+            findFieldByPath(allFields, fieldName) !== null ||
+            collectFieldNames(allFields).includes(fieldName);
+          if (!fieldExists) {
+            throw new CommandError(
+              `Field '${fieldName}' not found in schema '${schemaName}'.`,
+              EXIT_NOT_FOUND,
+            );
+          }
 
-      const qualifiedField = `${resolvedSchema.key}.${fieldName}`;
-      const canonicalField = canonicalKey(qualifiedField);
+          const qualifiedField = `${resolvedSchema.key}.${fieldName}`;
+          const canonicalField = canonicalKey(qualifiedField);
 
-      // Build the field-level edge graph (declared + nl-derived)
-      const edges = buildFieldEdgeGraph(index);
+          // Build the field-level edge graph (declared + nl-derived)
+          const edges = buildFieldEdgeGraph(index);
 
-      // Determine which directions to trace.
-      // If both flags are set (or neither), trace both directions.
-      const doUpstream = opts.upstream || !opts.downstream;
-      const doDownstream = opts.downstream || !opts.upstream;
+          // Determine which directions to trace.
+          // If both flags are set (or neither), trace both directions.
+          const doUpstream = opts.upstream || !opts.downstream;
+          const doDownstream = opts.downstream || !opts.upstream;
 
-      const upstream: Array<{ field: string; via_mapping: string; classification: string }> = [];
-      const downstream: Array<{ field: string; via_mapping: string; classification: string }> = [];
+          const upstream: Array<{ field: string; via_mapping: string; classification: string }> =
+            [];
+          const downstream: Array<{ field: string; via_mapping: string; classification: string }> =
+            [];
 
-      if (doUpstream) {
-        traceUpstream(canonicalField, edges, opts.depth, upstream);
-      }
-      if (doDownstream) {
-        traceDownstream(canonicalField, edges, opts.depth, downstream);
-      }
+          if (doUpstream) {
+            traceUpstream(canonicalField, edges, opts.depth, upstream);
+          }
+          if (doDownstream) {
+            traceDownstream(canonicalField, edges, opts.depth, downstream);
+          }
 
-      const result: FieldLineageResult = {
-        field: canonicalField,
-        upstream,
-        downstream,
-      };
+          const result: FieldLineageResult = {
+            field: canonicalField,
+            upstream,
+            downstream,
+          };
 
-      if (opts.json) {
-        console.log(JSON.stringify(result, null, 2));
-        return;
-      }
+          if (opts.json) {
+            console.log(JSON.stringify(result, null, 2));
+            return;
+          }
 
-      printDefault(result, doUpstream, doDownstream);
-    }));
+          printDefault(result, doUpstream, doDownstream);
+        },
+      ),
+    );
 }
 
 // ── Field-edge graph ──────────────────────────────────────────────────────────
@@ -158,15 +172,11 @@ function buildFieldEdgeGraph(index: ExtractedWorkspace): FieldEdgeEntry[] {
     const sourceSchemas = mapping?.sources ?? [];
     const targetSchemas = mapping?.targets ?? [];
 
-    const toField = record.target
-      ? canonicalKey(qualifyField(record.target, targetSchemas))
-      : null;
+    const toField = record.target ? canonicalKey(qualifyField(record.target, targetSchemas)) : null;
     if (!toField) continue;
 
     for (const src of record.sources.length > 0 ? record.sources : [null]) {
-      const fromField = src
-        ? canonicalKey(qualifyField(src, sourceSchemas))
-        : null;
+      const fromField = src ? canonicalKey(qualifyField(src, sourceSchemas)) : null;
       edges.push({
         from: fromField,
         to: toField,
@@ -204,8 +214,11 @@ function buildFieldEdgeGraph(index: ExtractedWorkspace): FieldEdgeEntry[] {
     // source to the same target in the same mapping
     const mappingCanonical = canonicalKey(rawMappingKey);
     const alreadyCovered = edges.some(
-      (e) => e.from === sourceField && e.to === targetField &&
-             e.via_mapping === mappingCanonical && e.classification !== "nl-derived",
+      (e) =>
+        e.from === sourceField &&
+        e.to === targetField &&
+        e.via_mapping === mappingCanonical &&
+        e.classification !== "nl-derived",
     );
     if (alreadyCovered) continue;
 

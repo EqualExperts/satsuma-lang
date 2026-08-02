@@ -14,20 +14,18 @@ describe("inlineCssVariables", () => {
     const { inlineCssVariables } = await import("../dist/satsuma-viz.js");
     const palette = { "--sz-orange": "#F2913D", "--sz-card-bg": "rgb(255, 250, 245)" };
 
-    const svg = '<rect fill="var(--sz-card-bg)" stroke="var(--sz-orange)"/>'
-      + ".cls { color: var(--sz-orange); }";
+    const svg =
+      '<rect fill="var(--sz-card-bg)" stroke="var(--sz-orange)"/>' +
+      ".cls { color: var(--sz-orange); }";
     const out = inlineCssVariables(svg, (name) => palette[name] ?? "");
 
-    assert.equal(
-      out,
-      '<rect fill="rgb(255, 250, 245)" stroke="#F2913D"/>.cls { color: #F2913D; }',
-    );
+    assert.equal(out, '<rect fill="rgb(255, 250, 245)" stroke="#F2913D"/>.cls { color: #F2913D; }');
     assert.ok(!out.includes("var("), "no unresolved references remain");
   });
 
   it("resolves values with surrounding whitespace (getComputedStyle returns ' #fff')", async () => {
     const { inlineCssVariables } = await import("../dist/satsuma-viz.js");
-    const out = inlineCssVariables("<rect fill=\"var(--sz-bg)\"/>", () => "  #0f1117  ");
+    const out = inlineCssVariables('<rect fill="var(--sz-bg)"/>', () => "  #0f1117  ");
     assert.equal(out, '<rect fill="#0f1117"/>');
   });
 
@@ -63,7 +61,10 @@ function assertWellFormedXml(doc) {
   while ((m = tagRe.exec(body)) !== null) {
     const [whole, closing, name, attrs, text] = m;
     if (text !== undefined) {
-      assert.ok(!/&(?![A-Za-z]+;|#\d+;)/.test(text), `dangling & in text: ${JSON.stringify(text.trim())}`);
+      assert.ok(
+        !/&(?![A-Za-z]+;|#\d+;)/.test(text),
+        `dangling & in text: ${JSON.stringify(text.trim())}`,
+      );
       continue;
     }
     assert.ok(name, `unparseable markup at: ${whole.slice(0, 40)}`);
@@ -82,7 +83,10 @@ describe("buildExportSvg", () => {
     width: 200,
     height: 100,
     nodes: new Map([
-      ["P&L <quarterly>", { id: "P&L <quarterly>", x: 0, y: 0, width: 100, height: 40, ports: new Map() }],
+      [
+        "P&L <quarterly>",
+        { id: "P&L <quarterly>", x: 0, y: 0, width: 100, height: 40, ports: new Map() },
+      ],
     ]),
     edges: [],
     sourceBlocks: [],
@@ -106,7 +110,7 @@ describe("buildExportSvg", () => {
   it("sanity: the well-formedness checker rejects the pre-fix breakage", () => {
     // Guards the guard: if assertWellFormedXml accepted raw interpolation,
     // the two tests above would prove nothing.
-    assert.throws(() => assertWellFormedXml('<svg><text>P&L <quarterly></text></svg>'));
+    assert.throws(() => assertWellFormedXml("<svg><text>P&L <quarterly></text></svg>"));
   });
 });
 

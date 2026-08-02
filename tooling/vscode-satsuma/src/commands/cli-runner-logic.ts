@@ -33,10 +33,7 @@ export function exitCodeFrom(error: SpawnError | null): number {
  * gets a specific install hint; callers surface this text directly in their
  * warning toasts.
  */
-export function spawnFailureMessage(
-  error: SpawnError | null,
-  cliPath: string,
-): string | null {
+export function spawnFailureMessage(error: SpawnError | null, cliPath: string): string | null {
   if (!error || typeof error.code !== "string") return null;
   if (error.code === "ENOENT") {
     return `Satsuma CLI not found at "${cliPath}". Install it (npm install -g satsuma-cli) or point the satsuma.cliPath setting at the executable.`;

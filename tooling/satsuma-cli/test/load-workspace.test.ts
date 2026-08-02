@@ -51,7 +51,10 @@ describe("loadWorkspace", () => {
     const { files, index } = await loadWorkspace(entry);
 
     assert.ok(files.length >= 1, "expected at least the entry file to be parsed");
-    assert.ok(files.every((f) => f.tree && f.src), "every parsed file must carry a tree and source");
+    assert.ok(
+      files.every((f) => f.tree && f.src),
+      "every parsed file must carry a tree and source",
+    );
     assert.ok(index.schemas.size > 0, "common.stm defines schemas — index should be populated");
   });
 
@@ -114,8 +117,7 @@ describe("loadWorkspace failure handling", () => {
     const bogus = "/definitely/does/not/exist.stm";
     await assert.rejects(
       () => loadWorkspace(bogus),
-      (err: unknown) =>
-        err instanceof CommandError && err.message.includes(`'${bogus}'`),
+      (err: unknown) => err instanceof CommandError && err.message.includes(`'${bogus}'`),
     );
   });
 });

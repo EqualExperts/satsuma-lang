@@ -39,7 +39,9 @@ export function register(program: Command): void {
     .command("where-used <name> [path]")
     .description("Find all references to a schema, fragment, or transform")
     .option("--json", "output JSON")
-    .addHelpText("after", `
+    .addHelpText(
+      "after",
+      `
 Searches mappings (source/target refs), metrics (source refs), schemas
 (fragment spreads, ref metadata), and NL @ref references.
 
@@ -52,63 +54,81 @@ JSON shape (--json):
 Examples:
   satsuma where-used hub_customer                    # who references this schema?
   satsuma where-used audit_fields                    # where is this fragment spread?
-  satsuma where-used trim_and_lower --json           # transform refs as JSON`)
-    .action(runCommand(async (name: string, pathArg: string | undefined, opts: { json?: boolean }) => {
-      const { files: parsedFiles, index } = await loadWorkspace(pathArg);
+  satsuma where-used trim_and_lower --json           # transform refs as JSON`,
+    )
+    .action(
+      runCommand(async (name: string, pathArg: string | undefined, opts: { json?: boolean }) => {
+        const { files: parsedFiles, index } = await loadWorkspace(pathArg);
 
-      // Determine entity type — resolve namespace-qualified lookups
-      const schemaResolved = resolveIndexKey(name, index.schemas);
-      const fragmentResolved = resolveIndexKey(name, index.fragments);
-      const transformResolved = resolveIndexKey(name, index.transforms);
-      const isSchema = schemaResolved != null;
-      const isFragment = fragmentResolved != null;
-      const isTransform = transformResolved != null;
-      const resolvedName = schemaResolved?.key ?? fragmentResolved?.key ?? transformResolved?.key ?? name;
+        // Determine entity type — resolve namespace-qualified lookups
+        const schemaResolved = resolveIndexKey(name, index.schemas);
+        const fragmentResolved = resolveIndexKey(name, index.fragments);
+        const transformResolved = resolveIndexKey(name, index.transforms);
+        const isSchema = schemaResolved != null;
+        const isFragment = fragmentResolved != null;
+        const isTransform = transformResolved != null;
+        const resolvedName =
+          schemaResolved?.key ?? fragmentResolved?.key ?? transformResolved?.key ?? name;
 
-      if (!isSchema && !isFragment && !isTransform) {
-        const errorMsg = `'${name}' not found as a schema, fragment, or transform.`;
-        const allNames = [
-          ...index.schemas.keys(),
-          ...index.fragments.keys(),
-          ...index.transforms.keys(),
-        ];
-        const close = allNames.find((k) => k.toLowerCase() === name.toLowerCase());
-        if (opts.json) {
-          // JSON consumers parse stdout, so the error must land there too —
-          // see schema.ts for the same pattern.
-          const errorObj: Record<string, unknown> = { error: errorMsg };
-          if (close) errorObj.suggestion = close;
-          throw new CommandError(JSON.stringify(errorObj, null, 2), EXIT_NOT_FOUND, "stdout");
+        if (!isSchema && !isFragment && !isTransform) {
+          const errorMsg = `'${name}' not found as a schema, fragment, or transform.`;
+          const allNames = [
+            ...index.schemas.keys(),
+            ...index.fragments.keys(),
+            ...index.transforms.keys(),
+          ];
+          const close = allNames.find((k) => k.toLowerCase() === name.toLowerCase());
+          if (opts.json) {
+            // JSON consumers parse stdout, so the error must land there too —
+            // see schema.ts for the same pattern.
+            const errorObj: Record<string, unknown> = { error: errorMsg };
+            if (close) errorObj.suggestion = close;
+            throw new CommandError(JSON.stringify(errorObj, null, 2), EXIT_NOT_FOUND, "stdout");
+          }
+          const lines = [errorMsg];
+          if (close) lines.push(`Did you mean '${close}'?`);
+          throw new CommandError(lines.join("\n"), EXIT_NOT_FOUND);
         }
-        const lines = [errorMsg];
-        if (close) lines.push(`Did you mean '${close}'?`);
-        throw new CommandError(lines.join("\n"), EXIT_NOT_FOUND);
-      }
 
-      const refs = gatherRefs(resolvedName, index, parsedFiles, isSchema, isFragment, isTransform);
+        const refs = gatherRefs(
+          resolvedName,
+          index,
+          parsedFiles,
+          isSchema,
+          isFragment,
+          isTransform,
+        );
 
-      if (opts.json) {
-        // Use resolvedName (the canonical index key) rather than the raw user
-        // query so that bare-name lookups produce the qualified form, e.g.
-        // "crm::customers" not "::customers" (sl-b0mq).
-        console.log(JSON.stringify({ name: canonicalKey(resolvedName), refs }, null, 2));
-        return refs.length === 0 ? EXIT_NOT_FOUND : undefined;
-      }
+        if (opts.json) {
+          // Use resolvedName (the canonical index key) rather than the raw user
+          // query so that bare-name lookups produce the qualified form, e.g.
+          // "crm::customers" not "::customers" (sl-b0mq).
+          console.log(JSON.stringify({ name: canonicalKey(resolvedName), refs }, null, 2));
+          return refs.length === 0 ? EXIT_NOT_FOUND : undefined;
+        }
 
-      if (refs.length === 0) {
-        // Use resolvedName in text output too so the header always shows the
-        // canonical qualified name regardless of how the user queried (sl-wfgx).
-        console.log(`No references to '${resolvedName}' found.`);
-        return EXIT_NOT_FOUND;
-      }
+        if (refs.length === 0) {
+          // Use resolvedName in text output too so the header always shows the
+          // canonical qualified name regardless of how the user queried (sl-wfgx).
+          console.log(`No references to '${resolvedName}' found.`);
+          return EXIT_NOT_FOUND;
+        }
 
-      printDefault(resolvedName, refs);
-    }));
+        printDefault(resolvedName, refs);
+      }),
+    );
 }
 
 // ── Reference gathering ───────────────────────────────────────────────────────
 
-function gatherRefs(name: string, index: ExtractedWorkspace, parsedFiles: ParsedFile[], isSchema: boolean, isFragment: boolean, isTransform: boolean): Ref[] {
+function gatherRefs(
+  name: string,
+  index: ExtractedWorkspace,
+  parsedFiles: ParsedFile[],
+  isSchema: boolean,
+  isFragment: boolean,
+  isTransform: boolean,
+): Ref[] {
   const refs: Ref[] = [];
 
   if (isSchema) {
@@ -123,7 +143,12 @@ function gatherRefs(name: string, index: ExtractedWorkspace, parsedFiles: Parsed
     for (const [metricName, sources] of index.referenceGraph.metricsReferences) {
       if (sources.includes(name)) {
         const m = index.metrics.get(metricName);
-        refs.push({ kind: "metric", name: metricName, file: m?.file ?? "?", line: (m?.row ?? 0) + 1 });
+        refs.push({
+          kind: "metric",
+          name: metricName,
+          file: m?.file ?? "?",
+          line: (m?.row ?? 0) + 1,
+        });
       }
     }
   }
@@ -157,7 +182,12 @@ function gatherRefs(name: string, index: ExtractedWorkspace, parsedFiles: Parsed
           if (m.kind === "kv" && m.key === "ref") {
             const refTarget = m.value.replace(/^@/, "").split(".")[0];
             if (refTarget === name || refTarget === name.split("::").pop()) {
-              refs.push({ kind: "ref_metadata", name: `${schemaName}.${field.name}`, file: schema.file, line: schema.row + 1 });
+              refs.push({
+                kind: "ref_metadata",
+                name: `${schemaName}.${field.name}`,
+                file: schema.file,
+                line: schema.row + 1,
+              });
             }
           }
         }
@@ -200,9 +230,17 @@ function gatherRefs(name: string, index: ExtractedWorkspace, parsedFiles: Parsed
  * Check whether a resolved ref name matches an entity query.
  * Handles exact match and field-prefixed match in both internal and canonical forms.
  */
-function matchesEntityOrField(resolvedName: string, internalName: string, canonicalName: string): boolean {
-  return resolvedName === internalName || resolvedName === canonicalName ||
-    resolvedName.startsWith(internalName + ".") || resolvedName.startsWith(canonicalName + ".");
+function matchesEntityOrField(
+  resolvedName: string,
+  internalName: string,
+  canonicalName: string,
+): boolean {
+  return (
+    resolvedName === internalName ||
+    resolvedName === canonicalName ||
+    resolvedName.startsWith(internalName + ".") ||
+    resolvedName.startsWith(canonicalName + ".")
+  );
 }
 
 /**
@@ -260,7 +298,9 @@ function walkForSpreads(
   for (const c of bodyNode.namedChildren) {
     if (c.type === "fragment_spread") {
       // fragment_spread children use spread_label, not block_label
-      const lbl = c.namedChildren.find((x) => x.type === "spread_label" || x.type === "block_label");
+      const lbl = c.namedChildren.find(
+        (x) => x.type === "spread_label" || x.type === "block_label",
+      );
       let sname = "";
       if (lbl) {
         const q = lbl.namedChildren.find((x) => x.type === "backtick_name");
@@ -268,7 +308,12 @@ function walkForSpreads(
           sname = q.text.slice(1, -1);
         } else {
           sname = lbl.namedChildren
-            .filter((x) => x.type === "identifier" || x.type === "continuation_word" || x.type === "qualified_name")
+            .filter(
+              (x) =>
+                x.type === "identifier" ||
+                x.type === "continuation_word" ||
+                x.type === "qualified_name",
+            )
             .map((x) => x.text)
             .join(" ");
         }
@@ -388,7 +433,8 @@ function findImportRefs(rootNode: SyntaxNode, name: string): Array<{ path: strin
     }
     if (importedNames.some((n) => n === name)) {
       const pathNode = c.namedChildren.find((x) => x.type === "import_path");
-      const pathStr = pathNode?.namedChildren[0]?.text?.slice(1, -1) ?? pathNode?.text?.slice(1, -1) ?? "";
+      const pathStr =
+        pathNode?.namedChildren[0]?.text?.slice(1, -1) ?? pathNode?.text?.slice(1, -1) ?? "";
       results.push({ path: pathStr, row: c.startPosition.row });
     }
   }

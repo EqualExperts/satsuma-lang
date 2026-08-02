@@ -13,7 +13,9 @@ const {
   computeScopedSemanticDiagnostics,
 } = require("../dist/semantic-diagnostics");
 
-before(async () => { await initTestParser(); });
+before(async () => {
+  await initTestParser();
+});
 
 /** Build an index from a map of { uri: source }. */
 function buildIndex(files) {
@@ -331,7 +333,10 @@ mapping m {
     const scoped = createScopedIndex(idx, getImportReachableUris("file:///c%3A/ws/a.stm", idx));
     const diags = computeCoreSemanticDiagnostics("file:///c%3A/ws/b.stm", scoped);
     const dupDiag = diags.find((d) => d.code === "duplicate-definition");
-    assert.ok(dupDiag, "expected the genuine duplicate to be reported under the alternate spelling");
+    assert.ok(
+      dupDiag,
+      "expected the genuine duplicate to be reported under the alternate spelling",
+    );
   });
 
   it("returns no diagnostics for a valid single-file workspace", () => {

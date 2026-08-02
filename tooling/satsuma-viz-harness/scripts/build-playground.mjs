@@ -66,9 +66,7 @@ const ROOT_ABSOLUTE_ASSET = /(?:src|href)="\/(?!\/)/;
 export function buildPlaygroundBundle(files, outDir) {
   for (const file of files) {
     if (!existsSync(file)) {
-      throw new Error(
-        `[playground] missing build artifact: ${file} — run "npm run build" first`,
-      );
+      throw new Error(`[playground] missing build artifact: ${file} — run "npm run build" first`);
     }
   }
 
@@ -77,7 +75,7 @@ export function buildPlaygroundBundle(files, outDir) {
     const html = readFileSync(indexHtml, "utf-8");
     if (ROOT_ABSOLUTE_ASSET.test(html)) {
       throw new Error(
-        "[playground] index.html references a root-absolute asset (src/href=\"/…\"); " +
+        '[playground] index.html references a root-absolute asset (src/href="/…"); ' +
           "all assets must be page-relative (./…) so the bundle works under a " +
           "non-root base path such as GitHub Pages",
       );

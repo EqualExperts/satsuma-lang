@@ -54,7 +54,7 @@ export default [
       },
     },
     rules: {
-      "no-unused-vars": ["error", { "argsIgnorePattern": "^_", "varsIgnorePattern": "^_" }],
+      "no-unused-vars": ["error", { argsIgnorePattern: "^_", varsIgnorePattern: "^_" }],
     },
   },
   {
@@ -78,13 +78,13 @@ export default [
       },
     },
     rules: {
-      "no-unused-vars": ["error", { "argsIgnorePattern": "^_", "varsIgnorePattern": "^_" }],
+      "no-unused-vars": ["error", { argsIgnorePattern: "^_", varsIgnorePattern: "^_" }],
     },
   },
   {
     files: ["tooling/tree-sitter-satsuma/grammar.js"],
     rules: {
-      "no-unused-vars": ["error", { "argsIgnorePattern": "^_", "varsIgnorePattern": "^_" }],
+      "no-unused-vars": ["error", { argsIgnorePattern: "^_", varsIgnorePattern: "^_" }],
     },
   },
   // TypeScript test files and the viz harness package (satsuma-cli tests, viz-harness
@@ -93,19 +93,16 @@ export default [
   // they are migrated to include test files in their tsconfigs.
   ...tseslint.configs.recommended.map((config) => ({
     ...config,
-    files: [
-      "tooling/satsuma-cli/test/**/*.ts",
-      "tooling/satsuma-viz-harness/**/*.ts",
-    ],
+    files: ["tooling/satsuma-cli/test/**/*.ts", "tooling/satsuma-viz-harness/**/*.ts"],
   })),
   {
-    files: [
-      "tooling/satsuma-cli/test/**/*.ts",
-      "tooling/satsuma-viz-harness/**/*.ts",
-    ],
+    files: ["tooling/satsuma-cli/test/**/*.ts", "tooling/satsuma-viz-harness/**/*.ts"],
     rules: {
       // Align with the JS convention used throughout the repo
-      "@typescript-eslint/no-unused-vars": ["error", { "argsIgnorePattern": "^_", "varsIgnorePattern": "^_" }],
+      "@typescript-eslint/no-unused-vars": [
+        "error",
+        { argsIgnorePattern: "^_", varsIgnorePattern: "^_" },
+      ],
       // Non-null assertions require targeted inline suppression with a safety justification
       "@typescript-eslint/no-non-null-assertion": "error",
     },
@@ -139,7 +136,10 @@ export default [
       },
     },
     rules: {
-      "@typescript-eslint/no-unused-vars": ["error", { "argsIgnorePattern": "^_", "varsIgnorePattern": "^_" }],
+      "@typescript-eslint/no-unused-vars": [
+        "error",
+        { argsIgnorePattern: "^_", varsIgnorePattern: "^_" },
+      ],
       "@typescript-eslint/no-non-null-assertion": "error",
     },
   },

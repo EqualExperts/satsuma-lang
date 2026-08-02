@@ -9,7 +9,9 @@ const {
 } = require("../dist/workspace-index");
 const { buildVizModel, mergeVizModels } = require("../dist/viz-model");
 
-before(async () => { await initTestParser(); });
+before(async () => {
+  await initTestParser();
+});
 
 /** Build a VizModel from source text. */
 function vizModel(source, uri = "file:///test.stm") {
@@ -134,9 +136,7 @@ describe("schemas", () => {
   });
 
   it("extracts schema with note metadata", () => {
-    const model = vizModel(
-      'schema foo (note "My description") {\n  id INT\n}',
-    );
+    const model = vizModel('schema foo (note "My description") {\n  id INT\n}');
     const schema = model.namespaces[0].schemas[0];
     assert.equal(schema.label, "My description");
   });
@@ -191,8 +191,8 @@ describe("mappings", () => {
   it("extracts a basic mapping with source, target, and arrows", () => {
     const model = vizModel(
       "schema src { id INT\n name STRING }\n" +
-      "schema tgt { id INT\n name STRING }\n" +
-      "mapping m1 {\n  source { src }\n  target { tgt }\n  id -> id\n  name -> name\n}",
+        "schema tgt { id INT\n name STRING }\n" +
+        "mapping m1 {\n  source { src }\n  target { tgt }\n  id -> id\n  name -> name\n}",
     );
     const mapping = model.namespaces[0].mappings[0];
     assert.equal(mapping.id, "m1");
@@ -204,7 +204,7 @@ describe("mappings", () => {
   it("extracts arrow source and target fields", () => {
     const model = vizModel(
       "schema s { a INT }\nschema t { b INT }\n" +
-      "mapping m {\n  source { s }\n  target { t }\n  a -> b\n}",
+        "mapping m {\n  source { s }\n  target { t }\n  a -> b\n}",
     );
     const arrow = model.namespaces[0].mappings[0].arrows[0];
     assert.deepEqual(arrow.sourceFields, ["a"]);
@@ -218,7 +218,7 @@ describe("mappings", () => {
   it("extracts bare-token transforms as NL kind", () => {
     const model = vizModel(
       "schema s { a INT }\nschema t { b INT }\n" +
-      "mapping m {\n  source { s }\n  target { t }\n  a -> b { trim | lowercase }\n}",
+        "mapping m {\n  source { s }\n  target { t }\n  a -> b { trim | lowercase }\n}",
     );
     const tf = model.namespaces[0].mappings[0].arrows[0].transform;
     assert.ok(tf);
@@ -229,7 +229,7 @@ describe("mappings", () => {
   it("extracts quoted NL transforms as NL kind", () => {
     const model = vizModel(
       "schema s { a INT }\nschema t { b INT }\n" +
-      'mapping m {\n  source { s }\n  target { t }\n  a -> b { "Convert to uppercase" }\n}',
+        'mapping m {\n  source { s }\n  target { t }\n  a -> b { "Convert to uppercase" }\n}',
     );
     const tf = model.namespaces[0].mappings[0].arrows[0].transform;
     assert.ok(tf);
@@ -239,7 +239,7 @@ describe("mappings", () => {
   it("extracts mixed bare + quoted transforms as NL kind", () => {
     const model = vizModel(
       "schema s { a INT }\nschema t { b INT }\n" +
-      'mapping m {\n  source { s }\n  target { t }\n  a -> b {\n    "Do something"\n    | round(2)\n  }\n}',
+        'mapping m {\n  source { s }\n  target { t }\n  a -> b {\n    "Do something"\n    | round(2)\n  }\n}',
     );
     const tf = model.namespaces[0].mappings[0].arrows[0].transform;
     assert.ok(tf);
@@ -250,7 +250,7 @@ describe("mappings", () => {
   it("extracts map block transforms", () => {
     const model = vizModel(
       "schema s { status STRING }\nschema t { stage STRING }\n" +
-      'mapping m {\n  source { s }\n  target { t }\n  status -> stage {\n    map {\n      A: "alpha"\n      B: "beta"\n    }\n  }\n}',
+        'mapping m {\n  source { s }\n  target { t }\n  status -> stage {\n    map {\n      A: "alpha"\n      B: "beta"\n    }\n  }\n}',
     );
     const tf = model.namespaces[0].mappings[0].arrows[0].transform;
     assert.ok(tf);
@@ -260,7 +260,7 @@ describe("mappings", () => {
   it("extracts computed arrows (no source)", () => {
     const model = vizModel(
       "schema s { a INT }\nschema t { b INT }\n" +
-      'mapping m {\n  source { s }\n  target { t }\n  -> b { "Compute something" }\n}',
+        'mapping m {\n  source { s }\n  target { t }\n  -> b { "Compute something" }\n}',
     );
     const arrow = model.namespaces[0].mappings[0].arrows[0];
     assert.deepEqual(arrow.sourceFields, []);
@@ -270,7 +270,7 @@ describe("mappings", () => {
   it("extracts multi-source arrows", () => {
     const model = vizModel(
       "schema s { a STRING\n  b STRING }\nschema t { c STRING }\n" +
-      'mapping m {\n  source { s }\n  target { t }\n  a, b -> c { "Concat" }\n}',
+        'mapping m {\n  source { s }\n  target { t }\n  a, b -> c { "Concat" }\n}',
     );
     const arrow = model.namespaces[0].mappings[0].arrows[0];
     assert.equal(arrow.sourceFields.length, 2);
@@ -281,7 +281,7 @@ describe("mappings", () => {
   it("extracts source block with join description", () => {
     const model = vizModel(
       "schema a { id INT }\nschema b { id INT }\nschema t { id INT }\n" +
-      'mapping m {\n  source {\n    a\n    b\n    "Join on a.id = b.id"\n  }\n  target { t }\n  a.id -> id\n}',
+        'mapping m {\n  source {\n    a\n    b\n    "Join on a.id = b.id"\n  }\n  target { t }\n  a.id -> id\n}',
     );
     const sb = model.namespaces[0].mappings[0].sourceBlock;
     assert.ok(sb);
@@ -292,14 +292,14 @@ describe("mappings", () => {
   it("resolves local namespaced mapping refs to qualified schema ids", () => {
     const model = vizModel(
       "namespace warehouse {\n" +
-      "  schema src { id INT }\n" +
-      "  schema tgt { id INT }\n" +
-      "  mapping m {\n" +
-      "    source { src }\n" +
-      "    target { tgt }\n" +
-      "    id -> id\n" +
-      "  }\n" +
-      "}",
+        "  schema src { id INT }\n" +
+        "  schema tgt { id INT }\n" +
+        "  mapping m {\n" +
+        "    source { src }\n" +
+        "    target { tgt }\n" +
+        "    id -> id\n" +
+        "  }\n" +
+        "}",
     );
     const mapping = model.namespaces.find((ns) => ns.name === "warehouse").mappings[0];
     assert.deepEqual(mapping.sourceRefs, ["warehouse::src"]);
@@ -310,14 +310,14 @@ describe("mappings", () => {
   it("falls back to global schema refs from inside namespaces", () => {
     const model = vizModel(
       "schema global_src { id INT }\n" +
-      "namespace warehouse {\n" +
-      "  schema tgt { id INT }\n" +
-      "  mapping m {\n" +
-      "    source { global_src }\n" +
-      "    target { tgt }\n" +
-      "    id -> id\n" +
-      "  }\n" +
-      "}",
+        "namespace warehouse {\n" +
+        "  schema tgt { id INT }\n" +
+        "  mapping m {\n" +
+        "    source { global_src }\n" +
+        "    target { tgt }\n" +
+        "    id -> id\n" +
+        "  }\n" +
+        "}",
     );
     const mapping = model.namespaces.find((ns) => ns.name === "warehouse").mappings[0];
     assert.deepEqual(mapping.sourceRefs, ["global_src"]);
@@ -327,7 +327,7 @@ describe("mappings", () => {
   it("does not treat source join descriptions as source refs", () => {
     const model = vizModel(
       "schema a { id INT }\nschema b { id INT }\nschema t { id INT }\n" +
-      'mapping m {\n  source {\n    a\n    b\n    "Join on a.id = b.id"\n  }\n  target { t }\n  a.id -> id\n}',
+        'mapping m {\n  source {\n    a\n    b\n    "Join on a.id = b.id"\n  }\n  target { t }\n  a.id -> id\n}',
     );
     const mapping = model.namespaces[0].mappings[0];
     assert.deepEqual(mapping.sourceRefs, ["a", "b"]);
@@ -336,8 +336,8 @@ describe("mappings", () => {
   it("extracts flatten blocks", () => {
     const model = vizModel(
       "schema s { items list_of record { sku STRING } }\n" +
-      "schema t { sku STRING }\n" +
-      "mapping m {\n  source { s }\n  target { t }\n  flatten items -> t {\n    .sku -> sku\n  }\n}",
+        "schema t { sku STRING }\n" +
+        "mapping m {\n  source { s }\n  target { t }\n  flatten items -> t {\n    .sku -> sku\n  }\n}",
     );
     const mapping = model.namespaces[0].mappings[0];
     assert.equal(mapping.flattenBlocks.length, 1);
@@ -348,7 +348,7 @@ describe("mappings", () => {
   it("extracts mapping-level notes", () => {
     const model = vizModel(
       "schema s { a INT }\nschema t { b INT }\n" +
-      'mapping m {\n  note { "Mapping note" }\n  source { s }\n  target { t }\n  a -> b\n}',
+        'mapping m {\n  note { "Mapping note" }\n  source { s }\n  target { t }\n  a -> b\n}',
     );
     const mapping = model.namespaces[0].mappings[0];
     assert.equal(mapping.notes.length, 1);
@@ -376,10 +376,10 @@ describe("metrics", () => {
   it("extracts metric fields with measure types", () => {
     const model = vizModel(
       "schema m1 (metric, source s) {\n" +
-      "  val DECIMAL (measure additive)\n" +
-      "  avg DECIMAL (measure non_additive)\n" +
-      "  half DECIMAL (measure semi_additive)\n" +
-      "}",
+        "  val DECIMAL (measure additive)\n" +
+        "  avg DECIMAL (measure non_additive)\n" +
+        "  half DECIMAL (measure semi_additive)\n" +
+        "}",
     );
     const fields = model.namespaces[0].metrics[0].fields;
     assert.equal(fields.length, 3);
@@ -405,9 +405,7 @@ describe("metrics", () => {
   });
 
   it("extracts bare measure tag as additive", () => {
-    const model = vizModel(
-      "schema m1 (metric, source s) {\n  count INT (measure)\n}",
-    );
+    const model = vizModel("schema m1 (metric, source s) {\n  count INT (measure)\n}");
     const fields = model.namespaces[0].metrics[0].fields;
     assert.equal(fields[0].measure, "additive");
   });
@@ -429,8 +427,7 @@ describe("namespaces", () => {
 
   it("separates global and namespaced blocks", () => {
     const model = vizModel(
-      "schema global_s { id INT }\n" +
-      "namespace ns1 {\n  schema ns_s { id INT }\n}",
+      "schema global_s { id INT }\n" + "namespace ns1 {\n  schema ns_s { id INT }\n}",
     );
     assert.equal(model.namespaces.length, 2);
     const global = model.namespaces.find((n) => n.name === null);
@@ -445,10 +442,10 @@ describe("namespaces", () => {
   it("handles mappings inside namespaces", () => {
     const model = vizModel(
       "namespace wh {\n" +
-      "  schema src { id INT }\n" +
-      "  schema tgt { id INT }\n" +
-      "  mapping load {\n    source { src }\n    target { tgt }\n    id -> id\n  }\n" +
-      "}",
+        "  schema src { id INT }\n" +
+        "  schema tgt { id INT }\n" +
+        "  mapping load {\n    source { src }\n    target { tgt }\n    id -> id\n  }\n" +
+        "}",
     );
     const ns = model.namespaces.find((n) => n.name === "wh");
     assert.ok(ns);
@@ -461,36 +458,24 @@ describe("namespaces", () => {
 
 describe("comments", () => {
   it("extracts warning comments from fields", () => {
-    const model = vizModel(
-      "schema s {\n  email STRING //! PII risk\n}",
-    );
+    const model = vizModel("schema s {\n  email STRING //! PII risk\n}");
     const schema = model.namespaces[0].schemas[0];
     // Warning comments appear on the schema or the field
-    const allComments = [
-      ...schema.comments,
-      ...schema.fields.flatMap((f) => f.comments),
-    ];
+    const allComments = [...schema.comments, ...schema.fields.flatMap((f) => f.comments)];
     assert.ok(allComments.some((c) => c.kind === "warning"));
   });
 
   it("extracts question comments", () => {
-    const model = vizModel(
-      "schema s {\n  status STRING //? Should this be an enum?\n}",
-    );
+    const model = vizModel("schema s {\n  status STRING //? Should this be an enum?\n}");
     const schema = model.namespaces[0].schemas[0];
-    const allComments = [
-      ...schema.comments,
-      ...schema.fields.flatMap((f) => f.comments),
-    ];
+    const allComments = [...schema.comments, ...schema.fields.flatMap((f) => f.comments)];
     assert.ok(allComments.some((c) => c.kind === "question"));
   });
 
   it("attaches a standalone comment between top-level blocks to the preceding block", () => {
     // Control case for the namespaced fix below: standalone //! siblings of
     // global blocks attach to the nearest preceding schema.
-    const model = vizModel(
-      "schema s {\n  id INT\n}\n//! needs review\nschema t {\n  id INT\n}",
-    );
+    const model = vizModel("schema s {\n  id INT\n}\n//! needs review\nschema t {\n  id INT\n}");
     const s = model.namespaces[0].schemas.find((x) => x.id === "s");
     assert.equal(s.comments.length, 1);
     assert.equal(s.comments[0].kind, "warning");
@@ -517,7 +502,8 @@ describe("external lineage", () => {
     const model = vizModelMulti(
       {
         "file:///a.stm": "schema customers { id INT }",
-        "file:///b.stm": "schema tgt { id INT }\nmapping m {\n  source { customers }\n  target { tgt }\n  id -> id\n}",
+        "file:///b.stm":
+          "schema tgt { id INT }\nmapping m {\n  source { customers }\n  target { tgt }\n  id -> id\n}",
       },
       "file:///a.stm",
     );
@@ -764,20 +750,14 @@ mapping enrich {
 }`;
 
   it("injects a stub schema card for an imported source schema", () => {
-    const model = vizModelScoped(
-      { [LOOKUP_URI]: LOOKUP_SRC, [MAIN_URI]: MAIN_SRC },
-      MAIN_URI,
-    );
+    const model = vizModelScoped({ [LOOKUP_URI]: LOOKUP_SRC, [MAIN_URI]: MAIN_SRC }, MAIN_URI);
     const ns = model.namespaces[0];
     const ids = ns.schemas.map((s) => s.qualifiedId);
     assert.ok(ids.includes("fx_spot_rates"), `expected fx_spot_rates in ${ids}`);
   });
 
   it("stub schema has hasExternalLineage = true", () => {
-    const model = vizModelScoped(
-      { [LOOKUP_URI]: LOOKUP_SRC, [MAIN_URI]: MAIN_SRC },
-      MAIN_URI,
-    );
+    const model = vizModelScoped({ [LOOKUP_URI]: LOOKUP_SRC, [MAIN_URI]: MAIN_SRC }, MAIN_URI);
     const ns = model.namespaces[0];
     const stub = ns.schemas.find((s) => s.qualifiedId === "fx_spot_rates");
     assert.ok(stub);
@@ -785,10 +765,7 @@ mapping enrich {
   });
 
   it("stub schema preserves fields from the imported definition", () => {
-    const model = vizModelScoped(
-      { [LOOKUP_URI]: LOOKUP_SRC, [MAIN_URI]: MAIN_SRC },
-      MAIN_URI,
-    );
+    const model = vizModelScoped({ [LOOKUP_URI]: LOOKUP_SRC, [MAIN_URI]: MAIN_SRC }, MAIN_URI);
     const ns = model.namespaces[0];
     const stub = ns.schemas.find((s) => s.qualifiedId === "fx_spot_rates");
     assert.ok(stub);
@@ -797,10 +774,7 @@ mapping enrich {
   });
 
   it("does not inject a stub when the schema is defined locally", () => {
-    const model = vizModelScoped(
-      { [LOOKUP_URI]: LOOKUP_SRC, [MAIN_URI]: MAIN_SRC },
-      MAIN_URI,
-    );
+    const model = vizModelScoped({ [LOOKUP_URI]: LOOKUP_SRC, [MAIN_URI]: MAIN_SRC }, MAIN_URI);
     const ns = model.namespaces[0];
     const localIds = ["transactions", "transactions_usd"];
     for (const id of localIds) {
@@ -839,7 +813,7 @@ mapping convert_amount {
     assert.equal(arrow.transform.kind, "nl");
     assert.ok(Array.isArray(arrow.transform.atRefs), "expected atRefs array");
     assert.ok(arrow.transform.atRefs.length >= 1, "expected at least one atRef");
-    const spotRef = arrow.transform.atRefs.find(r => r.ref === "exchange_rates.spot");
+    const spotRef = arrow.transform.atRefs.find((r) => r.ref === "exchange_rates.spot");
     assert.ok(spotRef, "expected atRef for exchange_rates.spot");
     assert.equal(spotRef.resolved, true);
     assert.ok(spotRef.resolvedTo, "expected resolvedTo to be set");
@@ -858,7 +832,7 @@ mapping m {
     const model = vizModel(source);
     const arrow = model.namespaces[0].mappings[0].arrows[0];
     assert.ok(arrow.transform);
-    const ref = arrow.transform.atRefs?.find(r => r.ref === "bogus_unknown_field");
+    const ref = arrow.transform.atRefs?.find((r) => r.ref === "bogus_unknown_field");
     assert.ok(ref, "expected atRef entry for unknown ref");
     assert.equal(ref.resolved, false);
   });
@@ -876,8 +850,10 @@ mapping m {
     const arrow = model.namespaces[0].mappings[0].arrows[0];
     assert.ok(arrow.transform);
     assert.equal(arrow.transform.kind, "nl");
-    assert.ok(!arrow.transform.atRefs || arrow.transform.atRefs.length === 0,
-      "expected no atRefs for bare-token NL transform");
+    assert.ok(
+      !arrow.transform.atRefs || arrow.transform.atRefs.length === 0,
+      "expected no atRefs for bare-token NL transform",
+    );
   });
 
   // After Feature 28, bare tokens + NL strings in the same pipe chain are all
@@ -896,7 +872,7 @@ mapping m {
     assert.ok(arrow.transform);
     assert.equal(arrow.transform.kind, "nl");
     assert.ok(Array.isArray(arrow.transform.atRefs));
-    const rateRef = arrow.transform.atRefs.find(r => r.ref === "rate");
+    const rateRef = arrow.transform.atRefs.find((r) => r.ref === "rate");
     assert.ok(rateRef, "expected atRef for rate");
     assert.equal(rateRef.classification, "bare");
   });
@@ -922,49 +898,61 @@ describe("mergeVizModels", () => {
     const m2 = vizModel("schema foo { id INT\nname VARCHAR }", "file:///b.stm");
     // Primary model's schema wins the dedup.
     const result = mergeVizModels("file:///a.stm", [m1, m2]);
-    const schemas = result.namespaces.flatMap(ns => ns.schemas);
+    const schemas = result.namespaces.flatMap((ns) => ns.schemas);
     assert.equal(schemas.length, 1, "duplicate schema should be deduped");
     assert.equal(schemas[0].fields.length, 1, "primary model schema should win");
   });
 
   it("includes mappings from upstream files", () => {
     // Model A has a schema and mapping; model B has a different mapping.
-    const modelA = vizModel(`
+    const modelA = vizModel(
+      `
 schema src { id INT }
 schema tgt { id INT }
 mapping m1 {
   source { src }
   target { tgt }
   src.id -> id
-}`, "file:///a.stm");
+}`,
+      "file:///a.stm",
+    );
 
-    const modelB = vizModel(`
+    const modelB = vizModel(
+      `
 schema upstream { code VARCHAR }
 schema src { id INT }
 mapping m_upstream {
   source { upstream }
   target { src }
   upstream.code -> id
-}`, "file:///b.stm");
+}`,
+      "file:///b.stm",
+    );
 
     const result = mergeVizModels("file:///a.stm", [modelA, modelB]);
-    const allMappings = result.namespaces.flatMap(ns => ns.mappings);
+    const allMappings = result.namespaces.flatMap((ns) => ns.mappings);
     assert.equal(allMappings.length, 2, "both mappings should be present");
-    const mappingIds = allMappings.map(m => m.id);
+    const mappingIds = allMappings.map((m) => m.id);
     assert.ok(mappingIds.includes("m1"), "primary mapping present");
     assert.ok(mappingIds.includes("m_upstream"), "upstream mapping present");
   });
 
   it("preserves only primary file's fileNotes", () => {
-    const modelA = vizModel(`
+    const modelA = vizModel(
+      `
 note { "File A note" }
 schema foo { id INT }
-`, "file:///a.stm");
+`,
+      "file:///a.stm",
+    );
 
-    const modelB = vizModel(`
+    const modelB = vizModel(
+      `
 note { "File B note" }
 schema bar { id INT }
-`, "file:///b.stm");
+`,
+      "file:///b.stm",
+    );
 
     const result = mergeVizModels("file:///a.stm", [modelA, modelB]);
     assert.equal(result.fileNotes.length, 1);
@@ -972,19 +960,25 @@ schema bar { id INT }
   });
 
   it("merges entities from different namespaces correctly", () => {
-    const modelA = vizModel(`
+    const modelA = vizModel(
+      `
 namespace crm {
   schema customers { id INT }
-}`, "file:///a.stm");
+}`,
+      "file:///a.stm",
+    );
 
-    const modelB = vizModel(`
+    const modelB = vizModel(
+      `
 namespace billing {
   schema invoices { id INT }
-}`, "file:///b.stm");
+}`,
+      "file:///b.stm",
+    );
 
     const result = mergeVizModels("file:///a.stm", [modelA, modelB]);
     assert.equal(result.namespaces.length, 2, "two namespace groups");
-    const nsNames = result.namespaces.map(ns => ns.name).sort();
+    const nsNames = result.namespaces.map((ns) => ns.name).sort();
     assert.deepStrictEqual(nsNames, ["billing", "crm"]);
   });
 
@@ -992,7 +986,8 @@ namespace billing {
     // Bug sl-aeae: the mapping dedup key was id@uri, omitting the namespace.
     // Two mappings named "load" in namespaces a and b of the same file
     // collided and the second was dropped from the merged model.
-    const modelA = vizModel(`
+    const modelA = vizModel(
+      `
 namespace a {
   schema s1 { id INT }
   schema t1 { id INT }
@@ -1002,7 +997,9 @@ namespace b {
   schema s2 { id INT }
   schema t2 { id INT }
   mapping load { source { s2 } target { t2 } id -> id }
-}`, "file:///a.stm");
+}`,
+      "file:///a.stm",
+    );
     const modelB = vizModel("schema unrelated { id INT }", "file:///b.stm");
 
     const result = mergeVizModels("file:///a.stm", [modelA, modelB]);
@@ -1107,15 +1104,15 @@ mapping m_a {
     const result = vizModelFullLineage(files, "file:///a.stm");
 
     // All three schemas should be present.
-    const allSchemas = result.namespaces.flatMap(ns => ns.schemas);
-    const schemaIds = allSchemas.map(s => s.qualifiedId).sort();
+    const allSchemas = result.namespaces.flatMap((ns) => ns.schemas);
+    const schemaIds = allSchemas.map((s) => s.qualifiedId).sort();
     assert.ok(schemaIds.includes("upstream"), "upstream schema from file C");
     assert.ok(schemaIds.includes("intermediate"), "intermediate schema from file B");
     assert.ok(schemaIds.includes("target"), "target schema from file A");
 
     // Both mappings should be present (one from A, one from B).
-    const allMappings = result.namespaces.flatMap(ns => ns.mappings);
-    const mappingIds = allMappings.map(m => m.id).sort();
+    const allMappings = result.namespaces.flatMap((ns) => ns.mappings);
+    const mappingIds = allMappings.map((m) => m.id).sort();
     assert.ok(mappingIds.includes("m_a"), "mapping from file A");
     assert.ok(mappingIds.includes("m_b"), "mapping from file B");
   });
@@ -1145,19 +1142,21 @@ import { cleaned_orders } from "./pipeline.stm"`,
     const result = vizModelFullLineage(files, "file:///platform.stm");
 
     // Both schemas and the mapping from imported files should be present.
-    const allSchemas = result.namespaces.flatMap(ns => ns.schemas);
-    const schemaIds = allSchemas.map(s => s.qualifiedId).sort();
+    const allSchemas = result.namespaces.flatMap((ns) => ns.schemas);
+    const schemaIds = allSchemas.map((s) => s.qualifiedId).sort();
     assert.ok(schemaIds.includes("raw_orders"), "upstream schema present");
     assert.ok(schemaIds.includes("cleaned_orders"), "downstream schema present");
 
-    const allMappings = result.namespaces.flatMap(ns => ns.mappings);
+    const allMappings = result.namespaces.flatMap((ns) => ns.mappings);
     assert.equal(allMappings.length, 1, "mapping from pipeline file present");
     assert.equal(allMappings[0].id, "clean");
 
     // Namespaces should not be empty — the import-only file contributes nothing
     // locally, but the merged model has content from imported files.
-    assert.ok(result.namespaces.length > 0,
-      "merged model has non-empty namespaces despite import-only entry point");
+    assert.ok(
+      result.namespaces.length > 0,
+      "merged model has non-empty namespaces despite import-only entry point",
+    );
   });
 
   it("location.uri tracks which file each entity came from", () => {
@@ -1176,14 +1175,20 @@ mapping m {
     };
 
     const result = vizModelFullLineage(files, "file:///main.stm");
-    const allSchemas = result.namespaces.flatMap(ns => ns.schemas);
+    const allSchemas = result.namespaces.flatMap((ns) => ns.schemas);
 
-    const resultSchema = allSchemas.find(s => s.qualifiedId === "result");
-    assert.equal(resultSchema.location.uri, "file:///main.stm",
-      "result schema should come from main.stm");
+    const resultSchema = allSchemas.find((s) => s.qualifiedId === "result");
+    assert.equal(
+      resultSchema.location.uri,
+      "file:///main.stm",
+      "result schema should come from main.stm",
+    );
 
-    const sourceSchema = allSchemas.find(s => s.qualifiedId === "source_data");
-    assert.equal(sourceSchema.location.uri, "file:///src.stm",
-      "source_data schema should come from src.stm");
+    const sourceSchema = allSchemas.find((s) => s.qualifiedId === "source_data");
+    assert.equal(
+      sourceSchema.location.uri,
+      "file:///src.stm",
+      "source_data schema should come from src.stm",
+    );
   });
 });

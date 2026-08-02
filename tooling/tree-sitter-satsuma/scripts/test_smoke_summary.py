@@ -225,7 +225,7 @@ class SmokeSummaryTests(unittest.TestCase):
                 self.assertEqual(
                     summary["parse_ok"],
                     expect["parse_ok"],
-                    f'{relpath}: expected parse_ok={expect["parse_ok"]}',
+                    f"{relpath}: expected parse_ok={expect['parse_ok']}",
                 )
 
     def test_section_minimum_counts(self) -> None:
@@ -279,7 +279,13 @@ class SmokeSummaryTests(unittest.TestCase):
 
     def test_map_items_have_kind(self) -> None:
         """Every map item must have a recognised kind."""
-        valid_kinds = {"map_arrow", "computed_arrow", "nested_arrow", "each_block", "flatten_block"}
+        valid_kinds = {
+            "map_arrow",
+            "computed_arrow",
+            "nested_arrow",
+            "each_block",
+            "flatten_block",
+        }
         for relpath in EXPECTATIONS:
             if relpath in self._errors:
                 continue

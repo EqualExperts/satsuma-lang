@@ -21,9 +21,7 @@ import { FieldLineagePanel } from "./webview/field-lineage/panel";
 let client: LanguageClient | undefined;
 
 export function activate(context: ExtensionContext): void {
-  const serverModule = context.asAbsolutePath(
-    join("server", "dist", "server.js"),
-  );
+  const serverModule = context.asAbsolutePath(join("server", "dist", "server.js"));
 
   const serverOptions: ServerOptions = {
     run: { module: serverModule, transport: TransportKind.ipc },
@@ -82,42 +80,40 @@ export function activate(context: ExtensionContext): void {
 
   // Field Lineage webview (Phase 1 — ELK panel)
   context.subscriptions.push(
-    vscode.commands.registerCommand("satsuma.traceFieldLineage", async (args?: { fieldPath?: string }) => {
-      // The CLI scopes the workspace via the entry file's imports and rejects
-      // directories (ADR-022) — never fall back to a folder path (sl-1ycv).
-      const entryFilePath = await resolveEntryFile();
-      if (!entryFilePath) return;
+    vscode.commands.registerCommand(
+      "satsuma.traceFieldLineage",
+      async (args?: { fieldPath?: string }) => {
+        // The CLI scopes the workspace via the entry file's imports and rejects
+        // directories (ADR-022) — never fall back to a folder path (sl-1ycv).
+        const entryFilePath = await resolveEntryFile();
+        if (!entryFilePath) return;
 
-      // Prefer: explicit arg > LSP actionContext > user input
-      let fieldPath: string | undefined = args?.fieldPath;
+        // Prefer: explicit arg > LSP actionContext > user input
+        let fieldPath: string | undefined = args?.fieldPath;
 
-      if (!fieldPath && client) {
-        const actionContext = await getEditorActionContext(client);
-        fieldPath = actionContext.fieldPath ?? undefined;
-      }
+        if (!fieldPath && client) {
+          const actionContext = await getEditorActionContext(client);
+          fieldPath = actionContext.fieldPath ?? undefined;
+        }
 
-      if (!fieldPath) {
-        // Command-palette fallback: prompt for the field
-        const editor = vscode.window.activeTextEditor;
-        const word = editor?.document.getText(
-          editor.document.getWordRangeAtPosition(editor.selection.active),
-        );
-        fieldPath = await vscode.window.showInputBox({
-          prompt: "Enter field reference (schema.field)",
-          value: word?.includes(".") ? word : `${word ?? ""}.`,
-          placeHolder: "customers.email",
-        });
-      }
+        if (!fieldPath) {
+          // Command-palette fallback: prompt for the field
+          const editor = vscode.window.activeTextEditor;
+          const word = editor?.document.getText(
+            editor.document.getWordRangeAtPosition(editor.selection.active),
+          );
+          fieldPath = await vscode.window.showInputBox({
+            prompt: "Enter field reference (schema.field)",
+            value: word?.includes(".") ? word : `${word ?? ""}.`,
+            placeHolder: "customers.email",
+          });
+        }
 
-      if (!fieldPath) return;
+        if (!fieldPath) return;
 
-      FieldLineagePanel.createOrShow(
-        context.extensionUri,
-        cliPath,
-        entryFilePath,
-        fieldPath,
-      );
-    }),
+        FieldLineagePanel.createOrShow(context.extensionUri, cliPath, entryFilePath, fieldPath);
+      },
+    ),
   );
 }
 

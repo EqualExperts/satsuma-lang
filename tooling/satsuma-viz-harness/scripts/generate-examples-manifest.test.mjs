@@ -63,10 +63,8 @@ describe("buildExamplesManifest", () => {
   // resolver produces, so indexedFiles.has(resolved) matches in the browser.
   it("derives file:/// virtual URIs consistent with the resolver", () => {
     const { examples } = buildExamplesManifest(corpusDir);
-    const uri = new URL(
-      examples.find((e) => e.path === "group/pipeline.stm").path,
-      LIBRARY_BASE,
-    ).href;
+    const uri = new URL(examples.find((e) => e.path === "group/pipeline.stm").path, LIBRARY_BASE)
+      .href;
     assert.equal(uri, "file:///library/group/pipeline.stm");
   });
 

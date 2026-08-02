@@ -17,7 +17,13 @@ import { resolveIndexKey } from "../index-builder.js";
 import { expandEntityFields, expandNestedSpreads } from "../spread-expand.js";
 import { coverageForMapping, coveredFieldPaths } from "../coverage-workspace.js";
 import { resolveAllNLRefs } from "../nl-ref-extract.js";
-import type { FieldDecl, ParsedFile, SchemaRecord, FragmentRecord, MetricRecord } from "../types.js";
+import type {
+  FieldDecl,
+  ParsedFile,
+  SchemaRecord,
+  FragmentRecord,
+  MetricRecord,
+} from "../types.js";
 
 interface FieldWithTags extends FieldDecl {
   tags?: string[];
@@ -30,7 +36,9 @@ export function register(program: Command): void {
     .option("--with-meta", "include metadata tags")
     .option("--unmapped-by <mapping>", "only unmapped fields relative to a mapping")
     .option("--json", "structured JSON output")
-    .addHelpText("after", `
+    .addHelpText(
+      "after",
+      `
 Looks up <name> in schemas first, then fragments, then metrics.
 Names can be namespace-qualified (e.g. pos::stores).
 
@@ -42,100 +50,122 @@ Examples:
   satsuma fields hub_customer                                    # list all fields
   satsuma fields hub_customer --with-meta                        # include tags
   satsuma fields hub_customer --unmapped-by 'load hub_customer'  # coverage gaps
-  satsuma fields pos::stores --json                              # namespace-qualified`)
-    .action(runCommand(async (schemaName: string, pathArg: string | undefined, opts: { withMeta?: boolean; unmappedBy?: string; json?: boolean }) => {
-      const { files: parsedFiles, index } = await loadWorkspace(pathArg);
+  satsuma fields pos::stores --json                              # namespace-qualified`,
+    )
+    .action(
+      runCommand(
+        async (
+          schemaName: string,
+          pathArg: string | undefined,
+          opts: { withMeta?: boolean; unmappedBy?: string; json?: boolean },
+        ) => {
+          const { files: parsedFiles, index } = await loadWorkspace(pathArg);
 
-      // Search schemas first, then fragments, then metrics
-      type ResolvedEntity = { key: string; entry: SchemaRecord | FragmentRecord | MetricRecord };
-      let resolved: ResolvedEntity | null = resolveIndexKey(schemaName, index.schemas);
-      let entityKind = "schema";
-      if (!resolved) {
-        resolved = resolveIndexKey(schemaName, index.fragments);
-        entityKind = "fragment";
-      }
-      if (!resolved) {
-        resolved = resolveIndexKey(schemaName, index.metrics);
-        entityKind = "metric";
-      }
-      if (!resolved) {
-        const allKeys = [...index.schemas.keys(), ...index.fragments.keys(), ...index.metrics.keys()];
-        const close = allKeys.find(
-          (k) => k.toLowerCase() === schemaName.toLowerCase(),
-        );
-        const lines = [`'${schemaName}' not found in schemas, fragments, or metrics.`];
-        if (close) lines.push(`Did you mean '${close}'?`);
-        throw new CommandError(lines.join("\n"), EXIT_NOT_FOUND);
-      }
-      const resolvedSchemaName = resolved.key;
+          // Search schemas first, then fragments, then metrics
+          type ResolvedEntity = {
+            key: string;
+            entry: SchemaRecord | FragmentRecord | MetricRecord;
+          };
+          let resolved: ResolvedEntity | null = resolveIndexKey(schemaName, index.schemas);
+          let entityKind = "schema";
+          if (!resolved) {
+            resolved = resolveIndexKey(schemaName, index.fragments);
+            entityKind = "fragment";
+          }
+          if (!resolved) {
+            resolved = resolveIndexKey(schemaName, index.metrics);
+            entityKind = "metric";
+          }
+          if (!resolved) {
+            const allKeys = [
+              ...index.schemas.keys(),
+              ...index.fragments.keys(),
+              ...index.metrics.keys(),
+            ];
+            const close = allKeys.find((k) => k.toLowerCase() === schemaName.toLowerCase());
+            const lines = [`'${schemaName}' not found in schemas, fragments, or metrics.`];
+            if (close) lines.push(`Did you mean '${close}'?`);
+            throw new CommandError(lines.join("\n"), EXIT_NOT_FOUND);
+          }
+          const resolvedSchemaName = resolved.key;
 
-      const entity = resolved.entry;
-      let fields: FieldWithTags[] = deepCopyFields(entity.fields);
+          const entity = resolved.entry;
+          let fields: FieldWithTags[] = deepCopyFields(entity.fields);
 
-      // Expand fragment spreads — inline fields from spread fragments (schemas and fragments only)
-      if (entityKind !== "metric") {
-        // Expand nested record-level spreads in place first
-        expandNestedSpreads(fields, entity.namespace ?? null, index);
-        // Then expand schema-level spreads
-        const spreadFields = expandEntityFields(entity as SchemaRecord | FragmentRecord, entity.namespace ?? null, index);
-        fields = [...fields, ...spreadFields];
-      }
+          // Expand fragment spreads — inline fields from spread fragments (schemas and fragments only)
+          if (entityKind !== "metric") {
+            // Expand nested record-level spreads in place first
+            expandNestedSpreads(fields, entity.namespace ?? null, index);
+            // Then expand schema-level spreads
+            const spreadFields = expandEntityFields(
+              entity as SchemaRecord | FragmentRecord,
+              entity.namespace ?? null,
+              index,
+            );
+            fields = [...fields, ...spreadFields];
+          }
 
-      // Enrich with metadata if requested
-      if (opts.withMeta) {
-        enrichFieldMeta(entity.name, fields, parsedFiles);
-      }
+          // Enrich with metadata if requested
+          if (opts.withMeta) {
+            enrichFieldMeta(entity.name, fields, parsedFiles);
+          }
 
-      // Filter to unmapped fields
-      if (opts.unmappedBy) {
-        const resolvedMapping = resolveIndexKey(opts.unmappedBy, index.mappings);
-        if (!resolvedMapping) {
-          const close = [...index.mappings.keys()].find(
-            // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- Safe: guarded by outer opts.unmappedBy check
-            (k) => k.toLowerCase() === opts.unmappedBy!.toLowerCase(),
-          );
-          const lines = [`Mapping '${opts.unmappedBy}' not found.`];
-          if (close) lines.push(`Did you mean '${close}'?`);
-          throw new CommandError(lines.join("\n"), EXIT_NOT_FOUND);
-        }
+          // Filter to unmapped fields
+          if (opts.unmappedBy) {
+            const resolvedMapping = resolveIndexKey(opts.unmappedBy, index.mappings);
+            if (!resolvedMapping) {
+              const close = [...index.mappings.keys()].find(
+                // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- Safe: guarded by outer opts.unmappedBy check
+                (k) => k.toLowerCase() === opts.unmappedBy!.toLowerCase(),
+              );
+              const lines = [`Mapping '${opts.unmappedBy}' not found.`];
+              if (close) lines.push(`Did you mean '${close}'?`);
+              throw new CommandError(lines.join("\n"), EXIT_NOT_FOUND);
+            }
 
-        // Resolved @refs count toward coverage (ADR-036), and this command must
-        // give the same answer as `satsuma coverage` — the lock sl-oqsj put in
-        // place — so it feeds core the same refs.
-        const coverage = coverageForMapping(
-          resolvedMapping.key,
-          index,
-          parsedFiles,
-          resolveAllNLRefs(index),
-        );
-        // No coverage result means the mapping does not reference this entity at
-        // all (or is anonymous, which --unmapped-by cannot name) — every field is
-        // then unmapped by it, which is what an empty covered set produces.
-        const covered = coverage ? coveredFieldPaths(coverage, resolvedSchemaName) : new Set<string>();
-        fields = filterUnmappedFields(fields, covered, "");
-      }
+            // Resolved @refs count toward coverage (ADR-036), and this command must
+            // give the same answer as `satsuma coverage` — the lock sl-oqsj put in
+            // place — so it feeds core the same refs.
+            const coverage = coverageForMapping(
+              resolvedMapping.key,
+              index,
+              parsedFiles,
+              resolveAllNLRefs(index),
+            );
+            // No coverage result means the mapping does not reference this entity at
+            // all (or is anonymous, which --unmapped-by cannot name) — every field is
+            // then unmapped by it, which is what an empty covered set produces.
+            const covered = coverage
+              ? coveredFieldPaths(coverage, resolvedSchemaName)
+              : new Set<string>();
+            fields = filterUnmappedFields(fields, covered, "");
+          }
 
-      if (opts.json) {
-        console.log(JSON.stringify(fields, null, 2));
-        return;
-      }
+          if (opts.json) {
+            console.log(JSON.stringify(fields, null, 2));
+            return;
+          }
 
-      if (fields.length === 0) {
-        // Use resolvedSchemaName (the canonical index key) so bare-name queries
-        // still produce the qualified name in output (e.g. "crm::customers" not
-        // "customers") — see sl-wfgx.
-        if (opts.unmappedBy) {
-          console.log(
-            `All fields in '${resolvedSchemaName}' are mapped by '${opts.unmappedBy}'.`,
-          );
-        } else {
-          console.log(`${entityKind.charAt(0).toUpperCase() + entityKind.slice(1)} '${resolvedSchemaName}' has no fields.`);
-        }
-        return;
-      }
+          if (fields.length === 0) {
+            // Use resolvedSchemaName (the canonical index key) so bare-name queries
+            // still produce the qualified name in output (e.g. "crm::customers" not
+            // "customers") — see sl-wfgx.
+            if (opts.unmappedBy) {
+              console.log(
+                `All fields in '${resolvedSchemaName}' are mapped by '${opts.unmappedBy}'.`,
+              );
+            } else {
+              console.log(
+                `${entityKind.charAt(0).toUpperCase() + entityKind.slice(1)} '${resolvedSchemaName}' has no fields.`,
+              );
+            }
+            return;
+          }
 
-      printDefault(resolvedSchemaName, fields, opts);
-    }));
+          printDefault(resolvedSchemaName, fields, opts);
+        },
+      ),
+    );
 }
 
 function deepCopyFields(fields: FieldDecl[]): FieldWithTags[] {
@@ -159,7 +189,11 @@ function deepCopyFields(fields: FieldDecl[]): FieldWithTags[] {
  * ancestor of a covered child, so treating it as covered would hide its
  * remaining gaps.
  */
-function filterUnmappedFields(fields: FieldWithTags[], covered: Set<string>, prefix: string): FieldWithTags[] {
+function filterUnmappedFields(
+  fields: FieldWithTags[],
+  covered: Set<string>,
+  prefix: string,
+): FieldWithTags[] {
   const result: FieldWithTags[] = [];
   for (const f of fields) {
     const path = prefix ? `${prefix}.${f.name}` : f.name;
@@ -179,7 +213,11 @@ function filterUnmappedFields(fields: FieldWithTags[], covered: Set<string>, pre
  * Enrich field objects with metadata tags from the FieldDecl metadata array.
  * Recurses into children for record/list blocks.
  */
-function enrichFieldMeta(_schemaName: string, fields: FieldWithTags[], _parsedFiles: ParsedFile[]): void {
+function enrichFieldMeta(
+  _schemaName: string,
+  fields: FieldWithTags[],
+  _parsedFiles: ParsedFile[],
+): void {
   function enrich(fieldList: FieldWithTags[]): void {
     for (const field of fieldList) {
       if (field.metadata && field.metadata.length > 0) {
@@ -199,11 +237,19 @@ function enrichFieldMeta(_schemaName: string, fields: FieldWithTags[], _parsedFi
   enrich(fields);
 }
 
-function printDefault(_schemaName: string, fields: FieldWithTags[], opts: { withMeta?: boolean }): void {
+function printDefault(
+  _schemaName: string,
+  fields: FieldWithTags[],
+  opts: { withMeta?: boolean },
+): void {
   printFieldTree(fields, opts, 1);
 }
 
-function printFieldTree(fields: FieldWithTags[], opts: { withMeta?: boolean }, indent: number): void {
+function printFieldTree(
+  fields: FieldWithTags[],
+  opts: { withMeta?: boolean },
+  indent: number,
+): void {
   const maxName = Math.max(...fields.map((f) => f.name.length), 4);
   const displayType = (f: FieldWithTags): string => {
     if (!f.isList) return f.type;

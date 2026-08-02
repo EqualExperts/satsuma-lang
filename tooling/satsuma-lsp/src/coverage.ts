@@ -141,10 +141,7 @@ type DefinitionEntryKind = "schema" | "fragment" | "transform";
  * blocks may name something the index also knows as another kind, and coverage
  * is defined over declared schema fields.
  */
-function resolveSchema(
-  wsIndex: WorkspaceIndex,
-  schemaId: string,
-): CoverageSchemaDefinition | null {
+function resolveSchema(wsIndex: WorkspaceIndex, schemaId: string): CoverageSchemaDefinition | null {
   const defs = resolveDefinition(wsIndex, schemaId, null);
   const def = defs.find((d) => d.kind === "schema");
   if (!def) return null;

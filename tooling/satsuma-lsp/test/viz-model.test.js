@@ -18,7 +18,9 @@ const {
   buildVizModel,
 } = require("@satsuma/viz-backend");
 
-before(async () => { await initTestParser(); });
+before(async () => {
+  await initTestParser();
+});
 
 /** Build a workspace from `{uri: source}` and return {index, trees}. */
 function workspace(files) {
@@ -41,10 +43,7 @@ function vizModel(files, primaryUri) {
 
 describe("satsuma/vizModel — single file", () => {
   it("returns a model whose uri matches the requested document", () => {
-    const model = vizModel(
-      { "file:///a.stm": "schema customers { id UUID }" },
-      "file:///a.stm",
-    );
+    const model = vizModel({ "file:///a.stm": "schema customers { id UUID }" }, "file:///a.stm");
     assert.equal(model.uri, "file:///a.stm");
   });
 

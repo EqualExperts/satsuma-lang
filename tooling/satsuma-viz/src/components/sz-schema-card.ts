@@ -5,7 +5,12 @@ import type { SchemaCard, FieldEntry } from "../model.js";
 import { SzNavigateEvent, SzFieldHoverEvent, SzFieldLineageEvent } from "../satsuma-viz.js";
 import { renderMarkdown } from "../markdown.js";
 import { isCoveredFieldPath } from "@satsuma/core/coverage-paths";
-import { HEADER_HEIGHT, META_PILL_ROW_GAP, META_PILL_ROW_HEIGHT, NAMESPACE_PILL_HEIGHT } from "../layout/geometry.js";
+import {
+  HEADER_HEIGHT,
+  META_PILL_ROW_GAP,
+  META_PILL_ROW_HEIGHT,
+  NAMESPACE_PILL_HEIGHT,
+} from "../layout/geometry.js";
 
 /**
  * Detail of the `sz-compact-toggled` CustomEvent a compact card dispatches
@@ -271,7 +276,7 @@ export class SzSchemaCard extends LitElement {
       display: none;
     }
 
-.metadata-pills {
+    .metadata-pills {
       /* Pills stack one per row and are EXCLUDED from the card's intrinsic
          width (contain: inline-size) — a long metadata value such as a
          namespace URI must never widen the card beyond what its field rows
@@ -417,7 +422,9 @@ export class SzSchemaCard extends LitElement {
       flex-shrink: 0;
       padding: 0;
       opacity: 0;
-      transition: opacity 0.1s, background 0.1s;
+      transition:
+        opacity 0.1s,
+        background 0.1s;
     }
 
     .field-row:hover .lineage-btn {
@@ -556,30 +563,31 @@ export class SzSchemaCard extends LitElement {
     // without text matching against a positioned <span>. The row is pinned
     // to the shared NAMESPACE_PILL_HEIGHT the layout reserves for it.
     return html`<div
-        style="height:${NAMESPACE_PILL_HEIGHT}px;box-sizing:border-box;display:flex;align-items:end;padding:0 12px;background:var(--sz-orange);"
-        data-testid=${`${this.testIdPrefix}-namespace-pill`}
+      style="height:${NAMESPACE_PILL_HEIGHT}px;box-sizing:border-box;display:flex;align-items:end;padding:0 12px;background:var(--sz-orange);"
+      data-testid=${`${this.testIdPrefix}-namespace-pill`}
+    >
+      <span
+        data-testid=${`${this.testIdPrefix}-namespace-label`}
+        style="display:inline-block;font-size:10px;font-weight:700;padding:1px 8px;border-radius:999px;background:var(--sz-namespace-pill-chip-bg);color:var(--sz-orange-dark);"
+        >${this.namespaceLabel}</span
       >
-        <span
-          data-testid=${`${this.testIdPrefix}-namespace-label`}
-          style="display:inline-block;font-size:10px;font-weight:700;padding:1px 8px;border-radius:999px;background:var(--sz-namespace-pill-chip-bg);color:var(--sz-orange-dark);"
-        >${this.namespaceLabel}</span>
-      </div>`;
+    </div>`;
   }
 
   private _headerIcon(isReport: boolean) {
     if (isReport) {
       // Chart/report icon
       return html`<svg class="header-icon" viewBox="0 0 16 16" fill="currentColor">
-        <rect x="1" y="2" width="14" height="12" rx="2" opacity="0.9"/>
-        <rect x="4" y="8" width="2" height="4" rx="0.5" fill="var(--sz-icon-overlay-soft)"/>
-        <rect x="7" y="5" width="2" height="7" rx="0.5" fill="var(--sz-icon-overlay-soft)"/>
-        <rect x="10" y="7" width="2" height="5" rx="0.5" fill="var(--sz-icon-overlay-soft)"/>
+        <rect x="1" y="2" width="14" height="12" rx="2" opacity="0.9" />
+        <rect x="4" y="8" width="2" height="4" rx="0.5" fill="var(--sz-icon-overlay-soft)" />
+        <rect x="7" y="5" width="2" height="7" rx="0.5" fill="var(--sz-icon-overlay-soft)" />
+        <rect x="10" y="7" width="2" height="5" rx="0.5" fill="var(--sz-icon-overlay-soft)" />
       </svg>`;
     }
     // Table/schema icon
     return html`<svg class="header-icon" viewBox="0 0 16 16" fill="currentColor">
-      <rect x="1" y="2" width="14" height="12" rx="2" opacity="0.9"/>
-      <line x1="1" y1="6" x2="15" y2="6" stroke="var(--sz-icon-divider)" stroke-width="1"/>
+      <rect x="1" y="2" width="14" height="12" rx="2" opacity="0.9" />
+      <line x1="1" y1="6" x2="15" y2="6" stroke="var(--sz-icon-divider)" stroke-width="1" />
     </svg>`;
   }
 
@@ -598,28 +606,47 @@ export class SzSchemaCard extends LitElement {
     return html`
       <div class=${this._collapsed ? "collapsed" : ""} data-testid=${this.testIdPrefix}>
         ${this._renderNamespacePill()}
-        <div class="header ${isReport ? "report" : ""}" data-testid=${`${this.testIdPrefix}-header`} @click=${this._onHeaderClick}>
+        <div
+          class="header ${isReport ? "report" : ""}"
+          data-testid=${`${this.testIdPrefix}-header`}
+          @click=${this._onHeaderClick}
+        >
           ${this._headerIcon(isReport)}
           <span class="header-name">${s.id}</span>
           <span class="header-count">${mappedCount}/${totalFields}</span>
-          <span class="header-toggle" ?data-collapsed=${this._collapsed} @click=${this._onToggleClick}>&#9660;</span>
+          <span
+            class="header-toggle"
+            ?data-collapsed=${this._collapsed}
+            @click=${this._onToggleClick}
+            >&#9660;</span
+          >
         </div>
         ${s.label ? html`<div class="label">${s.label}</div>` : ""}
-        ${metaPills.length > 0
-          ? html`<div class="metadata-pills">
-              ${metaPills.map(
-                (m) => html`<span class="meta-pill" title=${`${m.key} ${m.value}`}><span class="meta-key">${m.key}</span> ${m.value}</span>`
-              )}
-            </div>`
-          : ""}
+        ${
+          metaPills.length > 0
+            ? html`<div class="metadata-pills">
+                ${metaPills.map(
+                  (m) =>
+                    html`<span class="meta-pill" title=${`${m.key} ${m.value}`}
+                      ><span class="meta-key">${m.key}</span> ${m.value}</span
+                    >`,
+                )}
+              </div>`
+            : ""
+        }
         <div class="fields" data-testid=${`${this.testIdPrefix}-fields`}>
           ${s.fields.map((f) => this._renderField(f, 0))}
         </div>
-        ${s.spreads.length > 0
-          ? s.spreads.map(
-              (sp) => html`<div class="spread-indicator"><span class="spread-icon">&#8230;</span> spreads ${sp}</div>`
-            )
-          : ""}
+        ${
+          s.spreads.length > 0
+            ? s.spreads.map(
+                (sp) =>
+                  html`<div class="spread-indicator">
+                    <span class="spread-icon">&#8230;</span> spreads ${sp}
+                  </div>`,
+              )
+            : ""
+        }
         ${hasNotes ? this._renderNotes(s.notes) : ""}
       </div>
     `;
@@ -641,9 +668,13 @@ export class SzSchemaCard extends LitElement {
           <span class="arrow" ?data-expanded=${this._notesExpanded}>&#9654;</span>
           <span>&#128221; ${notes.length === 1 ? "Note" : `${notes.length} Notes`}</span>
         </div>
-        ${this._notesExpanded
-          ? notes.map((n) => html`<div class="note-content">${unsafeHTML(renderMarkdown(n.text))}</div>`)
-          : ""}
+        ${
+          this._notesExpanded
+            ? notes.map(
+                (n) => html`<div class="note-content">${unsafeHTML(renderMarkdown(n.text))}</div>`,
+              )
+            : ""
+        }
       </div>
     `;
   }
@@ -685,36 +716,66 @@ export class SzSchemaCard extends LitElement {
         <span class="badges">
           ${f.constraints
             .filter((c) => c !== "pii")
-            .map(
-              (c) => html`<span class="badge">${c}</span>`
-            )}
+            .map((c) => html`<span class="badge">${c}</span>`)}
           ${hasPii ? html`<span class="badge pii" title="PII">&#128737; pii</span>` : ""}
           ${this._fieldMetaPills(f).map(
-            (m) => html`<span class="badge field-meta" title=${`${m.key} ${m.value}`.trim()}><span class="badge-key">${m.key}</span>${m.value ? ` ${m.value}` : ""}</span>`
+            (m) =>
+              html`<span class="badge field-meta" title=${`${m.key} ${m.value}`.trim()}
+                ><span class="badge-key">${m.key}</span>${m.value ? ` ${m.value}` : ""}</span
+              >`,
           )}
         </span>
-        ${hasWarning
-          ? html`<span class="comment-badge warning" title=${this._commentText(f, "warning")}>&#9888;</span>`
-          : ""}
-        ${hasQuestion
-          ? html`<span class="comment-badge question" title=${this._commentText(f, "question")}>?</span>`
-          : ""}
+        ${
+          hasWarning
+            ? html`<span class="comment-badge warning" title=${this._commentText(f, "warning")}
+                >&#9888;</span
+              >`
+            : ""
+        }
+        ${
+          hasQuestion
+            ? html`<span class="comment-badge question" title=${this._commentText(f, "question")}
+                >?</span
+              >`
+            : ""
+        }
         <button
           class="lineage-btn"
           data-testid=${`${fieldTestId}-lineage`}
           title="Show field lineage"
-          @click=${(e: Event) => { e.stopPropagation(); this._onFieldLineage(fieldPath); }}
-        ><svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <circle cx="2" cy="6" r="1.5" fill="currentColor"/>
-          <circle cx="10" cy="3" r="1.5" fill="currentColor"/>
-          <circle cx="10" cy="9" r="1.5" fill="currentColor"/>
-          <line x1="3.5" y1="5.3" x2="8.5" y2="3.7" stroke="currentColor" stroke-width="1.2"/>
-          <line x1="3.5" y1="6.7" x2="8.5" y2="8.3" stroke="currentColor" stroke-width="1.2"/>
-        </svg></button>
+          @click=${(e: Event) => {
+            e.stopPropagation();
+            this._onFieldLineage(fieldPath);
+          }}
+        >
+          <svg
+            width="12"
+            height="12"
+            viewBox="0 0 12 12"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <circle cx="2" cy="6" r="1.5" fill="currentColor" />
+            <circle cx="10" cy="3" r="1.5" fill="currentColor" />
+            <circle cx="10" cy="9" r="1.5" fill="currentColor" />
+            <line x1="3.5" y1="5.3" x2="8.5" y2="3.7" stroke="currentColor" stroke-width="1.2" />
+            <line x1="3.5" y1="6.7" x2="8.5" y2="8.3" stroke="currentColor" stroke-width="1.2" />
+          </svg>
+        </button>
       </div>
-      ${f.notes.length > 0
-        ? f.notes.map((n) => html`<div class="field-note" style=${depth > 0 ? `padding-left: ${38 + depth * 20}px` : ""}>${n.text}</div>`)
-        : ""}
+      ${
+        f.notes.length > 0
+          ? f.notes.map(
+              (n) =>
+                html`<div
+                  class="field-note"
+                  style=${depth > 0 ? `padding-left: ${38 + depth * 20}px` : ""}
+                >
+                  ${n.text}
+                </div>`,
+            )
+          : ""
+      }
       ${f.children.map((child) => this._renderField(child, depth + 1, fieldPath))}
     `;
   }
@@ -776,21 +837,31 @@ export class SzSchemaCard extends LitElement {
         <div class="header ${isReport ? "report" : ""}" @click=${this._onHeaderClick}>
           ${this._headerIcon(isReport)}
           <span class="header-name">${displayName}</span>
-          <span class="header-toggle" ?data-collapsed=${!this.compactExpanded} @click=${this._onToggleClick}>&#9660;</span>
+          <span
+            class="header-toggle"
+            ?data-collapsed=${!this.compactExpanded}
+            @click=${this._onToggleClick}
+            >&#9660;</span
+          >
           <span class="header-count">${totalFields} fields</span>
         </div>
-        ${metaPills.length > 0
-          ? html`<div class="metadata-pills">
-              ${metaPills.map(
-                (m) => html`<span class="meta-pill" title=${`${m.key} ${m.value}`}><span class="meta-key">${m.key}</span> ${m.value}</span>`
-              )}
-            </div>`
-          : ""}
-        ${this.compactExpanded
-          ? html`<div class="fields">
-              ${s.fields.map((f) => this._renderField(f, 0))}
-            </div>`
-          : ""}
+        ${
+          metaPills.length > 0
+            ? html`<div class="metadata-pills">
+                ${metaPills.map(
+                  (m) =>
+                    html`<span class="meta-pill" title=${`${m.key} ${m.value}`}
+                      ><span class="meta-key">${m.key}</span> ${m.value}</span
+                    >`,
+                )}
+              </div>`
+            : ""
+        }
+        ${
+          this.compactExpanded
+            ? html`<div class="fields">${s.fields.map((f) => this._renderField(f, 0))}</div>`
+            : ""
+        }
       </div>
     `;
   }

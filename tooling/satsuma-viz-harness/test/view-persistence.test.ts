@@ -61,23 +61,19 @@ async function openWithBuffer(page: Page, text: string): Promise<void> {
   );
   await page.locator("#source-input").fill(text);
   // The one-mapping overview card proves the buffer replaced the fixture model.
-  await expect(
-    page.locator("[data-testid='overview-mapping-card-orders-load']"),
-  ).toBeVisible({ timeout: 10_000 });
+  await expect(page.locator("[data-testid='overview-mapping-card-orders-load']")).toBeVisible({
+    timeout: 10_000,
+  });
 }
 
 test.describe("Detail view persistence across live edits", () => {
-  test("an edit that keeps the mapping re-renders the detail view in place", async ({
-    page,
-  }) => {
+  test("an edit that keeps the mapping re-renders the detail view in place", async ({ page }) => {
     await openWithBuffer(page, doc("orders_load"));
 
     // dispatchEvent rather than a pointer click: the tiny two-schema graph
     // sits partly under the minimap overlay, which intercepts real pointer
     // events. Opening the mapping is the precondition here, not the subject.
-    await page
-      .locator("[data-testid='overview-mapping-card-orders-load']")
-      .dispatchEvent("click");
+    await page.locator("[data-testid='overview-mapping-card-orders-load']").dispatchEvent("click");
     const detail = page.locator("[data-testid='mapping-detail-orders-load']").first();
     await expect(detail).toBeVisible({ timeout: 10_000 });
 
@@ -99,20 +95,18 @@ test.describe("Detail view persistence across live edits", () => {
     await openWithBuffer(page, doc("orders_load"));
 
     // See above: dispatchEvent avoids minimap pointer interception.
-    await page
-      .locator("[data-testid='overview-mapping-card-orders-load']")
-      .dispatchEvent("click");
-    await expect(
-      page.locator("[data-testid='mapping-detail-orders-load']").first(),
-    ).toBeVisible({ timeout: 10_000 });
+    await page.locator("[data-testid='overview-mapping-card-orders-load']").dispatchEvent("click");
+    await expect(page.locator("[data-testid='mapping-detail-orders-load']").first()).toBeVisible({
+      timeout: 10_000,
+    });
 
     // Renaming the mapping deletes the selected one; the only sensible place
     // for the user is back at the overview, now showing the renamed mapping.
     await page.locator("#source-input").fill(doc("orders_load_v2"));
 
-    await expect(
-      page.locator("[data-testid='overview-mapping-card-orders-load-v2']"),
-    ).toBeVisible({ timeout: 10_000 });
+    await expect(page.locator("[data-testid='overview-mapping-card-orders-load-v2']")).toBeVisible({
+      timeout: 10_000,
+    });
     await expect(page.locator("[data-testid^='mapping-detail-']")).toHaveCount(0);
     await expect(page.locator("[data-testid='viz-root']")).toHaveAttribute(
       "data-view-mode",

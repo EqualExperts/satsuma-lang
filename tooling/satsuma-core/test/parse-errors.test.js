@@ -69,7 +69,7 @@ describe("collectParseErrors", () => {
   it("positions are 0-indexed (matching tree-sitter native format)", () => {
     // The CLI converts to 1-indexed by adding 1; the LSP uses 0-indexed directly.
     // This test pins the native format so consumers know the contract.
-    const tree = parse("%%% bad tokens");  // error at start of file
+    const tree = parse("%%% bad tokens"); // error at start of file
     const errors = collectParseErrors(tree);
     assert.ok(errors.length > 0);
     // Source starts at line 0, column 0

@@ -5,9 +5,9 @@ import { SzNavigateEvent } from "../satsuma-viz.js";
 import { HEADER_HEIGHT, NAMESPACE_PILL_HEIGHT } from "../layout/geometry.js";
 
 const MEASURE_ICONS: Record<string, string> = {
-  additive: "\u03A3",        // Σ
-  non_additive: "\u2248",    // ≈
-  semi_additive: "\u00BD",   // ½
+  additive: "\u03A3", // Σ
+  non_additive: "\u2248", // ≈
+  semi_additive: "\u00BD", // ½
 };
 
 @customElement("sz-metric-card")
@@ -200,9 +200,14 @@ export class SzMetricCard extends LitElement {
     // edge anchors missed the header — sl-wixe.) The row is pinned to the
     // shared NAMESPACE_PILL_HEIGHT the layout reserves for it.
     if (!this.namespaceLabel) return html``;
-    return html`<div style="height:${NAMESPACE_PILL_HEIGHT}px;box-sizing:border-box;display:flex;align-items:end;padding:0 12px;background:var(--sz-violet);">
-        <span style="display:inline-block;font-size:10px;font-weight:700;padding:1px 8px;border-radius:999px;background:var(--sz-namespace-pill-chip-bg);color:var(--sz-orange-dark);">${this.namespaceLabel}</span>
-      </div>`;
+    return html`<div
+      style="height:${NAMESPACE_PILL_HEIGHT}px;box-sizing:border-box;display:flex;align-items:end;padding:0 12px;background:var(--sz-violet);"
+    >
+      <span
+        style="display:inline-block;font-size:10px;font-weight:700;padding:1px 8px;border-radius:999px;background:var(--sz-namespace-pill-chip-bg);color:var(--sz-orange-dark);"
+        >${this.namespaceLabel}</span
+      >
+    </div>`;
   }
 
   override render() {
@@ -231,22 +236,31 @@ export class SzMetricCard extends LitElement {
         <div class="header" @click=${this._onHeaderClick}>
           <span class="header-icon">&#9670;</span>
           <span class="header-name">${m.id}</span>
-          <span class="header-toggle" ?data-collapsed=${this._collapsed} @click=${this._onToggleClick}>&#9660;</span>
+          <span
+            class="header-toggle"
+            ?data-collapsed=${this._collapsed}
+            @click=${this._onToggleClick}
+            >&#9660;</span
+          >
         </div>
-        ${hasMeta
-          ? html`
-              <div class="meta">
-                ${m.label ? html`<div class="meta-row">"${m.label}"${m.grain ? html` &middot; grain: ${m.grain}` : ""}</div>` : ""}
-                ${!m.label && m.grain ? html`<div class="meta-row"><span class="meta-label">grain:</span> ${m.grain}</div>` : ""}
-                ${m.slices.length > 0
-                  ? html`<div class="meta-row"><span class="meta-label">slice:</span> ${m.slices.join(", ")}</div>`
-                  : ""}
-              </div>
-            `
-          : ""}
-        <div class="fields">
-          ${m.fields.map((f) => this._renderField(f))}
-        </div>
+        ${
+          hasMeta
+            ? html`
+                <div class="meta">
+                  ${m.label ? html`<div class="meta-row">"${m.label}"${m.grain ? html` &middot; grain: ${m.grain}` : ""}</div>` : ""}
+                  ${!m.label && m.grain ? html`<div class="meta-row"><span class="meta-label">grain:</span> ${m.grain}</div>` : ""}
+                  ${
+                    m.slices.length > 0
+                      ? html`<div class="meta-row">
+                          <span class="meta-label">slice:</span> ${m.slices.join(", ")}
+                        </div>`
+                      : ""
+                  }
+                </div>
+              `
+            : ""
+        }
+        <div class="fields">${m.fields.map((f) => this._renderField(f))}</div>
         ${hasNotes ? this._renderNotes(m.notes) : ""}
       </div>
     `;
@@ -259,9 +273,11 @@ export class SzMetricCard extends LitElement {
           <span class="arrow" ?data-expanded=${this._notesExpanded}>&#9654;</span>
           <span>&#128221; ${notes.length === 1 ? "Note" : `${notes.length} Notes`}</span>
         </div>
-        ${this._notesExpanded
-          ? notes.map((n) => html`<div class="note-content">${n.text}</div>`)
-          : ""}
+        ${
+          this._notesExpanded
+            ? notes.map((n) => html`<div class="note-content">${n.text}</div>`)
+            : ""
+        }
       </div>
     `;
   }
@@ -272,7 +288,7 @@ export class SzMetricCard extends LitElement {
   }
 
   private _renderField(f: MetricFieldEntry) {
-    const icon = f.measure ? MEASURE_ICONS[f.measure] ?? "" : "";
+    const icon = f.measure ? (MEASURE_ICONS[f.measure] ?? "") : "";
     return html`
       <div class="field-row" @click=${() => this._navigate(f.location)}>
         <span class="measure-icon">${icon}</span>

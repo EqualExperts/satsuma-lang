@@ -116,11 +116,11 @@ test.describe("Overview view — sfdc-to-snowflake fixture", () => {
     await page.goto("/");
     // Lineage mode is active by default; load the single-file fixture first
     await page.waitForFunction(() => {
-    const harness = window.__satsumaHarness;
-    if (!harness?.setViewMode) return false; // app.js not evaluated yet
-    harness.setViewMode("single");
-    return true;
-  });
+      const harness = window.__satsumaHarness;
+      if (!harness?.setViewMode) return false; // app.js not evaluated yet
+      harness.setViewMode("single");
+      return true;
+    });
     await loadFixture(page, sfdcUri);
   });
 
@@ -145,11 +145,11 @@ test.describe("Detail view — clicking a mapping", () => {
   test.beforeEach(async ({ page }) => {
     await page.goto("/");
     await page.waitForFunction(() => {
-    const harness = window.__satsumaHarness;
-    if (!harness?.setViewMode) return false; // app.js not evaluated yet
-    harness.setViewMode("single");
-    return true;
-  });
+      const harness = window.__satsumaHarness;
+      if (!harness?.setViewMode) return false; // app.js not evaluated yet
+      harness.setViewMode("single");
+      return true;
+    });
     await loadFixture(page, sfdcUri);
   });
 
@@ -171,11 +171,11 @@ test.describe("Hover and highlight interaction", () => {
   test.beforeEach(async ({ page }) => {
     await page.goto("/");
     await page.waitForFunction(() => {
-    const harness = window.__satsumaHarness;
-    if (!harness?.setViewMode) return false; // app.js not evaluated yet
-    harness.setViewMode("single");
-    return true;
-  });
+      const harness = window.__satsumaHarness;
+      if (!harness?.setViewMode) return false; // app.js not evaluated yet
+      harness.setViewMode("single");
+      return true;
+    });
     await loadFixture(page, sfdcUri);
   });
 
@@ -196,11 +196,13 @@ test.describe("Hover and highlight interaction", () => {
       .first()
       .hover();
 
-    await expect.poll(async () => recordedEvents(page, "field-hover")).toContainEqual(
-      expect.objectContaining({
-        detail: { schemaId: "sfdc_opportunity", fieldName: "Id" },
-      }),
-    );
+    await expect
+      .poll(async () => recordedEvents(page, "field-hover"))
+      .toContainEqual(
+        expect.objectContaining({
+          detail: { schemaId: "sfdc_opportunity", fieldName: "Id" },
+        }),
+      );
   });
 });
 
@@ -235,11 +237,11 @@ test.describe("Cross-file lineage expansion", () => {
     // an expand-lineage control exists in the UI.
     await page.goto("/");
     await page.waitForFunction(() => {
-    const harness = window.__satsumaHarness;
-    if (!harness?.setViewMode) return false; // app.js not evaluated yet
-    harness.setViewMode("single");
-    return true;
-  });
+      const harness = window.__satsumaHarness;
+      if (!harness?.setViewMode) return false; // app.js not evaluated yet
+      harness.setViewMode("single");
+      return true;
+    });
     await loadFixture(page, metricsUri);
 
     await page.evaluate(() => window.__satsumaHarness.clearEvents());
@@ -253,9 +255,9 @@ test.describe("Cross-file lineage expansion", () => {
       }
     });
 
-    await expect.poll(async () => recordedEvents(page, "expand-lineage")).toContainEqual(
-      expect.objectContaining({ detail: { schemaId: "test::schema" } }),
-    );
+    await expect
+      .poll(async () => recordedEvents(page, "expand-lineage"))
+      .toContainEqual(expect.objectContaining({ detail: { schemaId: "test::schema" } }));
   });
 });
 
@@ -263,32 +265,32 @@ test.describe("Navigation intent", () => {
   test.beforeEach(async ({ page }) => {
     await page.goto("/");
     await page.waitForFunction(() => {
-    const harness = window.__satsumaHarness;
-    if (!harness?.setViewMode) return false; // app.js not evaluated yet
-    harness.setViewMode("single");
-    return true;
-  });
+      const harness = window.__satsumaHarness;
+      if (!harness?.setViewMode) return false; // app.js not evaluated yet
+      harness.setViewMode("single");
+      return true;
+    });
     await loadFixture(page, sfdcUri);
   });
 
-  test("navigate events from the viz are captured in the harness event log", async ({
-    page,
-  }) => {
+  test("navigate events from the viz are captured in the harness event log", async ({ page }) => {
     // A real overview schema-header click dispatches SzNavigateEvent with a
     // SourceLocation property; the harness must normalize it to stable JSON.
     await page.evaluate(() => window.__satsumaHarness.clearEvents());
 
     await page.locator("[data-testid='overview-schema-card-sfdc-opportunity']").click();
 
-    await expect.poll(async () => recordedEvents(page, "navigate")).toContainEqual(
-      expect.objectContaining({
-        detail: expect.objectContaining({
-          uri: expect.stringContaining("sfdc-to-snowflake/pipeline.stm"),
-          line: expect.any(Number),
-          character: expect.any(Number),
+    await expect
+      .poll(async () => recordedEvents(page, "navigate"))
+      .toContainEqual(
+        expect.objectContaining({
+          detail: expect.objectContaining({
+            uri: expect.stringContaining("sfdc-to-snowflake/pipeline.stm"),
+            line: expect.any(Number),
+            character: expect.any(Number),
+          }),
         }),
-      }),
-    );
+      );
   });
 
   test("field-lineage events from the viz are captured in the harness event log", async ({
@@ -307,16 +309,16 @@ test.describe("Navigation intent", () => {
     await fieldRow.hover();
     await fieldRow.locator("[data-testid$='-field-id-lineage']").click();
 
-    await expect.poll(async () => recordedEvents(page, "field-lineage")).toContainEqual(
-      expect.objectContaining({
-        detail: { schemaId: "sfdc_opportunity", fieldName: "Id" },
-      }),
-    );
+    await expect
+      .poll(async () => recordedEvents(page, "field-lineage"))
+      .toContainEqual(
+        expect.objectContaining({
+          detail: { schemaId: "sfdc_opportunity", fieldName: "Id" },
+        }),
+      );
   });
 
-  test("clicking an arrow row in the mapping detail records a navigate event", async ({
-    page,
-  }) => {
+  test("clicking an arrow row in the mapping detail records a navigate event", async ({ page }) => {
     // Each arrow row in the mapping detail table is wired to _navigate(arrow.location)
     // (sz-mapping-detail.ts:645). A real click must therefore round-trip through
     // SzNavigateEvent and surface as a `navigate` event in the harness recorder
@@ -331,15 +333,17 @@ test.describe("Navigation intent", () => {
       .first()
       .click();
 
-    await expect.poll(async () => recordedEvents(page, "navigate")).toContainEqual(
-      expect.objectContaining({
-        detail: expect.objectContaining({
-          uri: expect.stringContaining("sfdc-to-snowflake/pipeline.stm"),
-          line: expect.any(Number),
-          character: expect.any(Number),
+    await expect
+      .poll(async () => recordedEvents(page, "navigate"))
+      .toContainEqual(
+        expect.objectContaining({
+          detail: expect.objectContaining({
+            uri: expect.stringContaining("sfdc-to-snowflake/pipeline.stm"),
+            line: expect.any(Number),
+            character: expect.any(Number),
+          }),
         }),
-      }),
-    );
+      );
   });
 
   test("export events from the viz are captured in the harness event log", async ({ page }) => {
@@ -349,14 +353,16 @@ test.describe("Navigation intent", () => {
 
     await page.locator("[data-testid='toolbar-export']").click();
 
-    await expect.poll(async () => recordedEvents(page, "export")).toContainEqual(
-      expect.objectContaining({
-        detail: expect.objectContaining({
-          format: "svg",
-          content: expect.stringContaining("<svg"),
+    await expect
+      .poll(async () => recordedEvents(page, "export"))
+      .toContainEqual(
+        expect.objectContaining({
+          detail: expect.objectContaining({
+            format: "svg",
+            content: expect.stringContaining("<svg"),
+          }),
         }),
-      }),
-    );
+      );
   });
 });
 
@@ -379,11 +385,11 @@ test.describe("Overview view — sfdc-to-snowflake single-file mode", () => {
     // namespaced fixture against.
     await page.goto("/");
     await page.waitForFunction(() => {
-    const harness = window.__satsumaHarness;
-    if (!harness?.setViewMode) return false; // app.js not evaluated yet
-    harness.setViewMode("single");
-    return true;
-  });
+      const harness = window.__satsumaHarness;
+      if (!harness?.setViewMode) return false; // app.js not evaluated yet
+      harness.setViewMode("single");
+      return true;
+    });
     await loadFixture(page, sfdcUri);
 
     const schemaCards = page.locator("[data-testid^='overview-schema-card-']");
@@ -391,13 +397,9 @@ test.describe("Overview view — sfdc-to-snowflake single-file mode", () => {
 
     // None of the sfdc schemas live inside a namespace, so the namespace pill
     // hook (sl-3c2w) must not appear anywhere in the overview.
-    await expect(
-      page.locator("[data-testid$='-namespace-pill']"),
-    ).toHaveCount(0);
+    await expect(page.locator("[data-testid$='-namespace-pill']")).toHaveCount(0);
 
-    await expect(
-      page.locator("[data-testid^='overview-mapping-card-']"),
-    ).toHaveCount(1);
+    await expect(page.locator("[data-testid^='overview-mapping-card-']")).toHaveCount(1);
   });
 });
 
@@ -439,9 +441,7 @@ test.describe("Overview view — namespaces/ns-platform lineage mode", () => {
     // mapping becomes a test id starting with `overview-mapping-node-mapping-vault-`.
     // The vault layer is the densest mapping zone in this fixture.
     await expect(
-      page
-        .locator("[data-testid^='overview-mapping-node-mapping-vault-']")
-        .first(),
+      page.locator("[data-testid^='overview-mapping-node-mapping-vault-']").first(),
     ).toBeVisible();
   });
 });
@@ -461,14 +461,8 @@ test.describe("Overview view — metrics-platform lineage mode", () => {
     // look for the metric-card test id.  sanitizeTestIdSegment turns
     // underscores into dashes, so `monthly_recurring_revenue` →
     // `monthly-recurring-revenue`.
-    for (const metric of [
-      "monthly-recurring-revenue",
-      "churn-rate",
-      "customer-lifetime-value",
-    ]) {
-      await expect(
-        page.locator(`[data-testid='overview-metric-card-${metric}']`),
-      ).toBeVisible();
+    for (const metric of ["monthly-recurring-revenue", "churn-rate", "customer-lifetime-value"]) {
+      await expect(page.locator(`[data-testid='overview-metric-card-${metric}']`)).toBeVisible();
     }
 
     // Imported source from metric_sources.stm — proves the lineage merge
@@ -488,11 +482,11 @@ test.describe("Overview view — reports-and-models", () => {
     // report/model targets the same way they navigate to ordinary schemas.
     await page.goto("/");
     await page.waitForFunction(() => {
-    const harness = window.__satsumaHarness;
-    if (!harness?.setViewMode) return false; // app.js not evaluated yet
-    harness.setViewMode("single");
-    return true;
-  });
+      const harness = window.__satsumaHarness;
+      if (!harness?.setViewMode) return false; // app.js not evaluated yet
+      harness.setViewMode("single");
+      return true;
+    });
     await loadFixture(page, reportsUri);
 
     // sanitizeTestIdSegment lowercases and turns each underscore into `-`.
@@ -504,9 +498,7 @@ test.describe("Overview view — reports-and-models", () => {
       "customer-risk-report",
       "daily-order-summary",
     ]) {
-      await expect(
-        page.locator(`[data-testid='overview-schema-card-${id}']`),
-      ).toBeVisible();
+      await expect(page.locator(`[data-testid='overview-schema-card-${id}']`)).toBeVisible();
     }
   });
 });
@@ -520,11 +512,11 @@ test.describe("Overview view — sap-po-to-mfcs layout stability", () => {
     // ready" regression where layout completes but emits no cards.
     await page.goto("/");
     await page.waitForFunction(() => {
-    const harness = window.__satsumaHarness;
-    if (!harness?.setViewMode) return false; // app.js not evaluated yet
-    harness.setViewMode("single");
-    return true;
-  });
+      const harness = window.__satsumaHarness;
+      if (!harness?.setViewMode) return false; // app.js not evaluated yet
+      harness.setViewMode("single");
+      return true;
+    });
     await loadFixture(page, sapUri);
 
     const vizRoot = page.locator("[data-testid='viz-root']");
@@ -567,11 +559,11 @@ test.describe("Mapping detail — sfdc opportunity ingestion", () => {
     // view must render its core elements correctly.
     await page.goto("/");
     await page.waitForFunction(() => {
-    const harness = window.__satsumaHarness;
-    if (!harness?.setViewMode) return false; // app.js not evaluated yet
-    harness.setViewMode("single");
-    return true;
-  });
+      const harness = window.__satsumaHarness;
+      if (!harness?.setViewMode) return false; // app.js not evaluated yet
+      harness.setViewMode("single");
+      return true;
+    });
     await loadFixture(page, sfdcUri);
     const detail = await openMappingByName(page, "opportunity-ingestion");
 
@@ -666,11 +658,11 @@ test.describe("Mapping detail — completed orders (multi-source join)", () => {
     // correctly.
     await page.goto("/");
     await page.waitForFunction(() => {
-    const harness = window.__satsumaHarness;
-    if (!harness?.setViewMode) return false; // app.js not evaluated yet
-    harness.setViewMode("single");
-    return true;
-  });
+      const harness = window.__satsumaHarness;
+      if (!harness?.setViewMode) return false; // app.js not evaluated yet
+      harness.setViewMode("single");
+      return true;
+    });
     await loadFixture(page, ffgUri);
     const detail = await openMappingByName(page, "completed-orders");
 
@@ -721,11 +713,11 @@ test.describe("Mapping detail — order line facts (flatten)", () => {
     // marker, readers cannot tell flatten arrows from top-level arrows.
     await page.goto("/");
     await page.waitForFunction(() => {
-    const harness = window.__satsumaHarness;
-    if (!harness?.setViewMode) return false; // app.js not evaluated yet
-    harness.setViewMode("single");
-    return true;
-  });
+      const harness = window.__satsumaHarness;
+      if (!harness?.setViewMode) return false; // app.js not evaluated yet
+      harness.setViewMode("single");
+      return true;
+    });
     await loadFixture(page, ffgUri);
     const detail = await openMappingByName(page, "order-line-facts");
 
@@ -733,9 +725,7 @@ test.describe("Mapping detail — order line facts (flatten)", () => {
     //   {prefix}-{sectionPrefix}
     // where sectionPrefix = `flatten-{sourceField}` sanitized.
     await expect(
-      detail.locator(
-        "[data-testid='mapping-detail-order-line-facts-flatten-line-items']",
-      ),
+      detail.locator("[data-testid='mapping-detail-order-line-facts-flatten-line-items']"),
     ).toBeVisible();
 
     // Per-element arrow rows nested inside the flatten section have test ids
@@ -770,11 +760,11 @@ test.describe("Field coverage indicators", () => {
     // makes coverage circles meaningful in the UI.
     await page.goto("/");
     await page.waitForFunction(() => {
-    const harness = window.__satsumaHarness;
-    if (!harness?.setViewMode) return false; // app.js not evaluated yet
-    harness.setViewMode("single");
-    return true;
-  });
+      const harness = window.__satsumaHarness;
+      if (!harness?.setViewMode) return false; // app.js not evaluated yet
+      harness.setViewMode("single");
+      return true;
+    });
     await loadFixture(page, sfdcUri);
     const detail = await openMappingByName(page, "opportunity-ingestion");
 
@@ -802,20 +792,21 @@ test.describe("Field coverage indicators", () => {
     // collide with any other top-level sku in the same schema.
     await page.goto("/");
     await page.waitForFunction(() => {
-    const harness = window.__satsumaHarness;
-    if (!harness?.setViewMode) return false; // app.js not evaluated yet
-    harness.setViewMode("single");
-    return true;
-  });
+      const harness = window.__satsumaHarness;
+      if (!harness?.setViewMode) return false; // app.js not evaluated yet
+      harness.setViewMode("single");
+      return true;
+    });
     await loadFixture(page, ffgUri);
     const detail = await openMappingByName(page, "order-line-facts");
 
     const targetCardPrefix =
       "mapping-detail-order-line-facts-target-schema-card-order-line-facts-parquet";
 
-    await expect(
-      detail.locator(`[data-testid='${targetCardPrefix}-field-sku']`),
-    ).toHaveAttribute("data-coverage", "mapped");
+    await expect(detail.locator(`[data-testid='${targetCardPrefix}-field-sku']`)).toHaveAttribute(
+      "data-coverage",
+      "mapped",
+    );
     await expect(
       detail.locator(`[data-testid='${targetCardPrefix}-field-line-number']`),
     ).toHaveAttribute("data-coverage", "mapped");
@@ -832,11 +823,11 @@ test.describe("Hover highlighting between arrows and field rows", () => {
     // reader sees which fields participate in this arrow.
     await page.goto("/");
     await page.waitForFunction(() => {
-    const harness = window.__satsumaHarness;
-    if (!harness?.setViewMode) return false; // app.js not evaluated yet
-    harness.setViewMode("single");
-    return true;
-  });
+      const harness = window.__satsumaHarness;
+      if (!harness?.setViewMode) return false; // app.js not evaluated yet
+      harness.setViewMode("single");
+      return true;
+    });
     await loadFixture(page, sfdcUri);
     const detail = await openMappingByName(page, "opportunity-ingestion");
 
@@ -862,11 +853,11 @@ test.describe("Hover highlighting between arrows and field rows", () => {
     // bidirectional and not arrow-row-only.
     await page.goto("/");
     await page.waitForFunction(() => {
-    const harness = window.__satsumaHarness;
-    if (!harness?.setViewMode) return false; // app.js not evaluated yet
-    harness.setViewMode("single");
-    return true;
-  });
+      const harness = window.__satsumaHarness;
+      if (!harness?.setViewMode) return false; // app.js not evaluated yet
+      harness.setViewMode("single");
+      return true;
+    });
     await loadFixture(page, sfdcUri);
     const detail = await openMappingByName(page, "opportunity-ingestion");
 
@@ -910,38 +901,26 @@ test.describe("Toolbar namespace filter — ns-platform", () => {
     await loadFixture(page, nsPlatformUri);
 
     // Baseline: all namespaces show their cards.
-    await expect(
-      page.locator("[data-testid^='overview-schema-card-raw-']").first(),
-    ).toBeVisible();
-    await expect(
-      page.locator("[data-testid^='overview-schema-card-mart-']").first(),
-    ).toBeVisible();
+    await expect(page.locator("[data-testid^='overview-schema-card-raw-']").first()).toBeVisible();
+    await expect(page.locator("[data-testid^='overview-schema-card-mart-']").first()).toBeVisible();
 
     // Select `mart` only.
     await page.locator("[data-testid='toolbar-namespace-filter']").selectOption("mart");
     await waitForViewReady(page);
 
     // mart cards remain; raw cards must be gone.
-    await expect(
-      page.locator("[data-testid^='overview-schema-card-mart-']").first(),
-    ).toBeVisible();
-    expect(
-      await page.locator("[data-testid^='overview-schema-card-raw-']").count(),
-    ).toBe(0);
+    await expect(page.locator("[data-testid^='overview-schema-card-mart-']").first()).toBeVisible();
+    expect(await page.locator("[data-testid^='overview-schema-card-raw-']").count()).toBe(0);
 
     // Reset to all namespaces.
     await page.locator("[data-testid='toolbar-namespace-filter']").selectOption("");
     await waitForViewReady(page);
-    await expect(
-      page.locator("[data-testid^='overview-schema-card-raw-']").first(),
-    ).toBeVisible();
+    await expect(page.locator("[data-testid^='overview-schema-card-raw-']").first()).toBeVisible();
   });
 });
 
 test.describe("Toolbar file filter — metrics-platform lineage mode", () => {
-  test("selecting a source file restricts cards to that file's declarations", async ({
-    page,
-  }) => {
+  test("selecting a source file restricts cards to that file's declarations", async ({ page }) => {
     // metrics.stm imports from metric_sources.stm, so lineage mode shows
     // cards declared across both files.  Filtering to metrics.stm only must
     // drop the imported source cards (e.g. fact_subscriptions).  Filtering
@@ -965,7 +944,9 @@ test.describe("Toolbar file filter — metrics-platform lineage mode", () => {
       .evaluateAll((opts) =>
         (opts as HTMLOptionElement[]).map((o) => ({ value: o.value, label: o.textContent })),
       );
-    const metricsOption = options.find((o) => o.label?.includes("metrics.stm") && !o.label.includes("metric_sources"));
+    const metricsOption = options.find(
+      (o) => o.label?.includes("metrics.stm") && !o.label.includes("metric_sources"),
+    );
     const sourcesOption = options.find((o) => o.label?.includes("metric_sources.stm"));
     if (!metricsOption || !sourcesOption) {
       throw new Error(`expected both file filter options; got ${JSON.stringify(options)}`);
@@ -1027,20 +1008,18 @@ async function readOverviewCardBoxes(page: Page): Promise<CardBox[]> {
     .locator("[data-testid^='overview-schema-card-']")
     .first()
     .waitFor({ state: "attached", timeout: 10_000 });
-  const boxes = await page
-    .locator("[data-testid^='overview-schema-card-']")
-    .evaluateAll((els) =>
-      (els as HTMLElement[]).map((el) => {
-        const r = el.getBoundingClientRect();
-        return {
-          testId: el.getAttribute("data-testid") ?? "",
-          x: r.x,
-          y: r.y,
-          width: r.width,
-          height: r.height,
-        };
-      }),
-    );
+  const boxes = await page.locator("[data-testid^='overview-schema-card-']").evaluateAll((els) =>
+    (els as HTMLElement[]).map((el) => {
+      const r = el.getBoundingClientRect();
+      return {
+        testId: el.getAttribute("data-testid") ?? "",
+        x: r.x,
+        y: r.y,
+        width: r.width,
+        height: r.height,
+      };
+    }),
+  );
   return boxes.sort((a, b) => a.testId.localeCompare(b.testId));
 }
 
@@ -1069,10 +1048,8 @@ function assertBoxesDoNotOverlap(boxes: CardBox[], tolerance = 1): void {
       // Indices are loop-bounded, so this never skips; the guard only
       // narrows the noUncheckedIndexedAccess types without an assertion.
       if (!a || !b) continue;
-      const overlapX =
-        Math.min(a.x + a.width, b.x + b.width) - Math.max(a.x, b.x);
-      const overlapY =
-        Math.min(a.y + a.height, b.y + b.height) - Math.max(a.y, b.y);
+      const overlapX = Math.min(a.x + a.width, b.x + b.width) - Math.max(a.x, b.x);
+      const overlapY = Math.min(a.y + a.height, b.y + b.height) - Math.max(a.y, b.y);
       const overlapping = overlapX > tolerance && overlapY > tolerance;
       expect(
         overlapping,
@@ -1089,11 +1066,11 @@ test.describe("Geometry sanity — overview layout invariants", () => {
     // regression in the non-namespaced card-height path.
     await page.goto("/");
     await page.waitForFunction(() => {
-    const harness = window.__satsumaHarness;
-    if (!harness?.setViewMode) return false; // app.js not evaluated yet
-    harness.setViewMode("single");
-    return true;
-  });
+      const harness = window.__satsumaHarness;
+      if (!harness?.setViewMode) return false; // app.js not evaluated yet
+      harness.setViewMode("single");
+      return true;
+    });
     await loadFixture(page, sfdcUri);
     const boxes = await readOverviewCardBoxes(page);
     assertBoxesAreSane(boxes);
@@ -1121,20 +1098,18 @@ test.describe("Geometry sanity — overview layout invariants", () => {
     // every pill is contained within at least one card's box — proves the
     // pill height is included in the card-height calculation rather than
     // being clipped or rendered outside its host card.
-    const pillBoxes = await page
-      .locator("[data-testid$='-namespace-pill']")
-      .evaluateAll((els) =>
-        (els as HTMLElement[]).map((el) => {
-          const r = el.getBoundingClientRect();
-          return {
-            testId: el.getAttribute("data-testid") ?? "",
-            x: r.x,
-            y: r.y,
-            w: r.width,
-            h: r.height,
-          };
-        }),
-      );
+    const pillBoxes = await page.locator("[data-testid$='-namespace-pill']").evaluateAll((els) =>
+      (els as HTMLElement[]).map((el) => {
+        const r = el.getBoundingClientRect();
+        return {
+          testId: el.getAttribute("data-testid") ?? "",
+          x: r.x,
+          y: r.y,
+          w: r.width,
+          h: r.height,
+        };
+      }),
+    );
     expect(pillBoxes.length).toBeGreaterThan(0);
     for (const pill of pillBoxes) {
       expect(pill.w, `${pill.testId} width not positive`).toBeGreaterThan(0);
@@ -1166,11 +1141,11 @@ test.describe("Geometry sanity — overview layout invariants", () => {
     // per-mapping geometry expectations rather than a global rule.
     await page.goto("/");
     await page.waitForFunction(() => {
-    const harness = window.__satsumaHarness;
-    if (!harness?.setViewMode) return false; // app.js not evaluated yet
-    harness.setViewMode("single");
-    return true;
-  });
+      const harness = window.__satsumaHarness;
+      if (!harness?.setViewMode) return false; // app.js not evaluated yet
+      harness.setViewMode("single");
+      return true;
+    });
     await loadFixture(page, sfdcUri);
 
     const sourceBox = await page
@@ -1212,11 +1187,11 @@ test.describe("Geometry sanity — overview layout invariants", () => {
     // original kind would push every dot well outside the tolerance.
     await page.goto("/");
     await page.waitForFunction(() => {
-    const harness = window.__satsumaHarness;
-    if (!harness?.setViewMode) return false; // app.js not evaluated yet
-    harness.setViewMode("single");
-    return true;
-  });
+      const harness = window.__satsumaHarness;
+      if (!harness?.setViewMode) return false; // app.js not evaluated yet
+      harness.setViewMode("single");
+      return true;
+    });
     await loadFixture(page, sfdcUri);
 
     // Tolerance budget = anchor-dot radius (3.5px) + edge stroke width
@@ -1279,11 +1254,11 @@ test.describe("Geometry sanity — overview layout invariants", () => {
     // schemas or denser arrows than the small canonical fixtures expose.
     await page.goto("/");
     await page.waitForFunction(() => {
-    const harness = window.__satsumaHarness;
-    if (!harness?.setViewMode) return false; // app.js not evaluated yet
-    harness.setViewMode("single");
-    return true;
-  });
+      const harness = window.__satsumaHarness;
+      if (!harness?.setViewMode) return false; // app.js not evaluated yet
+      harness.setViewMode("single");
+      return true;
+    });
     await loadFixture(page, sapUri);
     const boxes = await readOverviewCardBoxes(page);
     assertBoxesAreSane(boxes);
@@ -1306,11 +1281,11 @@ test.describe("Compact card expansion in overview", () => {
   test.beforeEach(async ({ page }) => {
     await page.goto("/");
     await page.waitForFunction(() => {
-    const harness = window.__satsumaHarness;
-    if (!harness?.setViewMode) return false; // app.js not evaluated yet
-    harness.setViewMode("single");
-    return true;
-  });
+      const harness = window.__satsumaHarness;
+      if (!harness?.setViewMode) return false; // app.js not evaluated yet
+      harness.setViewMode("single");
+      return true;
+    });
     await loadFixture(page, buyToOmUri);
   });
 
@@ -1345,7 +1320,9 @@ test.describe("Compact card expansion in overview", () => {
 
     await header.click();
     // Fields visible after first click.
-    await expect(card.locator("[data-testid$='-field-id']").first()).toBeVisible({ timeout: 5_000 });
+    await expect(card.locator("[data-testid$='-field-id']").first()).toBeVisible({
+      timeout: 5_000,
+    });
 
     await header.click();
     // Fields gone after second click.
@@ -1364,7 +1341,9 @@ test.describe("Compact card expansion in overview", () => {
 
     const card = page.locator("[data-testid^='overview-schema-card-buy-order']");
     await card.locator(".header-toggle").click();
-    await expect(card.locator("[data-testid$='-field-id']").first()).toBeVisible({ timeout: 5_000 });
+    await expect(card.locator("[data-testid$='-field-id']").first()).toBeVisible({
+      timeout: 5_000,
+    });
     await expect
       .poll(async () => canvas.evaluate((el) => el.getBoundingClientRect().height))
       .toBeGreaterThan(heightBefore);
@@ -1413,7 +1392,9 @@ test.describe("Compact card expansion in overview", () => {
     assertBoxesDoNotOverlap(boxes);
   });
 
-  test("the toggle arrow expands without navigating; the header name navigates", async ({ page }) => {
+  test("the toggle arrow expands without navigating; the header name navigates", async ({
+    page,
+  }) => {
     // Regression for sl-tw0r: the old combined handler made every expansion
     // also dispatch SzNavigateEvent, so hosts that open documents on navigate
     // (VS Code) yanked the editor to the source file whenever a card was
@@ -1423,18 +1404,22 @@ test.describe("Compact card expansion in overview", () => {
 
     const card = page.locator("[data-testid^='overview-schema-card-buy-order']");
     await card.locator(".header-toggle").click();
-    await expect(card.locator("[data-testid$='-field-id']").first()).toBeVisible({ timeout: 5_000 });
+    await expect(card.locator("[data-testid$='-field-id']").first()).toBeVisible({
+      timeout: 5_000,
+    });
     expect(await recordedEvents(page, "navigate")).toEqual([]);
 
     await card.locator(".header-name").click();
-    await expect.poll(async () => recordedEvents(page, "navigate")).toContainEqual(
-      expect.objectContaining({
-        detail: expect.objectContaining({
-          uri: expect.stringContaining("buy-to-om-order.stm"),
-          line: expect.any(Number),
+    await expect
+      .poll(async () => recordedEvents(page, "navigate"))
+      .toContainEqual(
+        expect.objectContaining({
+          detail: expect.objectContaining({
+            uri: expect.stringContaining("buy-to-om-order.stm"),
+            line: expect.any(Number),
+          }),
         }),
-      }),
-    );
+      );
   });
 });
 
@@ -1450,24 +1435,15 @@ test.describe("Compact card expansion in overview", () => {
 
 /** Computed background-color of the <satsuma-viz> host (drives off --sz-bg). */
 async function vizHostBackground(page: Page): Promise<string> {
-  return page
-    .locator("satsuma-viz")
-    .evaluate((el) => getComputedStyle(el).backgroundColor);
+  return page.locator("satsuma-viz").evaluate((el) => getComputedStyle(el).backgroundColor);
 }
 
 /** Read a computed style property of the first element matching a selector. */
-async function computedStyle(
-  page: Page,
-  selector: string,
-  property: string,
-): Promise<string> {
+async function computedStyle(page: Page, selector: string, property: string): Promise<string> {
   return page
     .locator(selector)
     .first()
-    .evaluate(
-      (el, prop) => getComputedStyle(el).getPropertyValue(prop),
-      property,
-    );
+    .evaluate((el, prop) => getComputedStyle(el).getPropertyValue(prop), property);
 }
 
 test.describe("Theme switching — URL parameter", () => {
@@ -1500,9 +1476,7 @@ test.describe("Theme switching — prefers-color-scheme fallback", () => {
   // colorScheme. Playwright drives the media query via test.use({ colorScheme }).
   test.describe("emulated light scheme", () => {
     test.use({ colorScheme: "light" });
-    test("adopts light when the OS prefers light and no parameter is set", async ({
-      page,
-    }) => {
+    test("adopts light when the OS prefers light and no parameter is set", async ({ page }) => {
       await page.goto("/");
       await loadFixture(page, sfdcUri);
       expect(await page.evaluate(() => window.__satsumaHarness.theme)).toBe("light");
@@ -1512,9 +1486,7 @@ test.describe("Theme switching — prefers-color-scheme fallback", () => {
 
   test.describe("emulated dark scheme", () => {
     test.use({ colorScheme: "dark" });
-    test("adopts dark when the OS prefers dark and no parameter is set", async ({
-      page,
-    }) => {
+    test("adopts dark when the OS prefers dark and no parameter is set", async ({ page }) => {
       await page.goto("/");
       await loadFixture(page, sfdcUri);
       expect(await page.evaluate(() => window.__satsumaHarness.theme)).toBe("dark");
@@ -1554,16 +1526,14 @@ test.describe("Theme switching — header toggle", () => {
     expect(bodyBgAfter).toBe("rgb(255, 250, 245)");
 
     // The switch is observable in the automation event log.
-    await expect.poll(async () => recordedEvents(page, "theme-change")).toContainEqual(
-      expect.objectContaining({ detail: { theme: "light" } }),
-    );
+    await expect
+      .poll(async () => recordedEvents(page, "theme-change"))
+      .toContainEqual(expect.objectContaining({ detail: { theme: "light" } }));
   });
 });
 
 test.describe("Theme switching — representative audit tokens", () => {
-  test("report header and overview edge stroke change colour between themes", async ({
-    page,
-  }) => {
+  test("report header and overview edge stroke change colour between themes", async ({ page }) => {
     // --sz-bg flipping is necessary but not sufficient: the audit promoted many
     // other tokens. This asserts two representative ones — the report-card
     // header (--sz-report) and the overview edge stroke (--sz-edge-default) —
@@ -1579,11 +1549,11 @@ test.describe("Theme switching — representative audit tokens", () => {
 
     await page.goto("/?theme=light");
     await page.waitForFunction(() => {
-    const harness = window.__satsumaHarness;
-    if (!harness?.setViewMode) return false; // app.js not evaluated yet
-    harness.setViewMode("single");
-    return true;
-  });
+      const harness = window.__satsumaHarness;
+      if (!harness?.setViewMode) return false; // app.js not evaluated yet
+      harness.setViewMode("single");
+      return true;
+    });
     await loadFixture(page, reportsUri);
     const reportHeaderLight = await computedStyle(page, reportHeader, "background-color");
     const edgeStrokeLight = await computedStyle(page, overviewEdge, "stroke");
@@ -1596,11 +1566,11 @@ test.describe("Theme switching — representative audit tokens", () => {
 
     await page.goto("/?theme=dark");
     await page.waitForFunction(() => {
-    const harness = window.__satsumaHarness;
-    if (!harness?.setViewMode) return false; // app.js not evaluated yet
-    harness.setViewMode("single");
-    return true;
-  });
+      const harness = window.__satsumaHarness;
+      if (!harness?.setViewMode) return false; // app.js not evaluated yet
+      harness.setViewMode("single");
+      return true;
+    });
     await loadFixture(page, reportsUri);
     const reportHeaderDark = await computedStyle(page, reportHeader, "background-color");
     const edgeStrokeDark = await computedStyle(page, overviewEdge, "stroke");

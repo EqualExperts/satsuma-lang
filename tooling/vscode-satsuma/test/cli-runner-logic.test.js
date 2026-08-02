@@ -44,7 +44,10 @@ describe("spawnFailureMessage", () => {
   });
 
   it("reports other spawn errnos with their code", () => {
-    const msg = spawnFailureMessage({ code: "EACCES", message: "permission denied" }, "/opt/satsuma");
+    const msg = spawnFailureMessage(
+      { code: "EACCES", message: "permission denied" },
+      "/opt/satsuma",
+    );
     assert.match(msg, /EACCES/);
     assert.match(msg, /permission denied/);
   });

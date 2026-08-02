@@ -1,16 +1,8 @@
-import {
-  CompletionItem,
-  CompletionItemKind,
-} from "vscode-languageserver";
+import { CompletionItem, CompletionItemKind } from "vscode-languageserver";
 import type { SyntaxNode, Tree } from "./parser-utils";
 import { child, nodeAtPosition } from "./parser-utils";
 import { sourceRefStructuralText } from "@satsuma/core";
-import {
-  WorkspaceIndex,
-  allBlockNames,
-  getFields,
-  FieldInfo,
-} from "./workspace-index";
+import { WorkspaceIndex, allBlockNames, getFields, FieldInfo } from "./workspace-index";
 
 /**
  * Compute context-aware completions at the given position.
@@ -73,8 +65,12 @@ function detectCompletionContext(node: SyntaxNode): CompletionContext | null {
     // nested_arrow node itself. The user has just opened a transform body —
     // suggest pipe functions (sl-0tgo). Arrows with actual nested declarations
     // resolve deeper nodes first, so this only fires for empty bodies.
-    if (current.type === "nested_arrow" && !child(current, "map_arrow") &&
-        !child(current, "computed_arrow") && !child(current, "nested_arrow")) {
+    if (
+      current.type === "nested_arrow" &&
+      !child(current, "map_arrow") &&
+      !child(current, "computed_arrow") &&
+      !child(current, "nested_arrow")
+    ) {
       return { kind: "pipe_chain" };
     }
 
@@ -239,10 +235,7 @@ function importNameCompletions(index: WorkspaceIndex): CompletionItem[] {
   return items;
 }
 
-function namespaceMemberCompletions(
-  index: WorkspaceIndex,
-  nsName: string,
-): CompletionItem[] {
+function namespaceMemberCompletions(index: WorkspaceIndex, nsName: string): CompletionItem[] {
   const items: CompletionItem[] = [];
   const prefix = `${nsName}::`;
 
@@ -260,10 +253,7 @@ function namespaceMemberCompletions(
   return items;
 }
 
-function fieldCompletions(
-  index: WorkspaceIndex,
-  schemas: string[],
-): CompletionItem[] {
+function fieldCompletions(index: WorkspaceIndex, schemas: string[]): CompletionItem[] {
   const items: CompletionItem[] = [];
   const seen = new Set<string>();
 
@@ -275,11 +265,7 @@ function fieldCompletions(
   return items;
 }
 
-function addFieldItems(
-  items: CompletionItem[],
-  fields: FieldInfo[],
-  seen: Set<string>,
-): void {
+function addFieldItems(items: CompletionItem[], fields: FieldInfo[], seen: Set<string>): void {
   for (const f of fields) {
     if (seen.has(f.name)) continue;
     seen.add(f.name);
@@ -293,10 +279,7 @@ function addFieldItems(
 
 // ---------- Mapping schema helpers ----------
 
-function findMappingSchemas(
-  pathNode: SyntaxNode,
-  blockType: "source" | "target",
-): string[] {
+function findMappingSchemas(pathNode: SyntaxNode, blockType: "source" | "target"): string[] {
   // Walk up to find the enclosing mapping_body
   let current: SyntaxNode | null = pathNode.parent;
   while (current) {
@@ -308,10 +291,7 @@ function findMappingSchemas(
   return [];
 }
 
-function findMappingSchemasFromBody(
-  body: SyntaxNode,
-  blockType: "source" | "target",
-): string[] {
+function findMappingSchemasFromBody(body: SyntaxNode, blockType: "source" | "target"): string[] {
   const targetType = blockType === "source" ? "source_block" : "target_block";
   const schemas: string[] = [];
 

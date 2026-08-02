@@ -114,8 +114,9 @@ export class CommandError extends Error {
  * "soft" non-zero exits (e.g. validate exiting 2 because findings were
  * reported) without throwing.
  */
-export type CommandHandler<Args extends unknown[]> =
-  (...args: Args) => Promise<number | void> | number | void;
+export type CommandHandler<Args extends unknown[]> = (
+  ...args: Args
+) => Promise<number | void> | number | void;
 
 /**
  * Wrap a Commander `.action(...)` handler so it participates in the

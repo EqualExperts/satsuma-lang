@@ -212,9 +212,18 @@ export function buildIndex(parsedFiles: (ParsedFile | FileData)[]): ExtractedWor
   let totalErrors = 0;
 
   // Track all named definitions per namespace for cross-kind duplicate detection.
-  const namesByNamespace = new Map<string, Map<string, { kind: string; file: string; row: number }>>();
+  const namesByNamespace = new Map<
+    string,
+    Map<string, { kind: string; file: string; row: number }>
+  >();
 
-  function checkDuplicate(kind: string, name: string | null, namespace: string | null | undefined, file: string, row: number): void {
+  function checkDuplicate(
+    kind: string,
+    name: string | null,
+    namespace: string | null | undefined,
+    file: string,
+    row: number,
+  ): void {
     if (!name) return;
     const nsKey = namespace ?? "__global__";
     if (!namesByNamespace.has(nsKey)) namesByNamespace.set(nsKey, new Map());
@@ -237,12 +246,13 @@ export function buildIndex(parsedFiles: (ParsedFile | FileData)[]): ExtractedWor
   }
 
   // Track namespace block metadata for merge conflict detection.
-  const namespaceMeta = new Map<string, Map<string, { value: string; file: string; row: number }>>();
+  const namespaceMeta = new Map<
+    string,
+    Map<string, { value: string; file: string; row: number }>
+  >();
 
   // Accept either pre-extracted data or raw parsedFile objects.
-  const fileDataList = parsedFiles.map((pf) =>
-    "schemas" in pf ? pf : extractFileData(pf),
-  );
+  const fileDataList = parsedFiles.map((pf) => ("schemas" in pf ? pf : extractFileData(pf)));
 
   for (const fileData of fileDataList) {
     const { filePath } = fileData;
@@ -398,17 +408,17 @@ export function buildIndex(parsedFiles: (ParsedFile | FileData)[]): ExtractedWor
   const allDefinitions = new Map([...schemas, ...fragments]);
   for (const mapping of mappings.values()) {
     const currentNs = mapping.namespace ?? null;
-    mapping.sources = mapping.sources.map((ref) =>
-      resolveScopedEntityRef(ref, currentNs, allDefinitions) ?? ref,
+    mapping.sources = mapping.sources.map(
+      (ref) => resolveScopedEntityRef(ref, currentNs, allDefinitions) ?? ref,
     );
-    mapping.targets = mapping.targets.map((ref) =>
-      resolveScopedEntityRef(ref, currentNs, allDefinitions) ?? ref,
+    mapping.targets = mapping.targets.map(
+      (ref) => resolveScopedEntityRef(ref, currentNs, allDefinitions) ?? ref,
     );
   }
   for (const metric of metrics.values()) {
     const currentNs = metric.namespace ?? null;
-    metric.sources = metric.sources.map((ref) =>
-      resolveScopedEntityRef(ref, currentNs, schemas) ?? ref,
+    metric.sources = metric.sources.map(
+      (ref) => resolveScopedEntityRef(ref, currentNs, schemas) ?? ref,
     );
   }
 
@@ -453,7 +463,10 @@ export function buildIndex(parsedFiles: (ParsedFile | FileData)[]): ExtractedWor
 /**
  * Resolve a user-provided entity name against an index map.
  */
-export function resolveIndexKey<T>(name: string, entityMap: Map<string, T>): { key: string; entry: T } | null {
+export function resolveIndexKey<T>(
+  name: string,
+  entityMap: Map<string, T>,
+): { key: string; entry: T } | null {
   if (entityMap.has(name)) {
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- Safe: .has() check on line above
     return { key: name, entry: entityMap.get(name)! };
@@ -487,7 +500,10 @@ export function resolveIndexKey<T>(name: string, entityMap: Map<string, T>): { k
  * (which use bare paths), and hover/go-to-definition (which may use either)
  * to all share the same index without each needing their own traversal.
  */
-function buildFieldArrows(arrowRecords: ArrowRecord[], mappings: Map<string, MappingRecord>): Map<string, ArrowRecord[]> {
+function buildFieldArrows(
+  arrowRecords: ArrowRecord[],
+  mappings: Map<string, MappingRecord>,
+): Map<string, ArrowRecord[]> {
   const index = new Map<string, ArrowRecord[]>();
 
   function addToIndex(key: string | null, record: ArrowRecord): void {
@@ -558,7 +574,9 @@ function buildFieldArrows(arrowRecords: ArrowRecord[], mappings: Map<string, Map
  * one line), and a positional key silently drops the second arrow from
  * graph/lineage output (sl-201z).
  */
-export function* distinctArrowRecords(fieldArrows: Map<string, ArrowRecord[]>): Generator<ArrowRecord> {
+export function* distinctArrowRecords(
+  fieldArrows: Map<string, ArrowRecord[]>,
+): Generator<ArrowRecord> {
   const seen = new Set<ArrowRecord>();
   for (const records of fieldArrows.values()) {
     for (const record of records) {
@@ -572,7 +590,11 @@ export function* distinctArrowRecords(fieldArrows: Map<string, ArrowRecord[]>): 
 /**
  * Build a reference graph from the extracted items.
  */
-function buildReferenceGraph({ schemas, metrics, mappings }: {
+function buildReferenceGraph({
+  schemas,
+  metrics,
+  mappings,
+}: {
   schemas: Map<string, SchemaRecord>;
   metrics: Map<string, MetricRecord>;
   mappings: Map<string, MappingRecord>;

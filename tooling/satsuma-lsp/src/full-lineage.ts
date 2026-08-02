@@ -14,11 +14,7 @@
  */
 
 import type { Tree } from "./parser-utils";
-import {
-  WorkspaceIndex,
-  getImportReachableUris,
-  createScopedIndex,
-} from "./workspace-index";
+import { WorkspaceIndex, getImportReachableUris, createScopedIndex } from "./workspace-index";
 import { buildVizModel, mergeVizModels } from "@satsuma/viz-backend";
 import type { VizModel } from "@satsuma/viz-backend";
 

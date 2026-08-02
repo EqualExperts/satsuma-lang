@@ -53,9 +53,7 @@ test.describe("Static playground bundle (non-root base path)", () => {
 
     // The viz rendered a seeded example — the library came from the bundled
     // examples.json, because this server has no fixture API to fall back to.
-    await expect(
-      page.locator("[data-testid^='overview-schema-card-']").first(),
-    ).toBeVisible();
+    await expect(page.locator("[data-testid^='overview-schema-card-']").first()).toBeVisible();
 
     // The picker is populated from the seeded localStorage library.
     await page.locator("#fixture-picker-btn").click();
@@ -63,9 +61,7 @@ test.describe("Static playground bundle (non-root base path)", () => {
 
     expect(requests.length).toBeGreaterThan(0);
     for (const url of requests) {
-      expect(url, `request escaped the base path: ${url}`).toContain(
-        "/satsuma-lang/playground/",
-      );
+      expect(url, `request escaped the base path: ${url}`).toContain("/satsuma-lang/playground/");
     }
   });
 

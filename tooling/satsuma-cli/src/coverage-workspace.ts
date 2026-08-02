@@ -101,7 +101,9 @@ function expandedFields(schema: SchemaRecord, index: ExtractedWorkspace) {
 
 /** Recursive copy so in-place spread expansion cannot touch the shared index. */
 function deepCopyFields<T extends { children?: T[] }>(fields: T[]): T[] {
-  return fields.map((f) => (f.children ? { ...f, children: deepCopyFields(f.children) } : { ...f }));
+  return fields.map((f) =>
+    f.children ? { ...f, children: deepCopyFields(f.children) } : { ...f },
+  );
 }
 
 /**

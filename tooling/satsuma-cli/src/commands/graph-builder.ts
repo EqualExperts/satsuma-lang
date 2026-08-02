@@ -98,7 +98,12 @@ export interface WorkspaceGraph {
  * Collects nodes (schemas, mappings, metrics, transforms), builds schema-level
  * and field-level edges, applies namespace filtering, and computes stats.
  */
-export function buildWorkspaceGraph(index: ExtractedWorkspace, schemaGraph: FullGraph, root: string, opts: GraphBuildOpts): WorkspaceGraph {
+export function buildWorkspaceGraph(
+  index: ExtractedWorkspace,
+  schemaGraph: FullGraph,
+  root: string,
+  opts: GraphBuildOpts,
+): WorkspaceGraph {
   const nsFilter = opts.namespace ?? null;
   const includeNl = opts.includeNl;
   const schemaOnly = opts.schemaOnly;
@@ -201,19 +206,43 @@ export function buildWorkspaceGraph(index: ExtractedWorkspace, schemaGraph: Full
         const schema = index.schemas.get(id);
         if (schema && !index.metrics.has(id)) {
           includedNodeIds.add(id);
-          nodes.push({ id, kind: "schema", namespace: schema.namespace ?? null, file: schema.file, line: schema.row + 1, note: schema.note ?? null });
+          nodes.push({
+            id,
+            kind: "schema",
+            namespace: schema.namespace ?? null,
+            file: schema.file,
+            line: schema.row + 1,
+            note: schema.note ?? null,
+          });
           continue;
         }
         const mapping = index.mappings.get(id);
         if (mapping) {
           includedNodeIds.add(id);
-          nodes.push({ id, kind: "mapping", namespace: mapping.namespace ?? null, file: mapping.file, line: mapping.row + 1, sources: mapping.sources, targets: mapping.targets });
+          nodes.push({
+            id,
+            kind: "mapping",
+            namespace: mapping.namespace ?? null,
+            file: mapping.file,
+            line: mapping.row + 1,
+            sources: mapping.sources,
+            targets: mapping.targets,
+          });
           continue;
         }
         const metric = index.metrics.get(id);
         if (metric) {
           includedNodeIds.add(id);
-          nodes.push({ id, kind: "metric", namespace: metric.namespace ?? null, file: metric.file, line: metric.row + 1, sources: metric.sources, grain: metric.grain ?? null, slices: metric.slices ?? [] });
+          nodes.push({
+            id,
+            kind: "metric",
+            namespace: metric.namespace ?? null,
+            file: metric.file,
+            line: metric.row + 1,
+            sources: metric.sources,
+            grain: metric.grain ?? null,
+            slices: metric.slices ?? [],
+          });
         }
       }
     }
@@ -222,7 +251,13 @@ export function buildWorkspaceGraph(index: ExtractedWorkspace, schemaGraph: Full
   // Always build field edges (needed for --schema-only aggregation too)
   const result = buildFieldEdges(index, includedNodeIds, nsFilter, includeNl);
 
-  const unresolvedNl: Array<{ scope: string; arrow: string; text: string; file: string; line: number }> = [];
+  const unresolvedNl: Array<{
+    scope: string;
+    arrow: string;
+    text: string;
+    file: string;
+    line: number;
+  }> = [];
 
   const fieldEdges: FieldEdge[] = schemaOnly
     ? aggregateFieldEdgesToSchemaLevel(result.edges, index, nsFilter)
@@ -239,13 +274,18 @@ export function buildWorkspaceGraph(index: ExtractedWorkspace, schemaGraph: Full
     workspace: resolve(root),
     stats: {
       // Exclude metric schemas from the schema count — they are counted under metrics.
-      schemas: [...index.schemas.entries()]
-        .filter(([id, s]) => !index.metrics.has(id) && (!nsFilter || s.namespace === nsFilter))
+      schemas: [...index.schemas.entries()].filter(
+        ([id, s]) => !index.metrics.has(id) && (!nsFilter || s.namespace === nsFilter),
+      ).length,
+      mappings: [...index.mappings.values()].filter((m) => !nsFilter || m.namespace === nsFilter)
         .length,
-      mappings: [...index.mappings.values()].filter((m) => !nsFilter || m.namespace === nsFilter).length,
-      metrics: [...index.metrics.values()].filter((m) => !nsFilter || m.namespace === nsFilter).length,
-      fragments: [...index.fragments.values()].filter((f) => !nsFilter || f.namespace === nsFilter).length,
-      transforms: [...index.transforms.values()].filter((t) => !nsFilter || t.namespace === nsFilter).length,
+      metrics: [...index.metrics.values()].filter((m) => !nsFilter || m.namespace === nsFilter)
+        .length,
+      fragments: [...index.fragments.values()].filter((f) => !nsFilter || f.namespace === nsFilter)
+        .length,
+      transforms: [...index.transforms.values()].filter(
+        (t) => !nsFilter || t.namespace === nsFilter,
+      ).length,
       arrows: arrowCount,
       errors: index.totalErrors,
     },
@@ -263,7 +303,12 @@ export function buildWorkspaceGraph(index: ExtractedWorkspace, schemaGraph: Full
  * Build schema-level edges from the directed graph.
  * Each edge has: from, to, role (source/target/metric_source/nl_ref).
  */
-function buildSchemaEdges(index: ExtractedWorkspace, _schemaGraph: FullGraph, includedNodeIds: Set<string>, nsFilter: string | null): SchemaEdge[] {
+function buildSchemaEdges(
+  index: ExtractedWorkspace,
+  _schemaGraph: FullGraph,
+  includedNodeIds: Set<string>,
+  nsFilter: string | null,
+): SchemaEdge[] {
   const edges: SchemaEdge[] = [];
 
   // ── Mapping source/target edges ────────────────────────────────────────────
@@ -271,7 +316,8 @@ function buildSchemaEdges(index: ExtractedWorkspace, _schemaGraph: FullGraph, in
     // When namespace-filtering, include edges if either the mapping is in
     // the namespace OR any of its sources/targets are in the namespace
     if (nsFilter && mapping.namespace !== nsFilter) {
-      const touchesNs = mapping.sources.some((s) => includedNodeIds.has(s)) ||
+      const touchesNs =
+        mapping.sources.some((s) => includedNodeIds.has(s)) ||
         mapping.targets.some((t) => includedNodeIds.has(t));
       if (!touchesNs) continue;
     }
@@ -308,17 +354,19 @@ function buildSchemaEdges(index: ExtractedWorkspace, _schemaGraph: FullGraph, in
   if (index.nlRefData) {
     const seen = new Set<string>();
     for (const item of index.nlRefData) {
-      const mappingKey = item.namespace
-        ? `${item.namespace}::${item.mapping}`
-        : item.mapping;
+      const mappingKey = item.namespace ? `${item.namespace}::${item.mapping}` : item.mapping;
       const mapping = index.mappings.get(mappingKey);
       if (!mapping) continue;
 
-      const backtickRefs = extractNlSchemaRefs(item.text, {
-        sources: mapping.sources ?? [],
-        targets: mapping.targets ?? [],
-        namespace: item.namespace,
-      }, index);
+      const backtickRefs = extractNlSchemaRefs(
+        item.text,
+        {
+          sources: mapping.sources ?? [],
+          targets: mapping.targets ?? [],
+          namespace: item.namespace,
+        },
+        index,
+      );
 
       for (const schemaRef of backtickRefs) {
         const key = `${schemaRef}|${mappingKey}|nl_ref`;
@@ -362,7 +410,10 @@ function extractNlSchemaRefs(
       if (resolution.resolvedTo?.kind === "schema") {
         canonicalSchema = resolution.resolvedTo.name;
       }
-    } else if (classification === "dotted-field" || classification === "namespace-qualified-field") {
+    } else if (
+      classification === "dotted-field" ||
+      classification === "namespace-qualified-field"
+    ) {
       if (resolution.resolvedTo?.kind === "field") {
         const fieldName = resolution.resolvedTo.name;
         const lastDot = fieldName.lastIndexOf(".");
@@ -375,9 +426,7 @@ function extractNlSchemaRefs(
     if (!canonicalSchema) continue;
 
     // Convert canonical form (::name) to index key form (name)
-    const indexKey = canonicalSchema.startsWith("::")
-      ? canonicalSchema.slice(2)
-      : canonicalSchema;
+    const indexKey = canonicalSchema.startsWith("::") ? canonicalSchema.slice(2) : canonicalSchema;
 
     // Skip schemas already declared as source or target
     if (allDeclared.has(indexKey) || allDeclared.has(canonicalSchema)) continue;
@@ -406,9 +455,23 @@ function extractNlSchemaRefs(
  * parent schema names, attaches transform and NL metadata, and resolves
  * nl-derived edges from @ref mentions.
  */
-function buildFieldEdges(index: ExtractedWorkspace, includedNodeIds: Set<string>, nsFilter: string | null, includeNl: boolean): { edges: FieldEdge[]; unresolvedNl: Array<{ scope: string; arrow: string; text: string; file: string; line: number }> } {
+function buildFieldEdges(
+  index: ExtractedWorkspace,
+  includedNodeIds: Set<string>,
+  nsFilter: string | null,
+  includeNl: boolean,
+): {
+  edges: FieldEdge[];
+  unresolvedNl: Array<{ scope: string; arrow: string; text: string; file: string; line: number }>;
+} {
   const edges: FieldEdge[] = [];
-  const unresolvedNl: Array<{ scope: string; arrow: string; text: string; file: string; line: number }> = [];
+  const unresolvedNl: Array<{
+    scope: string;
+    arrow: string;
+    text: string;
+    file: string;
+    line: number;
+  }> = [];
 
   // Iterate all arrow records via the fieldArrows index. distinctArrowRecords
   // deduplicates the multi-key registrations by reference — see its doc-comment
@@ -422,7 +485,8 @@ function buildFieldEdges(index: ExtractedWorkspace, includedNodeIds: Set<string>
       const mapping = index.mappings.get(mappingKey);
       if (mapping?.namespace !== nsFilter) {
         // Still include if the mapping touches schemas in the namespace
-        const touchesNs = (mapping?.sources ?? []).some((s) => includedNodeIds.has(s)) ||
+        const touchesNs =
+          (mapping?.sources ?? []).some((s) => includedNodeIds.has(s)) ||
           (mapping?.targets ?? []).some((t) => includedNodeIds.has(t));
         if (!touchesNs) continue;
       }
@@ -433,12 +497,11 @@ function buildFieldEdges(index: ExtractedWorkspace, includedNodeIds: Set<string>
     const sourceSchemas = mapping?.sources ?? [];
     const targetSchemas = mapping?.targets ?? [];
 
-    const fromFields = record.sources.length > 0
-      ? record.sources.map((s) => canonicalKey(qualifyField(s, sourceSchemas)))
-      : [null];
-    const toField = record.target
-      ? canonicalKey(qualifyField(record.target, targetSchemas))
-      : null;
+    const fromFields =
+      record.sources.length > 0
+        ? record.sources.map((s) => canonicalKey(qualifyField(s, sourceSchemas)))
+        : [null];
+    const toField = record.target ? canonicalKey(qualifyField(record.target, targetSchemas)) : null;
 
     for (const fromField of fromFields) {
       const edge: FieldEdge = {
@@ -495,7 +558,8 @@ function buildFieldEdges(index: ExtractedWorkspace, includedNodeIds: Set<string>
 
     if (nsFilter) {
       if (mapping.namespace !== nsFilter) {
-        const touchesNs = mapping.sources.some((s) => includedNodeIds.has(s)) ||
+        const touchesNs =
+          mapping.sources.some((s) => includedNodeIds.has(s)) ||
           mapping.targets.some((t) => includedNodeIds.has(t));
         if (!touchesNs) continue;
       }
@@ -517,8 +581,11 @@ function buildFieldEdges(index: ExtractedWorkspace, includedNodeIds: Set<string>
     // source->target in the same mapping (e.g. `c -> d { "@s1.c is processed" }`
     // — c is already the declared source, no need for a duplicate nl-derived edge).
     const alreadyCovered = edges.some(
-      (e) => e.from === sourceField && e.to === targetField &&
-             e.mapping === mappingKey && e.classification !== "nl-derived",
+      (e) =>
+        e.from === sourceField &&
+        e.to === targetField &&
+        e.mapping === mappingKey &&
+        e.classification !== "nl-derived",
     );
     if (alreadyCovered) continue;
 
@@ -543,7 +610,11 @@ function buildFieldEdges(index: ExtractedWorkspace, includedNodeIds: Set<string>
  * with no field edges (e.g. derived-only), adds edges from the declared
  * source/target lists.
  */
-function aggregateFieldEdgesToSchemaLevel(fieldEdges: FieldEdge[], index: ExtractedWorkspace, nsFilter: string | null): FieldEdge[] {
+function aggregateFieldEdgesToSchemaLevel(
+  fieldEdges: FieldEdge[],
+  index: ExtractedWorkspace,
+  nsFilter: string | null,
+): FieldEdge[] {
   const aggregated: FieldEdge[] = [];
   const seen = new Set<string>();
 

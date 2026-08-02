@@ -19,7 +19,11 @@ function splitQualifiedName(name: string): QualifiedName {
   };
 }
 
-export function findBlockNode(rootNode: SyntaxNode, nodeType: string, qualifiedName: string): SyntaxNode | null {
+export function findBlockNode(
+  rootNode: SyntaxNode,
+  nodeType: string,
+  qualifiedName: string,
+): SyntaxNode | null {
   // Handle anonymous blocks keyed by <anon>@file:row
   const anonMatch = qualifiedName.match(/^<anon>@.*:(\d+)$/);
   if (anonMatch) {
@@ -47,7 +51,11 @@ export function findBlockNode(rootNode: SyntaxNode, nodeType: string, qualifiedN
   return null;
 }
 
-function findBlockByRow(rootNode: SyntaxNode, nodeType: string, targetRow: number): SyntaxNode | null {
+function findBlockByRow(
+  rootNode: SyntaxNode,
+  nodeType: string,
+  targetRow: number,
+): SyntaxNode | null {
   for (const c of rootNode.namedChildren) {
     if (c.type === nodeType && c.startPosition.row === targetRow) return c;
     if (c.type === "namespace_block") {
@@ -59,7 +67,11 @@ function findBlockByRow(rootNode: SyntaxNode, nodeType: string, targetRow: numbe
   return null;
 }
 
-function findBlockNodeInContainer(containerNode: SyntaxNode, nodeType: string, localName: string): SyntaxNode | null {
+function findBlockNodeInContainer(
+  containerNode: SyntaxNode,
+  nodeType: string,
+  localName: string,
+): SyntaxNode | null {
   for (const c of containerNode.namedChildren) {
     if (c.type === nodeType && labelText(c) === localName) return c;
   }

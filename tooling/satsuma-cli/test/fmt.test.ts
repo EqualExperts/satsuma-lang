@@ -40,8 +40,10 @@ describe("satsuma fmt --check", () => {
     try {
       const { code, stdout } = await satsuma("fmt", "--check", messyFile);
       assert.equal(code, 1, "should exit 1 when file would change");
-      assert.ok(stdout.includes("messy.stm") || stdout.includes("messy"),
-        "should print the filename that would change");
+      assert.ok(
+        stdout.includes("messy.stm") || stdout.includes("messy"),
+        "should print the filename that would change",
+      );
     } finally {
       unlinkSync(messyFile);
     }

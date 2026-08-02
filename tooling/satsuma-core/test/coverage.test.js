@@ -31,7 +31,9 @@ const WASM_PATH = resolve(__dirname, "../../tree-sitter-satsuma/tree-sitter-sats
 
 const TEST_URI = "file:///test.stm";
 
-before(async () => { await initParser(WASM_PATH); });
+before(async () => {
+  await initParser(WASM_PATH);
+});
 
 // ── Test resolver ───────────────────────────────────────────────────────────
 
@@ -81,7 +83,9 @@ function resolveRefsIn(tree, schemasById) {
     hasSchema: (k) => schemasById.has(k),
     getSchema: (k) => {
       const s = schemasById.get(k);
-      return s ? { fields: s.fields, hasSpreads: Boolean(s.spreads?.length), namespace: s.namespace } : null;
+      return s
+        ? { fields: s.fields, hasSpreads: Boolean(s.spreads?.length), namespace: s.namespace }
+        : null;
     },
     hasFragment: () => false,
     getFragment: () => null,
@@ -97,14 +101,21 @@ function resolveRefsIn(tree, schemasById) {
 /** Coverage entries for the single schema playing `role` in the result. */
 function forRole(result, role) {
   const schema = result.schemas.find((s) => s.role === role);
-  assert.ok(schema, `expected a ${role} schema in ${JSON.stringify(result.schemas.map((s) => s.role))}`);
+  assert.ok(
+    schema,
+    `expected a ${role} schema in ${JSON.stringify(result.schemas.map((s) => s.role))}`,
+  );
   return schema;
 }
 
 /** Assert `path` appears exactly once and carries the expected mapped flag. */
 function assertMapped(schema, path, expected) {
   const matches = schema.fields.filter((f) => f.path === path);
-  assert.equal(matches.length, 1, `expected exactly one "${path}" entry in ${schema.fields.map((f) => f.path)}`);
+  assert.equal(
+    matches.length,
+    1,
+    `expected exactly one "${path}" entry in ${schema.fields.map((f) => f.path)}`,
+  );
   assert.equal(matches[0].mapped, expected, `"${path}" should be mapped=${expected}`);
 }
 
@@ -154,7 +165,10 @@ mapping load {
   id -> id
 }`;
     const result = coverage(src, "load");
-    assert.deepEqual(result.schemas.map((s) => s.schemaId), ["src"]);
+    assert.deepEqual(
+      result.schemas.map((s) => s.schemaId),
+      ["src"],
+    );
   });
 
   it("finds a mapping declared inside a namespace block", () => {

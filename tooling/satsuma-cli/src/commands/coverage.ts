@@ -76,7 +76,9 @@ export function register(program: Command): void {
     .option("--uncovered", "list only the fields nothing maps")
     .option("--fail-under <pct>", "exit 3 when aggregate coverage is below <pct>", parsePercentage)
     .option("--json", "structured JSON output")
-    .addHelpText("after", `
+    .addHelpText(
+      "after",
+      `
 Coverage follows explicit references. A field counts as covered when an arrow in
 the mapping references it (the 'declared' tier) or a resolved NL @ref names it
 (the 'nl' tier). Nested paths cover their parents — mapping 'address.city' covers
@@ -167,51 +169,58 @@ Examples:
   satsuma coverage pipeline.stm --json                    # machine-readable
   satsuma coverage pipeline.stm --fail-under 90            # CI gate on target coverage
   satsuma coverage pipeline.stm --fail-under 80 --role source
-  satsuma coverage pipeline.stm --fail-under 95 --mapping 'load hub'`)
-    .action(runCommand(async (pathArg: string | undefined, opts: CoverageOptions) => {
-      const role = (opts.role ?? null) as Role | null;
-      const { files, index } = await loadWorkspace(pathArg);
+  satsuma coverage pipeline.stm --fail-under 95 --mapping 'load hub'`,
+    )
+    .action(
+      runCommand(async (pathArg: string | undefined, opts: CoverageOptions) => {
+        const role = (opts.role ?? null) as Role | null;
+        const { files, index } = await loadWorkspace(pathArg);
 
-      // Resolve scope arguments before doing any work, so a typo reports itself
-      // as a typo (exit 1) rather than as an empty — and misleading — report.
-      const mappingKey = opts.mapping ? resolveScopeName(opts.mapping, "Mapping", index.mappings) : null;
-      const schemaKey = opts.schema ? resolveScopeName(opts.schema, "Schema", index.schemas) : null;
+        // Resolve scope arguments before doing any work, so a typo reports itself
+        // as a typo (exit 1) rather than as an empty — and misleading — report.
+        const mappingKey = opts.mapping
+          ? resolveScopeName(opts.mapping, "Mapping", index.mappings)
+          : null;
+        const schemaKey = opts.schema
+          ? resolveScopeName(opts.schema, "Schema", index.schemas)
+          : null;
 
-      // Resolved once for the whole workspace and reused for every mapping —
-      // resolution is workspace-wide, and it is what makes the NL tier possible
-      // at all (ADR-036).
-      const nlRefs = resolveAllNLRefs(index);
-      const { mappings, skippedAnonymous } = coverageForWorkspace(index, files, nlRefs);
-      const scoped = applyScope(mappings, { mappingKey, schemaKey, role });
+        // Resolved once for the whole workspace and reused for every mapping —
+        // resolution is workspace-wide, and it is what makes the NL tier possible
+        // at all (ADR-036).
+        const nlRefs = resolveAllNLRefs(index);
+        const { mappings, skippedAnonymous } = coverageForWorkspace(index, files, nlRefs);
+        const scoped = applyScope(mappings, { mappingKey, schemaKey, role });
 
-      if (scoped.length === 0) {
-        console.log(describeEmptyScope(mappings.length, { mappingKey, schemaKey, role }));
-        return EXIT_NOT_FOUND;
-      }
+        if (scoped.length === 0) {
+          console.log(describeEmptyScope(mappings.length, { mappingKey, schemaKey, role }));
+          return EXIT_NOT_FOUND;
+        }
 
-      // Aggregate over the *scoped* mappings, so `--schema X` reports X's
-      // workspace-wide coverage rather than the whole workspace's.
-      const aggregate = aggregateCoverage(scoped);
-      const gate = evaluateGate(aggregate, role, opts.failUnder);
+        // Aggregate over the *scoped* mappings, so `--schema X` reports X's
+        // workspace-wide coverage rather than the whole workspace's.
+        const aggregate = aggregateCoverage(scoped);
+        const gate = evaluateGate(aggregate, role, opts.failUnder);
 
-      if (opts.json) {
-        const report: Record<string, unknown> = {
-          mappings: scoped.map((m) => toJson(m, opts)),
-          aggregate: aggregateToJson(aggregate, opts),
-        };
-        if (gate) report.gate = gate;
-        console.log(JSON.stringify(report, null, 2));
-      } else {
-        printPerMappingReport(scoped, opts);
-        printAggregateReport(aggregate, opts);
-        if (gate) printGate(gate);
-        if (skippedAnonymous > 0) printAnonymousNote(skippedAnonymous);
-      }
+        if (opts.json) {
+          const report: Record<string, unknown> = {
+            mappings: scoped.map((m) => toJson(m, opts)),
+            aggregate: aggregateToJson(aggregate, opts),
+          };
+          if (gate) report.gate = gate;
+          console.log(JSON.stringify(report, null, 2));
+        } else {
+          printPerMappingReport(scoped, opts);
+          printAggregateReport(aggregate, opts);
+          if (gate) printGate(gate);
+          if (skippedAnonymous > 0) printAnonymousNote(skippedAnonymous);
+        }
 
-      // The report is printed either way — a failed gate must still show the
-      // reviewer which fields are missing, not just that a number was too low.
-      return gate && !gate.met ? EXIT_THRESHOLD_NOT_MET : undefined;
-    }));
+        // The report is printed either way — a failed gate must still show the
+        // reviewer which fields are missing, not just that a number was too low.
+        return gate && !gate.met ? EXIT_THRESHOLD_NOT_MET : undefined;
+      }),
+    );
 }
 
 // ── Scope resolution ────────────────────────────────────────────────────────
@@ -252,7 +261,9 @@ function applyScope(mappings: MappingCoverage[], scope: Scope): MappingCoverage[
   for (const mapping of mappings) {
     if (scope.mappingKey && mapping.mappingId !== scope.mappingKey) continue;
     const schemas = mapping.result.schemas.filter(
-      (s) => (!scope.schemaKey || s.schemaId === scope.schemaKey) && (!scope.role || s.role === scope.role),
+      (s) =>
+        (!scope.schemaKey || s.schemaId === scope.schemaKey) &&
+        (!scope.role || s.role === scope.role),
     );
     if (schemas.length === 0) continue;
     result.push({ ...mapping, result: { schemas } });
@@ -371,7 +382,9 @@ const WORKSPACE_LABEL = "workspace";
  * than leaving a reviewer to infer it.
  */
 function printPerMappingReport(mappings: MappingCoverage[], opts: CoverageOptions): void {
-  console.log(`Coverage — ${mappings.length} mapping${mappings.length !== 1 ? "s" : ""}, per mapping`);
+  console.log(
+    `Coverage — ${mappings.length} mapping${mappings.length !== 1 ? "s" : ""}, per mapping`,
+  );
 
   for (const mapping of mappings) {
     console.log();
@@ -383,7 +396,7 @@ function printPerMappingReport(mappings: MappingCoverage[], opts: CoverageOption
     for (const schema of mapping.result.schemas) {
       console.log(
         `  ${schema.role.padEnd(ROLE_COLUMN_WIDTH)}  ${displayKey(schema.schemaId).padEnd(schemaWidth)}  ` +
-        `${formatTotals(summarizeFieldCoverage(schema.fields))}`,
+          `${formatTotals(summarizeFieldCoverage(schema.fields))}`,
       );
     }
 
@@ -407,7 +420,7 @@ function printFieldList(schema: SchemaCoverageResult, opts: CoverageOptions): vo
 
   console.log(
     `    uncovered in ${displayKey(schema.schemaId)} (${schema.role}): ` +
-    `${uncovered.length} field${uncovered.length !== 1 ? "s" : ""}`,
+      `${uncovered.length} field${uncovered.length !== 1 ? "s" : ""}`,
   );
   for (const line of wrapPaths(uncovered.map((f) => f.path))) {
     console.log(`      ${line}`);
@@ -477,8 +490,8 @@ function evaluateGate(
   if (totals.total === 0) {
     throw new CommandError(
       `No ${gatedRole}-role coverage in scope to gate with --fail-under.\n` +
-      `Nothing in scope declares ${gatedRole} fields; ` +
-      `use --role ${gatedRole === "target" ? "source" : "target"} or widen the scope.`,
+        `Nothing in scope declares ${gatedRole} fields; ` +
+        `use --role ${gatedRole === "target" ? "source" : "target"} or widen the scope.`,
       EXIT_NOT_FOUND,
     );
   }
@@ -497,7 +510,7 @@ function printGate(gate: CoverageGate): void {
   console.log();
   console.log(
     `--fail-under: ${gate.role} coverage ${gate.pct}% vs threshold ${gate.threshold}% — ` +
-    `${gate.met ? "met" : "NOT met"}`,
+      `${gate.met ? "met" : "NOT met"}`,
   );
 }
 
@@ -513,7 +526,10 @@ function printGate(gate: CoverageGate): void {
  * mapping does not. Keeping them in separate objects means a consumer has to
  * choose which claim it is making.
  */
-function aggregateToJson(aggregate: AggregateCoverage, opts: CoverageOptions): Record<string, unknown> {
+function aggregateToJson(
+  aggregate: AggregateCoverage,
+  opts: CoverageOptions,
+): Record<string, unknown> {
   return {
     schemas: aggregate.schemas.map((schema) => ({
       schema: canonicalKey(schema.schemaId),
@@ -538,7 +554,10 @@ function aggregateToJson(aggregate: AggregateCoverage, opts: CoverageOptions): R
  * The aggregate field entries to report, filtered exactly as the per-mapping
  * ones are so the two sections stay comparable line for line.
  */
-function aggregateFields(schema: AggregateSchemaCoverage, opts: CoverageOptions): FieldCoverageEntry[] {
+function aggregateFields(
+  schema: AggregateSchemaCoverage,
+  opts: CoverageOptions,
+): FieldCoverageEntry[] {
   const leaves = leafFieldEntries(schema.fields);
   return opts.uncovered ? leaves.filter((f) => !f.mapped) : leaves;
 }
@@ -555,13 +574,11 @@ function printAggregateReport(aggregate: AggregateCoverage, opts: CoverageOption
   console.log();
   console.log("Aggregate — a field is uncovered here only when NO mapping in scope covers it");
 
-  const schemaWidth = Math.max(
-    ...aggregate.schemas.map((s) => displayKey(s.schemaId).length),
-  );
+  const schemaWidth = Math.max(...aggregate.schemas.map((s) => displayKey(s.schemaId).length));
   for (const schema of aggregate.schemas) {
     console.log(
       `  ${schema.role.padEnd(ROLE_COLUMN_WIDTH)}  ${displayKey(schema.schemaId).padEnd(schemaWidth)}  ` +
-      `${formatTotals(schema.totals)}`,
+        `${formatTotals(schema.totals)}`,
     );
   }
 
@@ -570,7 +587,7 @@ function printAggregateReport(aggregate: AggregateCoverage, opts: CoverageOption
     if (uncovered.length === 0) continue;
     console.log(
       `    covered by no mapping — ${displayKey(schema.schemaId)} (${schema.role}): ` +
-      `${uncovered.length} field${uncovered.length !== 1 ? "s" : ""}`,
+        `${uncovered.length} field${uncovered.length !== 1 ? "s" : ""}`,
     );
     for (const line of wrapPaths(uncovered.map((f) => f.path))) {
       console.log(`      ${line}`);
@@ -591,7 +608,9 @@ function printSubtotals(aggregate: AggregateCoverage): void {
   const showNamespaces = aggregate.namespaces.length > 1;
   // One label width across namespace rows and the workspace row, so the
   // percentages line up into a column the eye can scan down.
-  const labels = showNamespaces ? aggregate.namespaces.map((ns) => namespaceLabel(ns.namespace)) : [];
+  const labels = showNamespaces
+    ? aggregate.namespaces.map((ns) => namespaceLabel(ns.namespace))
+    : [];
   const labelWidth = Math.max(...labels.map((l) => l.length), WORKSPACE_LABEL.length);
 
   console.log();
@@ -657,6 +676,6 @@ function printAnonymousNote(count: number): void {
   console.log();
   console.log(
     `Note: ${count} anonymous mapping${count !== 1 ? "s" : ""} not reported ` +
-    `(coverage is looked up by mapping name; name the mapping to include it).`,
+      `(coverage is looked up by mapping name; name the mapping to include it).`,
   );
 }

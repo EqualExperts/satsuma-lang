@@ -56,7 +56,11 @@ describe("satsuma warnings", () => {
       data.items.map((item: { line: number }) => item.line),
       [4, 5, 12, 13],
     );
-    assert.ok(data.items.every((item: { block: string; blockType: string }) => item.block && item.blockType));
+    assert.ok(
+      data.items.every(
+        (item: { block: string; blockType: string }) => item.block && item.blockType,
+      ),
+    );
   });
 
   it("emits question-only JSON with the question kind and filtered count", async () => {

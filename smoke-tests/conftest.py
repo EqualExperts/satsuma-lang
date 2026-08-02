@@ -127,7 +127,9 @@ def query_arrows_expect_exit(field: str, code: int, ctx: dict) -> None:
     ctx["exit_code"] = _run_exit_only(["arrows", field], ctx["fixture"])
 
 
-@when(parsers.parse('I query arrows for "{field}" as source expecting exit code {code:d}'))
+@when(
+    parsers.parse('I query arrows for "{field}" as source expecting exit code {code:d}')
+)
 def query_arrows_as_source_expect_exit(field: str, code: int, ctx: dict) -> None:
     ctx["exit_code"] = _run_exit_only(["arrows", field, "--as-source"], ctx["fixture"])
 

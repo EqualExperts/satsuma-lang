@@ -128,9 +128,7 @@ async function assertDotsOnCards(page: Page): Promise<void> {
 
 for (const theme of ["light", "dark"] as const) {
   test.describe(`Overview edge anchors — ${theme} theme`, () => {
-    test(`dots sit on non-namespaced cards at the header midpoint (${theme})`, async ({
-      page,
-    }) => {
+    test(`dots sit on non-namespaced cards at the header midpoint (${theme})`, async ({ page }) => {
       await loadFixture(page, buyToOmUri);
       await page.locator(`#theme-toggle .toggle-btn[data-theme='${theme}']`).click();
       await assertDotsOnCards(page);
@@ -144,9 +142,7 @@ for (const theme of ["light", "dark"] as const) {
   });
 }
 
-test("card chrome matches the geometry contract: no filler bar, 40px header", async ({
-  page,
-}) => {
+test("card chrome matches the geometry contract: no filler bar, 40px header", async ({ page }) => {
   // Anchor math measures from the card top: header midpoint is at
   // top + (pill ? 24 : 0) + 20. The old 24px filler bar shifted the visible
   // header down without the layout knowing. Assert the actual chrome: the

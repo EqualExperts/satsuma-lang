@@ -47,11 +47,13 @@ describe("matchFields", () => {
 
   it("flattens nested fields into dotted paths for matching", () => {
     // Nested source "address.city" should match flat target "city" by leaf name.
-    const src = [{
-      name: "address",
-      type: "record",
-      children: [{ name: "city", type: "VARCHAR" }],
-    }];
+    const src = [
+      {
+        name: "address",
+        type: "record",
+        children: [{ name: "city", type: "VARCHAR" }],
+      },
+    ];
     const tgt = [{ name: "city", type: "VARCHAR" }];
     const result = matchFields(src, tgt);
     assert.ok(
@@ -63,11 +65,13 @@ describe("matchFields", () => {
   it("matches cross-level: flat source matches nested target by leaf name", () => {
     // Flat source "city" should match nested target "address.city" by leaf.
     const src = [{ name: "city", type: "VARCHAR" }];
-    const tgt = [{
-      name: "address",
-      type: "record",
-      children: [{ name: "city", type: "VARCHAR" }],
-    }];
+    const tgt = [
+      {
+        name: "address",
+        type: "record",
+        children: [{ name: "city", type: "VARCHAR" }],
+      },
+    ];
     const result = matchFields(src, tgt);
     assert.ok(
       result.matched.some((m) => m.source === "city"),
@@ -90,15 +94,19 @@ describe("matchFields", () => {
 
   it("deeply nested fields are flattened correctly", () => {
     // Two levels of nesting: address.billing.zip
-    const src = [{
-      name: "address",
-      type: "record",
-      children: [{
-        name: "billing",
+    const src = [
+      {
+        name: "address",
         type: "record",
-        children: [{ name: "zip", type: "VARCHAR" }],
-      }],
-    }];
+        children: [
+          {
+            name: "billing",
+            type: "record",
+            children: [{ name: "zip", type: "VARCHAR" }],
+          },
+        ],
+      },
+    ];
     const tgt = [{ name: "zip", type: "VARCHAR" }];
     const result = matchFields(src, tgt);
     assert.ok(
@@ -109,11 +117,13 @@ describe("matchFields", () => {
 
   it("parent record names appear as both container and matchable fields", () => {
     // "address" itself is a field, plus its child "city" is also a field.
-    const src = [{
-      name: "address",
-      type: "record",
-      children: [{ name: "city", type: "VARCHAR" }],
-    }];
+    const src = [
+      {
+        name: "address",
+        type: "record",
+        children: [{ name: "city", type: "VARCHAR" }],
+      },
+    ];
     const tgt = [
       { name: "address", type: "record" },
       { name: "city", type: "VARCHAR" },

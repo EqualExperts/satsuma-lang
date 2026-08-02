@@ -102,10 +102,7 @@ export function registerCoverageCommand(
   _cliPath: string,
   client: LanguageClient,
 ): void {
-  coverageBar = vscode.window.createStatusBarItem(
-    vscode.StatusBarAlignment.Right,
-    100,
-  );
+  coverageBar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
   // The bar doubles as the overlay's dismiss affordance.
   coverageBar.command = "satsuma.clearCoverage";
   context.subscriptions.push(coverageBar);
@@ -138,9 +135,7 @@ export function registerCoverageCommand(
       }
 
       if (coverageResult.schemas.length === 0) {
-        vscode.window.showInformationMessage(
-          `No schemas found for mapping '${mappingName}'.`,
-        );
+        vscode.window.showInformationMessage(`No schemas found for mapping '${mappingName}'.`);
         return;
       }
 
@@ -150,9 +145,7 @@ export function registerCoverageCommand(
       createDecorationTypes(context.extensionPath);
 
       const grouped = groupCoverageByUri(coverageResult.schemas);
-      activeMarkers = new Map(
-        [...grouped].map(([uri, markers]) => [normalizeUri(uri), markers]),
-      );
+      activeMarkers = new Map([...grouped].map(([uri, markers]) => [normalizeUri(uri), markers]));
 
       // Decorate only what is already on screen; other affected files get
       // their icons when they become visible. Never open files here — one

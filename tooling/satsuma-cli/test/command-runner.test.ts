@@ -90,7 +90,9 @@ describe("runCommand return values", () => {
   it("exits 0 when the handler returns void", async () => {
     // The most common case: a successful command that printed its output
     // and has nothing more to say. The wrapper must default void → EXIT_OK.
-    const code = await runAndExpectExit(() => { /* no-op */ });
+    const code = await runAndExpectExit(() => {
+      /* no-op */
+    });
     assert.equal(code, EXIT_OK);
     assert.deepEqual(stderrLines, []);
     assert.deepEqual(stdoutLines, []);

@@ -17,11 +17,7 @@ import {
   expandEntityFields as _expandEntityFields,
   expandNestedSpreads as _expandNestedSpreads,
 } from "@satsuma/core";
-import type {
-  SpreadEntity,
-  SpreadDiagnostic,
-  ExpandedField,
-} from "@satsuma/core";
+import type { SpreadEntity, SpreadDiagnostic, ExpandedField } from "@satsuma/core";
 import { resolveScopedEntityRef } from "./index-builder.js";
 import type { FieldDecl, ExtractedWorkspace } from "./types.js";
 
@@ -49,7 +45,15 @@ export function expandSpreads(
   const resolveRef = makeIndexRefResolver(currentNs, index.fragments);
   const lookupFragment = (key: string) => index.fragments.get(key);
   const lookupSchema = (key: string) => index.schemas.get(key);
-  return _expandSpreads(schemaKeys, currentNs, resolveRef, lookupFragment, fieldPaths, diagnostics, lookupSchema);
+  return _expandSpreads(
+    schemaKeys,
+    currentNs,
+    resolveRef,
+    lookupFragment,
+    fieldPaths,
+    diagnostics,
+    lookupSchema,
+  );
 }
 
 /**

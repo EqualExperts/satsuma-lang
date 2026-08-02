@@ -39,9 +39,9 @@ async function openMappingDetail(
   await page
     .locator(`[data-testid='overview-mapping-card-${mappingTestId}']`)
     .dispatchEvent("click");
-  await expect(
-    page.locator(`[data-testid='mapping-detail-${mappingTestId}']`).first(),
-  ).toBeVisible({ timeout: 10_000 });
+  await expect(page.locator(`[data-testid='mapping-detail-${mappingTestId}']`).first()).toBeVisible(
+    { timeout: 10_000 },
+  );
 }
 
 test("mapping-level metadata renders in the detail header", async ({ page }) => {
@@ -65,9 +65,7 @@ test("non-constraint field metadata renders as pills on the field row", async ({
   // appear as key+value pills instead of being silently dropped.
   await openMappingDetail(page, governanceUri, "customer-360-assembly");
 
-  const fieldRow = page
-    .locator("[data-testid$='-field-first-name']")
-    .first();
+  const fieldRow = page.locator("[data-testid$='-field-first-name']").first();
   await expect(fieldRow).toBeVisible();
 
   const pills = fieldRow.locator(".badge.field-meta");

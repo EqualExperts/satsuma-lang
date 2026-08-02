@@ -29,7 +29,7 @@ export function run(cli: string, ...args: string[]): Promise<RunResult> {
       resolve({
         stdout: stdout ?? "",
         stderr: stderr ?? "",
-        code: err ? err.code ?? 1 : 0,
+        code: err ? (err.code ?? 1) : 0,
       });
     });
   });
@@ -46,7 +46,10 @@ export interface MockNode {
   text: string;
   startPosition: { row: number; column: number };
   namedChildren: MockNode[];
-  children: Array<MockNode | { type: string; text: string; isNamed: boolean; namedChildren: never[]; children: never[] }>;
+  children: Array<
+    | MockNode
+    | { type: string; text: string; isNamed: boolean; namedChildren: never[]; children: never[] }
+  >;
   isNamed: boolean;
 }
 
@@ -61,8 +64,11 @@ export function mockNode(
   const children: MockNode["children"] = [];
   children.push(
     ...anonymousChildren.map((t) => ({
-      type: t, text: t, isNamed: false as const,
-      namedChildren: [] as never[], children: [] as never[],
+      type: t,
+      text: t,
+      isNamed: false as const,
+      namedChildren: [] as never[],
+      children: [] as never[],
     })),
   );
   children.push(...namedChildren.map((c) => ({ ...c, isNamed: true as const })));

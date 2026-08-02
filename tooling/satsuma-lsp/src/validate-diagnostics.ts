@@ -1,9 +1,4 @@
-import {
-  Diagnostic,
-  DiagnosticSeverity,
-  Range,
-  Position,
-} from "vscode-languageserver";
+import { Diagnostic, DiagnosticSeverity, Range, Position } from "vscode-languageserver";
 import { execFile } from "node:child_process";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { canonicalizeFileUri } from "./workspace-index";
@@ -103,10 +98,7 @@ export async function runValidate(
             const col = Math.max(0, entry.column - 1);
 
             const diag: Diagnostic = {
-              range: Range.create(
-                Position.create(line, col),
-                Position.create(line, col),
-              ),
+              range: Range.create(Position.create(line, col), Position.create(line, col)),
               severity: SEVERITY_MAP[entry.severity] ?? DiagnosticSeverity.Warning,
               source: "satsuma-validate",
               code: entry.rule,

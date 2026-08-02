@@ -45,9 +45,9 @@ function trimTrailingNewlines(text: string): string {
 }
 
 function isComment(node: SyntaxNode): boolean {
-  return node.type === "comment" ||
-         node.type === "warning_comment" ||
-         node.type === "question_comment";
+  return (
+    node.type === "comment" || node.type === "warning_comment" || node.type === "question_comment"
+  );
 }
 
 function isImport(node: SyntaxNode): boolean {
@@ -74,7 +74,7 @@ function findChild(node: SyntaxNode, type: string): SyntaxNode | null {
 
 /** Find all children of a given type. */
 function findChildren(node: SyntaxNode, type: string): SyntaxNode[] {
-  return node.children.filter(c => c.type === type);
+  return node.children.filter((c) => c.type === type);
 }
 
 // Body-type names recognised when scanning block-level children for gap
@@ -82,9 +82,7 @@ function findChildren(node: SyntaxNode, type: string): SyntaxNode[] {
 // node and `}`).  Tree-sitter places extras (comments) at the nearest
 // enclosing named node, so a comment before the first body child lands as
 // a sibling of the body inside the block — not inside the body itself.
-const BODY_TYPES = new Set([
-  "schema_body", "mapping_body", "pipe_chain",
-]);
+const BODY_TYPES = new Set(["schema_body", "mapping_body", "pipe_chain"]);
 
 /**
  * Collect comments that appear between the opening `{` and the body node.
@@ -97,15 +95,16 @@ const BODY_TYPES = new Set([
  * Returns a formatted string (with leading newline per comment) ready to
  * append after the opening `{` line.
  */
-function collectBlockLeadingComments(
-  node: SyntaxNode, indent: number
-): string {
+function collectBlockLeadingComments(node: SyntaxNode, indent: number): string {
   const comments: string[] = [];
   let braceRow = -1;
 
   for (const child of node.children) {
-    if (child.type === "{") { braceRow = child.startPosition.row; continue; }
-    if (braceRow < 0) continue;                           // still before `{`
+    if (child.type === "{") {
+      braceRow = child.startPosition.row;
+      continue;
+    }
+    if (braceRow < 0) continue; // still before `{`
     if (BODY_TYPES.has(child.type) || child.type === "}") break;
     if (isComment(child)) {
       // Skip inline comments on the brace line — callers keep those on the
@@ -114,9 +113,7 @@ function collectBlockLeadingComments(
       comments.push(formatComment(child, indent + 1));
     }
   }
-  return comments.length > 0
-    ? "\n" + comments.join("\n")
-    : "";
+  return comments.length > 0 ? "\n" + comments.join("\n") : "";
 }
 
 /**
@@ -127,7 +124,7 @@ function collectBlockLeadingComments(
  * brace-row comment belongs after the brace (sl-dz3n).
  */
 function braceLineCommentSuffix(node: SyntaxNode): string {
-  const openBrace = node.children.find(c => c.type === "{");
+  const openBrace = node.children.find((c) => c.type === "{");
   if (!openBrace) return "";
   let suffix = "";
   for (const child of node.children) {
@@ -144,11 +141,13 @@ function braceLineCommentSuffix(node: SyntaxNode): string {
  * on the last body item. Returns the formatted comment lines.
  */
 function collectBlockTrailingComments(
-  node: SyntaxNode, bodyEndRow: number, indent: number
+  node: SyntaxNode,
+  bodyEndRow: number,
+  indent: number,
 ): string {
   const comments: string[] = [];
   let foundBody = false;
-  const openBrace = node.children.find(c => c.type === "{");
+  const openBrace = node.children.find((c) => c.type === "{");
   const openBraceRow = openBrace?.startPosition.row ?? -1;
 
   for (const child of node.children) {
@@ -173,7 +172,7 @@ function collectBlockTrailingComments(
 
 /** Check if a field_decl is multi-line (has a { } body — record or list_of record). */
 function isMultiLineField(node: SyntaxNode): boolean {
-  return node.children.some(c => c.type === "{");
+  return node.children.some((c) => c.type === "{");
 }
 
 /** Get the field name text from a field_decl. */
@@ -186,9 +185,9 @@ function fieldNameText(node: SyntaxNode): string {
 
 /** Get the display type string for a field_decl (for column alignment). */
 function fieldTypeText(node: SyntaxNode): string {
-  const hasListOf = node.children.some(c => c.type === "list_of");
+  const hasListOf = node.children.some((c) => c.type === "list_of");
   const typeExpr = findChild(node, "type_expr");
-  const hasRecord = node.children.some(c => c.type === "record");
+  const hasRecord = node.children.some((c) => c.type === "record");
 
   if (hasListOf && hasRecord) return "list_of record";
   if (hasListOf && typeExpr) return "list_of " + typeExpr.text;
@@ -245,8 +244,8 @@ function topLevelSep(prev: SyntaxNode, curr: SyntaxNode, seenNonComment: boolean
       // Preserve blank line between header comments when source had one
       return hasBlankBetween(prev, curr) ? "\n\n" : "\n";
     }
-    if (isImport(curr)) return "\n";        // header → imports: no blank line
-    return "\n\n";                          // header → first block: one blank line
+    if (isImport(curr)) return "\n"; // header → imports: no blank line
+    return "\n\n"; // header → first block: one blank line
   }
 
   // comment → non-comment: pull tight (comment annotates what follows)
@@ -264,13 +263,20 @@ function topLevelSep(prev: SyntaxNode, curr: SyntaxNode, seenNonComment: boolean
 
 function formatTopLevel(node: SyntaxNode, source: string, indent: number): string {
   switch (node.type) {
-    case "schema_block":    return formatSchemaBlock(node, source, indent);
-    case "fragment_block":  return formatFragmentBlock(node, source, indent);
-    case "mapping_block":   return formatMappingBlock(node, source, indent);
-    case "transform_block": return formatTransformBlock(node, source, indent);
-    case "note_block":      return formatNoteBlock(node, source, indent);
-    case "import_decl":     return formatImportDecl(node, source, indent);
-    case "namespace_block": return formatNamespaceBlock(node, source, indent);
+    case "schema_block":
+      return formatSchemaBlock(node, source, indent);
+    case "fragment_block":
+      return formatFragmentBlock(node, source, indent);
+    case "mapping_block":
+      return formatMappingBlock(node, source, indent);
+    case "transform_block":
+      return formatTransformBlock(node, source, indent);
+    case "note_block":
+      return formatNoteBlock(node, source, indent);
+    case "import_decl":
+      return formatImportDecl(node, source, indent);
+    case "namespace_block":
+      return formatNamespaceBlock(node, source, indent);
     case "comment":
     case "warning_comment":
     case "question_comment":
@@ -428,9 +434,9 @@ function formatSchemaBody(body: SyntaxNode, source: string, indent: number): str
 }
 
 interface FieldAlignment {
-  nameCol: number;   // max name width (capped)
-  typeCol: number;   // column where type starts (relative to indent)
-  metaCol: number;   // column where metadata starts (relative to indent)
+  nameCol: number; // max name width (capped)
+  typeCol: number; // column where type starts (relative to indent)
+  metaCol: number; // column where metadata starts (relative to indent)
 }
 
 /**
@@ -464,8 +470,12 @@ function calcFieldAlignment(fields: SyntaxNode[]): FieldAlignment {
 }
 
 function formatSingleLineField(
-  node: SyntaxNode, source: string, indent: number,
-  _nameCol: number, typeCol: number, metaCol: number
+  node: SyntaxNode,
+  source: string,
+  indent: number,
+  _nameCol: number,
+  typeCol: number,
+  metaCol: number,
 ): string {
   const name = fieldNameText(node);
   const type = fieldTypeText(node);
@@ -499,8 +509,8 @@ function formatSingleLineField(
 
 function formatMultiLineField(node: SyntaxNode, source: string, indent: number): string {
   const name = fieldNameText(node);
-  const hasListOf = node.children.some(c => c.type === "list_of");
-  const hasRecord = node.children.some(c => c.type === "record");
+  const hasListOf = node.children.some((c) => c.type === "list_of");
+  const hasRecord = node.children.some((c) => c.type === "record");
   const meta = findChild(node, "metadata_block");
   const body = findChild(node, "schema_body");
 
@@ -514,7 +524,7 @@ function formatMultiLineField(node: SyntaxNode, source: string, indent: number):
 
   line += " {" + braceLineCommentSuffix(node);
 
-  const openBrace = node.children.find(c => c.type === "{");
+  const openBrace = node.children.find((c) => c.type === "{");
   const leading = collectBlockLeadingComments(node, indent);
 
   if (!body || body.namedChildren.length === 0) {
@@ -545,8 +555,8 @@ function formatFragmentSpread(node: SyntaxNode, indent: number): string {
   }
   // _spread_words: identifier followed by zero or more continuation_words
   const words = label.children
-    .filter(c => c.type === "identifier" || c.type === "continuation_word")
-    .map(c => c.text);
+    .filter((c) => c.type === "identifier" || c.type === "continuation_word")
+    .map((c) => c.text);
   return ind(indent) + "..." + words.join(" ");
 }
 
@@ -643,7 +653,7 @@ type SourceBlockItem = { node: SyntaxNode; text: string; isComment: boolean };
 
 /** Gather refs, join strings, and body comments of a source/target block in order. */
 function collectSourceBlockItems(node: SyntaxNode, source: string): SourceBlockItem[] {
-  const openBrace = node.children.find(c => c.type === "{");
+  const openBrace = node.children.find((c) => c.type === "{");
   const braceRow = openBrace?.startPosition.row ?? -1;
 
   const items: SourceBlockItem[] = [];
@@ -667,9 +677,11 @@ function collectSourceBlockItems(node: SyntaxNode, source: string): SourceBlockI
  * (comma-separated, sl-q9oj); target blocks have no commas.
  */
 function formatSourceBlockBody(
-  items: SourceBlockItem[], indent: number, withCommas: boolean
+  items: SourceBlockItem[],
+  indent: number,
+  withCommas: boolean,
 ): string {
-  const entryCount = items.filter(i => !i.isComment).length;
+  const entryCount = items.filter((i) => !i.isComment).length;
   const lines: string[] = [];
   let entryIdx = 0;
   let prev: SyntaxNode | null = null;
@@ -693,10 +705,10 @@ function formatSourceBlockBody(
 
 function formatSourceBlock(node: SyntaxNode, source: string, indent: number): string {
   const items = collectSourceBlockItems(node, source);
-  const entries = items.filter(i => !i.isComment);
-  const nlStrings = entries.filter(i => i.node.type === "nl_string");
+  const entries = items.filter((i) => !i.isComment);
+  const nlStrings = entries.filter((i) => i.node.type === "nl_string");
   const braceSuffix = braceLineCommentSuffix(node);
-  const hasComments = braceSuffix !== "" || items.some(i => i.isComment);
+  const hasComments = braceSuffix !== "" || items.some((i) => i.isComment);
 
   if (items.length === 0) {
     // An empty block can still carry a brace-row comment: `source {  // c`
@@ -707,9 +719,9 @@ function formatSourceBlock(node: SyntaxNode, source: string, indent: number): st
 
   // Try single-line (comments can never share a single line — they would
   // comment out the closing brace)
-  const entryTexts = entries.map(i => i.text);
+  const entryTexts = entries.map((i) => i.text);
   const singleLine = ind(indent) + "source { " + entryTexts.join(", ") + " }";
-  if (!hasComments && singleLine.length <= 80 && !entryTexts.some(s => s.includes("\n"))) {
+  if (!hasComments && singleLine.length <= 80 && !entryTexts.some((s) => s.includes("\n"))) {
     // For multi-ref sources, use multi-line
     if (entries.length <= 1 && nlStrings.length === 0) {
       return singleLine;
@@ -724,11 +736,12 @@ function formatSourceBlock(node: SyntaxNode, source: string, indent: number): st
 }
 
 function formatTargetBlock(node: SyntaxNode, source: string, indent: number): string {
-  const items = collectSourceBlockItems(node, source)
-    .filter(i => i.isComment || i.node.type === "source_ref");
-  const entries = items.filter(i => !i.isComment);
+  const items = collectSourceBlockItems(node, source).filter(
+    (i) => i.isComment || i.node.type === "source_ref",
+  );
+  const entries = items.filter((i) => !i.isComment);
   const braceSuffix = braceLineCommentSuffix(node);
-  const hasComments = braceSuffix !== "" || items.some(i => i.isComment);
+  const hasComments = braceSuffix !== "" || items.some((i) => i.isComment);
 
   if (items.length === 0) {
     // An empty block can still carry a brace-row comment: `target {  // c`
@@ -751,7 +764,13 @@ function formatSourceRef(node: SyntaxNode, source: string): string {
   for (const child of node.children) {
     if (child.type === "metadata_block") {
       parts.push(formatMetadataInline(child, source));
-    } else if (child.isNamed || child.type === "identifier" || child.type === "qualified_name" || child.type === "backtick_name" || child.type === "nl_string") {
+    } else if (
+      child.isNamed ||
+      child.type === "identifier" ||
+      child.type === "qualified_name" ||
+      child.type === "backtick_name" ||
+      child.type === "nl_string"
+    ) {
       parts.push(child.text);
     }
   }
@@ -768,7 +787,11 @@ function formatSourceRef(node: SyntaxNode, source: string): string {
  * between the chain and `}` (sl-dz3n).
  */
 function formatArrowTransformBody(
-  node: SyntaxNode, pipeChain: SyntaxNode, line: string, source: string, indent: number
+  node: SyntaxNode,
+  pipeChain: SyntaxNode,
+  line: string,
+  source: string,
+  indent: number,
 ): string {
   // Comments that are direct children of the arrow node all live inside the
   // braces: a `//` comment before `{` would comment the brace out.
@@ -783,9 +806,18 @@ function formatArrowTransformBody(
   const braceSuffix = braceLineCommentSuffix(node);
   const leading = collectBlockLeadingComments(node, indent);
   const trailing = collectBlockTrailingComments(node, pipeChain.endPosition.row, indent);
-  return line + " {" + braceSuffix + leading + "\n"
-    + formatPipeChainMultiLine(pipeChain, source, indent + 1)
-    + trailing + "\n" + ind(indent) + "}";
+  return (
+    line +
+    " {" +
+    braceSuffix +
+    leading +
+    "\n" +
+    formatPipeChainMultiLine(pipeChain, source, indent + 1) +
+    trailing +
+    "\n" +
+    ind(indent) +
+    "}"
+  );
 }
 
 function formatMapArrow(node: SyntaxNode, source: string, indent: number): string {
@@ -832,8 +864,8 @@ function formatNestedArrow(node: SyntaxNode, source: string, indent: number): st
   if (meta) line += " " + formatMetadataInline(meta, source, indent);
 
   // Inner arrows
-  const innerArrows = node.children.filter(c =>
-    c.type === "map_arrow" || c.type === "computed_arrow" || c.type === "nested_arrow"
+  const innerArrows = node.children.filter(
+    (c) => c.type === "map_arrow" || c.type === "computed_arrow" || c.type === "nested_arrow",
   );
 
   if (innerArrows.length === 0) {
@@ -844,7 +876,8 @@ function formatNestedArrow(node: SyntaxNode, source: string, indent: number): st
   let prev: SyntaxNode | null = null;
   for (const child of node.children) {
     if (!child.isNamed && !isComment(child)) continue;
-    if (child.type === "src_path" || child.type === "tgt_path" || child.type === "metadata_block") continue;
+    if (child.type === "src_path" || child.type === "tgt_path" || child.type === "metadata_block")
+      continue;
 
     if (prev !== null && hasBlankBetween(prev, child)) {
       innerLines.push("");
@@ -876,7 +909,10 @@ function formatNestedArrow(node: SyntaxNode, source: string, indent: number): st
 // ── Each/Flatten Blocks ───────────────────────────────────────────────────────
 
 function formatEachFlattenBlock(
-  node: SyntaxNode, source: string, indent: number, keyword: string
+  node: SyntaxNode,
+  source: string,
+  indent: number,
+  keyword: string,
 ): string {
   const srcPath = findChild(node, "src_path");
   const tgtPath = findChild(node, "tgt_path");
@@ -897,7 +933,8 @@ function formatEachFlattenBlock(
 
   for (const child of node.children) {
     if (!child.isNamed && !isComment(child)) continue;
-    if (child.type === "src_path" || child.type === "tgt_path" || child.type === "metadata_block") continue;
+    if (child.type === "src_path" || child.type === "tgt_path" || child.type === "metadata_block")
+      continue;
     if (child.type === keyword) continue; // skip the keyword itself
 
     if (prev !== null && hasBlankBetween(prev, child)) {
@@ -1029,14 +1066,14 @@ function formatMapLiteral(node: SyntaxNode, _source: string, indent: number): st
   if (entries.length === 0) return "map { }";
 
   // Try single-line: map { key: val, key: val }
-  const entryStrs = entries.map(e => formatMapEntry(e));
+  const entryStrs = entries.map((e) => formatMapEntry(e));
   const singleLine = "map { " + entryStrs.join(", ") + " }";
   if (singleLine.length + ind(indent).length <= 80 && entries.length <= 3) {
     return singleLine;
   }
 
   // Multi-line
-  const inner = entryStrs.map(e => ind(indent + 1) + e).join("\n");
+  const inner = entryStrs.map((e) => ind(indent + 1) + e).join("\n");
   return "map {\n" + inner + "\n" + ind(indent) + "}";
 }
 
@@ -1073,7 +1110,13 @@ function formatTransformBlock(node: SyntaxNode, source: string, indent: number):
   // Try single-line (only when no comments exist anywhere in the body)
   const chainStr = formatPipeChain(pipeChain, source, indent);
   const singleLine = line + " { " + chainStr + " }";
-  if (!braceSuffix && !leading && !trailing && isInlinePipeChain(pipeChain) && singleLine.length <= 80) {
+  if (
+    !braceSuffix &&
+    !leading &&
+    !trailing &&
+    isInlinePipeChain(pipeChain) &&
+    singleLine.length <= 80
+  ) {
     return line + " {\n" + ind(indent + 1) + chainStr + "\n" + ind(indent) + "}";
   }
 
@@ -1088,7 +1131,7 @@ function formatNoteBlock(node: SyntaxNode, _source: string, indent: number): str
   // Body items in source order: strings plus any comments between them
   // (sl-dz3n). Brace-row comments stay on the `note {` line via the suffix.
   const braceSuffix = braceLineCommentSuffix(node);
-  const openBrace = node.children.find(c => c.type === "{");
+  const openBrace = node.children.find((c) => c.type === "{");
   const braceRow = openBrace?.startPosition.row ?? -1;
 
   const items: SyntaxNode[] = [];
@@ -1166,7 +1209,7 @@ function formatImportName(node: SyntaxNode): string {
 // ── Namespace Block ───────────────────────────────────────────────────────────
 
 function formatNamespaceBlock(node: SyntaxNode, source: string, indent: number): string {
-  const name = node.children.find(c => c.type === "identifier");
+  const name = node.children.find((c) => c.type === "identifier");
   const meta = findChild(node, "metadata_block");
 
   let line = ind(indent) + "namespace " + (name?.text || "");
@@ -1177,7 +1220,10 @@ function formatNamespaceBlock(node: SyntaxNode, source: string, indent: number):
   const innerItems: SyntaxNode[] = [];
   let insideBody = false;
   for (const child of node.children) {
-    if (child.type === "{") { insideBody = true; continue; }
+    if (child.type === "{") {
+      insideBody = true;
+      continue;
+    }
     if (child.type === "}") break;
     if (insideBody && (child.isNamed || isComment(child))) {
       innerItems.push(child);
@@ -1240,13 +1286,14 @@ function formatMetadataBlock(node: SyntaxNode, source: string, indent: number): 
 
   // Comments cannot share a single line (they would comment out everything
   // after them), and multiline strings never fit one — both force multi-line.
-  if (items.some(i => i.isComment) || hasMultilineString(node)) {
+  if (items.some((i) => i.isComment) || hasMultilineString(node)) {
     return formatMetadataMultiLine(items, indent);
   }
 
   // Try single-line
-  const singleLine = "(" + items.map(i => i.text).join(", ") + ")";
-  if (singleLine.length + ind(indent).length + 20 <= 80) { // rough line length check
+  const singleLine = "(" + items.map((i) => i.text).join(", ") + ")";
+  if (singleLine.length + ind(indent).length + 20 <= 80) {
+    // rough line length check
     return singleLine;
   }
 
@@ -1259,16 +1306,16 @@ function formatMetadataInline(node: SyntaxNode, source: string, indent: number =
   // Inline contexts (arrows, source refs) still fall back to the multi-line
   // layout when comments are present — there is no way to keep a `//`
   // comment on a shared line without commenting out the rest of it (sl-dz3n).
-  if (items.some(i => i.isComment)) {
+  if (items.some((i) => i.isComment)) {
     return formatMetadataMultiLine(items, indent);
   }
-  return "(" + items.map(i => i.text).join(", ") + ")";
+  return "(" + items.map((i) => i.text).join(", ") + ")";
 }
 
 function formatMetadataMultiLine(items: MetadataItem[], indent: number): string {
   if (items.length === 0) return "()";
 
-  const entryCount = items.filter(i => !i.isComment).length;
+  const entryCount = items.filter((i) => !i.isComment).length;
   const lines: string[] = ["("];
   let entryIdx = 0;
   let prev: SyntaxNode | null = null;
@@ -1347,7 +1394,8 @@ function formatNoteTag(node: SyntaxNode, _source: string): string {
 function formatEnumBody(node: SyntaxNode): string {
   const items: string[] = [];
   for (const child of node.children) {
-    if (child.type === "enum" || child.type === "{" || child.type === "}" || child.type === ",") continue;
+    if (child.type === "enum" || child.type === "{" || child.type === "}" || child.type === ",")
+      continue;
     items.push(child.text);
   }
   return "enum {" + items.join(", ") + "}";
@@ -1356,9 +1404,9 @@ function formatEnumBody(node: SyntaxNode): string {
 function formatSliceBody(node: SyntaxNode): string {
   const items: string[] = [];
   for (const child of node.children) {
-    if (child.type === "slice" || child.type === "{" || child.type === "}" || child.type === ",") continue;
+    if (child.type === "slice" || child.type === "{" || child.type === "}" || child.type === ",")
+      continue;
     if (child.type === "identifier") items.push(child.text);
   }
   return "slice {" + items.join(", ") + "}";
 }
-

@@ -106,7 +106,15 @@ describe("duplicate-definition diagnostics", () => {
     // is surfaced as an "error" (not warning) with rule=duplicate-definition.
     const index = makeIndex({
       duplicates: [
-        { kind: "schema", previousKind: "schema", name: "customers", file: "b.stm", row: 5, previousFile: "a.stm", previousRow: 0 },
+        {
+          kind: "schema",
+          previousKind: "schema",
+          name: "customers",
+          file: "b.stm",
+          row: 5,
+          previousFile: "a.stm",
+          previousRow: 0,
+        },
       ],
     });
     const diags = collectSemanticDiagnostics(index);
@@ -122,14 +130,28 @@ describe("duplicate-definition diagnostics", () => {
     // message must mention both kinds so the user knows which two entities conflict.
     const index = makeIndex({
       duplicates: [
-        { kind: "mapping", previousKind: "schema", name: "orders", file: "b.stm", row: 2, previousFile: "a.stm", previousRow: 0 },
+        {
+          kind: "mapping",
+          previousKind: "schema",
+          name: "orders",
+          file: "b.stm",
+          row: 2,
+          previousFile: "a.stm",
+          previousRow: 0,
+        },
       ],
     });
     const diags = collectSemanticDiagnostics(index);
     assert.equal(diags[0].rule, "duplicate-definition");
     // capitalize() uppercases the first letter; test with lower-case after the first character.
-    assert.ok(diags[0].message.toLowerCase().includes("mapping"), "message must name the current kind");
-    assert.ok(diags[0].message.toLowerCase().includes("schema"), "message must name the prior kind");
+    assert.ok(
+      diags[0].message.toLowerCase().includes("mapping"),
+      "message must name the current kind",
+    );
+    assert.ok(
+      diags[0].message.toLowerCase().includes("schema"),
+      "message must name the prior kind",
+    );
   });
 
   it("reports namespace-metadata-conflict when two files disagree on namespace metadata", () => {
@@ -138,9 +160,16 @@ describe("duplicate-definition diagnostics", () => {
     const index = makeIndex({
       duplicates: [
         {
-          kind: "namespace-metadata", previousKind: "namespace-metadata",
-          name: "pos", tag: "note", value: "Oracle", previousValue: "SAP",
-          file: "b.stm", row: 3, previousFile: "a.stm", previousRow: 0,
+          kind: "namespace-metadata",
+          previousKind: "namespace-metadata",
+          name: "pos",
+          tag: "note",
+          value: "Oracle",
+          previousValue: "SAP",
+          file: "b.stm",
+          row: 3,
+          previousFile: "a.stm",
+          previousRow: 0,
         },
       ],
     });
@@ -171,7 +200,9 @@ describe("undefined fragment spread diagnostics", () => {
       schemas: [{ name: "hub_customer", spreads: ["audit_fields"], fields: [] }],
     });
     const diags = collectSemanticDiagnostics(index);
-    const spreadDiag = diags.find((d) => d.rule === "undefined-ref" && d.message.includes("audit_fields"));
+    const spreadDiag = diags.find(
+      (d) => d.rule === "undefined-ref" && d.message.includes("audit_fields"),
+    );
     assert.ok(spreadDiag, "should warn about missing fragment spread");
   });
 
@@ -182,7 +213,9 @@ describe("undefined fragment spread diagnostics", () => {
       fragments: [{ name: "audit_fields", fields: [] }],
     });
     const diags = collectSemanticDiagnostics(index);
-    const spreadDiags = diags.filter((d) => d.rule === "undefined-ref" && d.message.includes("audit_fields"));
+    const spreadDiags = diags.filter(
+      (d) => d.rule === "undefined-ref" && d.message.includes("audit_fields"),
+    );
     assert.equal(spreadDiags.length, 0);
   });
 });
@@ -198,7 +231,9 @@ describe("mapping source/target reference diagnostics", () => {
       schemas: [{ name: "hub_customer", fields: [] }],
     });
     const diags = collectSemanticDiagnostics(index);
-    const srcDiag = diags.find((d) => d.rule === "undefined-ref" && d.message.includes("ghost_schema"));
+    const srcDiag = diags.find(
+      (d) => d.rule === "undefined-ref" && d.message.includes("ghost_schema"),
+    );
     assert.ok(srcDiag, "should warn about missing source schema");
   });
 
@@ -208,7 +243,9 @@ describe("mapping source/target reference diagnostics", () => {
       schemas: [{ name: "orders", fields: [] }],
     });
     const diags = collectSemanticDiagnostics(index);
-    const tgtDiag = diags.find((d) => d.rule === "undefined-ref" && d.message.includes("nonexistent_target"));
+    const tgtDiag = diags.find(
+      (d) => d.rule === "undefined-ref" && d.message.includes("nonexistent_target"),
+    );
     assert.ok(tgtDiag, "should warn about missing target schema");
   });
 
@@ -223,7 +260,9 @@ describe("mapping source/target reference diagnostics", () => {
       ],
     });
     const diags = collectSemanticDiagnostics(index);
-    const srcDiag = diags.find((d) => d.message.includes("customers") && d.message.includes("hint"));
+    const srcDiag = diags.find(
+      (d) => d.message.includes("customers") && d.message.includes("hint"),
+    );
     assert.ok(srcDiag, "should include namespace hint in message");
   });
 
@@ -261,7 +300,9 @@ describe("metric source reference diagnostics", () => {
       schemas: [{ name: "orders", fields: [] }],
     });
     const diags = collectSemanticDiagnostics(index);
-    const metricDiags = diags.filter((d) => d.rule === "undefined-ref" && d.message.includes("mrr"));
+    const metricDiags = diags.filter(
+      (d) => d.rule === "undefined-ref" && d.message.includes("mrr"),
+    );
     assert.equal(metricDiags.length, 0);
   });
 });
@@ -278,31 +319,49 @@ describe("arrow field-not-in-schema diagnostics", () => {
         { name: "hub_orders", fields: [{ name: "order_hk", type: "CHAR(32)" }] },
       ],
       mappings: [{ name: "load orders", sources: ["orders"], targets: ["hub_orders"] }],
-      fieldArrows: [{
-        mapping: "load orders", namespace: null,
-        sources: ["nonexistent_field"],
-        target: "order_hk",
-        steps: [], line: 5, file: "test.stm",
-      }],
+      fieldArrows: [
+        {
+          mapping: "load orders",
+          namespace: null,
+          sources: ["nonexistent_field"],
+          target: "order_hk",
+          steps: [],
+          line: 5,
+          file: "test.stm",
+        },
+      ],
     });
     const diags = collectSemanticDiagnostics(index);
-    const fieldDiag = diags.find((d) => d.rule === "field-not-in-schema" && d.message.includes("nonexistent_field"));
+    const fieldDiag = diags.find(
+      (d) => d.rule === "field-not-in-schema" && d.message.includes("nonexistent_field"),
+    );
     assert.ok(fieldDiag, "should warn about undeclared arrow source field");
   });
 
   it("does not warn when the arrow source field exists in the schema", () => {
     const index = makeIndex({
       schemas: [
-        { name: "orders", fields: [{ name: "id", type: "INT" }, { name: "amount", type: "DECIMAL" }] },
+        {
+          name: "orders",
+          fields: [
+            { name: "id", type: "INT" },
+            { name: "amount", type: "DECIMAL" },
+          ],
+        },
         { name: "hub_orders", fields: [{ name: "order_hk", type: "CHAR(32)" }] },
       ],
       mappings: [{ name: "load orders", sources: ["orders"], targets: ["hub_orders"] }],
-      fieldArrows: [{
-        mapping: "load orders", namespace: null,
-        sources: ["id"],
-        target: "order_hk",
-        steps: [], line: 5, file: "test.stm",
-      }],
+      fieldArrows: [
+        {
+          mapping: "load orders",
+          namespace: null,
+          sources: ["id"],
+          target: "order_hk",
+          steps: [],
+          line: 5,
+          file: "test.stm",
+        },
+      ],
     });
     const diags = collectSemanticDiagnostics(index);
     const fieldDiags = diags.filter((d) => d.rule === "field-not-in-schema");
@@ -318,21 +377,28 @@ describe("arrow field-not-in-schema diagnostics", () => {
         {
           name: "orders",
           fields: [{ name: "id", type: "INT" }],
-          spreads: ["base_fields"],  // unresolvable: base_fields not in fragments
+          spreads: ["base_fields"], // unresolvable: base_fields not in fragments
           hasSpreads: true,
         },
         { name: "hub_orders", fields: [{ name: "order_hk", type: "CHAR(32)" }] },
       ],
       mappings: [{ name: "load orders", sources: ["orders"], targets: ["hub_orders"] }],
-      fieldArrows: [{
-        mapping: "load orders", namespace: null,
-        sources: ["spread_sourced_field"],
-        target: "order_hk",
-        steps: [], line: 5, file: "test.stm",
-      }],
+      fieldArrows: [
+        {
+          mapping: "load orders",
+          namespace: null,
+          sources: ["spread_sourced_field"],
+          target: "order_hk",
+          steps: [],
+          line: 5,
+          file: "test.stm",
+        },
+      ],
     });
     const diags = collectSemanticDiagnostics(index);
-    const fieldDiags = diags.filter((d) => d.rule === "field-not-in-schema" && d.message.includes("spread_sourced_field"));
+    const fieldDiags = diags.filter(
+      (d) => d.rule === "field-not-in-schema" && d.message.includes("spread_sourced_field"),
+    );
     assert.equal(fieldDiags.length, 0, "must not warn when source has unresolved spreads");
   });
 
@@ -350,17 +416,25 @@ describe("arrow field-not-in-schema diagnostics", () => {
         { name: "z", fields: [{ name: "z_created", type: "TIMESTAMP" }] },
       ],
       mappings: [{ name: "m", sources: ["s1", "s2"], targets: ["z"] }],
-      fieldArrows: [{
-        mapping: "m", namespace: null,
-        sources: ["s2.created_at"],
-        target: "z_created",
-        steps: [], line: 5, file: "test.stm",
-      }],
+      fieldArrows: [
+        {
+          mapping: "m",
+          namespace: null,
+          sources: ["s2.created_at"],
+          target: "z_created",
+          steps: [],
+          line: 5,
+          file: "test.stm",
+        },
+      ],
     });
     const diags = collectSemanticDiagnostics(index);
     const fieldDiags = diags.filter((d) => d.rule === "field-not-in-schema");
-    assert.deepEqual(fieldDiags.map((d) => d.message), [],
-      "qualified spread-inherited field must validate clean");
+    assert.deepEqual(
+      fieldDiags.map((d) => d.message),
+      [],
+      "qualified spread-inherited field must validate clean",
+    );
   });
 
   it("blames the schema a qualified path names, not the first source (sl-kkao)", () => {
@@ -373,15 +447,22 @@ describe("arrow field-not-in-schema diagnostics", () => {
         { name: "z", fields: [{ name: "z_created", type: "TIMESTAMP" }] },
       ],
       mappings: [{ name: "m", sources: ["s1", "s2"], targets: ["z"] }],
-      fieldArrows: [{
-        mapping: "m", namespace: null,
-        sources: ["s2.missing"],
-        target: "z_created",
-        steps: [], line: 5, file: "test.stm",
-      }],
+      fieldArrows: [
+        {
+          mapping: "m",
+          namespace: null,
+          sources: ["s2.missing"],
+          target: "z_created",
+          steps: [],
+          line: 5,
+          file: "test.stm",
+        },
+      ],
     });
     const diags = collectSemanticDiagnostics(index);
-    const diag = diags.find((d) => d.rule === "field-not-in-schema" && d.message.includes("s2.missing"));
+    const diag = diags.find(
+      (d) => d.rule === "field-not-in-schema" && d.message.includes("s2.missing"),
+    );
     assert.ok(diag, "should still warn for a genuinely missing qualified field");
     assert.match(diag.message, /schema 's2'/);
     assert.ok(!diag.message.includes("'s1'"), "must not blame the first source schema");
@@ -400,15 +481,22 @@ describe("transform spread diagnostics", () => {
         { name: "tgt", fields: [{ name: "id", type: "INT" }] },
       ],
       mappings: [{ name: "m", sources: ["src"], targets: ["tgt"] }],
-      fieldArrows: [{
-        mapping: "m", namespace: null,
-        sources: ["id"], target: "id",
-        steps: [{ type: "fragment_spread", text: "...ghost_transform" }],
-        line: 3, file: "test.stm",
-      }],
+      fieldArrows: [
+        {
+          mapping: "m",
+          namespace: null,
+          sources: ["id"],
+          target: "id",
+          steps: [{ type: "fragment_spread", text: "...ghost_transform" }],
+          line: 3,
+          file: "test.stm",
+        },
+      ],
     });
     const diags = collectSemanticDiagnostics(index);
-    const spreadDiag = diags.find((d) => d.rule === "undefined-ref" && d.message.includes("ghost_transform"));
+    const spreadDiag = diags.find(
+      (d) => d.rule === "undefined-ref" && d.message.includes("ghost_transform"),
+    );
     assert.ok(spreadDiag, "should warn about missing transform spread");
   });
 
@@ -420,15 +508,22 @@ describe("transform spread diagnostics", () => {
       ],
       mappings: [{ name: "m", sources: ["src"], targets: ["tgt"] }],
       transforms: [{ name: "hash_pk" }],
-      fieldArrows: [{
-        mapping: "m", namespace: null,
-        sources: ["id"], target: "id",
-        steps: [{ type: "fragment_spread", text: "...hash_pk" }],
-        line: 3, file: "test.stm",
-      }],
+      fieldArrows: [
+        {
+          mapping: "m",
+          namespace: null,
+          sources: ["id"],
+          target: "id",
+          steps: [{ type: "fragment_spread", text: "...hash_pk" }],
+          line: 3,
+          file: "test.stm",
+        },
+      ],
     });
     const diags = collectSemanticDiagnostics(index);
-    const spreadDiags = diags.filter((d) => d.rule === "undefined-ref" && d.message.includes("hash_pk"));
+    const spreadDiags = diags.filter(
+      (d) => d.rule === "undefined-ref" && d.message.includes("hash_pk"),
+    );
     assert.equal(spreadDiags.length, 0);
   });
 });
@@ -440,17 +535,23 @@ describe("ref metadata target diagnostics", () => {
     // (ref @ghost_schema) on a field is a cross-schema lineage annotation.
     // An unresolvable ref silently breaks lineage tracing — must be reported.
     const index = makeIndex({
-      schemas: [{
-        name: "hub_customer",
-        fields: [{
-          name: "customer_id",
-          type: "INT",
-          metadata: [{ kind: "kv", key: "ref", value: "@ghost_schema.id" }],
-        }],
-      }],
+      schemas: [
+        {
+          name: "hub_customer",
+          fields: [
+            {
+              name: "customer_id",
+              type: "INT",
+              metadata: [{ kind: "kv", key: "ref", value: "@ghost_schema.id" }],
+            },
+          ],
+        },
+      ],
     });
     const diags = collectSemanticDiagnostics(index);
-    const refDiag = diags.find((d) => d.rule === "undefined-ref" && d.message.includes("ghost_schema"));
+    const refDiag = diags.find(
+      (d) => d.rule === "undefined-ref" && d.message.includes("ghost_schema"),
+    );
     assert.ok(refDiag, "should warn about nonexistent ref metadata target");
   });
 
@@ -459,17 +560,21 @@ describe("ref metadata target diagnostics", () => {
       schemas: [
         {
           name: "hub_customer",
-          fields: [{
-            name: "customer_id",
-            type: "INT",
-            metadata: [{ kind: "kv", key: "ref", value: "@crm_customers.id" }],
-          }],
+          fields: [
+            {
+              name: "customer_id",
+              type: "INT",
+              metadata: [{ kind: "kv", key: "ref", value: "@crm_customers.id" }],
+            },
+          ],
         },
         { name: "crm_customers", fields: [{ name: "id", type: "INT" }] },
       ],
     });
     const diags = collectSemanticDiagnostics(index);
-    const refDiags = diags.filter((d) => d.rule === "undefined-ref" && d.message.includes("crm_customers"));
+    const refDiags = diags.filter(
+      (d) => d.rule === "undefined-ref" && d.message.includes("crm_customers"),
+    );
     assert.equal(refDiags.length, 0);
   });
 });
@@ -481,11 +586,14 @@ describe("validateSemanticWorkspace", () => {
     // This pins the shared consumer contract: callers pass resolved imports,
     // core computes reachability, and out-of-scope symbols use the CLI rule.
     const index = makeIndex({
-      schemas: [
-        { name: "customers", file: "/workspace/customers.stm" },
-      ],
+      schemas: [{ name: "customers", file: "/workspace/customers.stm" }],
       mappings: [
-        { name: "load customers", file: "/workspace/load.stm", sources: ["customers"], targets: ["customers"] },
+        {
+          name: "load customers",
+          file: "/workspace/load.stm",
+          sources: ["customers"],
+          targets: ["customers"],
+        },
       ],
     });
     const diags = validateSemanticWorkspace(index, {
@@ -510,11 +618,14 @@ describe("validateSemanticWorkspace", () => {
     // LSP diagnostics keep their historic public code/message while using the
     // same reachability algorithm as CLI validation.
     const index = makeIndex({
-      schemas: [
-        { name: "orders", file: "file:///workspace/orders.stm" },
-      ],
+      schemas: [{ name: "orders", file: "file:///workspace/orders.stm" }],
       mappings: [
-        { name: "load orders", file: "file:///workspace/load.stm", sources: ["orders"], targets: [] },
+        {
+          name: "load orders",
+          file: "file:///workspace/load.stm",
+          sources: ["orders"],
+          targets: [],
+        },
       ],
     });
     const diags = validateSemanticWorkspace(index, {
@@ -541,12 +652,16 @@ describe("constraint-in-type-args", () => {
     // `customer_id UUID(pk)` parses cleanly with (pk) as part of the type
     // token; without this diagnostic the pk constraint silently disappears.
     const index = makeIndex({
-      schemas: [{
-        name: "customers",
-        fields: [{ name: "customer_id", type: "UUID(pk)", startRow: 3 }],
-      }],
+      schemas: [
+        {
+          name: "customers",
+          fields: [{ name: "customer_id", type: "UUID(pk)", startRow: 3 }],
+        },
+      ],
     });
-    const diags = collectSemanticDiagnostics(index).filter((d) => d.rule === "constraint-in-type-args");
+    const diags = collectSemanticDiagnostics(index).filter(
+      (d) => d.rule === "constraint-in-type-args",
+    );
     assert.equal(diags.length, 1);
     assert.equal(diags[0].severity, "warning");
     assert.equal(diags[0].line, 4); // startRow 3 → 1-indexed line 4
@@ -558,33 +673,46 @@ describe("constraint-in-type-args", () => {
     // Type vocabulary is open-ended (spec 3.2); numeric and vendor args are
     // exactly what type parentheses are for.
     const index = makeIndex({
-      schemas: [{
-        name: "orders",
-        fields: [
-          { name: "amount", type: "DECIMAL(12,2)" },
-          { name: "notes", type: "VARCHAR(MAX)" },
-        ],
-      }],
+      schemas: [
+        {
+          name: "orders",
+          fields: [
+            { name: "amount", type: "DECIMAL(12,2)" },
+            { name: "notes", type: "VARCHAR(MAX)" },
+          ],
+        },
+      ],
     });
-    const diags = collectSemanticDiagnostics(index).filter((d) => d.rule === "constraint-in-type-args");
+    const diags = collectSemanticDiagnostics(index).filter(
+      (d) => d.rule === "constraint-in-type-args",
+    );
     assert.deepEqual(diags, []);
   });
 
   it("recurses into record children and checks fragments too", () => {
     const index = makeIndex({
-      schemas: [{
-        name: "order",
-        fields: [{
-          name: "customer", type: "record",
-          children: [{ name: "id", type: "STRING(required)", startRow: 5 }],
-        }],
-      }],
-      fragments: [{
-        name: "audit",
-        fields: [{ name: "created_by", type: "VARCHAR(100)" }],
-      }],
+      schemas: [
+        {
+          name: "order",
+          fields: [
+            {
+              name: "customer",
+              type: "record",
+              children: [{ name: "id", type: "STRING(required)", startRow: 5 }],
+            },
+          ],
+        },
+      ],
+      fragments: [
+        {
+          name: "audit",
+          fields: [{ name: "created_by", type: "VARCHAR(100)" }],
+        },
+      ],
     });
-    const diags = collectSemanticDiagnostics(index).filter((d) => d.rule === "constraint-in-type-args");
+    const diags = collectSemanticDiagnostics(index).filter(
+      (d) => d.rule === "constraint-in-type-args",
+    );
     assert.equal(diags.length, 1);
     assert.match(diags[0].message, /'required'/);
   });

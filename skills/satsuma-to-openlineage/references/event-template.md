@@ -117,6 +117,7 @@ import uuid
 
 SATSUMA_NAMESPACE = uuid.UUID("6ba7b810-9dad-11d1-80b4-00c04fd430c8")  # URL namespace
 
+
 def run_id(job_namespace: str, job_name: str) -> str:
     return str(uuid.uuid5(SATSUMA_NAMESPACE, f"{job_namespace}/{job_name}"))
 ```
@@ -134,13 +135,21 @@ the OpenLineage client:
 ```python
 from openlineage.client import OpenLineageClient
 from openlineage.client.run import (
-    RunEvent, RunState, Run, Job, Dataset,
-    InputDataset, OutputDataset
+    RunEvent,
+    RunState,
+    Run,
+    Job,
+    Dataset,
+    InputDataset,
+    OutputDataset,
 )
 from openlineage.client.facet_v2 import (
-    schema_dataset, column_lineage_dataset,
-    documentation_dataset, documentation_job,
-    ownership_dataset, job_type_job
+    schema_dataset,
+    column_lineage_dataset,
+    documentation_dataset,
+    documentation_job,
+    ownership_dataset,
+    job_type_job,
 )
 import uuid
 from datetime import datetime, timezone

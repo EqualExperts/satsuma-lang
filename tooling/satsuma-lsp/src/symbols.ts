@@ -1,7 +1,4 @@
-import {
-  DocumentSymbol,
-  SymbolKind,
-} from "vscode-languageserver";
+import { DocumentSymbol, SymbolKind } from "vscode-languageserver";
 import type { SyntaxNode, Tree } from "./parser-utils";
 import { nodeRange, child, children, labelText, stringText } from "./parser-utils";
 import { fieldNameText, isMetricSchema } from "@satsuma/core";
@@ -109,7 +106,9 @@ function fieldSymbols(body: SyntaxNode): DocumentSymbol[] {
     const isNested = nestedBody !== null;
     const isList = fieldNode.children.some((c) => c.type === "list_of");
     const isRecord = fieldNode.children.some(
-      (c) => c.type === "record" || (c.type === "list_of" && fieldNode.children.some((d) => d.type === "record")),
+      (c) =>
+        c.type === "record" ||
+        (c.type === "list_of" && fieldNode.children.some((d) => d.type === "record")),
     );
 
     let detail: string | undefined;

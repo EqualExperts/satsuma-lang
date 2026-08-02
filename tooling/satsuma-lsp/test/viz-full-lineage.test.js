@@ -13,12 +13,11 @@ const { describe, it, before } = require("node:test");
 const assert = require("node:assert/strict");
 const { initTestParser, parse } = require("./helper");
 const { computeFullLineage } = require("../dist/full-lineage");
-const {
-  createWorkspaceIndex,
-  indexFile,
-} = require("@satsuma/viz-backend");
+const { createWorkspaceIndex, indexFile } = require("@satsuma/viz-backend");
 
-before(async () => { await initTestParser(); });
+before(async () => {
+  await initTestParser();
+});
 
 /**
  * Run computeFullLineage over an in-memory workspace. Every file's tree is
@@ -60,7 +59,10 @@ describe("satsuma/vizFullLineage — import graph traversal", () => {
   it("includes schemas from import-reachable files", () => {
     const { model } = fullLineage(FILES, "file:///entry.stm");
     const ids = model.namespaces.flatMap((g) => g.schemas.map((s) => s.id));
-    assert.ok(ids.includes("customers"), "imported schema 'customers' should appear in merged model");
+    assert.ok(
+      ids.includes("customers"),
+      "imported schema 'customers' should appear in merged model",
+    );
     assert.ok(ids.includes("orders"), "local schema 'orders' should still appear");
   });
 

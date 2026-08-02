@@ -15,7 +15,9 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[3]
 # Prefer the npm-local tree-sitter binary (always has --wasm support) over the
 # system one (e.g. Homebrew on macOS may not be compiled with the wasm feature).
-_LOCAL_BIN = Path(__file__).resolve().parents[1] / "node_modules" / ".bin" / "tree-sitter"
+_LOCAL_BIN = (
+    Path(__file__).resolve().parents[1] / "node_modules" / ".bin" / "tree-sitter"
+)
 TREE_SITTER_BIN = str(_LOCAL_BIN) if _LOCAL_BIN.exists() else "tree-sitter"
 DEFAULT_GLOBS = (
     "examples/*.stm",
@@ -176,7 +178,9 @@ def block_label(node: Node, source: SourceText) -> str:
     if node.type in ("schema_block", "fragment_block", "transform_block"):
         keyword = node.type.replace("_block", "")
         label_node = _find_child_by_type(node, "block_label")
-        name = clean_scalar(node_text(label_node, source)) if label_node else "<anonymous>"
+        name = (
+            clean_scalar(node_text(label_node, source)) if label_node else "<anonymous>"
+        )
         return f"{keyword} {name}"
     if node.type == "mapping_block":
         label_node = _find_child_by_type(node, "block_label")
@@ -258,7 +262,9 @@ def summarize_tree(source: SourceText, root: Node) -> dict[str, t.Any]:
     return {
         "parse_ok": counts["ERROR"] == 0 and counts["MISSING"] == 0,
         "counts": dict(sorted(counts.items())),
-        "blocks": [summarize_block(node, source) for node in nodes if node.type in BLOCK_TYPES],
+        "blocks": [
+            summarize_block(node, source) for node in nodes if node.type in BLOCK_TYPES
+        ],
         "schema_members": [
             summarize_schema_member(node, source)
             for node in nodes
@@ -267,7 +273,14 @@ def summarize_tree(source: SourceText, root: Node) -> dict[str, t.Any]:
         "map_items": [
             summarize_map_item(node, source)
             for node in nodes
-            if node.type in {"map_arrow", "computed_arrow", "nested_arrow", "each_block", "flatten_block"}
+            if node.type
+            in {
+                "map_arrow",
+                "computed_arrow",
+                "nested_arrow",
+                "each_block",
+                "flatten_block",
+            }
         ],
         "paths": [
             {
@@ -338,6 +351,7 @@ def parse_with_cli(path: Path) -> Node:
     ]
 
     import os
+
     env = os.environ.copy()
     env["XDG_CACHE_HOME"] = str(ROOT / ".cache")
     result = subprocess.run(
@@ -373,7 +387,9 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description="Emit JSON summaries from Satsuma CSTs using the repo-local tree-sitter wrapper."
     )
-    parser.add_argument("files", nargs="*", type=Path, help="Specific Satsuma files to summarize.")
+    parser.add_argument(
+        "files", nargs="*", type=Path, help="Specific Satsuma files to summarize."
+    )
     parser.add_argument(
         "--pretty",
         action="store_true",
@@ -381,7 +397,11 @@ def main(argv: list[str] | None = None) -> int:
     )
     args = parser.parse_args(argv)
 
-    files = [resolve_input_path(path) for path in args.files] if args.files else discover_files(DEFAULT_GLOBS)
+    files = (
+        [resolve_input_path(path) for path in args.files]
+        if args.files
+        else discover_files(DEFAULT_GLOBS)
+    )
     if not files:
         parser.error("no Satsuma files found")
 

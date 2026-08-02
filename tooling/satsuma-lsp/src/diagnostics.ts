@@ -1,8 +1,4 @@
-import {
-  Diagnostic,
-  DiagnosticSeverity,
-  DiagnosticTag,
-} from "vscode-languageserver";
+import { Diagnostic, DiagnosticSeverity, DiagnosticTag } from "vscode-languageserver";
 import type { SyntaxNode, Tree } from "./parser-utils";
 import { nodeRange } from "./parser-utils";
 import { collectParseErrors } from "@satsuma/core";
@@ -54,7 +50,10 @@ export function ensureNonEmptyMessages(diags: Diagnostic[]): Diagnostic[] {
   return diags.map((d) =>
     hasNonEmptyMessage(d)
       ? d
-      : { ...d, message: d.code ? `Diagnostic '${d.code}' (no message)` : "Diagnostic (no message)" },
+      : {
+          ...d,
+          message: d.code ? `Diagnostic '${d.code}' (no message)` : "Diagnostic (no message)",
+        },
   );
 }
 

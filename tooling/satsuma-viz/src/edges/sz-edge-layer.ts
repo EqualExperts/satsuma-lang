@@ -152,7 +152,9 @@ export class SzEdgeLayer extends LitElement {
     /* Dimmed edges when highlighting a field */
     :host([has-highlight]) .edge-path {
       opacity: 0.15;
-      transition: opacity 0.15s ease, stroke-width 0.15s ease;
+      transition:
+        opacity 0.15s ease,
+        stroke-width 0.15s ease;
     }
 
     :host([has-highlight]) .edge-path.highlighted {
@@ -215,19 +217,14 @@ export class SzEdgeLayer extends LitElement {
       edge.sourceNode === this.highlightSchema &&
       edge.arrow.sourceFields.includes(this.highlightField);
     const matchesTarget =
-      edge.targetNode === this.highlightSchema &&
-      edge.arrow.targetField === this.highlightField;
+      edge.targetNode === this.highlightSchema && edge.arrow.targetField === this.highlightField;
 
     return matchesSource || matchesTarget;
   }
 
   override render() {
     return html`
-      <svg
-        width=${this.width}
-        height=${this.height}
-        viewBox="0 0 ${this.width} ${this.height}"
-      >
+      <svg width=${this.width} height=${this.height} viewBox="0 0 ${this.width} ${this.height}">
         ${this.edges.map((e) => this._renderEdge(e))}
       </svg>
       ${this._expandedEdge ? this._renderTransformCard() : ""}
@@ -252,27 +249,34 @@ export class SzEdgeLayer extends LitElement {
         d=${d}
         @click=${() => this._onEdgeClick(edge)}
       />
-      ${hasTransform
-        ? svg`
+      ${
+        hasTransform
+          ? svg`
           <g
             class="gear-group ${hl}"
             transform="translate(${mid.x}, ${mid.y})"
-            @click=${(ev: Event) => { ev.stopPropagation(); this._toggleGear(edge.id); }}
+            @click=${(ev: Event) => {
+              ev.stopPropagation();
+              this._toggleGear(edge.id);
+            }}
           >
             <circle class="gear-circle" r="9" />
             <text class="gear-icon" dy="0.5">&#9881;</text>
           </g>
         `
-        : svg``}
-      ${edge.scopeLabel
-        ? svg`
+          : svg``
+      }
+      ${
+        edge.scopeLabel
+          ? svg`
           <text
             class="scope-label ${edge.scopeLabel} ${hl}"
             x=${mid.x}
             y=${mid.y + (hasTransform ? 18 : 0)}
           >${edge.scopeLabel === "each" ? "⟲ each" : "⤵ flatten"}</text>
         `
-        : svg``}
+          : svg``
+      }
     `;
   }
 
@@ -290,16 +294,12 @@ export class SzEdgeLayer extends LitElement {
       const prev = points[i - 1];
       const curr = points[i];
       const dx = (curr.x - prev.x) * 0.4;
-      parts.push(
-        `C ${prev.x + dx} ${prev.y}, ${curr.x - dx} ${curr.y}, ${curr.x} ${curr.y}`
-      );
+      parts.push(`C ${prev.x + dx} ${prev.y}, ${curr.x - dx} ${curr.y}, ${curr.x} ${curr.y}`);
     }
     return parts.join(" ");
   }
 
-  private _midpoint(
-    points: Array<{ x: number; y: number }>
-  ): { x: number; y: number } {
+  private _midpoint(points: Array<{ x: number; y: number }>): { x: number; y: number } {
     const mid = Math.floor(points.length / 2);
     if (points.length % 2 === 0) {
       return {
@@ -333,19 +333,19 @@ export class SzEdgeLayer extends LitElement {
         style="left: ${mid.x + 16}px; top: ${mid.y - 12}px"
         @click=${(ev: Event) => ev.stopPropagation()}
       >
-        <div class="label">
-          ${t.kind === "map" ? "Map" : "Transform"}
-        </div>
-        ${t.steps.length > 0
-          ? html`${t.steps.map(
-              (step, i) => html`
-                <div class="step">
-                  ${i > 0 ? html`<span class="step-sep">|</span>` : ""}
-                  <span class="step-text">${unsafeHTML(highlightAtRefs(step))}</span>
-                </div>
-              `
-            )}`
-          : html`<div class="step-text">${unsafeHTML(highlightAtRefs(t.text))}</div>`}
+        <div class="label">${t.kind === "map" ? "Map" : "Transform"}</div>
+        ${
+          t.steps.length > 0
+            ? html`${t.steps.map(
+                (step, i) => html`
+                  <div class="step">
+                    ${i > 0 ? html`<span class="step-sep">|</span>` : ""}
+                    <span class="step-text">${unsafeHTML(highlightAtRefs(step))}</span>
+                  </div>
+                `,
+              )}`
+            : html`<div class="step-text">${unsafeHTML(highlightAtRefs(t.text))}</div>`
+        }
       </div>
     `;
   }

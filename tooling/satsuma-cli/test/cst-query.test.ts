@@ -77,9 +77,7 @@ describe("findBlockNode: anonymous blocks", () => {
   it("finds a block by <anon>@file:row key", () => {
     const { tree } = parseFile(resolve(__dirname, "../../../examples/db-to-db/pipeline.stm"));
     // Use the actual row of the first schema_block
-    const firstSchema = tree.rootNode.namedChildren.find(
-      (c: any) => c.type === "schema_block",
-    );
+    const firstSchema = tree.rootNode.namedChildren.find((c: any) => c.type === "schema_block");
     assert.ok(firstSchema, "should have at least one schema block");
     const key = `<anon>@test:${firstSchema.startPosition.row}`;
     const node = findBlockNode(tree.rootNode, "schema_block", key);

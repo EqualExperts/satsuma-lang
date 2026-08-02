@@ -27,15 +27,31 @@ describe("field-lineage --upstream --downstream (sl-nknd)", () => {
     // intermediate_b.id has both upstream (source_a.id) and downstream (intermediate_c.id)
     const chainFixture = resolve(FIXTURES, "lineage-chain.stm");
     const { stdout: bothOut, code: bothCode } = await run(
-      "field-lineage", "intermediate_b.id", chainFixture, "--json", "--upstream", "--downstream",
+      "field-lineage",
+      "intermediate_b.id",
+      chainFixture,
+      "--json",
+      "--upstream",
+      "--downstream",
     );
     assert.equal(bothCode, 0, `expected exit 0, got ${bothCode}\n${bothOut}`);
     const both = JSON.parse(bothOut);
-    assert.ok(both.upstream.length > 0, "upstream should be non-empty when --upstream --downstream");
-    assert.ok(both.downstream.length > 0, "downstream should be non-empty when --upstream --downstream");
+    assert.ok(
+      both.upstream.length > 0,
+      "upstream should be non-empty when --upstream --downstream",
+    );
+    assert.ok(
+      both.downstream.length > 0,
+      "downstream should be non-empty when --upstream --downstream",
+    );
 
     // Should match result with no direction flags
-    const { stdout: allOut } = await run("field-lineage", "intermediate_b.id", chainFixture, "--json");
+    const { stdout: allOut } = await run(
+      "field-lineage",
+      "intermediate_b.id",
+      chainFixture,
+      "--json",
+    );
     const all = JSON.parse(allOut);
     assert.deepEqual(both.upstream, all.upstream, "upstream should match no-flag result");
     assert.deepEqual(both.downstream, all.downstream, "downstream should match no-flag result");
@@ -43,7 +59,13 @@ describe("field-lineage --upstream --downstream (sl-nknd)", () => {
 
   it("--upstream alone only returns upstream", async () => {
     const chainFixture = resolve(FIXTURES, "lineage-chain.stm");
-    const { stdout, code } = await run("field-lineage", "intermediate_b.id", chainFixture, "--json", "--upstream");
+    const { stdout, code } = await run(
+      "field-lineage",
+      "intermediate_b.id",
+      chainFixture,
+      "--json",
+      "--upstream",
+    );
     assert.equal(code, 0);
     const data = JSON.parse(stdout);
     assert.ok(data.upstream.length > 0, "upstream should be non-empty");
@@ -52,7 +74,13 @@ describe("field-lineage --upstream --downstream (sl-nknd)", () => {
 
   it("--downstream alone only returns downstream", async () => {
     const chainFixture = resolve(FIXTURES, "lineage-chain.stm");
-    const { stdout, code } = await run("field-lineage", "intermediate_b.id", chainFixture, "--json", "--downstream");
+    const { stdout, code } = await run(
+      "field-lineage",
+      "intermediate_b.id",
+      chainFixture,
+      "--json",
+      "--downstream",
+    );
     assert.equal(code, 0);
     const data = JSON.parse(stdout);
     assert.equal(data.upstream.length, 0, "upstream should be empty with --downstream only");
@@ -69,7 +97,10 @@ describe("field-lineage anonymous mappings (sl-m44v)", () => {
     const { stdout, code } = await run("field-lineage", "invoices.total", fixture, "--json");
     assert.equal(code, 0, `expected exit 0, got ${code}\n${stdout}`);
     const data = JSON.parse(stdout);
-    assert.ok(data.upstream.length > 0, "upstream should contain orders.amount via anonymous mapping");
+    assert.ok(
+      data.upstream.length > 0,
+      "upstream should contain orders.amount via anonymous mapping",
+    );
     const upstreamFields = data.upstream.map((u: any) => u.field);
     assert.ok(
       upstreamFields.some((f: any) => f.includes("orders") && f.includes("amount")),
@@ -82,7 +113,10 @@ describe("field-lineage anonymous mappings (sl-m44v)", () => {
     const { stdout, code } = await run("field-lineage", "orders.amount", fixture, "--json");
     assert.equal(code, 0, `expected exit 0, got ${code}\n${stdout}`);
     const data = JSON.parse(stdout);
-    assert.ok(data.downstream.length > 0, "downstream should contain invoices.total via anonymous mapping");
+    assert.ok(
+      data.downstream.length > 0,
+      "downstream should contain invoices.total via anonymous mapping",
+    );
     const downstreamFields = data.downstream.map((d: any) => d.field);
     assert.ok(
       downstreamFields.some((f: any) => f.includes("invoices") && f.includes("total")),
@@ -111,7 +145,12 @@ describe("field-lineage with typeless fields", () => {
   const fixture = resolve(FIXTURES, "typeless-field-lineage.stm");
 
   it("finds a typeless direct field before spreads in its schema", async () => {
-    const { stdout, code, stderr } = await run("field-lineage", "source_schema.PK_ID", fixture, "--json");
+    const { stdout, code, stderr } = await run(
+      "field-lineage",
+      "source_schema.PK_ID",
+      fixture,
+      "--json",
+    );
     assert.equal(code, 0, `expected exit 0, got ${code}\n${stderr}`);
     const data = JSON.parse(stdout);
     assert.ok(
@@ -148,8 +187,11 @@ describe("field-lineage same-line arrows sharing a target (sl-201z)", () => {
     assert.equal(code, 0);
     const data = JSON.parse(stdout);
     const upstreamFields = (data.upstream as any[]).map((e) => e.field).sort();
-    assert.deepEqual(upstreamFields, ["::s.a", "::s.b"],
-      "both same-line arrows should contribute an upstream connection");
+    assert.deepEqual(
+      upstreamFields,
+      ["::s.a", "::s.b"],
+      "both same-line arrows should contribute an upstream connection",
+    );
   });
 });
 
@@ -163,11 +205,21 @@ describe("field-lineage NL-derived edges in namespaced mappings (sl-njej)", () =
     // producing "ns::ns::load_s2" — the mapping lookup failed and the
     // nl-derived edge was silently dropped (graph showed it; field-lineage didn't).
     const fixture = resolve(FIXTURES, "ns-nl-lineage.stm");
-    const { stdout, code } = await run("field-lineage", "ns::s2.x", fixture, "--json", "--upstream");
+    const { stdout, code } = await run(
+      "field-lineage",
+      "ns::s2.x",
+      fixture,
+      "--json",
+      "--upstream",
+    );
     assert.equal(code, 0, `expected exit 0\n${stdout}`);
     const data = JSON.parse(stdout);
     const nlEdges = (data.upstream as any[]).filter((e) => e.classification === "nl-derived");
-    assert.equal(nlEdges.length, 1, `expected one nl-derived upstream edge, got: ${JSON.stringify(data.upstream)}`);
+    assert.equal(
+      nlEdges.length,
+      1,
+      `expected one nl-derived upstream edge, got: ${JSON.stringify(data.upstream)}`,
+    );
     assert.equal(nlEdges[0].field, "ns::s1.a");
     assert.equal(nlEdges[0].via_mapping, "ns::load_s2");
   });
@@ -188,11 +240,16 @@ describe("field-lineage — NL @refs inside containers (sl-hrql, sl-ez36)", () =
 
   it("anchors the nl-derived edge on the nested source field, not the schema root", async () => {
     const { stdout, code } = await run(
-      "field-lineage", "sap_purchase_order.Items.MEINS", SAP, "--json", "--downstream",
+      "field-lineage",
+      "sap_purchase_order.Items.MEINS",
+      SAP,
+      "--json",
+      "--downstream",
     );
     assert.equal(code, 0, `expected exit 0\n${stdout}`);
-    const nlEdges = (JSON.parse(stdout).downstream as any[])
-      .filter((e) => e.classification === "nl-derived");
+    const nlEdges = (JSON.parse(stdout).downstream as any[]).filter(
+      (e) => e.classification === "nl-derived",
+    );
     assert.deepEqual(
       nlEdges.map((e) => e.field),
       ["::mfcs_purchase_order.items.orderedQty"],
@@ -205,7 +262,11 @@ describe("field-lineage — NL @refs inside containers (sl-hrql, sl-ez36)", () =
     // name (the index is indexed by leaf too), so the assertion that matters is
     // that no edge hangs off it any more.
     const { stdout, code } = await run(
-      "field-lineage", "sap_purchase_order.MEINS", SAP, "--json", "--downstream",
+      "field-lineage",
+      "sap_purchase_order.MEINS",
+      SAP,
+      "--json",
+      "--downstream",
     );
     assert.equal(code, 0, `expected exit 0\n${stdout}`);
     assert.deepEqual(JSON.parse(stdout).downstream, []);
@@ -217,10 +278,12 @@ describe("field-lineage — NL @refs inside containers (sl-hrql, sl-ez36)", () =
     // source line. Any consumer building a graph got two nodes for one field.
     const { stdout, code } = await run("graph", SAP, "--json");
     assert.equal(code, 0, `expected exit 0\n${stdout}`);
-    const edges = (JSON.parse(stdout).edges as any[])
-      .filter((e) => e.to.endsWith("orderedQty"));
+    const edges = (JSON.parse(stdout).edges as any[]).filter((e) => e.to.endsWith("orderedQty"));
     const targets = [...new Set(edges.map((e) => e.to))];
-    assert.deepEqual(targets, ["::mfcs_purchase_order.items.orderedQty"],
-      "nl and nl-derived edges for one arrow must name one target field");
+    assert.deepEqual(
+      targets,
+      ["::mfcs_purchase_order.items.orderedQty"],
+      "nl and nl-derived edges for one arrow must name one target field",
+    );
   });
 });

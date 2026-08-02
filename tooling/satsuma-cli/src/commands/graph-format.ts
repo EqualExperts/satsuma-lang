@@ -26,10 +26,10 @@ export function printDefault(graph: WorkspaceGraph): void {
   // ── Node counts ────────────────────────────────────────────────────────────
   const s = graph.stats;
   console.log("Nodes:");
-  if (s.schemas > 0)    console.log(`  schemas:    ${s.schemas}`);
-  if (s.mappings > 0)   console.log(`  mappings:   ${s.mappings}`);
-  if (s.metrics > 0)    console.log(`  metrics:    ${s.metrics}`);
-  if (s.fragments > 0)  console.log(`  fragments:  ${s.fragments}`);
+  if (s.schemas > 0) console.log(`  schemas:    ${s.schemas}`);
+  if (s.mappings > 0) console.log(`  mappings:   ${s.mappings}`);
+  if (s.metrics > 0) console.log(`  metrics:    ${s.metrics}`);
+  if (s.fragments > 0) console.log(`  fragments:  ${s.fragments}`);
   if (s.transforms > 0) console.log(`  transforms: ${s.transforms}`);
   console.log();
 

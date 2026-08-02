@@ -102,7 +102,10 @@ function followImports(entryFile: string): string[] {
  * a clear error (ADR-022). When given a file, follows import declarations
  * to discover the full transitive import graph unless followImports is false.
  */
-export async function resolveInput(pathArg: string, opts?: { followImports?: boolean }): Promise<string[]> {
+export async function resolveInput(
+  pathArg: string,
+  opts?: { followImports?: boolean },
+): Promise<string[]> {
   const abs = resolve(pathArg);
   const s = await stat(abs);
   if (s.isDirectory()) {
