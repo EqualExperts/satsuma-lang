@@ -32,7 +32,10 @@ const edge = {
   id: "overview:mapping:_:orders_load:in:orders_raw",
   sourceNode: "orders_raw",
   targetNode: "mapping:_:orders_load",
-  points: [{ x: 0, y: 0 }, { x: 50, y: 50 }],
+  points: [
+    { x: 0, y: 0 },
+    { x: 50, y: 50 },
+  ],
   mapping,
 };
 
@@ -46,7 +49,11 @@ describe("sz-overview-edge-layer click contract (sl-sewl)", () => {
     layer._onEdgeClick(edge);
 
     assert.equal(opened.length, 1, "edge click must dispatch the open-mapping event");
-    assert.equal(opened[0].mapping.id, "orders_load", "the event must carry the clicked edge's mapping");
+    assert.equal(
+      opened[0].mapping.id,
+      "orders_load",
+      "the event must carry the clicked edge's mapping",
+    );
     assert.ok(opened[0] instanceof mod.SzOpenMappingEvent);
   });
 

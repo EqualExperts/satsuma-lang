@@ -10,7 +10,9 @@ import { describe, it } from "node:test";
 function n(type: string, namedChildren: any[] = [], text = "") {
   return { type, text, startPosition: { row: 0, column: 0 }, namedChildren };
 }
-function ident(t: string) { return n("identifier", [], t); }
+function ident(t: string) {
+  return n("identifier", [], t);
+}
 function blockLabel(name: string) {
   return n("block_label", [ident(name)]);
 }
@@ -40,7 +42,12 @@ function collectArrows(bodyNode: any): any[] {
       const tgt = c.namedChildren.find((x: any) => x.type === "tgt_path");
       const children: any[] = collectArrows(c);
       const hasChildren: boolean = children.length > 0;
-      arrows.push({ kind: hasChildren ? "nested" : "map", src: pathText(src), tgt: pathText(tgt), hasBody: hasChildren });
+      arrows.push({
+        kind: hasChildren ? "nested" : "map",
+        src: pathText(src),
+        tgt: pathText(tgt),
+        hasBody: hasChildren,
+      });
     }
   }
   return arrows;

@@ -21,9 +21,7 @@
 // Range is a runtime value (Range.create) from vscode-languageserver-types, the
 // zero-dependency types package — not the top-level vscode-languageserver, which
 // would drag Node-only JSON-RPC server code into the browser bundle (feature 33).
-import {
-  Range,
-} from "vscode-languageserver-types";
+import { Range } from "vscode-languageserver-types";
 import type { SyntaxNode, Tree } from "./parser-utils";
 import { nodeRange, child, children, labelText, walkDescendants } from "./parser-utils";
 import {
@@ -212,10 +210,7 @@ function walkImportGraph(
  * Import path strings are resolved relative to the importing file's directory.
  * Files not present in `index.indexedFiles` are silently skipped.
  */
-export function getImportReachableUris(
-  entryUri: string,
-  index: WorkspaceIndex,
-): Set<string> {
+export function getImportReachableUris(entryUri: string, index: WorkspaceIndex): Set<string> {
   return walkImportGraph(entryUri, index).reachable;
 }
 
@@ -227,10 +222,7 @@ export function getImportReachableUris(
  * consumer that needs missing-import diagnostics. Order follows the graph walk;
  * duplicates are preserved (one entry per failing import declaration).
  */
-export function getUnresolvedImportPaths(
-  entryUri: string,
-  index: WorkspaceIndex,
-): string[] {
+export function getUnresolvedImportPaths(entryUri: string, index: WorkspaceIndex): string[] {
   return walkImportGraph(entryUri, index).unresolved;
 }
 
@@ -284,11 +276,7 @@ export function createScopedIndex(
  * pathname diff (no Node `path.relative`), keeping this module browser-safe.
  * Falls back to a placeholder path when either URI is unparseable.
  */
-export function buildImportSuggestion(
-  currentUri: string,
-  name: string,
-  defUri: string,
-): string {
+export function buildImportSuggestion(currentUri: string, name: string, defUri: string): string {
   const rel = relativeUriPath(currentUri, defUri);
   if (rel === null) return `import { ${name} } from "..."`;
   // Import paths must be explicitly relative; bare paths read as bare-name imports.
@@ -453,10 +441,7 @@ export function resolveReferenceKey(
  * query), so renaming a::foo also rewrote `source { foo }` inside namespace
  * b — a reference that binds to b::foo (sl-p256).
  */
-export function findReferences(
-  index: WorkspaceIndex,
-  name: string,
-): ReferenceEntry[] {
+export function findReferences(index: WorkspaceIndex, name: string): ReferenceEntry[] {
   const results: ReferenceEntry[] = [];
 
   if (name.includes("::")) {
@@ -526,14 +511,9 @@ export function countReferences(
 }
 
 /** Find distinct mapping names that reference a given schema as source or target. */
-export function findMappingsUsing(
-  index: WorkspaceIndex,
-  schemaName: string,
-): string[] {
+export function findMappingsUsing(index: WorkspaceIndex, schemaName: string): string[] {
   const refs = findReferences(index, schemaName);
-  const mappingRefs = refs.filter(
-    (r) => r.context === "source" || r.context === "target",
-  );
+  const mappingRefs = refs.filter((r) => r.context === "source" || r.context === "target");
   // Deduplicate by the containing mapping, not by reference site — a mapping
   // that names the schema in both its source and target blocks is still one
   // mapping (sl-0tgo). The uri:line fallback covers entries indexed before
@@ -600,9 +580,7 @@ function indexTopLevel(
   // Metric schemas are schema_block nodes decorated with (metric, ...) metadata.
   // Upgrade the kind from "schema" to "metric" so the index correctly classifies them.
   const effectiveKind: DefinitionEntry["kind"] =
-    kind === "schema" && isMetricSchema(child(node, "metadata_block"))
-      ? "metric"
-      : kind;
+    kind === "schema" && isMetricSchema(child(node, "metadata_block")) ? "metric" : kind;
 
   const name = labelText(node);
   if (!name) return;
@@ -612,9 +590,10 @@ function indexTopLevel(
   const selectionRange = lblNode ? nodeRange(lblNode) : nodeRange(node);
 
   // Extract fields for schema/fragment blocks (metric schemas also have schema_body)
-  const fields = (effectiveKind === "schema" || effectiveKind === "metric" || effectiveKind === "fragment")
-    ? extractFields(child(node, "schema_body"))
-    : [];
+  const fields =
+    effectiveKind === "schema" || effectiveKind === "metric" || effectiveKind === "fragment"
+      ? extractFields(child(node, "schema_body"))
+      : [];
 
   addDefinition(index, qualifiedName, {
     uri,
@@ -702,7 +681,9 @@ function indexMappingRefs(
   // unique per mapping.
   const mappingName = labelText(mappingNode);
   const container = mappingName
-    ? (namespace ? `${namespace}::${mappingName}` : mappingName)
+    ? namespace
+      ? `${namespace}::${mappingName}`
+      : mappingName
     : `<anon>@${uri}:${mappingNode.startPosition.row}`;
 
   for (const ch of body.namedChildren) {
@@ -756,10 +737,7 @@ function indexMappingRefs(
  */
 function sourceRefNameRange(ref: SyntaxNode): Range {
   const nameNode = ref.namedChildren.find(
-    (c) =>
-      c.type === "qualified_name" ||
-      c.type === "backtick_name" ||
-      c.type === "identifier",
+    (c) => c.type === "qualified_name" || c.type === "backtick_name" || c.type === "identifier",
   );
   return nameNode ? nodeRange(nameNode) : nodeRange(ref);
 }
@@ -805,8 +783,8 @@ function indexArrowFieldRefs(
     const isSrc = n.type === "src_path";
     const schemas = isSrc ? sourceSchemas : targetSchemas;
 
-    const fieldName = extractArrowFieldName(n);    // first segment / bare name
-    const fullPath = extractArrowFullPath(n);       // full dotted path, namespace-stripped
+    const fieldName = extractArrowFieldName(n); // first segment / bare name
+    const fullPath = extractArrowFullPath(n); // full dotted path, namespace-stripped
 
     if (!fieldName) return;
 
@@ -868,10 +846,7 @@ function arrowFirstSegmentNode(pathNode: SyntaxNode): SyntaxNode | null {
   // is the namespace, so the field's first segment is the second. Every other
   // path form (field_path, backtick_path, relative_field_path) starts
   // directly with its first segment.
-  const seg =
-    inner.type === "namespaced_path"
-      ? inner.namedChildren[1]
-      : inner.namedChildren[0];
+  const seg = inner.type === "namespaced_path" ? inner.namedChildren[1] : inner.namedChildren[0];
   return seg ?? null;
 }
 
@@ -995,11 +970,7 @@ function enclosingNamespace(node: SyntaxNode): string | null {
  * pipe text — `a -> b { derived from @b }` has no nl_string at all, so a
  * string-only walk missed it entirely (bptar-l6n8).
  */
-function indexNlRefs(
-  index: WorkspaceIndex,
-  uri: string,
-  node: SyntaxNode,
-): void {
+function indexNlRefs(index: WorkspaceIndex, uri: string, node: SyntaxNode): void {
   walkDescendants(node, (n) => {
     if (n.type === "at_ref") {
       // Strip the leading @ and any backtick delimiters, mirroring the
@@ -1050,7 +1021,6 @@ function indexNlRefs(
         namespace: enclosingNamespace(n),
       });
     }
-
   });
 }
 
@@ -1088,7 +1058,14 @@ function offsetToRange(
     }
   }
   const endLine = nodeStartRow + endRow;
-  const endChar = endRow === 0 ? nodeStartCol + endCol : (endRow === row ? (row === 0 ? nodeStartCol + endCol : endCol) : endCol);
+  const endChar =
+    endRow === 0
+      ? nodeStartCol + endCol
+      : endRow === row
+        ? row === 0
+          ? nodeStartCol + endCol
+          : endCol
+        : endCol;
 
   return Range.create(startLine, startChar, endLine, endChar);
 }
@@ -1130,7 +1107,9 @@ function indexMetricRefs(
   // every metric_source ref in the file (sl-ei1e).
   const metricName = labelText(metricNode);
   const container = metricName
-    ? (namespace ? `${namespace}::${metricName}` : metricName)
+    ? namespace
+      ? `${namespace}::${metricName}`
+      : metricName
     : `<anon>@${uri}:${metricNode.startPosition.row}`;
 
   walkDescendants(meta, (n) => {
@@ -1169,9 +1148,7 @@ function extractFields(body: SyntaxNode | null): FieldInfo[] {
   if (!body) return [];
   const fieldTree = extractFieldTree(body);
   const fieldNodes = children(body, "field_decl");
-  return fieldTree.fields.map((decl, i) =>
-    fieldDeclToInfo(decl, fieldNodes[i] ?? null),
-  );
+  return fieldTree.fields.map((decl, i) => fieldDeclToInfo(decl, fieldNodes[i] ?? null));
 }
 
 /**
@@ -1190,7 +1167,12 @@ function fieldDeclToInfo(decl: FieldDecl, cstNode: SyntaxNode | null): FieldInfo
   const nameNode = cstNode ? child(cstNode, "field_name") : null;
   const range = nameNode
     ? nodeRange(nameNode)
-    : Range.create(decl.startRow ?? 0, decl.startColumn ?? 0, decl.startRow ?? 0, (decl.startColumn ?? 0) + decl.name.length);
+    : Range.create(
+        decl.startRow ?? 0,
+        decl.startColumn ?? 0,
+        decl.startRow ?? 0,
+        (decl.startColumn ?? 0) + decl.name.length,
+      );
 
   // Recurse for nested fields
   const nestedBody = cstNode ? child(cstNode, "schema_body") : null;
@@ -1242,28 +1224,22 @@ function spreadLabelText(node: SyntaxNode): string | null {
   if (qn) return coreQualifiedNameText(qn);
   const quoted = child(node, "backtick_name");
   if (quoted) return quoted.text.slice(1, -1);
-  const ids = node.namedChildren.filter((c: SyntaxNode) => c.type === "identifier" || c.type === "continuation_word");
+  const ids = node.namedChildren.filter(
+    (c: SyntaxNode) => c.type === "identifier" || c.type === "continuation_word",
+  );
   if (ids.length > 0) return ids.map((i: SyntaxNode) => i.text).join(" ");
   return node.text;
 }
 
 // ---------- Internal helpers ----------
 
-function addDefinition(
-  index: WorkspaceIndex,
-  name: string,
-  entry: DefinitionEntry,
-): void {
+function addDefinition(index: WorkspaceIndex, name: string, entry: DefinitionEntry): void {
   const existing = index.definitions.get(name) ?? [];
   existing.push(entry);
   index.definitions.set(name, existing);
 }
 
-function addReference(
-  index: WorkspaceIndex,
-  name: string,
-  entry: ReferenceEntry,
-): void {
+function addReference(index: WorkspaceIndex, name: string, entry: ReferenceEntry): void {
   const existing = index.references.get(name) ?? [];
   existing.push(entry);
   index.references.set(name, existing);

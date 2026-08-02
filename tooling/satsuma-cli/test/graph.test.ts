@@ -129,7 +129,9 @@ describe("satsuma graph --json", () => {
     // consumers complete metric field information.
     const { stdout } = await run("graph", "--json", PLATFORM);
     const data = JSON.parse(stdout);
-    const metric = data.nodes.find((n: any) => n.kind === "metric" && n.fields && n.fields.length > 0);
+    const metric = data.nodes.find(
+      (n: any) => n.kind === "metric" && n.fields && n.fields.length > 0,
+    );
     assert.ok(metric, "should have a metric node with fields");
     assert.ok(Array.isArray(metric.fields));
     assert.ok("name" in metric.fields[0]);
@@ -231,18 +233,32 @@ describe("satsuma graph --schema-only", () => {
   });
 
   it("produces no duplicate edges for namespaced mappings (sl-057k)", async () => {
-    const { stdout, code } = await run("graph", "--json", "--schema-only", resolve(FIXTURES, "namespaces.stm"));
+    const { stdout, code } = await run(
+      "graph",
+      "--json",
+      "--schema-only",
+      resolve(FIXTURES, "namespaces.stm"),
+    );
     assert.equal(code, 0);
     const data = JSON.parse(stdout);
     // Collect all edge keys to detect duplicates
     const edgeKeys = data.edges.map((e: any) => `${e.from}->${e.to}:${e.mapping}`);
     const unique = new Set(edgeKeys);
-    assert.equal(edgeKeys.length, unique.size, `duplicate edges found: ${JSON.stringify(edgeKeys)}`);
+    assert.equal(
+      edgeKeys.length,
+      unique.size,
+      `duplicate edges found: ${JSON.stringify(edgeKeys)}`,
+    );
     // Edges for the namespaced mapping should use qualified name
-    const warehouseEdges = data.edges.filter((e: any) => e.mapping && e.mapping.includes("warehouse::"));
+    const warehouseEdges = data.edges.filter(
+      (e: any) => e.mapping && e.mapping.includes("warehouse::"),
+    );
     assert.ok(warehouseEdges.length > 0, "should have edges with namespace-qualified mapping name");
     for (const e of warehouseEdges) {
-      assert.ok(e.mapping.startsWith("warehouse::"), `mapping should be namespace-qualified: ${e.mapping}`);
+      assert.ok(
+        e.mapping.startsWith("warehouse::"),
+        `mapping should be namespace-qualified: ${e.mapping}`,
+      );
     }
   });
 
@@ -270,7 +286,10 @@ describe("satsuma graph --namespace", () => {
     const warehouseNodes = data.nodes.filter((n: any) => n.namespace === "warehouse");
     assert.ok(warehouseNodes.length > 0, "should have warehouse-namespace nodes");
     assert.ok(data.stats.schemas > 0, "stats.schemas should count warehouse schemas");
-    assert.ok(data.stats.schemas < 49, "stats.schemas should be less than the full workspace count");
+    assert.ok(
+      data.stats.schemas < 49,
+      "stats.schemas should be less than the full workspace count",
+    );
   });
 
   it("schema_edges reference only nodes present in the nodes array (sl-p895)", async () => {
@@ -290,7 +309,9 @@ describe("satsuma graph --namespace", () => {
     const { stdout } = await run("graph", "--json", "--namespace", "warehouse", PLATFORM);
     const data = JSON.parse(stdout);
     // warehouse mappings have sources from other namespaces (e.g. pos::stores)
-    const crossNs = data.schema_edges.find((e: any) => e.from.includes("pos::") || e.from.includes("ecom::"));
+    const crossNs = data.schema_edges.find(
+      (e: any) => e.from.includes("pos::") || e.from.includes("ecom::"),
+    );
     assert.ok(crossNs, "should include cross-namespace source edges");
   });
 
@@ -373,7 +394,11 @@ describe("satsuma graph (nl-derived edges in namespace workspaces)", () => {
     // Before this fix, the graph builder double-prefixed the namespace on
     // the mapping key (ns::ns::name), causing zero nl-derived edges for
     // namespace workspaces despite nl-refs resolving successfully.
-    const { stdout, code } = await run("graph", "--json", resolve(EXAMPLES, "namespaces/ns-merging.stm"));
+    const { stdout, code } = await run(
+      "graph",
+      "--json",
+      resolve(EXAMPLES, "namespaces/ns-merging.stm"),
+    );
     assert.ok(code === 0 || code === 2);
     const data = JSON.parse(stdout);
     const nlDerived = data.edges.filter((e: any) => e.classification === "nl-derived");
@@ -381,7 +406,10 @@ describe("satsuma graph (nl-derived edges in namespace workspaces)", () => {
 
     // All nl-derived edges should reference namespace-qualified mappings
     for (const e of nlDerived) {
-      assert.ok(e.mapping.includes("::"), `nl-derived edge mapping should be namespace-qualified: ${e.mapping}`);
+      assert.ok(
+        e.mapping.includes("::"),
+        `nl-derived edge mapping should be namespace-qualified: ${e.mapping}`,
+      );
     }
   });
 });
@@ -434,7 +462,11 @@ describe("satsuma graph (slices)", () => {
   });
 
   it("nested arrow children have correct from/to (sl-6dt1, sl-9uh0)", async () => {
-    const { stdout, code } = await run("graph", "--json", resolve(EXAMPLES, "sap-po-to-mfcs/pipeline.stm"));
+    const { stdout, code } = await run(
+      "graph",
+      "--json",
+      resolve(EXAMPLES, "sap-po-to-mfcs/pipeline.stm"),
+    );
     assert.equal(code, 0);
     const data = JSON.parse(stdout);
 
@@ -454,7 +486,10 @@ describe("satsuma graph (slices)", () => {
     // Specifically check .TXZ01 -> .description (the last nested arrow, previously broken)
     const txz = childEdges.find((e: any) => e.from.endsWith(".TXZ01"));
     assert.ok(txz, "should find TXZ01 edge");
-    assert.ok(txz.to.endsWith(".description"), `TXZ01 target should be .description, got ${txz.to}`);
+    assert.ok(
+      txz.to.endsWith(".description"),
+      `TXZ01 target should be .description, got ${txz.to}`,
+    );
   });
 });
 
@@ -472,8 +507,10 @@ describe("satsuma graph (anonymous mapping edges, sl-riw5)", () => {
 
     for (const edge of data.edges) {
       // mapping key must not be empty
-      assert.ok(edge.mapping && edge.mapping.length > 0,
-        `edge mapping key should not be empty: ${JSON.stringify(edge)}`);
+      assert.ok(
+        edge.mapping && edge.mapping.length > 0,
+        `edge mapping key should not be empty: ${JSON.stringify(edge)}`,
+      );
 
       // from/to must be schema-qualified (contain a dot or :: prefix)
       if (edge.from) {
@@ -491,7 +528,9 @@ describe("satsuma graph (anonymous mapping edges, sl-riw5)", () => {
     }
 
     // The anonymous mapping node should appear in nodes[] with the <anon> key
-    const anonMapping = data.nodes.find((n: any) => n.kind === "mapping" && n.id.includes("<anon>"));
+    const anonMapping = data.nodes.find(
+      (n: any) => n.kind === "mapping" && n.id.includes("<anon>"),
+    );
     assert.ok(anonMapping, "should have an anonymous mapping node with <anon> in id");
 
     // Edges should reference that anonymous mapping key
@@ -500,11 +539,18 @@ describe("satsuma graph (anonymous mapping edges, sl-riw5)", () => {
 
     // Specifically: orders.amount -> invoices.total
     const amountToTotal = data.edges.find(
-      (e: any) => e.from && e.from.includes("orders") && e.from.includes("amount") &&
-             e.to && e.to.includes("invoices") && e.to.includes("total"),
+      (e: any) =>
+        e.from &&
+        e.from.includes("orders") &&
+        e.from.includes("amount") &&
+        e.to &&
+        e.to.includes("invoices") &&
+        e.to.includes("total"),
     );
-    assert.ok(amountToTotal,
-      `should have edge orders.amount -> invoices.total, got: ${JSON.stringify(data.edges)}`);
+    assert.ok(
+      amountToTotal,
+      `should have edge orders.amount -> invoices.total, got: ${JSON.stringify(data.edges)}`,
+    );
   });
 });
 
@@ -533,15 +579,22 @@ describe("satsuma graph vs summary (nl-derived count consistency)", () => {
     const summaryData = JSON.parse(summaryResult.stdout);
 
     // graph stats.arrows counts all edges in the output array.
-    assert.equal(graphData.stats.arrows, graphData.edges.length,
-      "stats.arrows should equal the number of edges in the output");
+    assert.equal(
+      graphData.stats.arrows,
+      graphData.edges.length,
+      "stats.arrows should equal the number of edges in the output",
+    );
 
     // summary arrowCount must equal graph stats.arrows for the same workspace.
     const summaryTotal = (summaryData.mappings as any[]).reduce(
-      (sum: number, m: any) => sum + (m.arrowCount as number), 0,
+      (sum: number, m: any) => sum + (m.arrowCount as number),
+      0,
     );
-    assert.equal(summaryTotal, graphData.stats.arrows,
-      "summary arrowCount sum should equal graph stats.arrows for the same workspace");
+    assert.equal(
+      summaryTotal,
+      graphData.stats.arrows,
+      "summary arrowCount sum should equal graph stats.arrows for the same workspace",
+    );
   });
 });
 
@@ -559,8 +612,10 @@ describe("satsuma graph (same-line arrows sharing a target, sl-201z)", () => {
     const data = JSON.parse(stdout);
     const pairs = (data.edges as any[]).map((e) => `${e.from}->${e.to}`);
     assert.ok(pairs.includes("::s.a->::t.x"), "edge from s.a should be present");
-    assert.ok(pairs.includes("::s.b->::t.x"),
-      "edge from s.b (same line, same target as s.a->x) should be present");
+    assert.ok(
+      pairs.includes("::s.b->::t.x"),
+      "edge from s.b (same line, same target as s.a->x) should be present",
+    );
     assert.equal(data.stats.arrows, 2, "both same-line arrows should be counted");
   });
 });

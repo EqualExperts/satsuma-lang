@@ -24,9 +24,7 @@ const serverConfig = {
   outfile: "server/dist/server.js",
   format: "cjs",
   sourcemap: true,
-  nodePaths: [
-    path.resolve(__dirname, "../satsuma-lsp/node_modules"),
-  ],
+  nodePaths: [path.resolve(__dirname, "../satsuma-lsp/node_modules")],
   alias: {
     "@satsuma/viz-backend": path.resolve(__dirname, "../satsuma-viz-backend/src/index.ts"),
     "@satsuma/viz-backend/workspace-index": path.resolve(
@@ -43,9 +41,7 @@ const serverConfig = {
   // making import.meta.url → undefined and crashing at runtime. The banner
   // injects a CJS-compatible shim so the bundled code gets a real URL.
   banner: {
-    js: [
-      `var __import_meta_url = require("url").pathToFileURL(__filename).href;`,
-    ].join("\n"),
+    js: [`var __import_meta_url = require("url").pathToFileURL(__filename).href;`].join("\n"),
   },
   define: {
     "import.meta.url": "__import_meta_url",
@@ -123,7 +119,10 @@ function copyAssets() {
     ["src/webview/lineage/lineage.css", "dist/webview/lineage/lineage.css"],
     ["src/webview/viz/viz.css", "dist/webview/viz/viz.css"],
     ["src/webview/field-lineage/field-lineage.css", "dist/webview/field-lineage/field-lineage.css"],
-    ["src/webview/schema-lineage/schema-lineage.css", "dist/webview/schema-lineage/schema-lineage.css"],
+    [
+      "src/webview/schema-lineage/schema-lineage.css",
+      "dist/webview/schema-lineage/schema-lineage.css",
+    ],
   ];
 
   // Copy WASM and highlights.scm into server/dist/ so the server can load them
@@ -136,7 +135,10 @@ function copyAssets() {
     // web-tree-sitter 0.26+ renamed tree-sitter.wasm → web-tree-sitter.wasm.
     // The WASM file lives in satsuma-lsp's node_modules since the server was
     // extracted into its own package (ADR-021).
-    ["../satsuma-lsp/node_modules/web-tree-sitter/web-tree-sitter.wasm", "server/dist/tree-sitter.wasm"],
+    [
+      "../satsuma-lsp/node_modules/web-tree-sitter/web-tree-sitter.wasm",
+      "server/dist/tree-sitter.wasm",
+    ],
   );
 
   for (const [src, dst] of pairs) {

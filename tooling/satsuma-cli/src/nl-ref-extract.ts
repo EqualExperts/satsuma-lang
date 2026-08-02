@@ -45,9 +45,9 @@ function makeLookup(index: ExtractedWorkspace): DefinitionLookup {
   return {
     hasSchema: (key) => index.schemas.has(key),
     getSchema: (key) => index.schemas.get(key) ?? null,
-    hasFragment: (key) => (index.fragments?.has(key) ?? false),
+    hasFragment: (key) => index.fragments?.has(key) ?? false,
     getFragment: (key) => index.fragments?.get(key) ?? null,
-    hasTransform: (key) => (index.transforms?.has(key) ?? false),
+    hasTransform: (key) => index.transforms?.has(key) ?? false,
     getMapping: (key) => index.mappings.get(key) ?? null,
     iterateSchemas: () => index.schemas.entries(),
     expandSpreads: (entity, ns) => expandEntityFields(entity, ns, index),
@@ -63,7 +63,11 @@ interface MappingContext {
 /**
  * Resolve a single @ref against the workspace index.
  */
-export function resolveRef(ref: string, mappingContext: MappingContext, index: ExtractedWorkspace): Resolution {
+export function resolveRef(
+  ref: string,
+  mappingContext: MappingContext,
+  index: ExtractedWorkspace,
+): Resolution {
   return _resolveRef(ref, mappingContext, makeLookup(index));
 }
 
@@ -79,7 +83,10 @@ export function resolveAllNLRefs(index: ExtractedWorkspace): ResolvedNLRef[] {
  * Check if a schema reference from an NL block is declared in the mapping's
  * source or target list.
  */
-export function isSchemaInMappingSources(schemaRef: string, mapping: MappingRecord | undefined): boolean {
+export function isSchemaInMappingSources(
+  schemaRef: string,
+  mapping: MappingRecord | undefined,
+): boolean {
   return _isSchemaInMappingSources(schemaRef, mapping);
 }
 
@@ -117,9 +124,7 @@ export function countNlDerivedEdgesByMapping(index: ExtractedWorkspace): Map<str
     const sourceSchemas = mapping?.sources ?? [];
     const targetSchemas = mapping?.targets ?? [];
 
-    const toField = record.target
-      ? canonicalKey(qualifyField(record.target, targetSchemas))
-      : null;
+    const toField = record.target ? canonicalKey(qualifyField(record.target, targetSchemas)) : null;
     if (!toField) continue;
 
     for (const src of record.sources) {

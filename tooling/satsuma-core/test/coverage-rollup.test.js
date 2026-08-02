@@ -29,7 +29,9 @@ import {
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const WASM_PATH = resolve(__dirname, "../../tree-sitter-satsuma/tree-sitter-satsuma.wasm");
 
-before(async () => { await initParser(WASM_PATH); });
+before(async () => {
+  await initParser(WASM_PATH);
+});
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -81,7 +83,10 @@ function aggregate(source) {
 /** The aggregate entry for one schema and role. */
 function entry(result, role, schemaId) {
   const found = result.schemas.find((s) => s.role === role && s.schemaId === schemaId);
-  assert.ok(found, `expected ${role} ${schemaId} in ${JSON.stringify(result.schemas.map((s) => [s.role, s.schemaId]))}`);
+  assert.ok(
+    found,
+    `expected ${role} ${schemaId} in ${JSON.stringify(result.schemas.map((s) => [s.role, s.schemaId]))}`,
+  );
   return found;
 }
 
@@ -181,7 +186,11 @@ mapping load_memos {
       .find((s) => s.role === "target")
       .fields.find((f) => f.path === "memo");
     assert.equal(perMapping.mapped, false, "per-mapping: 'load ids' does not write memo");
-    assert.equal(aggregateMapped(result, "target", "tgt", "memo"), true, "aggregate: some mapping writes memo");
+    assert.equal(
+      aggregateMapped(result, "target", "tgt", "memo"),
+      true,
+      "aggregate: some mapping writes memo",
+    );
   });
 
   it("records every mapping that references a schema in a role", () => {
@@ -280,12 +289,22 @@ namespace billing {
   it("workspace totals equal the sum of the namespace subtotals", () => {
     // If these can disagree, one of the two numbers in the report is a lie.
     const { aggregate: result } = aggregate(SRC);
-    const summed = (role) => result.namespaces.reduce(
-      (acc, ns) => ({ covered: acc.covered + ns[role].covered, total: acc.total + ns[role].total }),
-      { covered: 0, total: 0 },
-    );
-    assert.deepEqual(summed("source"), { covered: result.workspace.source.covered, total: result.workspace.source.total });
-    assert.deepEqual(summed("target"), { covered: result.workspace.target.covered, total: result.workspace.target.total });
+    const summed = (role) =>
+      result.namespaces.reduce(
+        (acc, ns) => ({
+          covered: acc.covered + ns[role].covered,
+          total: acc.total + ns[role].total,
+        }),
+        { covered: 0, total: 0 },
+      );
+    assert.deepEqual(summed("source"), {
+      covered: result.workspace.source.covered,
+      total: result.workspace.source.total,
+    });
+    assert.deepEqual(summed("target"), {
+      covered: result.workspace.target.covered,
+      total: result.workspace.target.total,
+    });
   });
 
   it("groups schemas declared at file scope under a null namespace", () => {
@@ -299,7 +318,10 @@ mapping load {
   target { tgt }
   id -> id
 }`);
-    assert.deepEqual(result.namespaces.map((n) => n.namespace), [null]);
+    assert.deepEqual(
+      result.namespaces.map((n) => n.namespace),
+      [null],
+    );
     assert.deepEqual(result.namespaces[0].target, result.workspace.target);
   });
 });

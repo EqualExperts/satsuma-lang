@@ -31,7 +31,11 @@ const PLATFORM = resolve(__dirname, "fixtures/platform.stm");
 
 const run = (...args: string[]) => _run(CLI, ...args);
 
-function makeIndex({ schemas = [], mappings = [], nlRefData = [] }: { schemas?: any[]; mappings?: any[]; nlRefData?: any[] } = {}) {
+function makeIndex({
+  schemas = [],
+  mappings = [],
+  nlRefData = [],
+}: { schemas?: any[]; mappings?: any[]; nlRefData?: any[] } = {}) {
   const schemaMap = new Map();
   for (const s of schemas) {
     schemaMap.set(s.name, { ...s, file: s.file ?? "test.stm", row: s.row ?? 0 });
@@ -49,7 +53,11 @@ function makeIndex({ schemas = [], mappings = [], nlRefData = [] }: { schemas?: 
     warnings: [],
     questions: [],
     fieldArrows: new Map(),
-    referenceGraph: { usedByMappings: new Map(), fragmentsUsedIn: new Map(), metricsReferences: new Map() },
+    referenceGraph: {
+      usedByMappings: new Map(),
+      fragmentsUsedIn: new Map(),
+      metricsReferences: new Map(),
+    },
     namespaceNames: new Set(),
     nlRefData,
     totalErrors: 0,
@@ -94,15 +102,13 @@ describe("sl-j1eb: graph --json no doubled schema prefix", () => {
         // Only check 3+ part paths for doubling; 2-part schema.field is legitimate
         // when flatten targets share the schema name
         if (parts.length >= 3) {
-          assert.notEqual(parts[0], parts[1],
-            `Doubled schema prefix in from: ${edge.from}`);
+          assert.notEqual(parts[0], parts[1], `Doubled schema prefix in from: ${edge.from}`);
         }
       }
       if (edge.to) {
         const parts = edge.to.split(".");
         if (parts.length >= 3) {
-          assert.notEqual(parts[0], parts[1],
-            `Doubled schema prefix in to: ${edge.to}`);
+          assert.notEqual(parts[0], parts[1], `Doubled schema prefix in to: ${edge.to}`);
         }
       }
     }
@@ -119,12 +125,10 @@ describe("sl-bl5e: graph --json no double-dot paths", () => {
 
     for (const edge of data.edges) {
       if (edge.from) {
-        assert.ok(!edge.from.includes(".."),
-          `Double-dot in from: ${edge.from}`);
+        assert.ok(!edge.from.includes(".."), `Double-dot in from: ${edge.from}`);
       }
       if (edge.to) {
-        assert.ok(!edge.to.includes(".."),
-          `Double-dot in to: ${edge.to}`);
+        assert.ok(!edge.to.includes(".."), `Double-dot in to: ${edge.to}`);
       }
     }
   });
@@ -145,12 +149,10 @@ describe("sl-n464: graph --schema-only aggregates field edges", () => {
     const data = JSON.parse(stdout);
     for (const edge of data.edges) {
       if (edge.from) {
-        assert.ok(!edge.from.includes("."),
-          `Edge from should be schema-level: ${edge.from}`);
+        assert.ok(!edge.from.includes("."), `Edge from should be schema-level: ${edge.from}`);
       }
       if (edge.to) {
-        assert.ok(!edge.to.includes("."),
-          `Edge to should be schema-level: ${edge.to}`);
+        assert.ok(!edge.to.includes("."), `Edge to should be schema-level: ${edge.to}`);
       }
     }
   });
@@ -178,20 +180,24 @@ describe("sl-04pv: hidden-source-in-nl fires on bare and dotted refs", () => {
         { name: "hidden", fields: [{ name: "code" }] },
         { name: "tgt", fields: [{ name: "id" }] },
       ],
-      mappings: [{
-        name: "test",
-        sources: ["src"],
-        targets: ["tgt"],
-      }],
-      nlRefData: [{
-        text: "Look up @hidden to get the code",
-        mapping: "test",
-        namespace: null,
-        targetField: "id",
-        file: "test.stm",
-        line: 10,
-        column: 0,
-      }],
+      mappings: [
+        {
+          name: "test",
+          sources: ["src"],
+          targets: ["tgt"],
+        },
+      ],
+      nlRefData: [
+        {
+          text: "Look up @hidden to get the code",
+          mapping: "test",
+          namespace: null,
+          targetField: "id",
+          file: "test.stm",
+          line: 10,
+          column: 0,
+        },
+      ],
     });
 
     const diags = runLint(index, { select: ["hidden-source-in-nl"] });
@@ -206,20 +212,24 @@ describe("sl-04pv: hidden-source-in-nl fires on bare and dotted refs", () => {
         { name: "hidden", fields: [{ name: "code" }] },
         { name: "tgt", fields: [{ name: "id" }] },
       ],
-      mappings: [{
-        name: "test",
-        sources: ["src"],
-        targets: ["tgt"],
-      }],
-      nlRefData: [{
-        text: "Use @hidden.code for the value",
-        mapping: "test",
-        namespace: null,
-        targetField: "id",
-        file: "test.stm",
-        line: 10,
-        column: 0,
-      }],
+      mappings: [
+        {
+          name: "test",
+          sources: ["src"],
+          targets: ["tgt"],
+        },
+      ],
+      nlRefData: [
+        {
+          text: "Use @hidden.code for the value",
+          mapping: "test",
+          namespace: null,
+          targetField: "id",
+          file: "test.stm",
+          line: 10,
+          column: 0,
+        },
+      ],
     });
 
     const diags = runLint(index, { select: ["hidden-source-in-nl"] });
@@ -233,20 +243,24 @@ describe("sl-04pv: hidden-source-in-nl fires on bare and dotted refs", () => {
         { name: "src", fields: [{ name: "id" }] },
         { name: "tgt", fields: [{ name: "id" }] },
       ],
-      mappings: [{
-        name: "test",
-        sources: ["src"],
-        targets: ["tgt"],
-      }],
-      nlRefData: [{
-        text: "Copy @src.id value",
-        mapping: "test",
-        namespace: null,
-        targetField: "id",
-        file: "test.stm",
-        line: 10,
-        column: 0,
-      }],
+      mappings: [
+        {
+          name: "test",
+          sources: ["src"],
+          targets: ["tgt"],
+        },
+      ],
+      nlRefData: [
+        {
+          text: "Copy @src.id value",
+          mapping: "test",
+          namespace: null,
+          targetField: "id",
+          file: "test.stm",
+          line: 10,
+          column: 0,
+        },
+      ],
     });
 
     const diags = runLint(index, { select: ["hidden-source-in-nl"] });
@@ -264,20 +278,24 @@ describe("sl-80jy: unresolved-nl-ref no false positive on dotted-field", () => {
         { name: "hidden", fields: [{ name: "code" }] },
         { name: "tgt", fields: [{ name: "id" }] },
       ],
-      mappings: [{
-        name: "test",
-        sources: ["src"],
-        targets: ["tgt"],
-      }],
-      nlRefData: [{
-        text: "Use @hidden.code for the value",
-        mapping: "test",
-        namespace: null,
-        targetField: "id",
-        file: "test.stm",
-        line: 10,
-        column: 0,
-      }],
+      mappings: [
+        {
+          name: "test",
+          sources: ["src"],
+          targets: ["tgt"],
+        },
+      ],
+      nlRefData: [
+        {
+          text: "Use @hidden.code for the value",
+          mapping: "test",
+          namespace: null,
+          targetField: "id",
+          file: "test.stm",
+          line: 10,
+          column: 0,
+        },
+      ],
     });
 
     const diags = runLint(index, { select: ["unresolved-nl-ref"] });
@@ -290,20 +308,24 @@ describe("sl-80jy: unresolved-nl-ref no false positive on dotted-field", () => {
         { name: "src", fields: [{ name: "id" }] },
         { name: "tgt", fields: [{ name: "id" }] },
       ],
-      mappings: [{
-        name: "test",
-        sources: ["src"],
-        targets: ["tgt"],
-      }],
-      nlRefData: [{
-        text: "Use @nonexistent.field for the value",
-        mapping: "test",
-        namespace: null,
-        targetField: "id",
-        file: "test.stm",
-        line: 10,
-        column: 0,
-      }],
+      mappings: [
+        {
+          name: "test",
+          sources: ["src"],
+          targets: ["tgt"],
+        },
+      ],
+      nlRefData: [
+        {
+          text: "Use @nonexistent.field for the value",
+          mapping: "test",
+          namespace: null,
+          targetField: "id",
+          file: "test.stm",
+          line: 10,
+          column: 0,
+        },
+      ],
     });
 
     const diags = runLint(index, { select: ["unresolved-nl-ref"] });
@@ -321,23 +343,34 @@ describe("sl-j9ew: unresolved-nl-ref message says 'metric' not 'mapping' for met
     // to get the bare entity name for the scope label.
     const index = makeIndex({
       schemas: [{ name: "orders", fields: [{ name: "total" }] }],
-      nlRefData: [{
-        text: "Sum @nonexistent_table.amount grouped by month",
-        mapping: "note:metric:revenue",
-        namespace: null,
-        targetField: null,
-        file: "test.stm",
-        line: 5,
-        column: 6,
-      }],
+      nlRefData: [
+        {
+          text: "Sum @nonexistent_table.amount grouped by month",
+          mapping: "note:metric:revenue",
+          namespace: null,
+          targetField: null,
+          file: "test.stm",
+          line: 5,
+          column: 6,
+        },
+      ],
     });
     index.metrics.set("revenue", { sources: [], fields: [], file: "test.stm", row: 2 });
 
     const diags = runLint(index, { select: ["unresolved-nl-ref"] });
     assert.equal(diags.length, 1, "should produce one unresolved-nl-ref warning");
-    assert.ok(diags[0].message.includes("metric"), `message should say 'metric', got: ${diags[0].message}`);
-    assert.ok(!diags[0].message.includes("mapping"), `message should not say 'mapping', got: ${diags[0].message}`);
-    assert.ok(diags[0].message.includes("revenue"), `message should include metric name, got: ${diags[0].message}`);
+    assert.ok(
+      diags[0].message.includes("metric"),
+      `message should say 'metric', got: ${diags[0].message}`,
+    );
+    assert.ok(
+      !diags[0].message.includes("mapping"),
+      `message should not say 'mapping', got: ${diags[0].message}`,
+    );
+    assert.ok(
+      diags[0].message.includes("revenue"),
+      `message should include metric name, got: ${diags[0].message}`,
+    );
   });
 });
 
@@ -350,15 +383,17 @@ describe("sl-tslm: collectSemanticWarnings emits 'unresolved-nl-ref' to match li
     const index = makeIndex({
       schemas: [{ name: "src", fields: [{ name: "id" }] }],
       mappings: [{ name: "m1", sources: ["src"], targets: ["src"] }],
-      nlRefData: [{
-        text: "Check @nonexistent",
-        mapping: "m1",
-        namespace: null,
-        targetField: null,
-        file: "test.stm",
-        line: 5,
-        column: 0,
-      }],
+      nlRefData: [
+        {
+          text: "Check @nonexistent",
+          mapping: "m1",
+          namespace: null,
+          targetField: null,
+          file: "test.stm",
+          line: 5,
+          column: 0,
+        },
+      ],
     });
 
     // runLint wraps the CLI lint-engine; collectSemanticWarnings wraps core validate.
@@ -436,7 +471,11 @@ describe("sc-8g9a: validate no false-positive field-not-in-schema on flatten", (
     const { stdout, stderr } = await run("validate", FFG);
     const output = stdout + stderr;
     const fieldNotInSchema = output.split("\n").filter((l) => l.includes("field-not-in-schema"));
-    assert.equal(fieldNotInSchema.length, 0, `unexpected field-not-in-schema warnings:\n${fieldNotInSchema.join("\n")}`);
+    assert.equal(
+      fieldNotInSchema.length,
+      0,
+      `unexpected field-not-in-schema warnings:\n${fieldNotInSchema.join("\n")}`,
+    );
   });
 });
 

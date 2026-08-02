@@ -24,7 +24,9 @@ const { computeDiagnostics } = require("../dist/diagnostics");
 const { computeDocumentSymbols } = require("../dist/symbols");
 const { computeCompletions } = require("../dist/completion");
 
-before(async () => { await initTestParser(); });
+before(async () => {
+  await initTestParser();
+});
 
 /** Parse `source`, index it under `uri`, and return {tree, index}. */
 function indexed(source, uri = "file:///broken.stm") {
@@ -42,7 +44,9 @@ describe("LSP error recovery — handlers on MISSING-node trees", () => {
     // collecting parse errors; it must produce a (non-empty) array.
     const { tree } = indexed("schema customers {\n  id UUID\n  name VARCHAR\n");
     let diags;
-    assert.doesNotThrow(() => { diags = computeDiagnostics(tree); });
+    assert.doesNotThrow(() => {
+      diags = computeDiagnostics(tree);
+    });
     assert.ok(Array.isArray(diags));
     assert.ok(diags.length >= 1, "an unterminated schema body should yield ≥1 parse diagnostic");
   });
@@ -63,7 +67,9 @@ mapping \`m\` {
 `,
     );
     let symbols;
-    assert.doesNotThrow(() => { symbols = computeDocumentSymbols(tree); });
+    assert.doesNotThrow(() => {
+      symbols = computeDocumentSymbols(tree);
+    });
     assert.ok(Array.isArray(symbols));
     const names = symbols.map((s) => s.name);
     assert.ok(names.includes("customers"), "well-formed schema must still appear in symbol list");

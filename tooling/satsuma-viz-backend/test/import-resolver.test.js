@@ -73,10 +73,7 @@ describe("resolveImportUri parity with the legacy path-based resolver", () => {
   // URL constructor must yield the same encoded form so indexedFiles keys match.
   it("matches the legacy output when the path contains a space", () => {
     const pathText = "./order items.stm";
-    assert.equal(
-      resolveImportUri(importer, pathText),
-      legacyResolveImportUri(importer, pathText),
-    );
+    assert.equal(resolveImportUri(importer, pathText), legacyResolveImportUri(importer, pathText));
   });
 
   // A malformed importer URI must degrade to null rather than throw, so a
@@ -98,20 +95,13 @@ describe("getImportReachableUris with virtual file:/// URIs (browser form)", () 
     const importeeUri = `${base}crm/customers.stm`;
 
     const index = createWorkspaceIndex();
-    indexFile(
-      index,
-      entryUri,
-      parse('import { customers } from "./customers.stm"\n'),
-    );
+    indexFile(index, entryUri, parse('import { customers } from "./customers.stm"\n'));
     indexFile(index, importeeUri, parse("schema customers { id INT }\n"));
 
     const reachable = getImportReachableUris(entryUri, index);
 
     assert.ok(reachable.has(entryUri), "entry file is always reachable");
-    assert.ok(
-      reachable.has(importeeUri),
-      "imported sibling resolves to the library-keyed URI",
-    );
+    assert.ok(reachable.has(importeeUri), "imported sibling resolves to the library-keyed URI");
   });
 
   // An import to a path with no matching indexed document must be skipped, not
@@ -121,11 +111,7 @@ describe("getImportReachableUris with virtual file:/// URIs (browser form)", () 
     await initTestParser();
     const entryUri = "file:///library/solo.stm";
     const index = createWorkspaceIndex();
-    indexFile(
-      index,
-      entryUri,
-      parse('import { missing } from "./nowhere.stm"\n'),
-    );
+    indexFile(index, entryUri, parse('import { missing } from "./nowhere.stm"\n'));
 
     const reachable = getImportReachableUris(entryUri, index);
 
@@ -137,11 +123,7 @@ describe("buildImportSuggestion relative-path computation", () => {
   // The quick-fix must emit an explicitly-relative path. A sibling file is the
   // common case and must gain a leading ./ so it is not read as a bare-name import.
   it("emits a ./-prefixed path for a sibling file", () => {
-    const suggestion = buildImportSuggestion(
-      "file:///ws/a.stm",
-      "Customer",
-      "file:///ws/b.stm",
-    );
+    const suggestion = buildImportSuggestion("file:///ws/a.stm", "Customer", "file:///ws/b.stm");
     assert.equal(suggestion, 'import { Customer } from "./b.stm"');
   });
 

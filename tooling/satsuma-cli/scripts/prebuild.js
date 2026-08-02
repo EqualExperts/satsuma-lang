@@ -62,7 +62,7 @@ for (const { src, dest, label } of wasmFiles) {
   } else {
     throw new Error(
       `prebuild: required ${label} not found at ${src}. ` +
-      "Build tooling/tree-sitter-satsuma/tree-sitter-satsuma.wasm before packaging the CLI.",
+        "Build tooling/tree-sitter-satsuma/tree-sitter-satsuma.wasm before packaging the CLI.",
     );
   }
 }

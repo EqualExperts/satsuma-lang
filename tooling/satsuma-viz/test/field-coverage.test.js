@@ -40,9 +40,7 @@ describe("field-coverage helpers", () => {
   });
 
   it("resolves unqualified nested source paths against the owning schema", () => {
-    const src = schema("order_events", [
-      field("customer", [field("email"), field("tier")]),
-    ]);
+    const src = schema("order_events", [field("customer", [field("email"), field("tier")])]);
     assert.equal(mod.schemaHasFieldPath(src, "customer.email"), true);
     assert.equal(
       mod.resolveSchemaLocalFieldPath("customer.email", src, ["order_events", "customer_profiles"]),
@@ -53,7 +51,10 @@ describe("field-coverage helpers", () => {
   it("strips explicit schema qualifiers when resolving local paths", () => {
     const profiles = schema("customer_profiles", [field("region")]);
     assert.equal(
-      mod.resolveSchemaLocalFieldPath("customer_profiles.region", profiles, ["order_events", "customer_profiles"]),
+      mod.resolveSchemaLocalFieldPath("customer_profiles.region", profiles, [
+        "order_events",
+        "customer_profiles",
+      ]),
       "region",
     );
   });
@@ -62,9 +63,7 @@ describe("field-coverage helpers", () => {
     const orderEvents = schema("order_events", [
       field("customer", [field("email"), field("tier")]),
     ]);
-    const target = schema("completed_orders", [
-      field("customer_email"),
-    ]);
+    const target = schema("completed_orders", [field("customer_email")]);
     const mapping = {
       id: "completed orders",
       sourceRefs: ["order_events", "customer_profiles"],
@@ -114,7 +113,10 @@ describe("field-coverage helpers", () => {
     // The qualified form must keep working too — cross-namespace refs are
     // authored fully qualified.
     assert.equal(
-      mod.resolveSchemaLocalFieldPath("crm::customers.id", customers, ["crm::customers", "crm::orders"]),
+      mod.resolveSchemaLocalFieldPath("crm::customers.id", customers, [
+        "crm::customers",
+        "crm::orders",
+      ]),
       "id",
     );
   });
@@ -134,7 +136,11 @@ describe("field-coverage helpers", () => {
     // with bare-prefixed arrow refs left sourceMapped empty for both schemas.
     const customers = schema("customers", [field("id"), field("email")], "crm::customers");
     const orders = schema("orders", [field("customer_id"), field("total")], "crm::orders");
-    const target = schema("customer_orders", [field("email"), field("total")], "crm::customer_orders");
+    const target = schema(
+      "customer_orders",
+      [field("email"), field("total")],
+      "crm::customer_orders",
+    );
     const mapping = {
       id: "join_orders",
       sourceRefs: ["crm::customers", "crm::orders"],
@@ -191,7 +197,12 @@ describe("field-coverage helpers", () => {
 
 /** One arrow, for building nesting fixtures compactly. */
 const arrow = (src, tgt) => ({
-  sourceFields: [src], targetField: tgt, transform: null, metadata: [], comments: [], location: loc,
+  sourceFields: [src],
+  targetField: tgt,
+  transform: null,
+  metadata: [],
+  comments: [],
+  location: loc,
 });
 
 /** A mapping with one arrow at each level: top, each, nested-each, flatten. */
@@ -200,32 +211,38 @@ const arrowAtEveryLevel = () => ({
   sourceRefs: ["order"],
   targetRef: "invoice",
   arrows: [arrow("id", "id")],
-  eachBlocks: [{
-    sourceField: "items",
-    targetField: "lines",
-    arrows: [arrow("items.sku", "lines.sku")],
-    nestedEach: [{
-      sourceField: "items.discounts",
-      targetField: "lines.discounts",
-      arrows: [arrow("items.discounts.code", "lines.discounts.code")],
+  eachBlocks: [
+    {
+      sourceField: "items",
+      targetField: "lines",
+      arrows: [arrow("items.sku", "lines.sku")],
+      nestedEach: [
+        {
+          sourceField: "items.discounts",
+          targetField: "lines.discounts",
+          arrows: [arrow("items.discounts.code", "lines.discounts.code")],
+          nestedEach: [],
+          nestedFlatten: [],
+          nestedArrows: [],
+          location: loc,
+        },
+      ],
+      nestedFlatten: [],
+      nestedArrows: [],
+      location: loc,
+    },
+  ],
+  flattenBlocks: [
+    {
+      sourceField: "tags",
+      targetField: "invoice",
+      arrows: [arrow("tags.label", "tag_label")],
       nestedEach: [],
       nestedFlatten: [],
       nestedArrows: [],
       location: loc,
-    }],
-    nestedFlatten: [],
-    nestedArrows: [],
-    location: loc,
-  }],
-  flattenBlocks: [{
-    sourceField: "tags",
-    targetField: "invoice",
-    arrows: [arrow("tags.label", "tag_label")],
-    nestedEach: [],
-    nestedFlatten: [],
-    nestedArrows: [],
-    location: loc,
-  }],
+    },
+  ],
   nestedArrows: [],
   sourceBlock: null,
   notes: [],
@@ -252,23 +269,27 @@ describe("countMappingArrows (sl-fm0q)", () => {
       arrows: [],
       flattenBlocks: [],
       nestedArrows: [],
-      eachBlocks: [{
-        sourceField: "orders",
-        targetField: "orders",
-        arrows: [arrow("orders.id", "orders.id")],
-        nestedEach: [],
-        nestedFlatten: [{
-          sourceField: "orders.parcels.contents",
-          targetField: "orders.packed_items",
-          arrows: [arrow("orders.parcels.contents.sku", "orders.packed_items.sku")],
+      eachBlocks: [
+        {
+          sourceField: "orders",
+          targetField: "orders",
+          arrows: [arrow("orders.id", "orders.id")],
           nestedEach: [],
-          nestedFlatten: [],
+          nestedFlatten: [
+            {
+              sourceField: "orders.parcels.contents",
+              targetField: "orders.packed_items",
+              arrows: [arrow("orders.parcels.contents.sku", "orders.packed_items.sku")],
+              nestedEach: [],
+              nestedFlatten: [],
+              nestedArrows: [],
+              location: loc,
+            },
+          ],
           nestedArrows: [],
           location: loc,
-        }],
-        nestedArrows: [],
-        location: loc,
-      }],
+        },
+      ],
     };
     assert.equal(countMappingArrows(mapping), 2);
   });
@@ -283,23 +304,30 @@ describe("countMappingArrows (sl-fm0q)", () => {
     // arrow each for a mapping-level nested_arrow and one inside an each.
     const { countMappingArrows } = await import("../dist/satsuma-viz.js");
     const nestedArrowBlock = (src, tgt, arrows) => ({
-      sourceField: src, targetField: tgt, arrows,
-      nestedEach: [], nestedFlatten: [], nestedArrows: [], location: loc,
+      sourceField: src,
+      targetField: tgt,
+      arrows,
+      nestedEach: [],
+      nestedFlatten: [],
+      nestedArrows: [],
+      location: loc,
     });
     const mapping = {
       ...arrowAtEveryLevel(),
       arrows: [arrow("id", "id")],
       flattenBlocks: [],
       nestedArrows: [nestedArrowBlock("addr", "address", [arrow(".line1", ".line1")])],
-      eachBlocks: [{
-        sourceField: "items",
-        targetField: "lines",
-        arrows: [],
-        nestedEach: [],
-        nestedFlatten: [],
-        nestedArrows: [nestedArrowBlock(".dims", ".dims", [arrow(".h", ".h")])],
-        location: loc,
-      }],
+      eachBlocks: [
+        {
+          sourceField: "items",
+          targetField: "lines",
+          arrows: [],
+          nestedEach: [],
+          nestedFlatten: [],
+          nestedArrows: [nestedArrowBlock(".dims", ".dims", [arrow(".h", ".h")])],
+          location: loc,
+        },
+      ],
     };
     assert.equal(countMappingArrows(mapping), 5);
   });
@@ -338,7 +366,11 @@ describe("sz-mapping-detail hover lookups recurse into nestedEach (sl-fm0q)", ()
 
   it("hovering a nested-each source field highlights its target counterpart", async () => {
     const detail = await makeDetail();
-    const targets = detail._findTargetFieldsForSource("items.discounts.code", "order", detail.mapping);
+    const targets = detail._findTargetFieldsForSource(
+      "items.discounts.code",
+      "order",
+      detail.mapping,
+    );
     assert.deepEqual([...targets], ["lines.discounts.code"]);
   });
 });

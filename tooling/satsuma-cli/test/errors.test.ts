@@ -65,7 +65,10 @@ describe("loadFiles", () => {
     // warning goes to stderr.
     const stderrCaptured: string[] = [];
     const origWrite = process.stderr.write;
-    process.stderr.write = ((s: string) => { stderrCaptured.push(s); return true; }) as never;
+    process.stderr.write = ((s: string) => {
+      stderrCaptured.push(s);
+      return true;
+    }) as never;
     try {
       const mockParse = (f: string) => ({ filePath: f, tree: {}, errorCount: 2 });
       const result = loadFiles(["bad.stm"], mockParse as never);
@@ -85,15 +88,18 @@ describe("loadFiles", () => {
     // an empty message because the runner would otherwise double-print).
     const stderrCaptured: string[] = [];
     const origWrite = process.stderr.write;
-    process.stderr.write = ((s: string) => { stderrCaptured.push(s); return true; }) as never;
+    process.stderr.write = ((s: string) => {
+      stderrCaptured.push(s);
+      return true;
+    }) as never;
     try {
-      const mockParse = (_f: string) => { throw new Error("ENOENT"); };
+      const mockParse = (_f: string) => {
+        throw new Error("ENOENT");
+      };
       assert.throws(
         () => loadFiles(["missing.stm"], mockParse as never),
         (err: unknown) =>
-          err instanceof CommandError &&
-          err.code === EXIT_PARSE_ERROR &&
-          err.message === "",
+          err instanceof CommandError && err.code === EXIT_PARSE_ERROR && err.message === "",
       );
       assert.ok(
         stderrCaptured.some((s) => s.includes("could not read or parse missing.stm")),
@@ -134,9 +140,7 @@ describe("notFound", () => {
     // because dumping it is cheaper than making them re-query.
     assert.throws(
       () => notFound("Schema", "xyz", ["a", "b", "c"]),
-      (err: unknown) =>
-        err instanceof CommandError &&
-        err.message.includes("Available: a, b, c"),
+      (err: unknown) => err instanceof CommandError && err.message.includes("Available: a, b, c"),
     );
   });
 
@@ -147,8 +151,7 @@ describe("notFound", () => {
     assert.throws(
       () => notFound("Schema", "xyz", many),
       (err: unknown) =>
-        err instanceof CommandError &&
-        err.message.includes("15 schemas in workspace"),
+        err instanceof CommandError && err.message.includes("15 schemas in workspace"),
     );
   });
 
@@ -158,9 +161,7 @@ describe("notFound", () => {
     // findSuggestion's exact-match branch.
     assert.throws(
       () => notFound("Schema", "orders", ["orders", "customers"]),
-      (err: unknown) =>
-        err instanceof CommandError &&
-        !err.message.includes("Did you mean"),
+      (err: unknown) => err instanceof CommandError && !err.message.includes("Did you mean"),
     );
   });
 });

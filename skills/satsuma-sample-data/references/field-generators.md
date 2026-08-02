@@ -131,7 +131,10 @@ Always unique. For `(pk)` UUID fields, use `uuid4()` directly.
 
 ```python
 # Salesforce 18-char ID
-fake.lexify("001" + "?" * 15, letters="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789")
+fake.lexify(
+    "001" + "?" * 15,
+    letters="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789",
+)
 ```
 
 ### PICKLIST (Salesforce)
@@ -150,7 +153,7 @@ Generate as a nested dict:
 row["customer"] = {
     "customer_id": str(uuid.uuid4()),
     "email": fake.email(),
-    "tier": random.choice(["standard", "silver", "gold", "platinum"])
+    "tier": random.choice(["standard", "silver", "gold", "platinum"]),
 }
 ```
 
@@ -176,7 +179,7 @@ row["line_items"] = [
         "line_number": i + 1,
         "sku": fake.lexify("SKU-######"),
         "quantity": fake.random_int(1, 10),
-        "unit_price": round(random.uniform(1.0, 500.0), 2)
+        "unit_price": round(random.uniform(1.0, 500.0), 2),
     }
     for i in range(random.randint(1, 5))
 ]
@@ -207,7 +210,9 @@ values for testing filter logic.
 
 ```python
 # Positive values, realistic distribution
-round(random.lognormvariate(3, 1), 2)  # log-normal → right-skewed like real financial data
+round(
+    random.lognormvariate(3, 1), 2
+)  # log-normal → right-skewed like real financial data
 ```
 
 ### `(measure semi_additive)` — balances, inventory

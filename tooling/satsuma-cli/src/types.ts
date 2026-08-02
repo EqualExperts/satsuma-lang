@@ -252,14 +252,32 @@ export type RegisterFn = (rule: LintRule) => void;
 // ── Diff types ──────────────────────────────────────────────────────────────
 
 export interface SchemaChange {
-  kind: "field-removed" | "field-added" | "type-changed" | "metadata-changed" | "source-changed" | "grain-changed" | "slices-changed" | "note-changed" | "note-added" | "note-removed";
+  kind:
+    | "field-removed"
+    | "field-added"
+    | "type-changed"
+    | "metadata-changed"
+    | "source-changed"
+    | "grain-changed"
+    | "slices-changed"
+    | "note-changed"
+    | "note-added"
+    | "note-removed";
   field: string;
   from?: string;
   to?: string;
 }
 
 export interface MappingChange {
-  kind: "arrow-count-changed" | "sources-changed" | "targets-changed" | "arrow-added" | "arrow-removed" | "arrow-transform-changed" | "note-added" | "note-removed";
+  kind:
+    | "arrow-count-changed"
+    | "sources-changed"
+    | "targets-changed"
+    | "arrow-added"
+    | "arrow-removed"
+    | "arrow-transform-changed"
+    | "note-added"
+    | "note-removed";
   from?: unknown;
   to?: unknown;
   arrow?: string;

@@ -26,45 +26,58 @@ export function register(program: Command): void {
     .option("--compact", "suppress note text")
     .option("--sources", "print source schema names only (one per line)")
     .option("--json", "output JSON")
-    .addHelpText("after", `
+    .addHelpText(
+      "after",
+      `
 Names can be namespace-qualified (e.g. analytics::daily_sales).
 
 Examples:
   satsuma metric daily_sales                         # full metric
   satsuma metric daily_sales --sources               # just source schemas
-  satsuma metric analytics::daily_sales --json       # namespace-qualified`)
-    .action(runCommand(async (name: string, pathArg: string | undefined, opts: { compact?: boolean; sources?: boolean; json?: boolean }) => {
-      const { files: parsedFiles, index } = await loadWorkspace(pathArg);
+  satsuma metric analytics::daily_sales --json       # namespace-qualified`,
+    )
+    .action(
+      runCommand(
+        async (
+          name: string,
+          pathArg: string | undefined,
+          opts: { compact?: boolean; sources?: boolean; json?: boolean },
+        ) => {
+          const { files: parsedFiles, index } = await loadWorkspace(pathArg);
 
-      const resolved = resolveIndexKey(name, index.metrics);
-      if (!resolved) {
-        const keys = [...index.metrics.keys()];
-        const close = keys.find((k) => k.toLowerCase() === name.toLowerCase());
-        const lines: string[] = [];
-        if (close) {
-          lines.push(`Metric '${name}' not found. Did you mean '${close}'?`);
-        } else {
-          lines.push(`Metric '${name}' not found.`);
-          if (keys.length > 0) lines.push(`Available: ${keys.join(", ")}`);
-        }
-        throw new CommandError(lines.join("\n"), EXIT_NOT_FOUND);
-      }
-      const entry = resolved.entry;
-      const resolvedName = resolved.key;
+          const resolved = resolveIndexKey(name, index.metrics);
+          if (!resolved) {
+            const keys = [...index.metrics.keys()];
+            const close = keys.find((k) => k.toLowerCase() === name.toLowerCase());
+            const lines: string[] = [];
+            if (close) {
+              lines.push(`Metric '${name}' not found. Did you mean '${close}'?`);
+            } else {
+              lines.push(`Metric '${name}' not found.`);
+              if (keys.length > 0) lines.push(`Available: ${keys.join(", ")}`);
+            }
+            throw new CommandError(lines.join("\n"), EXIT_NOT_FOUND);
+          }
+          const entry = resolved.entry;
+          const resolvedName = resolved.key;
 
-      const parsed = parsedFiles.find((p) => p.filePath === entry.file);
-      // Metrics are schema_block nodes decorated with the `metric` tag in their
-      // metadata_block. Look up the schema_block by the qualified metric name.
-      const metricNode = parsed ? findBlockNode(parsed.tree.rootNode, "schema_block", resolvedName) : null;
+          const parsed = parsedFiles.find((p) => p.filePath === entry.file);
+          // Metrics are schema_block nodes decorated with the `metric` tag in their
+          // metadata_block. Look up the schema_block by the qualified metric name.
+          const metricNode = parsed
+            ? findBlockNode(parsed.tree.rootNode, "schema_block", resolvedName)
+            : null;
 
-      if (opts.json) {
-        printJson(entry, metricNode);
-      } else if (opts.sources) {
-        for (const s of entry.sources) console.log(s);
-      } else {
-        printDefault(entry, metricNode, opts.compact);
-      }
-    }));
+          if (opts.json) {
+            printJson(entry, metricNode);
+          } else if (opts.sources) {
+            for (const s of entry.sources) console.log(s);
+          } else {
+            printDefault(entry, metricNode, opts.compact);
+          }
+        },
+      ),
+    );
 }
 
 // ── CST helpers ───────────────────────────────────────────────────────────────
@@ -106,9 +119,7 @@ function extractMetaEntries(metaNode: SyntaxNode | undefined): MetaEntry[] {
         entries.push({ key: "note", value: text, quoted: true });
       }
     } else if (c.type === "slice_body") {
-      const sliceNames = c.namedChildren
-        .filter((x) => x.type === "identifier")
-        .map((x) => x.text);
+      const sliceNames = c.namedChildren.filter((x) => x.type === "identifier").map((x) => x.text);
       entries.push({ key: "slice", value: `{${sliceNames.join(", ")}}` });
     }
   }
@@ -180,7 +191,11 @@ function printJson(entry: MetricRecord, metricNode: SyntaxNode | null): void {
   );
 }
 
-function printDefault(entry: MetricRecord, metricNode: SyntaxNode | null, compact: boolean | undefined): void {
+function printDefault(
+  entry: MetricRecord,
+  metricNode: SyntaxNode | null,
+  compact: boolean | undefined,
+): void {
   const metaNode = metricNode?.namedChildren.find((c) => c.type === "metadata_block");
   const meta = extractMetaEntries(metaNode);
   const metaStr = formatMeta(meta);
@@ -203,7 +218,10 @@ function printDefault(entry: MetricRecord, metricNode: SyntaxNode | null, compac
         console.log(`  ${fname.padEnd(20)}${typeNode?.text ?? ""}${metaDeclText}`);
       } else if (c.type === "note_block" && !compact) {
         console.log(`  note { ... }`);
-      } else if ((c.type === "comment" || c.type === "warning_comment" || c.type === "question_comment") && !compact) {
+      } else if (
+        (c.type === "comment" || c.type === "warning_comment" || c.type === "question_comment") &&
+        !compact
+      ) {
         console.log(`  ${c.text}`);
       }
     }

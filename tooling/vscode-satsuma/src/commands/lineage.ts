@@ -32,9 +32,7 @@ export function registerLineageCommand(
         names = [];
       }
 
-      const schemaNames = names
-        .filter((n) => n.kind === "schema")
-        .map((n) => n.name);
+      const schemaNames = names.filter((n) => n.kind === "schema").map((n) => n.name);
 
       if (schemaNames.length === 0) {
         vscode.window.showInformationMessage("No schemas found in workspace.");

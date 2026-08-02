@@ -45,7 +45,10 @@ describe("SATSUMA-CLI.md command coverage", () => {
     const names = commandNamesFromHelp(stdout);
     // Sanity floor: if help parsing ever breaks, fail loudly here rather
     // than silently asserting nothing below.
-    assert.ok(names.length >= 20, `expected to parse a full command list from --help, got ${names.length}`);
+    assert.ok(
+      names.length >= 20,
+      `expected to parse a full command list from --help, got ${names.length}`,
+    );
 
     const reference = readFileSync(CLI_REFERENCE, "utf8");
     const undocumented = names.filter((name) => !reference.includes(`\`${name}`));
@@ -79,13 +82,21 @@ describe("SATSUMA-CLI.md coverage JSON contract", () => {
     // mention, the contract has silently changed — which is exactly the drift
     // calling it "stable" is meant to prevent.
     const { stdout, code } = await runCli(
-      CLI, "coverage", COVERAGE_FIXTURE, "--fail-under", "50", "--json",
+      CLI,
+      "coverage",
+      COVERAGE_FIXTURE,
+      "--fail-under",
+      "50",
+      "--json",
     );
     assert.equal(code, 0);
 
     const keys = [...allKeys(JSON.parse(stdout))];
     // Sanity floor: a parsing slip here must fail loudly, not assert nothing.
-    assert.ok(keys.length >= 10, `expected a populated coverage payload, got keys: ${keys.join(", ")}`);
+    assert.ok(
+      keys.length >= 10,
+      `expected a populated coverage payload, got keys: ${keys.join(", ")}`,
+    );
 
     const reference = readFileSync(CLI_REFERENCE, "utf8");
     const contract = reference.slice(reference.indexOf("#### JSON contract"));

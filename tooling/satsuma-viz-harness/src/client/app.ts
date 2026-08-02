@@ -139,7 +139,9 @@ const harness: SatsumaHarness = {
   unresolvedImports: [],
   events: [],
   ready: false,
-  clearEvents() { this.events = []; },
+  clearEvents() {
+    this.events = [];
+  },
 };
 
 window.__satsumaHarness = harness;
@@ -170,26 +172,26 @@ function getRequired(id: string): HTMLElement {
   return el;
 }
 
-const layoutEl          = getRequired("layout");
-const fixtureListEl     = getRequired("fixture-list");
-const fixturePickerBtn  = getRequired("fixture-picker-btn");
+const layoutEl = getRequired("layout");
+const fixtureListEl = getRequired("fixture-list");
+const fixturePickerBtn = getRequired("fixture-picker-btn");
 const fixturePickerName = getRequired("fixture-picker-name");
-const fixtureDropdown   = getRequired("fixture-picker-dropdown");
-const libraryNewBtn     = getRequired("library-new-btn");
-const libraryResetBtn   = getRequired("library-reset-btn");
-const sourceEditorHost  = getRequired("source-editor");
-const parseStatusEl     = getRequired("parse-status");
+const fixtureDropdown = getRequired("fixture-picker-dropdown");
+const libraryNewBtn = getRequired("library-new-btn");
+const libraryResetBtn = getRequired("library-reset-btn");
+const sourceEditorHost = getRequired("source-editor");
+const parseStatusEl = getRequired("parse-status");
 const parseStatusDismiss = getRequired("parse-status-dismiss");
-const unresolvedNoteEl  = getRequired("unresolved-imports");
-const storageWarningEl  = getRequired("storage-warning");
+const unresolvedNoteEl = getRequired("unresolved-imports");
+const storageWarningEl = getRequired("storage-warning");
 const storageWarningDismiss = getRequired("storage-warning-dismiss");
-const fileOpenBtn       = getRequired("file-open-btn");
-const fileOpenInput     = getRequired("file-open-input") as HTMLInputElement;
-const fileSaveBtn       = getRequired("file-save-btn");
+const fileOpenBtn = getRequired("file-open-btn");
+const fileOpenInput = getRequired("file-open-input") as HTMLInputElement;
+const fileSaveBtn = getRequired("file-save-btn");
 const editorCollapseBtn = getRequired("editor-collapse-btn");
-const editorExpandRail  = getRequired("editor-expand-rail");
-const vizContainer      = getRequired("viz-container");
-const themeToggle       = getRequired("theme-toggle");
+const editorExpandRail = getRequired("editor-expand-rail");
+const vizContainer = getRequired("viz-container");
+const themeToggle = getRequired("theme-toggle");
 
 // ---------- Storage warning ----------
 
@@ -281,9 +283,10 @@ function normalizeNavigateEvent(event: Event): HarnessSourceLocation | null {
  * CustomEvent.detail for compatibility with legacy synthetic recorder tests.
  */
 function normalizeFieldEvent(event: Event): HarnessFieldPayload | null {
-  const source = ("schemaId" in event || "fieldName" in event)
-    ? event as Event & { schemaId?: unknown; fieldName?: unknown }
-    : customEventDetail(event);
+  const source =
+    "schemaId" in event || "fieldName" in event
+      ? (event as Event & { schemaId?: unknown; fieldName?: unknown })
+      : customEventDetail(event);
   if (!isRecord(source)) return null;
   const schemaId = source["schemaId"];
   const fieldName = source["fieldName"];
@@ -298,11 +301,12 @@ function normalizeFieldEvent(event: Event): HarnessFieldPayload | null {
  */
 function normalizeOpenMappingEvent(event: Event): HarnessMappingPayload | null {
   const detail = customEventDetail(event);
-  const source = "mapping" in event
-    ? (event as Event & { mapping?: unknown }).mapping
-    : isRecord(detail) && "mapping" in detail
-      ? detail["mapping"]
-      : detail;
+  const source =
+    "mapping" in event
+      ? (event as Event & { mapping?: unknown }).mapping
+      : isRecord(detail) && "mapping" in detail
+        ? detail["mapping"]
+        : detail;
   if (!isRecord(source)) return null;
   const id = source["id"];
   const sourceRefs = source["sourceRefs"];
@@ -310,7 +314,9 @@ function normalizeOpenMappingEvent(event: Event): HarnessMappingPayload | null {
   if (typeof id !== "string" || !Array.isArray(sourceRefs) || typeof targetRef !== "string") {
     return null;
   }
-  const normalizedSourceRefs = sourceRefs.filter((value): value is string => typeof value === "string");
+  const normalizedSourceRefs = sourceRefs.filter(
+    (value): value is string => typeof value === "string",
+  );
   if (normalizedSourceRefs.length !== sourceRefs.length) return null;
   return { id, sourceRefs: normalizedSourceRefs, targetRef };
 }
@@ -320,9 +326,8 @@ function normalizeOpenMappingEvent(event: Event): HarnessMappingPayload | null {
  * while preserving the legacy detail object shape.
  */
 function normalizeExpandLineageEvent(event: Event): { schemaId: string } | null {
-  const source = "schemaId" in event
-    ? event as Event & { schemaId?: unknown }
-    : customEventDetail(event);
+  const source =
+    "schemaId" in event ? (event as Event & { schemaId?: unknown }) : customEventDetail(event);
   if (!isRecord(source)) return null;
   const schemaId = source["schemaId"];
   return typeof schemaId === "string" ? { schemaId } : null;
@@ -354,7 +359,11 @@ function recordEvent(type: string, detail: unknown): void {
  * A null payload is retained when an event shape is invalid so test failures
  * expose the recorder mismatch instead of silently dropping the interaction.
  */
-function recordNormalizedEvent(type: string, event: Event, normalize: (event: Event) => unknown): unknown {
+function recordNormalizedEvent(
+  type: string,
+  event: Event,
+  normalize: (event: Event) => unknown,
+): unknown {
   const detail = normalize(event);
   recordEvent(type, detail);
   return detail;
@@ -418,9 +427,11 @@ function ensureVizElement(): HTMLElement {
     recordNormalizedEvent("open-mapping", e, normalizeOpenMappingEvent);
   });
   el.addEventListener("export", (e) => {
-    const payload = recordNormalizedEvent("export", e, normalizeExportEvent) as
-      | HarnessExportPayload
-      | null;
+    const payload = recordNormalizedEvent(
+      "export",
+      e,
+      normalizeExportEvent,
+    ) as HarnessExportPayload | null;
     // Export SVG must produce an artifact, not just an event: download it
     // client-side like Save does — nothing leaves the browser (sl-7pdf).
     if (payload?.format === "svg") {
@@ -619,7 +630,10 @@ document.addEventListener("click", () => {
 function renderLibraryList(): void {
   fixtureListEl.innerHTML = "";
   const docs = library.list();
-  renderLibrarySection("Examples", docs.filter((d) => d.kind === "builtin"));
+  renderLibrarySection(
+    "Examples",
+    docs.filter((d) => d.kind === "builtin"),
+  );
   const userDocs = docs.filter((d) => d.kind === "user");
   if (userDocs.length > 0) renderLibrarySection("Your documents", userDocs);
 }

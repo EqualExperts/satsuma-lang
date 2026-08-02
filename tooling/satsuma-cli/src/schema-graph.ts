@@ -65,9 +65,7 @@ export function buildFullGraph(index: ExtractedWorkspace): FullGraph {
   if (index.nlRefData) {
     const seen = new Set<string>();
     for (const item of index.nlRefData) {
-      const mappingKey = item.namespace
-        ? `${item.namespace}::${item.mapping}`
-        : item.mapping;
+      const mappingKey = item.namespace ? `${item.namespace}::${item.mapping}` : item.mapping;
       const mapping = index.mappings.get(mappingKey);
       if (!mapping) continue;
 
@@ -88,8 +86,12 @@ export function buildFullGraph(index: ExtractedWorkspace): FullGraph {
 
         let canonicalSchema: string | null = null;
         if (classification === "namespace-qualified-schema" || classification === "bare") {
-          if (resolution.resolvedTo?.kind === "schema") canonicalSchema = resolution.resolvedTo.name;
-        } else if (classification === "dotted-field" || classification === "namespace-qualified-field") {
+          if (resolution.resolvedTo?.kind === "schema")
+            canonicalSchema = resolution.resolvedTo.name;
+        } else if (
+          classification === "dotted-field" ||
+          classification === "namespace-qualified-field"
+        ) {
           if (resolution.resolvedTo?.kind === "field") {
             const fieldName = resolution.resolvedTo.name;
             const lastDot = fieldName.lastIndexOf(".");
@@ -98,7 +100,9 @@ export function buildFullGraph(index: ExtractedWorkspace): FullGraph {
         }
         if (!canonicalSchema) continue;
 
-        const indexKey = canonicalSchema.startsWith("::") ? canonicalSchema.slice(2) : canonicalSchema;
+        const indexKey = canonicalSchema.startsWith("::")
+          ? canonicalSchema.slice(2)
+          : canonicalSchema;
         if (allDeclared.has(indexKey) || allDeclared.has(canonicalSchema)) continue;
 
         const edgeKey = `${indexKey}|${mappingKey}`;

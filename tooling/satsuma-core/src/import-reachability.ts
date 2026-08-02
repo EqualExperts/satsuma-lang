@@ -130,15 +130,15 @@ export function computeSymbolDependencies(index: SemanticIndex): Map<string, Set
   // one and record its outgoing dependency edges.
 
   const allDefinitions = new Map<string, unknown>([
-    ...index.schemas as Map<string, unknown>,
-    ...index.fragments as Map<string, unknown>,
+    ...(index.schemas as Map<string, unknown>),
+    ...(index.fragments as Map<string, unknown>),
   ]);
 
   // --- Schemas: depend on spread fragments ---
   for (const [key, schema] of index.schemas) {
     ensureEntry(key);
     const ns = schema.namespace ?? null;
-    for (const spread of (schema.spreads ?? [])) {
+    for (const spread of schema.spreads ?? []) {
       const resolved = resolveScopedEntityRef(spread, ns, index.fragments as Map<string, unknown>);
       if (resolved) addDep(key, resolved);
     }
@@ -148,7 +148,7 @@ export function computeSymbolDependencies(index: SemanticIndex): Map<string, Set
   for (const [key, fragment] of index.fragments) {
     ensureEntry(key);
     const ns = fragment.namespace ?? null;
-    for (const spread of (fragment.spreads ?? [])) {
+    for (const spread of fragment.spreads ?? []) {
       const resolved = resolveScopedEntityRef(spread, ns, index.fragments as Map<string, unknown>);
       if (resolved) addDep(key, resolved);
     }
@@ -172,7 +172,7 @@ export function computeSymbolDependencies(index: SemanticIndex): Map<string, Set
   for (const [key, metric] of index.metrics) {
     ensureEntry(key);
     const ns = metric.namespace ?? null;
-    for (const src of (metric.sources ?? [])) {
+    for (const src of metric.sources ?? []) {
       const resolved = resolveScopedEntityRef(src, ns, index.schemas as Map<string, unknown>);
       if (resolved) addDep(key, resolved);
     }

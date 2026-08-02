@@ -3,7 +3,9 @@ const assert = require("node:assert/strict");
 const { initTestParser, parse } = require("./helper");
 const { computeDiagnostics } = require("../dist/diagnostics");
 
-before(async () => { await initTestParser(); });
+before(async () => {
+  await initTestParser();
+});
 
 describe("computeDiagnostics", () => {
   it("returns empty diagnostics for valid input", () => {

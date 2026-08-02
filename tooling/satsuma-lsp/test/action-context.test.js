@@ -4,7 +4,9 @@ const { initTestParser, parse } = require("./helper");
 const { computeActionContext } = require("../dist/action-context");
 const { createWorkspaceIndex, indexFile } = require("../dist/workspace-index");
 
-before(async () => { await initTestParser(); });
+before(async () => {
+  await initTestParser();
+});
 
 function contextAt(source, line, col) {
   const uri = "file:///workspace/test.stm";

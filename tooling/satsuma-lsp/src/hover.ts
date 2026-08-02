@@ -14,11 +14,7 @@ const MAX_HOVER_FIELDS = 8;
  * Per-file only — no workspace index.  Shows structural information
  * derived from the CST: block summaries, field types, metadata, etc.
  */
-export function computeHover(
-  tree: Tree,
-  line: number,
-  character: number,
-): Hover | null {
+export function computeHover(tree: Tree, line: number, character: number): Hover | null {
   const node = nodeAtPosition(tree, line, character);
   if (!node) return null;
 
@@ -136,7 +132,9 @@ function hoverBlock(node: SyntaxNode): HoverResult | null {
       if (body) {
         const fields = children(body, "field_decl");
         const spreads = children(body, "fragment_spread");
-        lines.push(`${fields.length} field(s)${spreads.length > 0 ? `, ${spreads.length} spread(s)` : ""}`);
+        lines.push(
+          `${fields.length} field(s)${spreads.length > 0 ? `, ${spreads.length} spread(s)` : ""}`,
+        );
         // Show a preview of the first MAX_HOVER_FIELDS fields; truncate the rest.
         const fieldSummary = fields.slice(0, MAX_HOVER_FIELDS).map((f) => {
           const fn = child(f, "field_name");
@@ -167,8 +165,10 @@ function hoverBlock(node: SyntaxNode): HoverResult | null {
         if (sources.length > 0 || targets.length > 0) {
           const srcNames = sources.map((s) => backtickText(s)).filter(Boolean);
           const tgtNames = targets.map((t) => backtickText(t)).filter(Boolean);
-          if (srcNames.length > 0) lines.push(`Source: ${srcNames.map((n) => `\`${n}\``).join(", ")}`);
-          if (tgtNames.length > 0) lines.push(`Target: ${tgtNames.map((n) => `\`${n}\``).join(", ")}`);
+          if (srcNames.length > 0)
+            lines.push(`Source: ${srcNames.map((n) => `\`${n}\``).join(", ")}`);
+          if (tgtNames.length > 0)
+            lines.push(`Target: ${tgtNames.map((n) => `\`${n}\``).join(", ")}`);
         }
       }
       break;

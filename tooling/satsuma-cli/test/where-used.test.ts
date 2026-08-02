@@ -37,12 +37,25 @@ describe("where-used: transforms defined inside a namespace (sl-l3m8)", () => {
     const calls = refsOfKind(stdout, "transform_call");
     const byMapping = new Map(calls.map((r) => [r.name, r.line]));
     // `...tidy` spread inside the namespace binds to crm::tidy
-    assert.ok(byMapping.has("crm::clean_customers"), "bare ...spread inside namespace must be found");
+    assert.ok(
+      byMapping.has("crm::clean_customers"),
+      "bare ...spread inside namespace must be found",
+    );
     // bare `tidy` pipe step inside the namespace binds to crm::tidy
-    assert.ok(byMapping.has("crm::clean_customers_again"), "bare pipe invocation inside namespace must be found");
+    assert.ok(
+      byMapping.has("crm::clean_customers_again"),
+      "bare pipe invocation inside namespace must be found",
+    );
     // `...crm::tidy` from outside the namespace binds to crm::tidy
-    assert.ok(byMapping.has("clean_global_users"), "qualified ...spread from outside namespace must be found");
-    assert.equal(calls.length, 3, "exactly the three crm::tidy call sites — no fan-out to the global tidy");
+    assert.ok(
+      byMapping.has("clean_global_users"),
+      "qualified ...spread from outside namespace must be found",
+    );
+    assert.equal(
+      calls.length,
+      3,
+      "exactly the three crm::tidy call sites — no fan-out to the global tidy",
+    );
   });
 
   it("does not attribute bare references inside the namespace to a same-named global transform", async () => {
@@ -54,7 +67,10 @@ describe("where-used: transforms defined inside a namespace (sl-l3m8)", () => {
     const data = JSON.parse(stdout);
     assert.equal(data.name, "::tidy", "bare query resolves to the global transform");
     const calls = refsOfKind(stdout, "transform_call");
-    assert.deepEqual(calls.map((r) => r.name), ["shout_global_users"]);
+    assert.deepEqual(
+      calls.map((r) => r.name),
+      ["shout_global_users"],
+    );
   });
 });
 
@@ -76,7 +92,10 @@ describe("where-used: fragments defined inside a namespace (sl-l3m8)", () => {
     assert.equal(code, 0);
     const spreads = refsOfKind(stdout, "fragment_spread");
     assert.ok(spreads.length >= 5, `expected the corpus's many spreads, got ${spreads.length}`);
-    assert.ok(spreads.some((r) => r.name.includes("::")), "spread targets include namespaced schemas");
+    assert.ok(
+      spreads.some((r) => r.name.includes("::")),
+      "spread targets include namespaced schemas",
+    );
   });
 
   it("finds spreads of multi-word backticked fragment names", async () => {
@@ -85,6 +104,9 @@ describe("where-used: fragments defined inside a namespace (sl-l3m8)", () => {
     const { stdout, code } = await run("where-used", "common keys", FIXTURE, "--json");
     assert.equal(code, 0);
     const spreads = refsOfKind(stdout, "fragment_spread");
-    assert.deepEqual(spreads.map((r) => r.name), ["global_users"]);
+    assert.deepEqual(
+      spreads.map((r) => r.name),
+      ["global_users"],
+    );
   });
 });

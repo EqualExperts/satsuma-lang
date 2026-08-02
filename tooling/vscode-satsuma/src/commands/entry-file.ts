@@ -34,8 +34,7 @@ let lastPickedEntryFile: string | undefined;
  */
 export async function resolveEntryFile(): Promise<string | undefined> {
   const activeDoc = vscode.window.activeTextEditor?.document;
-  const activeFsPath =
-    activeDoc && !activeDoc.isUntitled ? activeDoc.uri.fsPath : undefined;
+  const activeFsPath = activeDoc && !activeDoc.isUntitled ? activeDoc.uri.fsPath : undefined;
 
   const found = await vscode.workspace.findFiles(
     SATSUMA_FILE_GLOB,
@@ -70,8 +69,7 @@ export async function resolveEntryFile(): Promise<string | undefined> {
           fsPath,
         })),
         {
-          placeHolder:
-            "Select the Satsuma entry file (the workspace is its transitive imports)",
+          placeHolder: "Select the Satsuma entry file (the workspace is its transitive imports)",
         },
       );
       if (picked) lastPickedEntryFile = picked.fsPath;

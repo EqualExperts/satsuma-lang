@@ -35,7 +35,9 @@ export function register(program: Command): void {
     .option("--schema-only", "omit field-level edges and field arrays")
     .option("--namespace <ns>", "filter to a namespace")
     .option("--no-nl", "strip NL text from edges")
-    .addHelpText("after", `
+    .addHelpText(
+      "after",
+      `
 Output modes (pick one):
   --json          full structured JSON (primary agent interface)
   --compact       flat schema-level adjacency list (minimal tokens)
@@ -64,29 +66,32 @@ Examples:
   satsuma graph pipeline.stm --json                  # full graph
   satsuma graph pipeline.stm --json --schema-only    # topology only
   satsuma graph pipeline.stm --json --namespace crm  # one namespace
-  satsuma graph pipeline.stm --compact               # minimal output`)
-    .action(runCommand(async (pathArg: string | undefined, opts: GraphOpts) => {
-      const root = pathArg ?? ".";
-      const { index } = await loadWorkspace(root);
-      const schemaGraph = buildFullGraph(index);
-      const graph = buildWorkspaceGraph(index, schemaGraph, root, {
-        namespace: opts.namespace ?? null,
-        includeNl: opts.nl !== false, // --no-nl sets opts.nl to false
-        schemaOnly: opts.schemaOnly ?? false,
-      });
+  satsuma graph pipeline.stm --compact               # minimal output`,
+    )
+    .action(
+      runCommand(async (pathArg: string | undefined, opts: GraphOpts) => {
+        const root = pathArg ?? ".";
+        const { index } = await loadWorkspace(root);
+        const schemaGraph = buildFullGraph(index);
+        const graph = buildWorkspaceGraph(index, schemaGraph, root, {
+          namespace: opts.namespace ?? null,
+          includeNl: opts.nl !== false, // --no-nl sets opts.nl to false
+          schemaOnly: opts.schemaOnly ?? false,
+        });
 
-      if (opts.json) {
-        console.log(JSON.stringify(graph, null, 2));
-      } else if (opts.compact) {
-        printCompact(graph);
-      } else {
-        printDefault(graph);
-      }
+        if (opts.json) {
+          console.log(JSON.stringify(graph, null, 2));
+        } else if (opts.compact) {
+          printCompact(graph);
+        } else {
+          printDefault(graph);
+        }
 
-      // The runner flushes stdout/stderr before exit, so we don't need
-      // a manual drain here even though `--json` payloads can be large.
-      if (index.totalErrors > 0) {
-        return EXIT_PARSE_ERROR;
-      }
-    }));
+        // The runner flushes stdout/stderr before exit, so we don't need
+        // a manual drain here even though `--json` payloads can be large.
+        if (index.totalErrors > 0) {
+          return EXIT_PARSE_ERROR;
+        }
+      }),
+    );
 }

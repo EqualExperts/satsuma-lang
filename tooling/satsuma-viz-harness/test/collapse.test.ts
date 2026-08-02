@@ -58,9 +58,7 @@ test.describe("Collapsible source pane", () => {
     expect(await vizWidth(page)).toBeGreaterThan(expandedWidth + MIN_RECLAIMED_WIDTH);
 
     // The automation contract mirrors the state and records the toggle.
-    expect(
-      await page.evaluate(() => window.__satsumaHarness.editorCollapsed),
-    ).toBe(true);
+    expect(await page.evaluate(() => window.__satsumaHarness.editorCollapsed)).toBe(true);
     expect(
       await page.evaluate(() =>
         window.__satsumaHarness.events.filter((e) => e.type === "editor-collapse"),
@@ -72,9 +70,7 @@ test.describe("Collapsible source pane", () => {
     await expect(page.locator("#source-editor")).toBeVisible();
     await expect(page.locator("#editor-expand-rail")).toBeHidden();
     expect(await vizWidth(page)).toBeCloseTo(expandedWidth, 0);
-    expect(
-      await page.evaluate(() => window.__satsumaHarness.editorCollapsed),
-    ).toBe(false);
+    expect(await page.evaluate(() => window.__satsumaHarness.editorCollapsed)).toBe(false);
   });
 
   test("the collapsed state survives a reload via localStorage", async ({ page }) => {
@@ -87,17 +83,13 @@ test.describe("Collapsible source pane", () => {
     await page.reload();
     await expect(page.locator("#editor-expand-rail")).toBeVisible();
     await expect(page.locator("#source-editor")).toBeHidden();
-    expect(
-      await page.evaluate(() => window.__satsumaHarness.editorCollapsed),
-    ).toBe(true);
+    expect(await page.evaluate(() => window.__satsumaHarness.editorCollapsed)).toBe(true);
 
     // And it is symmetric: expanding then reloading comes back expanded.
     await page.locator("#editor-expand-rail").click();
     await page.reload();
     await expect(page.locator("#source-editor")).toBeVisible();
-    expect(
-      await page.evaluate(() => window.__satsumaHarness.editorCollapsed),
-    ).toBe(false);
+    expect(await page.evaluate(() => window.__satsumaHarness.editorCollapsed)).toBe(false);
   });
 });
 
@@ -105,9 +97,7 @@ test.describe("Collapse affordance discoverability (sl-i0db)", () => {
   // The Feature 34 review flagged the original bare ◀ glyph as "useless —
   // more obvious hint needed". Both directions must now say what they do in
   // words, and stay keyboard-operable with accessible names.
-  test("both directions are labelled in words and carry accessible names", async ({
-    page,
-  }) => {
+  test("both directions are labelled in words and carry accessible names", async ({ page }) => {
     await openWithFixture(page);
 
     const collapseBtn = page.locator("#editor-collapse-btn");

@@ -10,7 +10,9 @@ const assert = require("node:assert/strict");
 const { initTestParser, parse } = require("./helper");
 const { createWorkspaceIndex, indexFile, resolveDefinition } = require("../dist/workspace-index");
 
-before(async () => { await initTestParser(); });
+before(async () => {
+  await initTestParser();
+});
 
 /** Mimic the fieldLocations handler logic: recursively flatten FieldInfo tree. */
 function flattenFields(fields, prefix = "") {
@@ -44,7 +46,10 @@ schema orders {
 
   it("returns all top-level fields", () => {
     const locs = fieldLocations(SRC, "orders");
-    assert.deepEqual(locs.map(l => l.name), ["id", "amount", "status"]);
+    assert.deepEqual(
+      locs.map((l) => l.name),
+      ["id", "amount", "status"],
+    );
   });
 
   it("returns correct line numbers", () => {
@@ -70,7 +75,7 @@ schema customer {
 
   it("includes nested record fields with dotted paths", () => {
     const locs = fieldLocations(SRC, "customer");
-    const names = locs.map(l => l.name);
+    const names = locs.map((l) => l.name);
     assert.ok(names.includes("address"), "should include 'address'");
     assert.ok(names.includes("address.street"), "should include 'address.street'");
     assert.ok(names.includes("address.city"), "should include 'address.city'");
@@ -79,14 +84,14 @@ schema customer {
 
   it("includes top-level fields alongside nested ones", () => {
     const locs = fieldLocations(SRC, "customer");
-    const names = locs.map(l => l.name);
+    const names = locs.map((l) => l.name);
     assert.ok(names.includes("id"), "should include 'id'");
     assert.ok(names.includes("name"), "should include 'name'");
   });
 
   it("returns fields in tree-order (parent before children)", () => {
     const locs = fieldLocations(SRC, "customer");
-    const names = locs.map(l => l.name);
+    const names = locs.map((l) => l.name);
     const addressIdx = names.indexOf("address");
     const streetIdx = names.indexOf("address.street");
     assert.ok(addressIdx < streetIdx, "parent field should come before child");
@@ -107,7 +112,7 @@ schema invoice {
 
   it("includes nested list_of record fields", () => {
     const locs = fieldLocations(SRC, "invoice");
-    const names = locs.map(l => l.name);
+    const names = locs.map((l) => l.name);
     assert.ok(names.includes("line_items.product_id"), "should include 'line_items.product_id'");
     assert.ok(names.includes("line_items.quantity"), "should include 'line_items.quantity'");
     assert.ok(names.includes("line_items.unit_price"), "should include 'line_items.unit_price'");

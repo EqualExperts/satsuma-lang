@@ -12,13 +12,8 @@ export interface CliResult {
  * Run a satsuma CLI command and return the result.
  * Resolves even on non-zero exit (caller checks exitCode).
  */
-export function runCli(
-  cliPath: string,
-  args: string[],
-  cwd?: string,
-): Promise<CliResult> {
-  const workDir =
-    cwd ?? workspace.workspaceFolders?.[0]?.uri.fsPath ?? ".";
+export function runCli(cliPath: string, args: string[], cwd?: string): Promise<CliResult> {
+  const workDir = cwd ?? workspace.workspaceFolders?.[0]?.uri.fsPath ?? ".";
 
   return new Promise((resolve) => {
     execFile(

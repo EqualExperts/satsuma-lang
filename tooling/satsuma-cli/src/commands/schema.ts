@@ -26,62 +26,73 @@ export function register(program: Command): void {
     .option("--compact", "omit notes and inline strings")
     .option("--fields-only", "one line per field")
     .option("--json", "output JSON")
-    .addHelpText("after", `
+    .addHelpText(
+      "after",
+      `
 Names can be namespace-qualified (e.g. pos::stores). Quote names with
 spaces (e.g. 'my schema').
 
 Examples:
   satsuma schema hub_customer                        # full schema
   satsuma schema hub_customer --fields-only          # one field per line
-  satsuma schema pos::stores --json                  # namespace-qualified`)
-    .action(runCommand(async (name: string, pathArg: string | undefined, opts: { compact?: boolean; fieldsOnly?: boolean; json?: boolean }) => {
-      const { files: parsedFiles, index } = await loadWorkspace(pathArg);
+  satsuma schema pos::stores --json                  # namespace-qualified`,
+    )
+    .action(
+      runCommand(
+        async (
+          name: string,
+          pathArg: string | undefined,
+          opts: { compact?: boolean; fieldsOnly?: boolean; json?: boolean },
+        ) => {
+          const { files: parsedFiles, index } = await loadWorkspace(pathArg);
 
-      const resolved = resolveIndexKey(name, index.schemas);
-      if (!resolved) {
-        const keys = [...index.schemas.keys()];
-        const close = keys.find((k) => k.toLowerCase() === name.toLowerCase());
-        // Check for ambiguous unqualified name
-        const ambiguous = !name.includes("::") && keys.filter((k) => k.endsWith(`::${name}`));
-        let errorMsg: string;
-        if (ambiguous && ambiguous.length > 1) {
-          errorMsg = `Schema '${name}' is ambiguous. Found in: ${ambiguous.join(", ")}`;
-        } else if (close) {
-          errorMsg = `Schema '${name}' not found. Did you mean '${close}'?`;
-        } else {
-          errorMsg = `Schema '${name}' not found.`;
-        }
-        if (opts.json) {
-          // JSON callers want the error on the same channel as success
-          // output so they can pipe `satsuma schema … --json | jq` and
-          // still parse the response. Hand the JSON-shaped message to the
-          // runner with stream: "stdout".
-          const errorObj: Record<string, unknown> = { error: errorMsg };
-          if (keys.length > 0) errorObj.available = keys;
-          throw new CommandError(JSON.stringify(errorObj, null, 2), EXIT_NOT_FOUND, "stdout");
-        }
-        const lines: string[] = [errorMsg];
-        if (keys.length > 0 && !(ambiguous && ambiguous.length > 1) && !close) {
-          lines.push(`Available: ${keys.join(", ")}`);
-        }
-        throw new CommandError(lines.join("\n"), EXIT_NOT_FOUND);
-      }
-      const entry = resolved.entry;
+          const resolved = resolveIndexKey(name, index.schemas);
+          if (!resolved) {
+            const keys = [...index.schemas.keys()];
+            const close = keys.find((k) => k.toLowerCase() === name.toLowerCase());
+            // Check for ambiguous unqualified name
+            const ambiguous = !name.includes("::") && keys.filter((k) => k.endsWith(`::${name}`));
+            let errorMsg: string;
+            if (ambiguous && ambiguous.length > 1) {
+              errorMsg = `Schema '${name}' is ambiguous. Found in: ${ambiguous.join(", ")}`;
+            } else if (close) {
+              errorMsg = `Schema '${name}' not found. Did you mean '${close}'?`;
+            } else {
+              errorMsg = `Schema '${name}' not found.`;
+            }
+            if (opts.json) {
+              // JSON callers want the error on the same channel as success
+              // output so they can pipe `satsuma schema … --json | jq` and
+              // still parse the response. Hand the JSON-shaped message to the
+              // runner with stream: "stdout".
+              const errorObj: Record<string, unknown> = { error: errorMsg };
+              if (keys.length > 0) errorObj.available = keys;
+              throw new CommandError(JSON.stringify(errorObj, null, 2), EXIT_NOT_FOUND, "stdout");
+            }
+            const lines: string[] = [errorMsg];
+            if (keys.length > 0 && !(ambiguous && ambiguous.length > 1) && !close) {
+              lines.push(`Available: ${keys.join(", ")}`);
+            }
+            throw new CommandError(lines.join("\n"), EXIT_NOT_FOUND);
+          }
+          const entry = resolved.entry;
 
-      // Find the raw CST node for richer reconstruction
-      const parsed = parsedFiles.find((p) => p.filePath === entry.file);
-      const schemaNode = parsed
-        ? findBlockNode(parsed.tree.rootNode, "schema_block", resolved.key)
-        : null;
+          // Find the raw CST node for richer reconstruction
+          const parsed = parsedFiles.find((p) => p.filePath === entry.file);
+          const schemaNode = parsed
+            ? findBlockNode(parsed.tree.rootNode, "schema_block", resolved.key)
+            : null;
 
-      if (opts.json) {
-        printJson(entry, schemaNode, index, opts);
-      } else if (opts.fieldsOnly) {
-        printFieldsOnly(entry);
-      } else {
-        printDefault(entry, schemaNode, opts.compact);
-      }
-    }));
+          if (opts.json) {
+            printJson(entry, schemaNode, index, opts);
+          } else if (opts.fieldsOnly) {
+            printFieldsOnly(entry);
+          } else {
+            printDefault(entry, schemaNode, opts.compact);
+          }
+        },
+      ),
+    );
 }
 
 // ── CST helpers ───────────────────────────────────────────────────────────────
@@ -100,7 +111,11 @@ function fieldHasListOf(fd: SyntaxNode): boolean {
 }
 
 /** Collect edge comments (before first field / after last field) from a block node. */
-function collectEdgeComments(blockNode: SyntaxNode, position: "before" | "after", bodyNode: SyntaxNode): CollectedLine[] {
+function collectEdgeComments(
+  blockNode: SyntaxNode,
+  position: "before" | "after",
+  bodyNode: SyntaxNode,
+): CollectedLine[] {
   const lines: CollectedLine[] = [];
   const commentTypes = new Set(["comment", "warning_comment", "question_comment"]);
   for (const c of blockNode.children) {
@@ -149,7 +164,10 @@ function collectFields(bodyNode: SyntaxNode, indent: number = 0): CollectedLine[
         const isList = fieldHasListOf(c);
         const typePrefix = isList ? "list_of " : "";
         const metaText = meta ? ` ${meta.text}` : "";
-        lines.push({ indent, text: `${pad}${fname.padEnd(24)}${typePrefix}${typeNode?.text ?? ""}${metaText}` });
+        lines.push({
+          indent,
+          text: `${pad}${fname.padEnd(24)}${typePrefix}${typeNode?.text ?? ""}${metaText}`,
+        });
       }
     } else if (c.type === "fragment_spread") {
       const lbl = c.namedChildren.find((x) => x.type === "spread_label");
@@ -160,13 +178,22 @@ function collectFields(bodyNode: SyntaxNode, indent: number = 0): CollectedLine[
           sname = q.text;
         } else {
           sname = lbl.namedChildren
-            .filter((x) => x.type === "identifier" || x.type === "continuation_word" || x.type === "qualified_name")
+            .filter(
+              (x) =>
+                x.type === "identifier" ||
+                x.type === "continuation_word" ||
+                x.type === "qualified_name",
+            )
             .map((x) => x.text)
             .join(" ");
         }
       }
       lines.push({ indent, text: `${pad}...${sname}` });
-    } else if (c.type === "comment" || c.type === "warning_comment" || c.type === "question_comment") {
+    } else if (
+      c.type === "comment" ||
+      c.type === "warning_comment" ||
+      c.type === "question_comment"
+    ) {
       lines.push({ indent, text: `${pad}${c.text}` });
     }
   }
@@ -175,7 +202,12 @@ function collectFields(bodyNode: SyntaxNode, indent: number = 0): CollectedLine[
 
 // ── Formatters ────────────────────────────────────────────────────────────────
 
-function printJson(entry: SchemaRecord, schemaNode: SyntaxNode | null, index: ExtractedWorkspace, opts: { compact?: boolean; fieldsOnly?: boolean }): void {
+function printJson(
+  entry: SchemaRecord,
+  schemaNode: SyntaxNode | null,
+  index: ExtractedWorkspace,
+  opts: { compact?: boolean; fieldsOnly?: boolean },
+): void {
   const spreadFields = expandEntityFields(entry, entry.namespace ?? null, index);
   const allFields = [...entry.fields, ...spreadFields];
 
@@ -227,7 +259,11 @@ function printFieldsOnly(entry: SchemaRecord): void {
   }
 }
 
-function printDefault(entry: SchemaRecord, schemaNode: SyntaxNode | null, compact: boolean | undefined): void {
+function printDefault(
+  entry: SchemaRecord,
+  schemaNode: SyntaxNode | null,
+  compact: boolean | undefined,
+): void {
   const metaNode = schemaNode?.namedChildren.find((c) => c.type === "metadata_block");
   const metaText = metaNode && !compact ? ` ${metaNode.text}` : "";
   const baseName = entry.name && entry.name.includes(" ") ? `'${entry.name}'` : (entry.name ?? "");
@@ -246,7 +282,11 @@ function printDefault(entry: SchemaRecord, schemaNode: SyntaxNode | null, compac
         if (compact) {
           // Strip comments and inline note text in compact mode
           if (text.trimStart().startsWith("//")) continue;
-          console.log(text.replace(/\s*\(\s*note\s+"""[\s\S]*?"""\s*\)/, "").replace(/\s*\(note\s+"[^"]*"\)/, ""));
+          console.log(
+            text
+              .replace(/\s*\(\s*note\s+"""[\s\S]*?"""\s*\)/, "")
+              .replace(/\s*\(note\s+"[^"]*"\)/, ""),
+          );
         } else {
           console.log(text);
         }

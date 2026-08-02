@@ -17,7 +17,13 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { relative } from "node:path";
 import type { Command } from "commander";
-import { runCommand, CommandError, EXIT_OK, EXIT_NOT_FOUND, EXIT_PARSE_ERROR } from "../command-runner.js";
+import {
+  runCommand,
+  CommandError,
+  EXIT_OK,
+  EXIT_NOT_FOUND,
+  EXIT_PARSE_ERROR,
+} from "../command-runner.js";
 import { resolveInput } from "../workspace.js";
 import { parseFile, parseSource } from "../parser.js";
 import { format } from "../format.js";
@@ -29,7 +35,9 @@ export function register(program: Command): void {
     .option("--check", "exit 1 if any file would change (for CI)")
     .option("--diff", "print unified diff without writing")
     .option("--stdin", "read from stdin, write to stdout")
-    .addHelpText("after", `
+    .addHelpText(
+      "after",
+      `
 Formatting is opinionated and zero-config: consistent indentation, spacing,
 and ordering. Safe to run on any valid file — idempotent. Follows imports to
 format the entry file and all transitively imported files.
@@ -38,78 +46,83 @@ Examples:
   satsuma fmt pipeline.stm                   # format file and its imports
   satsuma fmt --check pipeline.stm           # CI mode — exit 1 if any file would change
   satsuma fmt --diff file.stm                # show what would change without writing
-  cat file.stm | satsuma fmt --stdin         # pipe mode`)
-    .action(runCommand(async (
-      pathArg: string | undefined,
-      opts: { check?: boolean; diff?: boolean; stdin?: boolean }
-    ) => {
-      if (opts.stdin) {
-        handleStdin();
-        return;
-      }
+  cat file.stm | satsuma fmt --stdin         # pipe mode`,
+    )
+    .action(
+      runCommand(
+        async (
+          pathArg: string | undefined,
+          opts: { check?: boolean; diff?: boolean; stdin?: boolean },
+        ) => {
+          if (opts.stdin) {
+            handleStdin();
+            return;
+          }
 
-      const root = pathArg ?? ".";
-      let files: string[];
-      try {
-        files = await resolveInput(root);
-      } catch (err: unknown) {
-        // fmt is the third command that bypasses loadWorkspace: it needs
-        // to tolerate parse errors per-file (skipping rather than aborting)
-        // and uses a slightly different "Error: ..." prefix from the rest
-        // of the CLI. The resolve failure itself is still a hard exit.
-        throw new CommandError(`Error: ${(err as Error).message}`, EXIT_PARSE_ERROR);
-      }
+          const root = pathArg ?? ".";
+          let files: string[];
+          try {
+            files = await resolveInput(root);
+          } catch (err: unknown) {
+            // fmt is the third command that bypasses loadWorkspace: it needs
+            // to tolerate parse errors per-file (skipping rather than aborting)
+            // and uses a slightly different "Error: ..." prefix from the rest
+            // of the CLI. The resolve failure itself is still a hard exit.
+            throw new CommandError(`Error: ${(err as Error).message}`, EXIT_PARSE_ERROR);
+          }
 
-      if (files.length === 0) {
-        // Nothing to format — that's a success, not a failure.
-        return EXIT_OK;
-      }
+          if (files.length === 0) {
+            // Nothing to format — that's a success, not a failure.
+            return EXIT_OK;
+          }
 
-      let wouldChange = 0;
-      let parseErrors = 0;
+          let wouldChange = 0;
+          let parseErrors = 0;
 
-      for (const filePath of files) {
-        const parsed = parseFile(filePath);
+          for (const filePath of files) {
+            const parsed = parseFile(filePath);
 
-        if (parsed.errorCount > 0) {
-          const rel = displayPath(filePath);
-          console.error(`skipping ${rel}: parse error (${parsed.errorCount} error(s))`);
-          parseErrors++;
-          continue;
-        }
+            if (parsed.errorCount > 0) {
+              const rel = displayPath(filePath);
+              console.error(`skipping ${rel}: parse error (${parsed.errorCount} error(s))`);
+              parseErrors++;
+              continue;
+            }
 
-        const formatted = format(parsed.tree, parsed.src);
+            const formatted = format(parsed.tree, parsed.src);
 
-        if (formatted === parsed.src) {
-          continue; // already formatted
-        }
+            if (formatted === parsed.src) {
+              continue; // already formatted
+            }
 
-        wouldChange++;
-        const rel = displayPath(filePath);
+            wouldChange++;
+            const rel = displayPath(filePath);
 
-        if (opts.check) {
-          console.log(rel);
-        } else if (opts.diff) {
-          printDiff(rel, parsed.src, formatted);
-        } else {
-          writeFileSync(filePath, formatted, "utf8");
-          console.log(`formatted ${rel}`);
-        }
-      }
+            if (opts.check) {
+              console.log(rel);
+            } else if (opts.diff) {
+              printDiff(rel, parsed.src, formatted);
+            } else {
+              writeFileSync(filePath, formatted, "utf8");
+              console.log(`formatted ${rel}`);
+            }
+          }
 
-      // Surface a hard failure if every input was unparseable (no formatting
-      // happened and no --check assertion was made). This catches the case
-      // of running `satsuma fmt` on a directory of broken files.
-      if (parseErrors > 0 && wouldChange === 0 && !opts.check) {
-        return EXIT_PARSE_ERROR;
-      }
+          // Surface a hard failure if every input was unparseable (no formatting
+          // happened and no --check assertion was made). This catches the case
+          // of running `satsuma fmt` on a directory of broken files.
+          if (parseErrors > 0 && wouldChange === 0 && !opts.check) {
+            return EXIT_PARSE_ERROR;
+          }
 
-      // --check is the CI assertion mode: exit 1 if anything would change.
-      if (opts.check && wouldChange > 0) {
-        console.error(`\n${wouldChange} file(s) would be reformatted`);
-        return EXIT_NOT_FOUND;
-      }
-    }));
+          // --check is the CI assertion mode: exit 1 if anything would change.
+          if (opts.check && wouldChange > 0) {
+            console.error(`\n${wouldChange} file(s) would be reformatted`);
+            return EXIT_NOT_FOUND;
+          }
+        },
+      ),
+    );
 }
 
 /** Return the shorter of the relative and absolute path. */
@@ -144,8 +157,14 @@ function printDiff(filename: string, original: string, formatted: string): void 
 
   // Group into hunks with 3 lines of context
   const CTX = 3;
-  const hunks: Array<{ origStart: number; origLen: number; fmtStart: number; fmtLen: number; lines: string[] }> = [];
-  let hunk: typeof hunks[0] | null = null;
+  const hunks: Array<{
+    origStart: number;
+    origLen: number;
+    fmtStart: number;
+    fmtLen: number;
+    lines: string[];
+  }> = [];
+  let hunk: (typeof hunks)[0] | null = null;
   let oi = 0;
   let fi = 0;
 
@@ -154,7 +173,7 @@ function printDiff(filename: string, original: string, formatted: string): void 
     const op = ops[k]!;
     if (op === "equal") {
       // Check if we need to start or extend a hunk (look ahead for changes within CTX*2+1)
-      const inRange = hunk && (oi - (hunk.origStart + hunk.origLen) < CTX * 2 + 1);
+      const inRange = hunk && oi - (hunk.origStart + hunk.origLen) < CTX * 2 + 1;
       if (hunk && inRange) {
         hunk.lines.push(` ${origLines[oi]}`);
         hunk.origLen = oi - hunk.origStart + 1;
@@ -165,7 +184,13 @@ function printDiff(filename: string, original: string, formatted: string): void 
     } else if (op === "delete") {
       if (!hunk) {
         const ctxStart = Math.max(0, oi - CTX);
-        hunk = { origStart: ctxStart, origLen: 0, fmtStart: Math.max(0, fi - CTX + (oi - ctxStart) - (oi - ctxStart)), fmtLen: 0, lines: [] };
+        hunk = {
+          origStart: ctxStart,
+          origLen: 0,
+          fmtStart: Math.max(0, fi - CTX + (oi - ctxStart) - (oi - ctxStart)),
+          fmtLen: 0,
+          lines: [],
+        };
         hunk.fmtStart = fi - (oi - ctxStart);
         for (let c = ctxStart; c < oi; c++) {
           hunk.lines.push(` ${origLines[c]}`);
@@ -200,8 +225,8 @@ function printDiff(filename: string, original: string, formatted: string): void 
       for (let c = oi; c < trailEnd; c++) {
         hunk.lines.push(` ${origLines[c]}`);
       }
-      hunk.origLen = (oi + Math.min(CTX, origLines.length - oi)) - hunk.origStart;
-      hunk.fmtLen = (fi + Math.min(CTX, fmtLines.length - fi)) - hunk.fmtStart;
+      hunk.origLen = oi + Math.min(CTX, origLines.length - oi) - hunk.origStart;
+      hunk.fmtLen = fi + Math.min(CTX, fmtLines.length - fi) - hunk.fmtStart;
       hunks.push(hunk);
       hunk = null;
     }
@@ -274,21 +299,39 @@ function greedyDiff(a: string[], b: string[]): DiffOp[] {
       let foundI = -1;
       let foundJ = -1;
       for (let d = 1; d < 50; d++) {
-        if (i + d < a.length && a[i + d] === b[j]) { foundI = i + d; break; }
-        if (j + d < b.length && a[i] === b[j + d]) { foundJ = j + d; break; }
+        if (i + d < a.length && a[i + d] === b[j]) {
+          foundI = i + d;
+          break;
+        }
+        if (j + d < b.length && a[i] === b[j + d]) {
+          foundJ = j + d;
+          break;
+        }
       }
       if (foundI >= 0 && (foundJ < 0 || foundI - i <= foundJ - j)) {
-        while (i < foundI) { ops.push("delete"); i++; }
+        while (i < foundI) {
+          ops.push("delete");
+          i++;
+        }
       } else if (foundJ >= 0) {
-        while (j < foundJ) { ops.push("insert"); j++; }
+        while (j < foundJ) {
+          ops.push("insert");
+          j++;
+        }
       } else {
         ops.push("delete");
         i++;
       }
     }
   }
-  while (i < a.length) { ops.push("delete"); i++; }
-  while (j < b.length) { ops.push("insert"); j++; }
+  while (i < a.length) {
+    ops.push("delete");
+    i++;
+  }
+  while (j < b.length) {
+    ops.push("insert");
+    j++;
+  }
   return ops;
 }
 

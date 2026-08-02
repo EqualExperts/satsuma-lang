@@ -10,14 +10,8 @@ const {
   semanticTokensLegend,
 } = require("../dist/semantic-tokens");
 
-const WASM_PATH = path.resolve(
-  __dirname,
-  "../../tree-sitter-satsuma/tree-sitter-satsuma.wasm",
-);
-const HIGHLIGHTS_PATH = path.resolve(
-  __dirname,
-  "../../tree-sitter-satsuma/queries/highlights.scm",
-);
+const WASM_PATH = path.resolve(__dirname, "../../tree-sitter-satsuma/tree-sitter-satsuma.wasm");
+const HIGHLIGHTS_PATH = path.resolve(__dirname, "../../tree-sitter-satsuma/queries/highlights.scm");
 
 before(async () => {
   await initTestParser();
@@ -90,9 +84,7 @@ describe("computeSemanticTokens", () => {
     const tokens = decodeTokens(computeSemanticTokens(tree).data);
 
     // Find the field name token
-    const fieldToken = tokens.find(
-      (t) => t.type === "property" && t.line === 1,
-    );
+    const fieldToken = tokens.find((t) => t.type === "property" && t.line === 1);
     assert.ok(fieldToken, "should have a property token for field name");
     assert.equal(fieldToken.length, 2); // "id"
 
@@ -103,9 +95,7 @@ describe("computeSemanticTokens", () => {
   });
 
   it("tokenizes mapping keyword and label as function definition", () => {
-    const tree = parse(
-      "mapping migrate {\n  source { `s` }\n  target { `t` }\n  a -> b\n}",
-    );
+    const tree = parse("mapping migrate {\n  source { `s` }\n  target { `t` }\n  a -> b\n}");
     const tokens = decodeTokens(computeSemanticTokens(tree).data);
 
     const keyword = tokens.find((t) => t.type === "keyword");
@@ -145,9 +135,7 @@ describe("computeSemanticTokens", () => {
   // After Feature 28, pipe chain bare tokens are NL text, not function calls.
   // They should receive string tokens, while the block label stays function.definition.
   it("tokenizes pipe chain bare tokens as strings, not function calls", () => {
-    const tree = parse(
-      "transform clean {\n  trim | lowercase | validate_email\n}",
-    );
+    const tree = parse("transform clean {\n  trim | lowercase | validate_email\n}");
     const tokens = decodeTokens(computeSemanticTokens(tree).data);
 
     // 'clean' is still function.definition (block label)
@@ -164,10 +152,7 @@ describe("computeSemanticTokens", () => {
     const tokens = decodeTokens(computeSemanticTokens(tree).data);
 
     const keywords = tokens.filter((t) => t.type === "keyword");
-    assert.ok(
-      keywords.length >= 2,
-      "should have keyword tokens for import and from",
-    );
+    assert.ok(keywords.length >= 2, "should have keyword tokens for import and from");
   });
 
   it("tokenizes operators and punctuation", () => {
@@ -186,11 +171,7 @@ describe("computeSemanticTokens", () => {
     // Check no two tokens share the same position
     const positions = tokens.map((t) => `${t.line}:${t.col}`);
     const unique = new Set(positions);
-    assert.equal(
-      positions.length,
-      unique.size,
-      "no duplicate token positions",
-    );
+    assert.equal(positions.length, unique.size, "no duplicate token positions");
   });
 
   it("does not emit variable tokens for strings without @refs", () => {
@@ -212,9 +193,7 @@ describe("computeSemanticTokens", () => {
   });
 
   it("applies nlRef modifier to @refs in nl_string", () => {
-    const tree = parse(
-      'note { "Check @balance field." }',
-    );
+    const tree = parse('note { "Check @balance field." }');
     const tokens = decodeTokens(computeSemanticTokens(tree).data);
 
     const varTokens = tokens.filter((t) => t.type === "variable");
@@ -223,9 +202,7 @@ describe("computeSemanticTokens", () => {
     assert.equal(varTokens[0].mods & 16, 16, "should have nlRef modifier set");
 
     // String parts should NOT have the nlRef modifier
-    const stringTokens = tokens.filter(
-      (t) => t.type === "string" && t.line === 0 && t.col >= 7,
-    );
+    const stringTokens = tokens.filter((t) => t.type === "string" && t.line === 0 && t.col >= 7);
     for (const st of stringTokens) {
       assert.equal(st.mods & 16, 0, "string segments should not have nlRef modifier");
     }
@@ -239,9 +216,7 @@ describe("computeSemanticTokens", () => {
   });
 
   it("tokenizes @ref references inside nl_string as variable", () => {
-    const tree = parse(
-      'note { "Check @balance and @customers.email field." }',
-    );
+    const tree = parse('note { "Check @balance and @customers.email field." }');
     const tokens = decodeTokens(computeSemanticTokens(tree).data);
 
     const varTokens = tokens.filter((t) => t.type === "variable");
@@ -255,9 +230,7 @@ describe("computeSemanticTokens", () => {
   });
 
   it("tokenizes @ref references inside multiline_string as variable", () => {
-    const tree = parse(
-      'note {\n  """\n  Sum @orders.total and @tax fields.\n  """\n}',
-    );
+    const tree = parse('note {\n  """\n  Sum @orders.total and @tax fields.\n  """\n}');
     const tokens = decodeTokens(computeSemanticTokens(tree).data);
 
     const varTokens = tokens.filter((t) => t.type === "variable");

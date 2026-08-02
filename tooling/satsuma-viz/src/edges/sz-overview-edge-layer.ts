@@ -50,7 +50,11 @@ export class SzOverviewEdgeLayer extends LitElement {
       stroke: var(--sz-edge-default);
       pointer-events: stroke;
       cursor: pointer;
-      transition: stroke-width 0.15s ease, stroke 0.15s ease, opacity 0.15s ease, filter 0.15s ease;
+      transition:
+        stroke-width 0.15s ease,
+        stroke 0.15s ease,
+        opacity 0.15s ease,
+        filter 0.15s ease;
       opacity: 0.55;
     }
 
@@ -79,7 +83,9 @@ export class SzOverviewEdgeLayer extends LitElement {
       pointer-events: none;
       fill: var(--sz-edge-default);
       opacity: 0.55;
-      transition: fill 0.15s ease, opacity 0.15s ease;
+      transition:
+        fill 0.15s ease,
+        opacity 0.15s ease;
     }
 
     .anchor-dot.highlighted {
@@ -146,11 +152,7 @@ export class SzOverviewEdgeLayer extends LitElement {
       : null;
 
     return html`
-      <svg
-        width=${this.width}
-        height=${this.height}
-        viewBox="0 0 ${this.width} ${this.height}"
-      >
+      <svg width=${this.width} height=${this.height} viewBox="0 0 ${this.width} ${this.height}">
         ${this.edges.map((e) => this._renderOverviewEdge(e))}
       </svg>
       ${hoveredEdge ? this._renderTooltip(hoveredEdge) : ""}
@@ -165,9 +167,9 @@ export class SzOverviewEdgeLayer extends LitElement {
     const last = edge.points[edge.points.length - 1];
 
     const hasHighlight = this.highlightNodes.size > 0;
-    const connected = hasHighlight && (
-      this.highlightNodes.has(edge.sourceNode) || this.highlightNodes.has(edge.targetNode)
-    );
+    const connected =
+      hasHighlight &&
+      (this.highlightNodes.has(edge.sourceNode) || this.highlightNodes.has(edge.targetNode));
     const cls = hasHighlight ? (connected ? "highlighted" : "dimmed") : "";
 
     return svg`
@@ -235,9 +237,7 @@ export class SzOverviewEdgeLayer extends LitElement {
     return html`
       <div class="tooltip" style="left: ${this._hoverPos.x}px; top: ${this._hoverPos.y}px;">
         <div class="tooltip-name">${m.id}</div>
-        <div class="tooltip-detail">
-          ${m.sourceRefs.join(", ")} &#x2192; ${m.targetRef}
-        </div>
+        <div class="tooltip-detail">${m.sourceRefs.join(", ")} &#x2192; ${m.targetRef}</div>
         <div class="tooltip-count">${arrowCount} arrow${arrowCount !== 1 ? "s" : ""}</div>
       </div>
     `;

@@ -219,15 +219,25 @@ function makeHandler(
     // ── API routes ─────────────────────────────────────────────────────────
 
     if (rawPath === "/api/fixtures") {
-      sendJson(res, 200, fixtures.map((f) => ({ name: f.name, path: f.path, uri: f.uri })));
+      sendJson(
+        res,
+        200,
+        fixtures.map((f) => ({ name: f.name, path: f.path, uri: f.uri })),
+      );
       return;
     }
 
     if (rawPath === "/api/source") {
       const uri = query.get("uri");
-      if (!uri) { sendError(res, 400, "Missing ?uri="); return; }
+      if (!uri) {
+        sendError(res, 400, "Missing ?uri=");
+        return;
+      }
       const fixture = fixturesByUri.get(uri);
-      if (!fixture) { sendError(res, 404, `Unknown fixture URI: ${uri}`); return; }
+      if (!fixture) {
+        sendError(res, 404, `Unknown fixture URI: ${uri}`);
+        return;
+      }
       try {
         const source = fs.readFileSync(fixture.path, "utf-8");
         sendJson(res, 200, { source, uri });

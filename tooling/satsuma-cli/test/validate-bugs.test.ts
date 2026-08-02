@@ -17,11 +17,32 @@ import { extractSchemas, extractMetrics } from "@satsuma/core";
 
 // ── Mock helpers ─────────────────────────────────────────────────────────────
 
-function n(type: any, namedChildren: any[] = [], text = "", row = 0, anonymousChildren: any[] = []) {
+function n(
+  type: any,
+  namedChildren: any[] = [],
+  text = "",
+  row = 0,
+  anonymousChildren: any[] = [],
+) {
   const children: any[] = [];
-  children.push(...anonymousChildren.map((t: any) => ({ type: t, text: t, isNamed: false, namedChildren: [], children: [] })));
+  children.push(
+    ...anonymousChildren.map((t: any) => ({
+      type: t,
+      text: t,
+      isNamed: false,
+      namedChildren: [],
+      children: [],
+    })),
+  );
   children.push(...namedChildren.map((c: any) => ({ ...c, isNamed: true })));
-  return { type, text, startPosition: { row, column: 0 }, namedChildren, children, isNamed: true } as any;
+  return {
+    type,
+    text,
+    startPosition: { row, column: 0 },
+    namedChildren,
+    children,
+    isNamed: true,
+  } as any;
 }
 
 function ident(text: any, row = 0) {
@@ -45,12 +66,22 @@ function fieldDecl(name: any, type: any, row = 0) {
 }
 
 function kvPair(key: any, valNode: any) {
-  const valText = n("value_text", valNode.type === "value_text" ? valNode.namedChildren : [valNode], valNode.text);
+  const valText = n(
+    "value_text",
+    valNode.type === "value_text" ? valNode.namedChildren : [valNode],
+    valNode.text,
+  );
   return n("tag_with_value", [ident(key), valText]);
 }
 
 /** Build a minimal ExtractedWorkspace for testing semantic warnings. */
-function makeIndex({ schemas = [], mappings = [], metrics = [], fragments = [], fieldArrows = [] }: {
+function makeIndex({
+  schemas = [],
+  mappings = [],
+  metrics = [],
+  fragments = [],
+  fieldArrows = [],
+}: {
   schemas?: any[];
   mappings?: any[];
   metrics?: any[];
@@ -75,7 +106,7 @@ function makeIndex({ schemas = [], mappings = [], metrics = [], fragments = [], 
   }
   const arrowMap = new Map();
   for (const a of fieldArrows) {
-    for (const source of (a.sources ?? (a.source ? [a.source] : []))) {
+    for (const source of a.sources ?? (a.source ? [a.source] : [])) {
       if (!arrowMap.has(source)) arrowMap.set(source, []);
       arrowMap.get(source).push(a);
     }
@@ -93,7 +124,11 @@ function makeIndex({ schemas = [], mappings = [], metrics = [], fragments = [], 
     warnings: [],
     questions: [],
     fieldArrows: arrowMap,
-    referenceGraph: { usedByMappings: new Map(), fragmentsUsedIn: new Map(), metricsReferences: new Map() },
+    referenceGraph: {
+      usedByMappings: new Map(),
+      fragmentsUsedIn: new Map(),
+      metricsReferences: new Map(),
+    },
     totalErrors: 0,
   };
 }
@@ -107,7 +142,9 @@ describe("Bug 1: nested field path resolution", () => {
       fieldDecl("MESSGFUN", "CHAR(3)"),
     ]);
     // Unified syntax: field_decl with "record" keyword as anonymous child
-    const recordField = n("field_decl", [fieldName("BeginningOfMessage"), innerBody], "", 0, ["record"]);
+    const recordField = n("field_decl", [fieldName("BeginningOfMessage"), innerBody], "", 0, [
+      "record",
+    ]);
     const outerBody = n("schema_body", [recordField, fieldDecl("top_field", "INT")]);
     const block = n("schema_block", [blockLabel("my_schema"), outerBody]);
     const root = n("source_file", [block]);
@@ -124,7 +161,10 @@ describe("Bug 1: nested field path resolution", () => {
   it("extracts nested list fields with isList flag", () => {
     const innerBody = n("schema_body", [fieldDecl("unit_price", "DECIMAL")]);
     // Unified syntax: field_decl with "list_of" and "record" keywords
-    const listField = n("field_decl", [fieldName("CartLines"), innerBody], "", 0, ["list_of", "record"]);
+    const listField = n("field_decl", [fieldName("CartLines"), innerBody], "", 0, [
+      "list_of",
+      "record",
+    ]);
     const outerBody = n("schema_body", [listField]);
     const block = n("schema_block", [blockLabel("my_schema"), outerBody]);
     const root = n("source_file", [block]);
@@ -136,26 +176,44 @@ describe("Bug 1: nested field path resolution", () => {
 
   it("validates dotted paths against nested field tree", () => {
     const index = makeIndex({
-      schemas: [{
-        name: "src_schema",
-        fields: [{
-          name: "Order",
-          type: "record",
-          children: [
-            { name: "OrderId", type: "INT" },
-            { name: "Customer", type: "record", children: [
-              { name: "Email", type: "STRING" },
-            ] },
+      schemas: [
+        {
+          name: "src_schema",
+          fields: [
+            {
+              name: "Order",
+              type: "record",
+              children: [
+                { name: "OrderId", type: "INT" },
+                { name: "Customer", type: "record", children: [{ name: "Email", type: "STRING" }] },
+              ],
+            },
           ],
-        }],
-      }, {
-        name: "tgt_schema",
-        fields: [{ name: "order_id", type: "INT" }, { name: "email", type: "STRING" }],
-      }],
+        },
+        {
+          name: "tgt_schema",
+          fields: [
+            { name: "order_id", type: "INT" },
+            { name: "email", type: "STRING" },
+          ],
+        },
+      ],
       mappings: [{ name: "m1", sources: ["src_schema"], targets: ["tgt_schema"] }],
       fieldArrows: [
-        { mapping: "m1", sources: ["Order.OrderId"], target: "order_id", file: "test.stm", line: 10 },
-        { mapping: "m1", sources: ["Order.Customer.Email"], target: "email", file: "test.stm", line: 11 },
+        {
+          mapping: "m1",
+          sources: ["Order.OrderId"],
+          target: "order_id",
+          file: "test.stm",
+          line: 10,
+        },
+        {
+          mapping: "m1",
+          sources: ["Order.Customer.Email"],
+          target: "email",
+          file: "test.stm",
+          line: 11,
+        },
       ],
     });
 
@@ -166,21 +224,32 @@ describe("Bug 1: nested field path resolution", () => {
 
   it("validates list dotted paths against nested field tree", () => {
     const index = makeIndex({
-      schemas: [{
-        name: "src_schema",
-        fields: [{
-          name: "CartLines",
-          type: "record",
-          isList: true,
-          children: [{ name: "unit_price", type: "DECIMAL" }],
-        }],
-      }, {
-        name: "tgt_schema",
-        fields: [{ name: "price", type: "DECIMAL" }],
-      }],
+      schemas: [
+        {
+          name: "src_schema",
+          fields: [
+            {
+              name: "CartLines",
+              type: "record",
+              isList: true,
+              children: [{ name: "unit_price", type: "DECIMAL" }],
+            },
+          ],
+        },
+        {
+          name: "tgt_schema",
+          fields: [{ name: "price", type: "DECIMAL" }],
+        },
+      ],
       mappings: [{ name: "m1", sources: ["src_schema"], targets: ["tgt_schema"] }],
       fieldArrows: [
-        { mapping: "m1", sources: ["CartLines.unit_price"], target: "price", file: "test.stm", line: 10 },
+        {
+          mapping: "m1",
+          sources: ["CartLines.unit_price"],
+          target: "price",
+          file: "test.stm",
+          line: 10,
+        },
       ],
     });
 
@@ -191,13 +260,16 @@ describe("Bug 1: nested field path resolution", () => {
 
   it("accepts relative paths (.REFNUM) without warning", () => {
     const index = makeIndex({
-      schemas: [{
-        name: "src_schema",
-        fields: [{ name: "top_field", type: "INT" }],
-      }, {
-        name: "tgt_schema",
-        fields: [{ name: "out", type: "INT" }],
-      }],
+      schemas: [
+        {
+          name: "src_schema",
+          fields: [{ name: "top_field", type: "INT" }],
+        },
+        {
+          name: "tgt_schema",
+          fields: [{ name: "out", type: "INT" }],
+        },
+      ],
       mappings: [{ name: "m1", sources: ["src_schema"], targets: ["tgt_schema"] }],
       fieldArrows: [
         { mapping: "m1", sources: [".REFNUM"], target: ".orderNo", file: "test.stm", line: 10 },
@@ -216,20 +288,48 @@ describe("Bug 2: schema-qualified references in multi-source mappings", () => {
   it("resolves schema.field paths in multi-source mappings", () => {
     const index = makeIndex({
       schemas: [
-        { name: "crm_customers", fields: [{ name: "customer_id", type: "INT" }, { name: "email", type: "STRING" }] },
+        {
+          name: "crm_customers",
+          fields: [
+            { name: "customer_id", type: "INT" },
+            { name: "email", type: "STRING" },
+          ],
+        },
         { name: "orders", fields: [{ name: "order_id", type: "INT" }] },
-        { name: "target", fields: [{ name: "id", type: "INT" }, { name: "email", type: "STRING" }] },
+        {
+          name: "target",
+          fields: [
+            { name: "id", type: "INT" },
+            { name: "email", type: "STRING" },
+          ],
+        },
       ],
       mappings: [{ name: "m1", sources: ["crm_customers", "orders"], targets: ["target"] }],
       fieldArrows: [
-        { mapping: "m1", sources: ["crm_customers.customer_id"], target: "id", file: "test.stm", line: 10 },
-        { mapping: "m1", sources: ["crm_customers.email"], target: "email", file: "test.stm", line: 11 },
+        {
+          mapping: "m1",
+          sources: ["crm_customers.customer_id"],
+          target: "id",
+          file: "test.stm",
+          line: 10,
+        },
+        {
+          mapping: "m1",
+          sources: ["crm_customers.email"],
+          target: "email",
+          file: "test.stm",
+          line: 11,
+        },
       ],
     });
 
     const warnings = collectSemanticWarnings(index);
     const fieldWarnings = warnings.filter((w: any) => w.rule === "field-not-in-schema");
-    assert.equal(fieldWarnings.length, 0, "Schema-qualified paths should resolve in multi-source mappings");
+    assert.equal(
+      fieldWarnings.length,
+      0,
+      "Schema-qualified paths should resolve in multi-source mappings",
+    );
   });
 
   it("still warns for unknown schema qualifiers in multi-source mappings", () => {
@@ -241,7 +341,13 @@ describe("Bug 2: schema-qualified references in multi-source mappings", () => {
       ],
       mappings: [{ name: "m1", sources: ["crm_customers", "orders"], targets: ["target"] }],
       fieldArrows: [
-        { mapping: "m1", sources: ["unknown_schema.email"], target: "email", file: "test.stm", line: 10 },
+        {
+          mapping: "m1",
+          sources: ["unknown_schema.email"],
+          target: "email",
+          file: "test.stm",
+          line: 10,
+        },
       ],
     });
 
@@ -253,24 +359,68 @@ describe("Bug 2: schema-qualified references in multi-source mappings", () => {
   it("does not cross-wire arrows between same-named mappings in different namespaces", () => {
     const index = makeIndex({
       schemas: [
-        { name: "alpha::customer", namespace: "alpha", fields: [{ name: "alpha_flag", type: "STRING" }] },
-        { name: "alpha::customer_out", namespace: "alpha", fields: [{ name: "alpha_flag", type: "STRING" }] },
-        { name: "beta::customer", namespace: "beta", fields: [{ name: "beta_score", type: "NUMBER" }] },
-        { name: "beta::customer_out", namespace: "beta", fields: [{ name: "beta_score", type: "NUMBER" }] },
+        {
+          name: "alpha::customer",
+          namespace: "alpha",
+          fields: [{ name: "alpha_flag", type: "STRING" }],
+        },
+        {
+          name: "alpha::customer_out",
+          namespace: "alpha",
+          fields: [{ name: "alpha_flag", type: "STRING" }],
+        },
+        {
+          name: "beta::customer",
+          namespace: "beta",
+          fields: [{ name: "beta_score", type: "NUMBER" }],
+        },
+        {
+          name: "beta::customer_out",
+          namespace: "beta",
+          fields: [{ name: "beta_score", type: "NUMBER" }],
+        },
       ],
       mappings: [
-        { name: "alpha::load_customer", namespace: "alpha", sources: ["alpha::customer"], targets: ["alpha::customer_out"] },
-        { name: "beta::load_customer", namespace: "beta", sources: ["beta::customer"], targets: ["beta::customer_out"] },
+        {
+          name: "alpha::load_customer",
+          namespace: "alpha",
+          sources: ["alpha::customer"],
+          targets: ["alpha::customer_out"],
+        },
+        {
+          name: "beta::load_customer",
+          namespace: "beta",
+          sources: ["beta::customer"],
+          targets: ["beta::customer_out"],
+        },
       ],
       fieldArrows: [
-        { mapping: "load_customer", namespace: "alpha", sources: ["alpha_flag"], target: "alpha_flag", file: "test.stm", line: 10 },
-        { mapping: "load_customer", namespace: "beta", sources: ["beta_score"], target: "beta_score", file: "test.stm", line: 20 },
+        {
+          mapping: "load_customer",
+          namespace: "alpha",
+          sources: ["alpha_flag"],
+          target: "alpha_flag",
+          file: "test.stm",
+          line: 10,
+        },
+        {
+          mapping: "load_customer",
+          namespace: "beta",
+          sources: ["beta_score"],
+          target: "beta_score",
+          file: "test.stm",
+          line: 20,
+        },
       ],
     });
 
     const warnings = collectSemanticWarnings(index);
     const fieldWarnings = warnings.filter((w: any) => w.rule === "field-not-in-schema");
-    assert.equal(fieldWarnings.length, 0, "same-named mappings in different namespaces should validate independently");
+    assert.equal(
+      fieldWarnings.length,
+      0,
+      "same-named mappings in different namespaces should validate independently",
+    );
   });
 });
 
@@ -300,10 +450,11 @@ describe("Bug 3: metric source extraction", () => {
 
   it("extracts block-form metric sources from schema_block decorated with metric tag", () => {
     // Validates that multi-identifier `source` values are all extracted.
-    const valText = n("value_text", [
-      ident("fact_subscriptions"),
-      ident("dim_customer"),
-    ], "{fact_subscriptions, dim_customer}");
+    const valText = n(
+      "value_text",
+      [ident("fact_subscriptions"), ident("dim_customer")],
+      "{fact_subscriptions, dim_customer}",
+    );
     const meta = n("metadata_block", [
       metricTag(),
       n("tag_with_value", [ident("source"), valText]),
@@ -323,7 +474,9 @@ describe("Bug 3: metric source extraction", () => {
     });
 
     const warnings = collectSemanticWarnings(index);
-    const metricWarnings = warnings.filter((w: any) => w.rule === "undefined-ref" && w.message.includes("Metric"));
+    const metricWarnings = warnings.filter(
+      (w: any) => w.rule === "undefined-ref" && w.message.includes("Metric"),
+    );
     assert.equal(metricWarnings.length, 1, "Should warn for undefined metric source");
     assert.match(metricWarnings[0].message, /external_table/);
   });
@@ -374,27 +527,54 @@ describe("Bug 4: suppress field-not-in-schema for schemas with spreads", () => {
       ],
       mappings: [{ name: "m1", sources: ["src"], targets: ["tgt"] }],
       fieldArrows: [
-        { mapping: "m1", sources: ["created_at"], target: "created_at", file: "test.stm", line: 10 },
+        {
+          mapping: "m1",
+          sources: ["created_at"],
+          target: "created_at",
+          file: "test.stm",
+          line: 10,
+        },
       ],
     });
 
     const warnings = collectSemanticWarnings(index);
     const fieldWarnings = warnings.filter((w: any) => w.rule === "field-not-in-schema");
-    assert.equal(fieldWarnings.length, 0, "Should not warn for target schema with unresolved spreads");
+    assert.equal(
+      fieldWarnings.length,
+      0,
+      "Should not warn for target schema with unresolved spreads",
+    );
   });
 
   it("expands fragment fields and validates arrow targets", () => {
     const index = makeIndex({
       schemas: [
         { name: "src", fields: [{ name: "created_at", type: "TIMESTAMP" }] },
-        { name: "tgt", fields: [{ name: "id", type: "INT" }], hasSpreads: true, spreads: ["audit_fields"] },
+        {
+          name: "tgt",
+          fields: [{ name: "id", type: "INT" }],
+          hasSpreads: true,
+          spreads: ["audit_fields"],
+        },
       ],
       fragments: [
-        { name: "audit_fields", fields: [{ name: "created_at", type: "TIMESTAMP" }, { name: "updated_at", type: "TIMESTAMP" }] },
+        {
+          name: "audit_fields",
+          fields: [
+            { name: "created_at", type: "TIMESTAMP" },
+            { name: "updated_at", type: "TIMESTAMP" },
+          ],
+        },
       ],
       mappings: [{ name: "m1", sources: ["src"], targets: ["tgt"] }],
       fieldArrows: [
-        { mapping: "m1", sources: ["created_at"], target: "created_at", file: "test.stm", line: 10 },
+        {
+          mapping: "m1",
+          sources: ["created_at"],
+          target: "created_at",
+          file: "test.stm",
+          line: 10,
+        },
       ],
     });
 
@@ -407,14 +587,23 @@ describe("Bug 4: suppress field-not-in-schema for schemas with spreads", () => {
     const index = makeIndex({
       schemas: [
         { name: "src", fields: [{ name: "bogus_field", type: "VARCHAR" }] },
-        { name: "tgt", fields: [{ name: "id", type: "INT" }], hasSpreads: true, spreads: ["audit_fields"] },
+        {
+          name: "tgt",
+          fields: [{ name: "id", type: "INT" }],
+          hasSpreads: true,
+          spreads: ["audit_fields"],
+        },
       ],
-      fragments: [
-        { name: "audit_fields", fields: [{ name: "created_at", type: "TIMESTAMP" }] },
-      ],
+      fragments: [{ name: "audit_fields", fields: [{ name: "created_at", type: "TIMESTAMP" }] }],
       mappings: [{ name: "m1", sources: ["src"], targets: ["tgt"] }],
       fieldArrows: [
-        { mapping: "m1", sources: ["bogus_field"], target: "nonexistent_field", file: "test.stm", line: 10 },
+        {
+          mapping: "m1",
+          sources: ["bogus_field"],
+          target: "nonexistent_field",
+          file: "test.stm",
+          line: 10,
+        },
       ],
     });
 
@@ -427,21 +616,40 @@ describe("Bug 4: suppress field-not-in-schema for schemas with spreads", () => {
   it("expands fragment fields for source schemas", () => {
     const index = makeIndex({
       schemas: [
-        { name: "src", fields: [{ name: "id", type: "INT" }], hasSpreads: true, spreads: ["audit_fields"] },
-        { name: "tgt", fields: [{ name: "id", type: "INT" }, { name: "created_at", type: "TIMESTAMP" }] },
+        {
+          name: "src",
+          fields: [{ name: "id", type: "INT" }],
+          hasSpreads: true,
+          spreads: ["audit_fields"],
+        },
+        {
+          name: "tgt",
+          fields: [
+            { name: "id", type: "INT" },
+            { name: "created_at", type: "TIMESTAMP" },
+          ],
+        },
       ],
-      fragments: [
-        { name: "audit_fields", fields: [{ name: "created_at", type: "TIMESTAMP" }] },
-      ],
+      fragments: [{ name: "audit_fields", fields: [{ name: "created_at", type: "TIMESTAMP" }] }],
       mappings: [{ name: "m1", sources: ["src"], targets: ["tgt"] }],
       fieldArrows: [
-        { mapping: "m1", sources: ["created_at"], target: "created_at", file: "test.stm", line: 10 },
+        {
+          mapping: "m1",
+          sources: ["created_at"],
+          target: "created_at",
+          file: "test.stm",
+          line: 10,
+        },
       ],
     });
 
     const warnings = collectSemanticWarnings(index);
     const fieldWarnings = warnings.filter((w: any) => w.rule === "field-not-in-schema");
-    assert.equal(fieldWarnings.length, 0, "Fragment-contributed source field should pass validation");
+    assert.equal(
+      fieldWarnings.length,
+      0,
+      "Fragment-contributed source field should pass validation",
+    );
   });
 });
 
@@ -452,21 +660,47 @@ describe("Bug 4b: fragment spread cycles and nested expansion", () => {
     const index = makeIndex({
       schemas: [
         { name: "src", fields: [{ name: "created_at", type: "TIMESTAMP" }] },
-        { name: "tgt", fields: [{ name: "id", type: "INT" }], hasSpreads: true, spreads: ["base_fields"] },
+        {
+          name: "tgt",
+          fields: [{ name: "id", type: "INT" }],
+          hasSpreads: true,
+          spreads: ["base_fields"],
+        },
       ],
       fragments: [
-        { name: "base_fields", fields: [{ name: "name", type: "VARCHAR" }], hasSpreads: true, spreads: ["audit_fields"] },
-        { name: "audit_fields", fields: [{ name: "created_at", type: "TIMESTAMP" }, { name: "updated_at", type: "TIMESTAMP" }] },
+        {
+          name: "base_fields",
+          fields: [{ name: "name", type: "VARCHAR" }],
+          hasSpreads: true,
+          spreads: ["audit_fields"],
+        },
+        {
+          name: "audit_fields",
+          fields: [
+            { name: "created_at", type: "TIMESTAMP" },
+            { name: "updated_at", type: "TIMESTAMP" },
+          ],
+        },
       ],
       mappings: [{ name: "m1", sources: ["src"], targets: ["tgt"] }],
       fieldArrows: [
-        { mapping: "m1", sources: ["created_at"], target: "created_at", file: "test.stm", line: 10 },
+        {
+          mapping: "m1",
+          sources: ["created_at"],
+          target: "created_at",
+          file: "test.stm",
+          line: 10,
+        },
       ],
     });
 
     const warnings = collectSemanticWarnings(index);
     const fieldWarnings = warnings.filter((w: any) => w.rule === "field-not-in-schema");
-    assert.equal(fieldWarnings.length, 0, "Transitively spread fragment field should pass validation");
+    assert.equal(
+      fieldWarnings.length,
+      0,
+      "Transitively spread fragment field should pass validation",
+    );
   });
 
   it("detects self-referential fragment spread", () => {
@@ -479,9 +713,7 @@ describe("Bug 4b: fragment spread cycles and nested expansion", () => {
         { name: "loop", fields: [{ name: "x", type: "INT" }], hasSpreads: true, spreads: ["loop"] },
       ],
       mappings: [{ name: "m1", sources: ["src"], targets: ["tgt"] }],
-      fieldArrows: [
-        { mapping: "m1", sources: ["id"], target: "id", file: "test.stm", line: 1 },
-      ],
+      fieldArrows: [{ mapping: "m1", sources: ["id"], target: "id", file: "test.stm", line: 1 }],
     });
 
     const warnings = collectSemanticWarnings(index);
@@ -493,16 +725,29 @@ describe("Bug 4b: fragment spread cycles and nested expansion", () => {
   it("detects mutual cycle between two fragments", () => {
     const index = makeIndex({
       schemas: [
-        { name: "tgt", fields: [{ name: "id", type: "INT" }], hasSpreads: true, spreads: ["frag_a"] },
+        {
+          name: "tgt",
+          fields: [{ name: "id", type: "INT" }],
+          hasSpreads: true,
+          spreads: ["frag_a"],
+        },
       ],
       fragments: [
-        { name: "frag_a", fields: [{ name: "a", type: "INT" }], hasSpreads: true, spreads: ["frag_b"] },
-        { name: "frag_b", fields: [{ name: "b", type: "INT" }], hasSpreads: true, spreads: ["frag_a"] },
+        {
+          name: "frag_a",
+          fields: [{ name: "a", type: "INT" }],
+          hasSpreads: true,
+          spreads: ["frag_b"],
+        },
+        {
+          name: "frag_b",
+          fields: [{ name: "b", type: "INT" }],
+          hasSpreads: true,
+          spreads: ["frag_a"],
+        },
       ],
       mappings: [{ name: "m1", sources: ["tgt"], targets: ["tgt"] }],
-      fieldArrows: [
-        { mapping: "m1", sources: ["id"], target: "id", file: "test.stm", line: 1 },
-      ],
+      fieldArrows: [{ mapping: "m1", sources: ["id"], target: "id", file: "test.stm", line: 1 }],
     });
 
     const warnings = collectSemanticWarnings(index);
@@ -516,17 +761,30 @@ describe("Bug 4b: fragment spread cycles and nested expansion", () => {
     // No cycle — just shared dependency.
     const index = makeIndex({
       schemas: [
-        { name: "tgt", fields: [{ name: "id", type: "INT" }], hasSpreads: true, spreads: ["frag_a", "frag_b"] },
+        {
+          name: "tgt",
+          fields: [{ name: "id", type: "INT" }],
+          hasSpreads: true,
+          spreads: ["frag_a", "frag_b"],
+        },
       ],
       fragments: [
-        { name: "frag_a", fields: [{ name: "a", type: "INT" }], hasSpreads: true, spreads: ["base"] },
-        { name: "frag_b", fields: [{ name: "b", type: "INT" }], hasSpreads: true, spreads: ["base"] },
+        {
+          name: "frag_a",
+          fields: [{ name: "a", type: "INT" }],
+          hasSpreads: true,
+          spreads: ["base"],
+        },
+        {
+          name: "frag_b",
+          fields: [{ name: "b", type: "INT" }],
+          hasSpreads: true,
+          spreads: ["base"],
+        },
         { name: "base", fields: [{ name: "created_at", type: "TIMESTAMP" }] },
       ],
       mappings: [{ name: "m1", sources: ["tgt"], targets: ["tgt"] }],
-      fieldArrows: [
-        { mapping: "m1", sources: ["id"], target: "id", file: "test.stm", line: 1 },
-      ],
+      fieldArrows: [{ mapping: "m1", sources: ["id"], target: "id", file: "test.stm", line: 1 }],
     });
 
     const warnings = collectSemanticWarnings(index);
@@ -541,18 +799,25 @@ describe("Bug 6: duplicate named definitions", () => {
   it("emits error when the same schema name is defined twice", () => {
     const index = makeIndex({
       schemas: [
-        { name: "pos_oracle", fields: [{ name: "STORE_ID", type: "VARCHAR(20)" }], file: "hub-store.stm", row: 20 },
+        {
+          name: "pos_oracle",
+          fields: [{ name: "STORE_ID", type: "VARCHAR(20)" }],
+          file: "hub-store.stm",
+          row: 20,
+        },
       ],
     });
-    index.duplicates = [{
-      kind: "schema",
-      previousKind: "schema",
-      name: "pos_oracle",
-      file: "link-sale.stm",
-      row: 26,
-      previousFile: "hub-store.stm",
-      previousRow: 20,
-    }];
+    index.duplicates = [
+      {
+        kind: "schema",
+        previousKind: "schema",
+        name: "pos_oracle",
+        file: "link-sale.stm",
+        row: 26,
+        previousFile: "hub-store.stm",
+        previousRow: 20,
+      },
+    ];
 
     const warnings = collectSemanticWarnings(index);
     const dupErrors = warnings.filter((w: any) => w.rule === "duplicate-definition");
@@ -567,9 +832,7 @@ describe("Bug 6: duplicate named definitions", () => {
 
   it("emits multiple errors for a schema defined in three files", () => {
     const index = makeIndex({
-      schemas: [
-        { name: "pos_oracle", fields: [], file: "link-sale.stm", row: 26 },
-      ],
+      schemas: [{ name: "pos_oracle", fields: [], file: "link-sale.stm", row: 26 }],
     });
     index.duplicates = [
       {
@@ -601,15 +864,17 @@ describe("Bug 6: duplicate named definitions", () => {
     const index = makeIndex({
       metrics: [{ name: "mrr", sources: [], fields: [], file: "b.stm", row: 10 }],
     });
-    index.duplicates = [{
-      kind: "metric",
-      previousKind: "metric",
-      name: "mrr",
-      file: "b.stm",
-      row: 10,
-      previousFile: "a.stm",
-      previousRow: 5,
-    }];
+    index.duplicates = [
+      {
+        kind: "metric",
+        previousKind: "metric",
+        name: "mrr",
+        file: "b.stm",
+        row: 10,
+        previousFile: "a.stm",
+        previousRow: 5,
+      },
+    ];
 
     const warnings = collectSemanticWarnings(index);
     const dupErrors = warnings.filter((w: any) => w.rule === "duplicate-definition");
@@ -620,17 +885,21 @@ describe("Bug 6: duplicate named definitions", () => {
 
   it("emits error for duplicate named mappings", () => {
     const index = makeIndex({
-      mappings: [{ name: "load customers", sources: ["s"], targets: ["t"], file: "b.stm", row: 15 }],
+      mappings: [
+        { name: "load customers", sources: ["s"], targets: ["t"], file: "b.stm", row: 15 },
+      ],
     });
-    index.duplicates = [{
-      kind: "mapping",
-      previousKind: "mapping",
-      name: "load customers",
-      file: "b.stm",
-      row: 15,
-      previousFile: "a.stm",
-      previousRow: 8,
-    }];
+    index.duplicates = [
+      {
+        kind: "mapping",
+        previousKind: "mapping",
+        name: "load customers",
+        file: "b.stm",
+        row: 15,
+        previousFile: "a.stm",
+        previousRow: 8,
+      },
+    ];
 
     const warnings = collectSemanticWarnings(index);
     const dupErrors = warnings.filter((w: any) => w.rule === "duplicate-definition");
@@ -643,15 +912,17 @@ describe("Bug 6: duplicate named definitions", () => {
     const index = makeIndex({
       fragments: [{ name: "audit_fields", fields: [], file: "b.stm", row: 3 }],
     });
-    index.duplicates = [{
-      kind: "fragment",
-      previousKind: "fragment",
-      name: "audit_fields",
-      file: "b.stm",
-      row: 3,
-      previousFile: "a.stm",
-      previousRow: 1,
-    }];
+    index.duplicates = [
+      {
+        kind: "fragment",
+        previousKind: "fragment",
+        name: "audit_fields",
+        file: "b.stm",
+        row: 3,
+        previousFile: "a.stm",
+        previousRow: 1,
+      },
+    ];
 
     const warnings = collectSemanticWarnings(index);
     const dupErrors = warnings.filter((w: any) => w.rule === "duplicate-definition");
@@ -661,15 +932,17 @@ describe("Bug 6: duplicate named definitions", () => {
 
   it("emits error for duplicate transforms", () => {
     const index = makeIndex({});
-    index.duplicates = [{
-      kind: "transform",
-      previousKind: "transform",
-      name: "dv_hash",
-      file: "b.stm",
-      row: 7,
-      previousFile: "a.stm",
-      previousRow: 2,
-    }];
+    index.duplicates = [
+      {
+        kind: "transform",
+        previousKind: "transform",
+        name: "dv_hash",
+        file: "b.stm",
+        row: 7,
+        previousFile: "a.stm",
+        previousRow: 2,
+      },
+    ];
 
     const warnings = collectSemanticWarnings(index);
     const dupErrors = warnings.filter((w: any) => w.rule === "duplicate-definition");
@@ -683,15 +956,17 @@ describe("Bug 6: duplicate named definitions", () => {
       schemas: [{ name: "customer", fields: [], file: "a.stm", row: 5 }],
       metrics: [{ name: "customer", sources: [], fields: [], file: "b.stm", row: 10 }],
     });
-    index.duplicates = [{
-      kind: "metric",
-      previousKind: "schema",
-      name: "customer",
-      file: "b.stm",
-      row: 10,
-      previousFile: "a.stm",
-      previousRow: 5,
-    }];
+    index.duplicates = [
+      {
+        kind: "metric",
+        previousKind: "schema",
+        name: "customer",
+        file: "b.stm",
+        row: 10,
+        previousFile: "a.stm",
+        previousRow: 5,
+      },
+    ];
 
     const warnings = collectSemanticWarnings(index);
     const dupErrors = warnings.filter((w: any) => w.rule === "duplicate-definition");
@@ -720,7 +995,13 @@ describe("Bug 6: duplicate named definitions", () => {
 
 describe("Bug 5: duplicate warning elimination", () => {
   it("emits at most one warning per arrow", () => {
-    const arrow = { mapping: "m1", sources: ["unknown_field"], target: "also_unknown", file: "test.stm", line: 10 };
+    const arrow = {
+      mapping: "m1",
+      sources: ["unknown_field"],
+      target: "also_unknown",
+      file: "test.stm",
+      line: 10,
+    };
     const index = makeIndex({
       schemas: [
         { name: "src", fields: [{ name: "id", type: "INT" }] },
@@ -757,19 +1038,35 @@ describe("sl-akdg: field-not-in-schema fires for anonymous mapping arrows", () =
     const mappingMap = new Map<string, any>([
       [anonKey, { name: null, sources: ["src"], targets: ["tgt"], file: "test.stm", row: 4 }],
     ]);
-    const arrow = { mapping: anonKey, namespace: null, sources: ["nonexistent_field"], target: "id", file: "test.stm", line: 5 };
+    const arrow = {
+      mapping: anonKey,
+      namespace: null,
+      sources: ["nonexistent_field"],
+      target: "id",
+      file: "test.stm",
+      line: 5,
+    };
     const arrowMap = new Map<string, any>([
       ["nonexistent_field", [arrow]],
       ["id", [arrow]],
     ]);
     const index = {
-      schemas: schemaMap, mappings: mappingMap, metrics: new Map(), fragments: new Map(),
-      transforms: new Map(), fieldArrows: arrowMap, totalErrors: 0,
+      schemas: schemaMap,
+      mappings: mappingMap,
+      metrics: new Map(),
+      fragments: new Map(),
+      transforms: new Map(),
+      fieldArrows: arrowMap,
+      totalErrors: 0,
     } as any;
 
     const warnings = collectSemanticWarnings(index);
     const fieldWarnings = warnings.filter((w: any) => w.rule === "field-not-in-schema");
-    assert.equal(fieldWarnings.length, 1, "should report field-not-in-schema for anonymous mapping arrow");
+    assert.equal(
+      fieldWarnings.length,
+      1,
+      "should report field-not-in-schema for anonymous mapping arrow",
+    );
     assert.ok(fieldWarnings[0].message.includes("nonexistent_field"));
   });
 
@@ -783,11 +1080,23 @@ describe("sl-akdg: field-not-in-schema fires for anonymous mapping arrows", () =
     const mappingMap = new Map<string, any>([
       [anonKey, { name: null, sources: ["src"], targets: ["tgt"], file: "test.stm", row: 4 }],
     ]);
-    const arrow = { mapping: anonKey, namespace: null, sources: ["id"], target: "id", file: "test.stm", line: 5 };
+    const arrow = {
+      mapping: anonKey,
+      namespace: null,
+      sources: ["id"],
+      target: "id",
+      file: "test.stm",
+      line: 5,
+    };
     const arrowMap = new Map<string, any>([["id", [arrow]]]);
     const index = {
-      schemas: schemaMap, mappings: mappingMap, metrics: new Map(), fragments: new Map(),
-      transforms: new Map(), fieldArrows: arrowMap, totalErrors: 0,
+      schemas: schemaMap,
+      mappings: mappingMap,
+      metrics: new Map(),
+      fragments: new Map(),
+      transforms: new Map(),
+      fieldArrows: arrowMap,
+      totalErrors: 0,
     } as any;
 
     const warnings = collectSemanticWarnings(index);

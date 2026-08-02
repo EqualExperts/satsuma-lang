@@ -8,9 +8,7 @@ export interface EditorActionContext {
   targetSchema: string | null;
 }
 
-export async function getEditorActionContext(
-  client: LanguageClient,
-): Promise<EditorActionContext> {
+export async function getEditorActionContext(client: LanguageClient): Promise<EditorActionContext> {
   const editor = vscode.window.activeTextEditor;
   if (!editor || editor.document.languageId !== "satsuma") {
     return { schemaName: null, fieldPath: null, mappingName: null, targetSchema: null };

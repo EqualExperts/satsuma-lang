@@ -43,7 +43,9 @@ export function register(program: Command): void {
     .option("--budget <n>", "token budget", parsePositiveInt, 4000)
     .option("--compact", "omit notes and transform bodies")
     .option("--json", "emit ranked JSON list")
-    .addHelpText("after", `
+    .addHelpText(
+      "after",
+      `
 Scores blocks by keyword relevance: block name (+10), field names (+5),
 notes (+2), metadata (+1). Emits highest-scoring blocks within the token
 budget (~4 chars per token). --json bypasses the budget and emits all scores.
@@ -52,56 +54,65 @@ Examples:
   satsuma context "customer mapping"                 # blocks about customers
   satsuma context "loyalty tier" --budget 8000       # larger context window
   satsuma context "pii email" --compact              # compact output
-  satsuma context "order" --json                     # all scores as JSON`)
-    .action(runCommand(async (query: string, pathArg: string | undefined, opts: { budget: number; compact?: boolean; json?: boolean }) => {
-      const { files: parsedFiles, index } = await loadWorkspace(pathArg);
+  satsuma context "order" --json                     # all scores as JSON`,
+    )
+    .action(
+      runCommand(
+        async (
+          query: string,
+          pathArg: string | undefined,
+          opts: { budget: number; compact?: boolean; json?: boolean },
+        ) => {
+          const { files: parsedFiles, index } = await loadWorkspace(pathArg);
 
-      const terms = tokenize(query);
-      const candidates = scoreAll(index, terms, parsedFiles);
-      candidates.sort((a, b) => b.score - a.score || a.name.localeCompare(b.name));
+          const terms = tokenize(query);
+          const candidates = scoreAll(index, terms, parsedFiles);
+          candidates.sort((a, b) => b.score - a.score || a.name.localeCompare(b.name));
 
-      if (opts.json) {
-        console.log(
-          JSON.stringify(
-            candidates.map(({ name, type, score, file, line }) => ({
-              name,
-              type,
-              score,
-              file,
-              line,
-            })),
-            null,
-            2,
-          ),
-        );
-        return;
-      }
+          if (opts.json) {
+            console.log(
+              JSON.stringify(
+                candidates.map(({ name, type, score, file, line }) => ({
+                  name,
+                  type,
+                  score,
+                  file,
+                  line,
+                })),
+                null,
+                2,
+              ),
+            );
+            return;
+          }
 
-      // Emit within token budget
-      const budget = opts.budget;
-      let used = 0;
-      const emitted: Array<ScoredCandidate & { block: string }> = [];
+          // Emit within token budget
+          const budget = opts.budget;
+          let used = 0;
+          const emitted: Array<ScoredCandidate & { block: string }> = [];
 
-      for (const c of candidates) {
-        const block = renderBlock(index, c, opts.compact);
-        const tokens = estimateTokens(block);
-        if (used + tokens > budget && emitted.length > 0) break;
-        used += tokens;
-        emitted.push({ ...c, block });
-      }
+          for (const c of candidates) {
+            const block = renderBlock(index, c, opts.compact);
+            const tokens = estimateTokens(block);
+            if (used + tokens > budget && emitted.length > 0) break;
+            used += tokens;
+            emitted.push({ ...c, block });
+          }
 
-      if (emitted.length === 0) {
-        console.log("No relevant blocks found.");
-        return EXIT_NOT_FOUND;
-      }
+          if (emitted.length === 0) {
+            console.log("No relevant blocks found.");
+            return EXIT_NOT_FOUND;
+          }
 
-      console.log(`// Context for: ${query}  (${used} tokens, ${emitted.length} blocks)`);
-      console.log();
-      for (const { block } of emitted) {
-        console.log(block);
-        console.log();
-      }
-    }));
+          console.log(`// Context for: ${query}  (${used} tokens, ${emitted.length} blocks)`);
+          console.log();
+          for (const { block } of emitted) {
+            console.log(block);
+            console.log();
+          }
+        },
+      ),
+    );
 }
 
 // ── Scoring ───────────────────────────────────────────────────────────────────
@@ -125,7 +136,11 @@ function scoreText(text: string, terms: string[]): number {
  * Score all blocks in the index against terms.
  * Returns [{name, type, score, file, line}]
  */
-function scoreAll(index: ExtractedWorkspace, terms: string[], parsedFiles: ParsedFile[]): ScoredCandidate[] {
+function scoreAll(
+  index: ExtractedWorkspace,
+  terms: string[],
+  parsedFiles: ParsedFile[],
+): ScoredCandidate[] {
   const results: ScoredCandidate[] = [];
 
   // Collect NL content (comments, notes) grouped by parent block name
@@ -149,7 +164,18 @@ function scoreAll(index: ExtractedWorkspace, terms: string[], parsedFiles: Parse
     collectRawBlockText(tree.rootNode, null, rawTextByBlock);
   }
 
-  const scoreEntry = (name: string, type: string, entry: { note?: string | null; fields?: Array<{ name: string; type: string }>; sources?: string[]; targets?: string[]; file: string; row: number }) => {
+  const scoreEntry = (
+    name: string,
+    type: string,
+    entry: {
+      note?: string | null;
+      fields?: Array<{ name: string; type: string }>;
+      sources?: string[];
+      targets?: string[];
+      file: string;
+      row: number;
+    },
+  ) => {
     let score = 0;
     score += scoreText(name, terms) * 10;
     if (entry.note) score += scoreText(entry.note, terms) * 2;
@@ -227,7 +253,13 @@ function scoreAll(index: ExtractedWorkspace, terms: string[], parsedFiles: Parse
         } else {
           const m = index.mappings.get(mappingKey);
           if (m) {
-            results.push({ name: mappingKey, type: "mapping", score: nlScore, file: m.file, line: m.row + 1 });
+            results.push({
+              name: mappingKey,
+              type: "mapping",
+              score: nlScore,
+              file: m.file,
+              line: m.row + 1,
+            });
           }
         }
       }
@@ -244,7 +276,11 @@ function estimateTokens(text: string): number {
 }
 
 /** Render a block as a compact string for output. */
-function renderBlock(index: ExtractedWorkspace, candidate: ScoredCandidate, compact?: boolean): string {
+function renderBlock(
+  index: ExtractedWorkspace,
+  candidate: ScoredCandidate,
+  compact?: boolean,
+): string {
   const { name, type } = candidate;
   const lines: string[] = [];
 
@@ -262,7 +298,7 @@ function renderBlock(index: ExtractedWorkspace, candidate: ScoredCandidate, comp
     const m = index.metrics.get(name);
     const display = m?.displayName ? ` "${m.displayName}"` : "";
     lines.push(`metric ${name}${display} {`);
-    const maxLen = Math.max(20, ...((m?.fields ?? []).map((f) => f.name.length + 1)));
+    const maxLen = Math.max(20, ...(m?.fields ?? []).map((f) => f.name.length + 1));
     for (const f of m?.fields ?? []) lines.push(`  ${f.name.padEnd(maxLen)}${f.type}`);
     lines.push("}");
   } else if (type === "mapping") {
@@ -275,7 +311,7 @@ function renderBlock(index: ExtractedWorkspace, candidate: ScoredCandidate, comp
   } else if (type === "fragment") {
     const f = index.fragments.get(name);
     lines.push(`fragment '${name}' {`);
-    const maxLen = Math.max(24, ...((f?.fields ?? []).map((fld) => fld.name.length + 1)));
+    const maxLen = Math.max(24, ...(f?.fields ?? []).map((fld) => fld.name.length + 1));
     for (const fld of f?.fields ?? []) lines.push(`  ${fld.name.padEnd(maxLen)}${fld.type}`);
     lines.push("}");
   } else if (type === "transform") {
@@ -288,10 +324,7 @@ function renderBlock(index: ExtractedWorkspace, candidate: ScoredCandidate, comp
 // ── Metadata collection ──────────────────────────────────────────────────────
 
 // metric_block is removed — metrics are now schema_block nodes with the `metric` tag.
-const BLOCK_TYPES = new Set([
-  "schema_block", "mapping_block",
-  "fragment_block", "transform_block",
-]);
+const BLOCK_TYPES = new Set(["schema_block", "mapping_block", "fragment_block", "transform_block"]);
 
 function getBlockName(node: SyntaxNode): string | null {
   const label = node.namedChildren.find((c) => c.type === "block_label");
@@ -310,7 +343,11 @@ function getBlockName(node: SyntaxNode): string | null {
  * Walk the CST and collect raw block text grouped by block name.
  * Used for full-text keyword search (flatten, list_of, governance, etc.).
  */
-function collectRawBlockText(node: SyntaxNode, _parent: string | null, result: Map<string, string>): void {
+function collectRawBlockText(
+  node: SyntaxNode,
+  _parent: string | null,
+  result: Map<string, string>,
+): void {
   for (const c of node.namedChildren) {
     if (BLOCK_TYPES.has(c.type)) {
       const name = getBlockName(c);
@@ -327,7 +364,11 @@ function collectRawBlockText(node: SyntaxNode, _parent: string | null, result: M
 /**
  * Walk the CST and collect metadata_block text grouped by parent block name.
  */
-function collectMetadataText(node: SyntaxNode, parent: string | null, result: Map<string, string[]>): void {
+function collectMetadataText(
+  node: SyntaxNode,
+  parent: string | null,
+  result: Map<string, string[]>,
+): void {
   for (const c of node.namedChildren) {
     let newParent = parent;
     if (BLOCK_TYPES.has(c.type)) {

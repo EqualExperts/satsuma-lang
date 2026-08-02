@@ -7,7 +7,11 @@ import { describe, it } from "node:test";
 import { collectSemanticWarnings } from "#src/semantic-warnings.js";
 
 /** Build a minimal ExtractedWorkspace with nlRefData for testing. */
-function makeIndex({ schemas = [], mappings = [], nlRefData = [] }: {
+function makeIndex({
+  schemas = [],
+  mappings = [],
+  nlRefData = [],
+}: {
   schemas?: any[];
   mappings?: any[];
   nlRefData?: any[];
@@ -30,7 +34,11 @@ function makeIndex({ schemas = [], mappings = [], nlRefData = [] }: {
     warnings: [],
     questions: [],
     fieldArrows: new Map(),
-    referenceGraph: { usedByMappings: new Map(), fragmentsUsedIn: new Map(), metricsReferences: new Map() },
+    referenceGraph: {
+      usedByMappings: new Map(),
+      fragmentsUsedIn: new Map(),
+      metricsReferences: new Map(),
+    },
     namespaceNames: new Set(),
     nlRefData,
     duplicates: [],
@@ -46,25 +54,31 @@ describe("NL ref validation: unresolved-nl-ref", () => {
         { name: "source::finance_gl", fields: [{ name: "posted_by" }] },
         { name: "staging::stg_gl_entries", fields: [{ name: "department" }] },
       ],
-      mappings: [{
-        name: "staging::stage gl entries",
-        namespace: "staging",
-        sources: ["source::finance_gl", "source::hr_employees"],
-        targets: ["staging::stg_gl_entries"],
-      }],
-      nlRefData: [{
-        text: "Lookup @department from @source::hr_employees using @posted_by -> @employee_id",
-        mapping: "stage gl entries",
-        namespace: "staging",
-        targetField: "department",
-        file: "test.stm",
-        line: 99,
-        column: 6,
-      }],
+      mappings: [
+        {
+          name: "staging::stage gl entries",
+          namespace: "staging",
+          sources: ["source::finance_gl", "source::hr_employees"],
+          targets: ["staging::stg_gl_entries"],
+        },
+      ],
+      nlRefData: [
+        {
+          text: "Lookup @department from @source::hr_employees using @posted_by -> @employee_id",
+          mapping: "stage gl entries",
+          namespace: "staging",
+          targetField: "department",
+          file: "test.stm",
+          line: 99,
+          column: 6,
+        },
+      ],
     });
 
     const warnings = collectSemanticWarnings(index);
-    const nlWarnings = warnings.filter((w) => w.rule === "unresolved-nl-ref" || w.rule === "nl-ref-not-in-source");
+    const nlWarnings = warnings.filter(
+      (w) => w.rule === "unresolved-nl-ref" || w.rule === "nl-ref-not-in-source",
+    );
     assert.equal(nlWarnings.length, 0, "Valid NL refs should produce no warnings");
   });
 
@@ -74,21 +88,25 @@ describe("NL ref validation: unresolved-nl-ref", () => {
         { name: "source::finance_gl", fields: [{ name: "posted_by" }] },
         { name: "staging::stg_gl_entries", fields: [] },
       ],
-      mappings: [{
-        name: "staging::my_mapping",
-        namespace: "staging",
-        sources: ["source::finance_gl"],
-        targets: ["staging::stg_gl_entries"],
-      }],
-      nlRefData: [{
-        text: "Lookup @nonexistent_field from @source::unknown_schema",
-        mapping: "my_mapping",
-        namespace: "staging",
-        targetField: "foo",
-        file: "test.stm",
-        line: 10,
-        column: 6,
-      }],
+      mappings: [
+        {
+          name: "staging::my_mapping",
+          namespace: "staging",
+          sources: ["source::finance_gl"],
+          targets: ["staging::stg_gl_entries"],
+        },
+      ],
+      nlRefData: [
+        {
+          text: "Lookup @nonexistent_field from @source::unknown_schema",
+          mapping: "my_mapping",
+          namespace: "staging",
+          targetField: "foo",
+          file: "test.stm",
+          line: 10,
+          column: 6,
+        },
+      ],
     });
 
     const warnings = collectSemanticWarnings(index);
@@ -107,21 +125,25 @@ describe("NL ref validation: nl-ref-not-in-source", () => {
         { name: "source::finance_gl", fields: [{ name: "posted_by" }] },
         { name: "staging::stg_gl_entries", fields: [] },
       ],
-      mappings: [{
-        name: "staging::my_mapping",
-        namespace: "staging",
-        sources: ["source::finance_gl"],
-        targets: ["staging::stg_gl_entries"],
-      }],
-      nlRefData: [{
-        text: "Lookup from @source::hr_employees using @posted_by",
-        mapping: "my_mapping",
-        namespace: "staging",
-        targetField: "dept",
-        file: "test.stm",
-        line: 15,
-        column: 6,
-      }],
+      mappings: [
+        {
+          name: "staging::my_mapping",
+          namespace: "staging",
+          sources: ["source::finance_gl"],
+          targets: ["staging::stg_gl_entries"],
+        },
+      ],
+      nlRefData: [
+        {
+          text: "Lookup from @source::hr_employees using @posted_by",
+          mapping: "my_mapping",
+          namespace: "staging",
+          targetField: "dept",
+          file: "test.stm",
+          line: 15,
+          column: 6,
+        },
+      ],
     });
 
     const warnings = collectSemanticWarnings(index);
@@ -138,21 +160,25 @@ describe("NL ref validation: nl-ref-not-in-source", () => {
         { name: "source::finance_gl", fields: [] },
         { name: "staging::stg_gl_entries", fields: [] },
       ],
-      mappings: [{
-        name: "staging::my_mapping",
-        namespace: "staging",
-        sources: ["source::finance_gl", "source::hr_employees"],
-        targets: ["staging::stg_gl_entries"],
-      }],
-      nlRefData: [{
-        text: "Lookup from @source::hr_employees",
-        mapping: "my_mapping",
-        namespace: "staging",
-        targetField: "dept",
-        file: "test.stm",
-        line: 15,
-        column: 6,
-      }],
+      mappings: [
+        {
+          name: "staging::my_mapping",
+          namespace: "staging",
+          sources: ["source::finance_gl", "source::hr_employees"],
+          targets: ["staging::stg_gl_entries"],
+        },
+      ],
+      nlRefData: [
+        {
+          text: "Lookup from @source::hr_employees",
+          mapping: "my_mapping",
+          namespace: "staging",
+          targetField: "dept",
+          file: "test.stm",
+          line: 15,
+          column: 6,
+        },
+      ],
     });
 
     const warnings = collectSemanticWarnings(index);
@@ -174,12 +200,14 @@ describe("NL ref validation: fragment spread fields", () => {
         },
         { name: "ex::summary_day", fields: [{ name: "TOTAL_SALES" }, { name: "TOTAL_RETURNS" }] },
       ],
-      mappings: [{
-        name: "ex::Product to Summary",
-        namespace: "ex",
-        sources: ["ex::product_day"],
-        targets: ["ex::summary_day"],
-      }],
+      mappings: [
+        {
+          name: "ex::Product to Summary",
+          namespace: "ex",
+          sources: ["ex::product_day"],
+          targets: ["ex::summary_day"],
+        },
+      ],
       nlRefData: [
         {
           text: "SUM(@ex::product_day.SALES_VALUE)",
@@ -209,7 +237,11 @@ describe("NL ref validation: fragment spread fields", () => {
 
     const warnings = collectSemanticWarnings(index);
     const nlWarnings = warnings.filter((w) => w.rule === "unresolved-nl-ref");
-    assert.equal(nlWarnings.length, 0, "Fields from fragment spreads should not produce unresolved-nl-ref warnings");
+    assert.equal(
+      nlWarnings.length,
+      0,
+      "Fields from fragment spreads should not produce unresolved-nl-ref warnings",
+    );
   });
 
   it("still warns for genuine misses even when schema has spreads", () => {
@@ -224,21 +256,25 @@ describe("NL ref validation: fragment spread fields", () => {
         },
         { name: "ex::summary_day", fields: [{ name: "TOTAL" }] },
       ],
-      mappings: [{
-        name: "ex::m1",
-        namespace: "ex",
-        sources: ["ex::product_day"],
-        targets: ["ex::summary_day"],
-      }],
-      nlRefData: [{
-        text: "SUM(@ex::product_day.NONEXISTENT)",
-        mapping: "m1",
-        namespace: "ex",
-        targetField: "TOTAL",
-        file: "test.stm",
-        line: 10,
-        column: 6,
-      }],
+      mappings: [
+        {
+          name: "ex::m1",
+          namespace: "ex",
+          sources: ["ex::product_day"],
+          targets: ["ex::summary_day"],
+        },
+      ],
+      nlRefData: [
+        {
+          text: "SUM(@ex::product_day.NONEXISTENT)",
+          mapping: "m1",
+          namespace: "ex",
+          targetField: "TOTAL",
+          file: "test.stm",
+          line: 10,
+          column: 6,
+        },
+      ],
     });
     index.fragments.set("ex::common_measures", {
       fields: [{ name: "SALES_VALUE" }],
@@ -260,60 +296,70 @@ describe("NL ref validation: standalone notes (sl-xrc8)", () => {
         { name: "source_system", fields: [{ name: "user_id" }] },
         { name: "target_system", fields: [{ name: "id" }] },
       ],
-      nlRefData: [{
-        text: "Converts @source_system records into @target_system",
-        mapping: "note:",
-        namespace: null,
-        targetField: null,
-        file: "test.stm",
-        line: 5,
-        column: 2,
-      }],
+      nlRefData: [
+        {
+          text: "Converts @source_system records into @target_system",
+          mapping: "note:",
+          namespace: null,
+          targetField: null,
+          file: "test.stm",
+          line: 5,
+          column: 2,
+        },
+      ],
     });
 
     const warnings = collectSemanticWarnings(index);
-    const nlWarnings = warnings.filter((w) => w.rule === "unresolved-nl-ref" || w.rule === "nl-ref-not-in-source");
+    const nlWarnings = warnings.filter(
+      (w) => w.rule === "unresolved-nl-ref" || w.rule === "nl-ref-not-in-source",
+    );
     assert.equal(nlWarnings.length, 0, "Schema refs in standalone notes should not warn");
   });
 
   it("does not warn for bare field refs in standalone notes", () => {
     // A bare @fieldName that resolves globally should not produce unresolved-nl-ref warnings.
     const index = makeIndex({
-      schemas: [
-        { name: "my_schema", fields: [{ name: "user_id" }, { name: "email" }] },
+      schemas: [{ name: "my_schema", fields: [{ name: "user_id" }, { name: "email" }] }],
+      nlRefData: [
+        {
+          text: "The @user_id field is the primary key",
+          mapping: "note:",
+          namespace: null,
+          targetField: null,
+          file: "test.stm",
+          line: 5,
+          column: 2,
+        },
       ],
-      nlRefData: [{
-        text: "The @user_id field is the primary key",
-        mapping: "note:",
-        namespace: null,
-        targetField: null,
-        file: "test.stm",
-        line: 5,
-        column: 2,
-      }],
     });
 
     const warnings = collectSemanticWarnings(index);
-    const nlWarnings = warnings.filter((w) => w.rule === "unresolved-nl-ref" || w.rule === "nl-ref-not-in-source");
-    assert.equal(nlWarnings.length, 0, "Bare field refs in standalone notes should resolve without warnings");
+    const nlWarnings = warnings.filter(
+      (w) => w.rule === "unresolved-nl-ref" || w.rule === "nl-ref-not-in-source",
+    );
+    assert.equal(
+      nlWarnings.length,
+      0,
+      "Bare field refs in standalone notes should resolve without warnings",
+    );
   });
 
   it("warns for unresolvable refs in file-level notes (sl-vjvf)", () => {
     // Bug sl-vjvf: file-level note @refs that don't resolve to any known identifier
     // should produce an unresolved-nl-ref warning. Previously these were silently skipped.
     const index = makeIndex({
-      schemas: [
-        { name: "my_schema", fields: [{ name: "user_id" }] },
+      schemas: [{ name: "my_schema", fields: [{ name: "user_id" }] }],
+      nlRefData: [
+        {
+          text: "Needs @external_config_key to be provisioned",
+          mapping: "note:",
+          namespace: null,
+          targetField: null,
+          file: "test.stm",
+          line: 5,
+          column: 2,
+        },
       ],
-      nlRefData: [{
-        text: "Needs @external_config_key to be provisioned",
-        mapping: "note:",
-        namespace: null,
-        targetField: null,
-        file: "test.stm",
-        line: 5,
-        column: 2,
-      }],
     });
 
     const warnings = collectSemanticWarnings(index);
@@ -325,44 +371,48 @@ describe("NL ref validation: standalone notes (sl-xrc8)", () => {
   it("does not warn for dotted field refs in standalone notes", () => {
     // Dotted @schema.field refs that resolve should not warn.
     const index = makeIndex({
-      schemas: [
-        { name: "source_system", fields: [{ name: "email_addr" }] },
+      schemas: [{ name: "source_system", fields: [{ name: "email_addr" }] }],
+      nlRefData: [
+        {
+          text: "See @source_system.email_addr for details",
+          mapping: "note:",
+          namespace: null,
+          targetField: null,
+          file: "test.stm",
+          line: 5,
+          column: 2,
+        },
       ],
-      nlRefData: [{
-        text: "See @source_system.email_addr for details",
-        mapping: "note:",
-        namespace: null,
-        targetField: null,
-        file: "test.stm",
-        line: 5,
-        column: 2,
-      }],
     });
 
     const warnings = collectSemanticWarnings(index);
-    const nlWarnings = warnings.filter((w) => w.rule === "unresolved-nl-ref" || w.rule === "nl-ref-not-in-source");
+    const nlWarnings = warnings.filter(
+      (w) => w.rule === "unresolved-nl-ref" || w.rule === "nl-ref-not-in-source",
+    );
     assert.equal(nlWarnings.length, 0, "Dotted field refs in standalone notes should not warn");
   });
 
   it("does not warn for refs in schema-scoped notes (note:<parent>)", () => {
     // Schema-scoped notes use a note:<name> mapping key. Resolved @refs should not warn.
     const index = makeIndex({
-      schemas: [
-        { name: "my_schema", fields: [{ name: "user_id" }] },
+      schemas: [{ name: "my_schema", fields: [{ name: "user_id" }] }],
+      nlRefData: [
+        {
+          text: "The @user_id is sequential",
+          mapping: "note:my_schema",
+          namespace: null,
+          targetField: null,
+          file: "test.stm",
+          line: 5,
+          column: 2,
+        },
       ],
-      nlRefData: [{
-        text: "The @user_id is sequential",
-        mapping: "note:my_schema",
-        namespace: null,
-        targetField: null,
-        file: "test.stm",
-        line: 5,
-        column: 2,
-      }],
     });
 
     const warnings = collectSemanticWarnings(index);
-    const nlWarnings = warnings.filter((w) => w.rule === "unresolved-nl-ref" || w.rule === "nl-ref-not-in-source");
+    const nlWarnings = warnings.filter(
+      (w) => w.rule === "unresolved-nl-ref" || w.rule === "nl-ref-not-in-source",
+    );
     assert.equal(nlWarnings.length, 0, "Refs in schema-scoped notes should not warn");
   });
 
@@ -376,19 +426,23 @@ describe("NL ref validation: standalone notes (sl-xrc8)", () => {
         { name: "crm::foo", namespace: "crm", fields: [{ name: "id" }] },
         { name: "crm::other", namespace: "crm", fields: [{ name: "key" }] },
       ],
-      nlRefData: [{
-        text: "derived from @other",
-        mapping: "note:schema:foo",
-        namespace: "crm",
-        targetField: null,
-        file: "test.stm",
-        line: 5,
-        column: 2,
-      }],
+      nlRefData: [
+        {
+          text: "derived from @other",
+          mapping: "note:schema:foo",
+          namespace: "crm",
+          targetField: null,
+          file: "test.stm",
+          line: 5,
+          column: 2,
+        },
+      ],
     });
 
     const warnings = collectSemanticWarnings(index);
-    const nlWarnings = warnings.filter((w) => w.rule === "unresolved-nl-ref" || w.rule === "nl-ref-not-in-source");
+    const nlWarnings = warnings.filter(
+      (w) => w.rule === "unresolved-nl-ref" || w.rule === "nl-ref-not-in-source",
+    );
     assert.equal(nlWarnings.length, 0, "Resolvable refs in namespaced notes should not warn");
   });
 
@@ -396,25 +450,31 @@ describe("NL ref validation: standalone notes (sl-xrc8)", () => {
     // Unresolvable refs in namespaced notes should warn with a human-readable
     // scope ("schema 'crm::foo'"), not the internal key ("crm::note:schema:foo").
     const index = makeIndex({
-      schemas: [
-        { name: "crm::foo", namespace: "crm", fields: [{ name: "id" }] },
+      schemas: [{ name: "crm::foo", namespace: "crm", fields: [{ name: "id" }] }],
+      nlRefData: [
+        {
+          text: "needs @does_not_exist provisioned",
+          mapping: "note:schema:foo",
+          namespace: "crm",
+          targetField: null,
+          file: "test.stm",
+          line: 5,
+          column: 2,
+        },
       ],
-      nlRefData: [{
-        text: "needs @does_not_exist provisioned",
-        mapping: "note:schema:foo",
-        namespace: "crm",
-        targetField: null,
-        file: "test.stm",
-        line: 5,
-        column: 2,
-      }],
     });
 
     const warnings = collectSemanticWarnings(index);
     const nlWarnings = warnings.filter((w) => w.rule === "unresolved-nl-ref");
     assert.equal(nlWarnings.length, 1, "Unresolvable ref in a namespaced note should still warn");
-    assert.ok(nlWarnings[0].message.includes("schema 'crm::foo'"), `message names the schema scope: ${nlWarnings[0].message}`);
-    assert.ok(!nlWarnings[0].message.includes("note:"), `internal note: prefix must not leak: ${nlWarnings[0].message}`);
+    assert.ok(
+      nlWarnings[0].message.includes("schema 'crm::foo'"),
+      `message names the schema scope: ${nlWarnings[0].message}`,
+    );
+    assert.ok(
+      !nlWarnings[0].message.includes("note:"),
+      `internal note: prefix must not leak: ${nlWarnings[0].message}`,
+    );
   });
 
   it("still warns for unresolved refs inside mapping notes", () => {
@@ -423,25 +483,33 @@ describe("NL ref validation: standalone notes (sl-xrc8)", () => {
         { name: "source::src", fields: [{ name: "amount" }] },
         { name: "target::tgt", fields: [] },
       ],
-      mappings: [{
-        name: "my_mapping",
-        sources: ["source::src"],
-        targets: ["target::tgt"],
-      }],
-      nlRefData: [{
-        text: "Check @nonexistent_field before proceeding",
-        mapping: "my_mapping",
-        namespace: null,
-        targetField: null,
-        file: "test.stm",
-        line: 10,
-        column: 6,
-      }],
+      mappings: [
+        {
+          name: "my_mapping",
+          sources: ["source::src"],
+          targets: ["target::tgt"],
+        },
+      ],
+      nlRefData: [
+        {
+          text: "Check @nonexistent_field before proceeding",
+          mapping: "my_mapping",
+          namespace: null,
+          targetField: null,
+          file: "test.stm",
+          line: 10,
+          column: 6,
+        },
+      ],
     });
 
     const warnings = collectSemanticWarnings(index);
     const unresolvedWarnings = warnings.filter((w) => w.rule === "unresolved-nl-ref");
-    assert.equal(unresolvedWarnings.length, 1, "Mapping notes should still warn for unresolved refs");
+    assert.equal(
+      unresolvedWarnings.length,
+      1,
+      "Mapping notes should still warn for unresolved refs",
+    );
   });
 });
 
@@ -452,25 +520,31 @@ describe("NL ref validation: bare field matching", () => {
         { name: "source::gl", fields: [{ name: "amount" }, { name: "department" }] },
         { name: "staging::stg", fields: [{ name: "amount" }] },
       ],
-      mappings: [{
-        name: "staging::m1",
-        namespace: "staging",
-        sources: ["source::gl"],
-        targets: ["staging::stg"],
-      }],
-      nlRefData: [{
-        text: "Sum of @amount grouped by @department",
-        mapping: "m1",
-        namespace: "staging",
-        targetField: "total",
-        file: "test.stm",
-        line: 20,
-        column: 6,
-      }],
+      mappings: [
+        {
+          name: "staging::m1",
+          namespace: "staging",
+          sources: ["source::gl"],
+          targets: ["staging::stg"],
+        },
+      ],
+      nlRefData: [
+        {
+          text: "Sum of @amount grouped by @department",
+          mapping: "m1",
+          namespace: "staging",
+          targetField: "total",
+          file: "test.stm",
+          line: 20,
+          column: 6,
+        },
+      ],
     });
 
     const warnings = collectSemanticWarnings(index);
-    const nlWarnings = warnings.filter((w) => w.rule === "unresolved-nl-ref" || w.rule === "nl-ref-not-in-source");
+    const nlWarnings = warnings.filter(
+      (w) => w.rule === "unresolved-nl-ref" || w.rule === "nl-ref-not-in-source",
+    );
     assert.equal(nlWarnings.length, 0, "Bare fields matching source schema should not warn");
   });
 });

@@ -24,17 +24,13 @@ async function loadFixture(page: Page, fixtureUri: string): Promise<void> {
 }
 
 test.describe("Branded header (sl-ohxn)", () => {
-  test("the header is the Satsuma logo + wordmark, with no internal chrome", async ({
-    page,
-  }) => {
+  test("the header is the Satsuma logo + wordmark, with no internal chrome", async ({ page }) => {
     await page.goto("/");
 
     // Logo must actually load (a broken image still occupies layout space).
     const logo = page.locator("#header-logo");
     await expect(logo).toBeVisible();
-    expect(
-      await logo.evaluate((img) => (img as HTMLImageElement).naturalWidth),
-    ).toBeGreaterThan(0);
+    expect(await logo.evaluate((img) => (img as HTMLImageElement).naturalWidth)).toBeGreaterThan(0);
 
     // Wordmark is exactly "Satsuma" — no "viz harness" suffix.
     await expect(page.locator("#header h1")).toHaveText(/^\s*Satsuma\s*$/);
@@ -49,9 +45,7 @@ test.describe("Branded header (sl-ohxn)", () => {
 
   test("lineage is the default view mode without a visible toggle", async ({ page }) => {
     await page.goto("/");
-    await expect
-      .poll(() => page.evaluate(() => window.__satsumaHarness?.viewMode))
-      .toBe("lineage");
+    await expect.poll(() => page.evaluate(() => window.__satsumaHarness?.viewMode)).toBe("lineage");
   });
 });
 
@@ -87,19 +81,18 @@ test.describe("Brand typography (sl-ga3c)", () => {
   // (header, panel labels, toolbar buttons) must render in the self-hosted
   // Lexend; code surfaces keep JetBrains Mono. The component's --sz-font-sans
   // deliberately stays on its Inter/system stack — see the sl-ga3c notes.
-  test("chrome text renders in Lexend; the source editor stays monospace", async ({
-    page,
-  }) => {
+  test("chrome text renders in Lexend; the source editor stays monospace", async ({ page }) => {
     await page.goto("/");
 
     // The self-hosted face must actually have loaded — a bad @font-face URL
     // silently falls back to system-ui and font-family alone wouldn't catch it.
-    await expect
-      .poll(() => page.evaluate(() => document.fonts.check("12px Lexend")))
-      .toBe(true);
+    await expect.poll(() => page.evaluate(() => document.fonts.check("12px Lexend"))).toBe(true);
 
     const familyOf = (selector: string) =>
-      page.locator(selector).first().evaluate((el) => getComputedStyle(el).fontFamily);
+      page
+        .locator(selector)
+        .first()
+        .evaluate((el) => getComputedStyle(el).fontFamily);
 
     for (const selector of ["#header h1", ".panel-label", ".toolbar-action"]) {
       expect(await familyOf(selector), `${selector} must use Lexend`).toContain("Lexend");
@@ -120,9 +113,7 @@ test.describe("Brand typography (sl-ga3c)", () => {
     });
 
     await page.goto("/");
-    await expect
-      .poll(() => page.evaluate(() => document.fonts.check("12px Lexend")))
-      .toBe(true);
+    await expect.poll(() => page.evaluate(() => document.fonts.check("12px Lexend"))).toBe(true);
 
     expect(fontRequests.length).toBeGreaterThan(0);
     const origin = new URL(page.url()).origin;

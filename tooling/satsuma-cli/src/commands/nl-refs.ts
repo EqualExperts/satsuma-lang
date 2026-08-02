@@ -25,7 +25,9 @@ export function register(program: Command): void {
     .option("--mapping <name>", "scope to a specific mapping")
     .option("--json", "structured JSON output")
     .option("--unresolved", "show only unresolved references")
-    .addHelpText("after", `
+    .addHelpText(
+      "after",
+      `
 @ref references are @field_name, @schema.field, or @ns::schema.field
 inside "..." NL strings. Each ref is checked against the file index —
 "resolved" means the referenced field or schema exists, "unresolved" means
@@ -47,39 +49,47 @@ JSON shape (--json): array of ref objects
 Examples:
   satsuma nl-refs pipeline.stm                       # all refs in file and imports
   satsuma nl-refs --mapping 'load hub_customer'      # refs in one mapping
-  satsuma nl-refs pipeline.stm --unresolved --json   # broken refs as JSON`)
-    .action(runCommand(async (pathArg: string | undefined, opts: { mapping?: string; json?: boolean; unresolved?: boolean }) => {
-      const { index } = await loadWorkspace(pathArg);
+  satsuma nl-refs pipeline.stm --unresolved --json   # broken refs as JSON`,
+    )
+    .action(
+      runCommand(
+        async (
+          pathArg: string | undefined,
+          opts: { mapping?: string; json?: boolean; unresolved?: boolean },
+        ) => {
+          const { index } = await loadWorkspace(pathArg);
 
-      let refs = resolveAllNLRefs(index);
+          let refs = resolveAllNLRefs(index);
 
-      // Apply --mapping filter
-      if (opts.mapping) {
-        const resolved = resolveIndexKey(opts.mapping, index.mappings);
-        if (!resolved) {
-          throw new CommandError(`Mapping '${opts.mapping}' not found.`, EXIT_NOT_FOUND);
-        }
-        refs = refs.filter((r) => r.mapping === resolved.key);
-      }
+          // Apply --mapping filter
+          if (opts.mapping) {
+            const resolved = resolveIndexKey(opts.mapping, index.mappings);
+            if (!resolved) {
+              throw new CommandError(`Mapping '${opts.mapping}' not found.`, EXIT_NOT_FOUND);
+            }
+            refs = refs.filter((r) => r.mapping === resolved.key);
+          }
 
-      // Apply --unresolved filter
-      if (opts.unresolved) {
-        refs = refs.filter((r) => !r.resolved);
-      }
+          // Apply --unresolved filter
+          if (opts.unresolved) {
+            refs = refs.filter((r) => !r.resolved);
+          }
 
-      if (opts.json) {
-        const out = refs.map((r) => ({ ...r, line: r.line + 1 }));
-        console.log(JSON.stringify(out, null, 2));
-        return refs.length === 0 ? EXIT_NOT_FOUND : undefined;
-      }
+          if (opts.json) {
+            const out = refs.map((r) => ({ ...r, line: r.line + 1 }));
+            console.log(JSON.stringify(out, null, 2));
+            return refs.length === 0 ? EXIT_NOT_FOUND : undefined;
+          }
 
-      if (refs.length === 0) {
-        console.log("No NL @ref references found.");
-        return EXIT_NOT_FOUND;
-      }
+          if (refs.length === 0) {
+            console.log("No NL @ref references found.");
+            return EXIT_NOT_FOUND;
+          }
 
-      printDefault(refs);
-    }));
+          printDefault(refs);
+        },
+      ),
+    );
 }
 
 function printDefault(refs: ResolvedNLRef[]): void {
@@ -112,10 +122,8 @@ function printDefault(refs: ResolvedNLRef[]): void {
     }
     console.log(`  ${label}:`);
     for (const ref of mappingRefs) {
-      const status = ref.resolved
-        ? `-> ${ref.resolvedTo?.name ?? "?"}`
-        : "(unresolved)";
-      const padRef = (`\`${ref.ref}\``).padEnd(32);
+      const status = ref.resolved ? `-> ${ref.resolvedTo?.name ?? "?"}` : "(unresolved)";
+      const padRef = `\`${ref.ref}\``.padEnd(32);
       const padClass = ref.classification.padEnd(28);
       console.log(`    ${padRef} ${padClass} ${status}  (line ${ref.line + 1})`);
     }

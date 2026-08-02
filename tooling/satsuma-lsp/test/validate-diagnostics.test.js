@@ -30,11 +30,7 @@ describe("reconcileValidateCache", () => {
     ]);
     // The fixing save: the new run reports nothing for B any more.
     const results = new Map([["file:///a.stm", diag("new A")]]);
-    const cleared = reconcileValidateCache(
-      cache,
-      ["file:///a.stm", "file:///b.stm"],
-      results,
-    );
+    const cleared = reconcileValidateCache(cache, ["file:///a.stm", "file:///b.stm"], results);
     assert.deepEqual(cleared, ["file:///b.stm"]);
     assert.equal(cache.has("file:///b.stm"), false, "stale entry must be removed");
     assert.deepEqual(cache.get("file:///a.stm"), diag("new A"), "fresh results replace old");
@@ -91,7 +87,17 @@ describe("parseValidateFindings", () => {
 
   it("extracts findings from the {findings, summary} envelope the CLI emits today", () => {
     const raw = JSON.stringify({
-      findings: [{ file: "/a.stm", line: 3, column: 1, severity: "warning", rule: "r", message: "m", fixable: false }],
+      findings: [
+        {
+          file: "/a.stm",
+          line: 3,
+          column: 1,
+          severity: "warning",
+          rule: "r",
+          message: "m",
+          fixable: false,
+        },
+      ],
       summary: { files: 1, errors: 0, warnings: 1 },
     });
     const entries = parseValidateFindings(raw);
@@ -121,20 +127,14 @@ describe("parseValidateFindings", () => {
 describe("runValidate", () => {
   it("returns empty map when CLI produces no output", async () => {
     // Use a non-existent CLI to exercise the error/empty path
-    const result = await runValidate(
-      "file:///tmp/nonexistent.stm",
-      "/nonexistent/satsuma-cli",
-    );
+    const result = await runValidate("file:///tmp/nonexistent.stm", "/nonexistent/satsuma-cli");
     assert.ok(result instanceof Map);
     assert.equal(result.size, 0);
   });
 
   it("returns empty map when CLI produces invalid JSON", async () => {
     // echo outputs non-JSON text
-    const result = await runValidate(
-      "file:///tmp/test.stm",
-      "echo",
-    );
+    const result = await runValidate("file:///tmp/test.stm", "echo");
     assert.ok(result instanceof Map);
     assert.equal(result.size, 0);
   });
@@ -146,27 +146,33 @@ describe("runValidate", () => {
   // warehouse::conformed_store in the 'daily sales pipeline' mapping), so a
   // non-empty result is a hard requirement, not an if-guarded hope.
   it("surfaces the namespaces example's four field-not-in-schema warnings from the real CLI", async () => {
-    const fixturePath = path.resolve(
-      __dirname,
-      "../../../examples/namespaces/namespaces.stm",
-    );
+    const fixturePath = path.resolve(__dirname, "../../../examples/namespaces/namespaces.stm");
     const fixtureUri = pathToFileURL(fixturePath).toString();
 
     const result = await runValidate(fixtureUri, CLI_PATH);
 
-    assert.ok(result.size > 0, "real CLI output must produce diagnostics — empty means the JSON shapes have drifted (sl-rngq)");
+    assert.ok(
+      result.size > 0,
+      "real CLI output must produce diagnostics — empty means the JSON shapes have drifted (sl-rngq)",
+    );
 
     const all = [...result.values()].flat();
     const fieldWarnings = all.filter((d) => d.code === "field-not-in-schema");
-    assert.equal(fieldWarnings.length, 4, "the four bogus source fields must each surface as a diagnostic");
+    assert.equal(
+      fieldWarnings.length,
+      4,
+      "the four bogus source fields must each surface as a diagnostic",
+    );
     for (const d of fieldWarnings) {
       assert.equal(d.source, "satsuma-validate");
       // DiagnosticSeverity.Warning === 2
       assert.equal(d.severity, 2, "field-not-in-schema is warning severity");
       assert.match(d.message, /not declared in schema 'warehouse::conformed_store'/);
       // CLI reports lines 105-108 (1-based); LSP must convert to 0-based.
-      assert.ok(d.range.start.line >= 104 && d.range.start.line <= 107,
-        `expected 0-based line in [104,107], got ${d.range.start.line}`);
+      assert.ok(
+        d.range.start.line >= 104 && d.range.start.line <= 107,
+        `expected 0-based line in [104,107], got ${d.range.start.line}`,
+      );
     }
 
     // Diagnostics must be keyed by canonical file:// URIs so they attach to

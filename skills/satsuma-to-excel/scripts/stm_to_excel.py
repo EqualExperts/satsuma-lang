@@ -70,14 +70,28 @@ FONT_HYPERLINK = Font(name="Calibri", size=10, color="0563C1", underline="single
 # ── Fills ───────────────────────────────────────────────────────────────
 
 FILL_HEADER = PatternFill(start_color=HEADER_BG, end_color=HEADER_BG, fill_type="solid")
-FILL_ALT_EVEN = PatternFill(start_color=ALT_ROW_EVEN, end_color=ALT_ROW_EVEN, fill_type="solid")
-FILL_ALT_ODD = PatternFill(start_color=ALT_ROW_ODD, end_color=ALT_ROW_ODD, fill_type="solid")
-FILL_WARNING = PatternFill(start_color=WARNING_BG, end_color=WARNING_BG, fill_type="solid")
-FILL_QUESTION = PatternFill(start_color=QUESTION_BG, end_color=QUESTION_BG, fill_type="solid")
-FILL_COMPUTED = PatternFill(start_color=COMPUTED_BG, end_color=COMPUTED_BG, fill_type="solid")
+FILL_ALT_EVEN = PatternFill(
+    start_color=ALT_ROW_EVEN, end_color=ALT_ROW_EVEN, fill_type="solid"
+)
+FILL_ALT_ODD = PatternFill(
+    start_color=ALT_ROW_ODD, end_color=ALT_ROW_ODD, fill_type="solid"
+)
+FILL_WARNING = PatternFill(
+    start_color=WARNING_BG, end_color=WARNING_BG, fill_type="solid"
+)
+FILL_QUESTION = PatternFill(
+    start_color=QUESTION_BG, end_color=QUESTION_BG, fill_type="solid"
+)
+FILL_COMPUTED = PatternFill(
+    start_color=COMPUTED_BG, end_color=COMPUTED_BG, fill_type="solid"
+)
 FILL_PK = PatternFill(start_color=PK_BG, end_color=PK_BG, fill_type="solid")
-FILL_SNAPSHOT = PatternFill(start_color=SNAPSHOT_BG, end_color=SNAPSHOT_BG, fill_type="solid")
-FILL_LIGHT_GRAY = PatternFill(start_color="F5F5F5", end_color="F5F5F5", fill_type="solid")
+FILL_SNAPSHOT = PatternFill(
+    start_color=SNAPSHOT_BG, end_color=SNAPSHOT_BG, fill_type="solid"
+)
+FILL_LIGHT_GRAY = PatternFill(
+    start_color="F5F5F5", end_color="F5F5F5", fill_type="solid"
+)
 
 ALIGN_CENTER = Alignment(horizontal="center", vertical="center")
 ALIGN_WRAP = Alignment(wrap_text=True, vertical="top")
@@ -87,6 +101,7 @@ THIN_BORDER_BOTTOM = Border(bottom=Side(style="thin", color="DDDDDD"))
 
 
 # ── Data model ──────────────────────────────────────────────────────────
+
 
 @dataclass
 class Comment:
@@ -124,6 +139,7 @@ class SchemaInfo:
 @dataclass
 class MapEntry:
     """A single key-value in a map {} block, used for lookup tabs."""
+
     key: str
     value: str
 
@@ -265,14 +281,14 @@ def _parse_map_block(raw: str) -> tuple[str, list[MapEntry], bool]:
         if not line:
             continue
         # Match key: value patterns
-        kv_match = re.match(r'^([^:]+?):\s*(.+)$', line)
+        kv_match = re.match(r"^([^:]+?):\s*(.+)$", line)
         if kv_match:
             key = kv_match.group(1).strip()
             value = kv_match.group(2).strip()
             # Strip trailing comma if present
             value = value.rstrip(",")
             # Check for conditional operators
-            if re.match(r'^[<>=!]', key) or key == "default":
+            if re.match(r"^[<>=!]", key) or key == "default":
                 is_conditional = True
             entries.append(MapEntry(key=key, value=value))
 
@@ -344,6 +360,7 @@ def translate_transform(
 
 
 # ── Data collection ─────────────────────────────────────────────────────
+
 
 def _run_satsuma(args: list[str]) -> str:
     """Run a satsuma CLI command and return stdout.
@@ -426,21 +443,25 @@ def collect_data(
     # -- Build issues list --
     issues: list[Comment] = []
     for item in warnings_data.get("items", []):
-        issues.append(Comment(
-            kind="warning",
-            text=item["text"],
-            location=f"{item.get('blockType', 'block').title()} {item.get('block', '?')}",
-            block=item.get("block", ""),
-            block_type=item.get("blockType", ""),
-        ))
+        issues.append(
+            Comment(
+                kind="warning",
+                text=item["text"],
+                location=f"{item.get('blockType', 'block').title()} {item.get('block', '?')}",
+                block=item.get("block", ""),
+                block_type=item.get("blockType", ""),
+            )
+        )
     for item in questions_data.get("items", []):
-        issues.append(Comment(
-            kind="question",
-            text=item["text"],
-            location=f"{item.get('blockType', 'block').title()} {item.get('block', '?')}",
-            block=item.get("block", ""),
-            block_type=item.get("blockType", ""),
-        ))
+        issues.append(
+            Comment(
+                kind="question",
+                text=item["text"],
+                location=f"{item.get('blockType', 'block').title()} {item.get('block', '?')}",
+                block=item.get("block", ""),
+                block_type=item.get("blockType", ""),
+            )
+        )
 
     # -- Build schema map from graph nodes --
     graph_schemas: dict[str, dict] = {}
@@ -468,7 +489,8 @@ def collect_data(
         target_set = set(targets)
         # Filter mappings to those targeting requested schemas
         graph_mappings = [
-            m for m in graph_mappings
+            m
+            for m in graph_mappings
             if any(t in target_set for t in m.get("targets", []))
         ]
         # Re-derive sources from filtered mappings
@@ -537,12 +559,14 @@ def collect_data(
                         if fm.name in frag_fields:
                             fm.fragment_origin = frag_name
 
-        schemas.append(SchemaInfo(
-            name=sname,
-            role=role,
-            note=schema_note,
-            fields=fields,
-        ))
+        schemas.append(
+            SchemaInfo(
+                name=sname,
+                role=role,
+                note=schema_note,
+                fields=fields,
+            )
+        )
 
     # Sort: targets first (file order), then sources (file order)
     target_schemas = [s for s in schemas if s.role == "target"]
@@ -585,7 +609,9 @@ def collect_data(
             is_derived = edge.get("derived", False)
 
             human, map_entries, is_conditional = translate_transform(
-                edge_transforms, nl_text, classification,
+                edge_transforms,
+                nl_text,
+                classification,
             )
 
             # Look up source/target types from schemas
@@ -623,7 +649,8 @@ def collect_data(
                         lookup_name = f"{tgt_field}_map" if tgt_field else "lookup"
                         if lookup_name not in lookups:
                             lookups[lookup_name] = LookupTable(
-                                name=lookup_name, entries=entries,
+                                name=lookup_name,
+                                entries=entries,
                             )
 
             arrow = MappingArrow(
@@ -642,13 +669,15 @@ def collect_data(
             )
             arrows.append(arrow)
 
-        mappings.append(MappingInfo(
-            name=mname,
-            sources=gm.get("sources", []),
-            targets=gm.get("targets", []),
-            note=mapping_note,
-            arrows=arrows,
-        ))
+        mappings.append(
+            MappingInfo(
+                name=mname,
+                sources=gm.get("sources", []),
+                targets=gm.get("targets", []),
+                note=mapping_note,
+                arrows=arrows,
+            )
+        )
 
     ts = timestamp or datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
@@ -667,6 +696,7 @@ def collect_data(
 
 
 # ── Workbook generation ─────────────────────────────────────────────────
+
 
 def _set_header_row(ws: Worksheet, row: int, headers: list[str]) -> None:
     """Write a styled header row."""
@@ -699,7 +729,9 @@ def _apply_data_tab_formatting(
 
     # Auto-filter
     if data_end_row >= header_row:
-        ws.auto_filter.ref = f"A{header_row}:{get_column_letter(col_count)}{data_end_row}"
+        ws.auto_filter.ref = (
+            f"A{header_row}:{get_column_letter(col_count)}{data_end_row}"
+        )
 
     # Print layout
     ws.sheet_properties.pageSetUpPr = openpyxl.worksheet.properties.PageSetupProperties(
@@ -801,7 +833,9 @@ def create_overview_tab(ws: Worksheet, data: WorkbookData) -> None:
 
     for s in data.schemas:
         tab_name = _schema_tab_name(s)
-        toc_entries.append((tab_name, f"{s.role.title()} schema: {len(s.fields)} fields"))
+        toc_entries.append(
+            (tab_name, f"{s.role.title()} schema: {len(s.fields)} fields")
+        )
 
     for lt in data.lookups:
         tab_name = _lookup_tab_name(lt)
@@ -849,7 +883,9 @@ def create_issues_tab(ws: Worksheet, data: WorkbookData) -> None:
 
     if not data.issues:
         ws.merge_cells("A2:D2")
-        ws.cell(row=2, column=1, value="No warnings or open questions found.").font = FONT_DATA
+        ws.cell(
+            row=2, column=1, value="No warnings or open questions found."
+        ).font = FONT_DATA
         _apply_data_tab_formatting(ws, 1, 2, 4)
         return
 
@@ -905,8 +941,18 @@ def _lookup_tab_name(lt: LookupTable) -> str:
 
 def create_mapping_tab(ws: Worksheet, mapping: MappingInfo, data: WorkbookData) -> None:
     """Generate a mapping tab."""
-    headers = ["#", "Source", "Source Type", "", "Target", "Target Type",
-               "Req", "Transform", "Tags", "Notes"]
+    headers = [
+        "#",
+        "Source",
+        "Source Type",
+        "",
+        "Target",
+        "Target Type",
+        "Req",
+        "Transform",
+        "Tags",
+        "Notes",
+    ]
     col_widths = {1: 5, 2: 25, 3: 15, 4: 3, 5: 25, 6: 15, 7: 5, 8: 50, 9: 15, 10: 40}
     _set_column_widths(ws, col_widths)
 
@@ -918,7 +964,9 @@ def create_mapping_tab(ws: Worksheet, mapping: MappingInfo, data: WorkbookData) 
         cell.font = FONT_DATA
         cell.fill = FILL_LIGHT_GRAY
         cell.alignment = ALIGN_WRAP
-        ws.merge_cells(start_row=start_row, start_column=1, end_row=start_row, end_column=10)
+        ws.merge_cells(
+            start_row=start_row, start_column=1, end_row=start_row, end_column=10
+        )
         line_count = mapping.note.count("\n") + 1
         ws.row_dimensions[start_row].height = max(15, line_count * 15)
         start_row += 1
@@ -950,14 +998,18 @@ def create_mapping_tab(ws: Worksheet, mapping: MappingInfo, data: WorkbookData) 
         ws.cell(row=row, column=6, value=arrow.target_type or "").font = FONT_DATA
 
         # Required
-        ws.cell(row=row, column=7, value="Yes" if arrow.is_required else "").font = FONT_DATA
+        ws.cell(
+            row=row, column=7, value="Yes" if arrow.is_required else ""
+        ).font = FONT_DATA
 
         # Transform
         ws.cell(row=row, column=8, value=arrow.transform_human).font = FONT_DATA
         ws.cell(row=row, column=8).alignment = ALIGN_WRAP
 
         # Tags
-        ws.cell(row=row, column=9, value=", ".join(arrow.tags) if arrow.tags else "").font = FONT_DATA
+        ws.cell(
+            row=row, column=9, value=", ".join(arrow.tags) if arrow.tags else ""
+        ).font = FONT_DATA
 
         # Notes
         note_text = ""
@@ -985,7 +1037,9 @@ def create_mapping_tab(ws: Worksheet, mapping: MappingInfo, data: WorkbookData) 
         if arrow.map_entries:
             for ci, entry in enumerate(arrow.map_entries):
                 child_label = f"{idx}{chr(97 + ci)}"  # 5a, 5b, 5c...
-                ws.cell(row=row, column=1, value=child_label).font = FONT_DATA_ITALIC_GRAY
+                ws.cell(
+                    row=row, column=1, value=child_label
+                ).font = FONT_DATA_ITALIC_GRAY
 
                 if entry.key == "default":
                     display = f"default = {entry.value}"
@@ -1007,8 +1061,17 @@ def create_mapping_tab(ws: Worksheet, mapping: MappingInfo, data: WorkbookData) 
 
 def create_schema_tab(ws: Worksheet, schema: SchemaInfo) -> None:
     """Generate a schema reference tab."""
-    headers = ["#", "Field", "Type", "PK", "Required", "Unique",
-               "Default", "Tags", "Notes"]
+    headers = [
+        "#",
+        "Field",
+        "Type",
+        "PK",
+        "Required",
+        "Unique",
+        "Default",
+        "Tags",
+        "Notes",
+    ]
     col_widths = {1: 5, 2: 25, 3: 20, 4: 5, 5: 8, 6: 8, 7: 15, 8: 20, 9: 40}
     _set_column_widths(ws, col_widths)
 
@@ -1020,7 +1083,9 @@ def create_schema_tab(ws: Worksheet, schema: SchemaInfo) -> None:
         cell.font = FONT_DATA
         cell.fill = FILL_LIGHT_GRAY
         cell.alignment = ALIGN_WRAP
-        ws.merge_cells(start_row=start_row, start_column=1, end_row=start_row, end_column=9)
+        ws.merge_cells(
+            start_row=start_row, start_column=1, end_row=start_row, end_column=9
+        )
         start_row += 1
 
     header_row = start_row
@@ -1039,7 +1104,9 @@ def create_schema_tab(ws: Worksheet, schema: SchemaInfo) -> None:
         ws.cell(row=row, column=2, value=f.name).font = FONT_DATA
         ws.cell(row=row, column=3, value=f.type).font = FONT_DATA
         ws.cell(row=row, column=4, value="Yes" if f.is_pk else "").font = FONT_DATA
-        ws.cell(row=row, column=5, value="Yes" if f.is_required else "").font = FONT_DATA
+        ws.cell(
+            row=row, column=5, value="Yes" if f.is_required else ""
+        ).font = FONT_DATA
         ws.cell(row=row, column=6, value="Yes" if f.is_unique else "").font = FONT_DATA
         ws.cell(row=row, column=7, value=f.default or "").font = FONT_DATA
 
@@ -1064,7 +1131,9 @@ def create_schema_tab(ws: Worksheet, schema: SchemaInfo) -> None:
             note_parts.append(f.note)
         if f.fragment_origin:
             note_parts.append(f"From fragment: {f.fragment_origin}")
-        ws.cell(row=row, column=9, value="; ".join(note_parts) if note_parts else "").font = FONT_DATA
+        ws.cell(
+            row=row, column=9, value="; ".join(note_parts) if note_parts else ""
+        ).font = FONT_DATA
         ws.cell(row=row, column=9).alignment = ALIGN_WRAP
 
         # Row fill
@@ -1150,6 +1219,7 @@ def generate_workbook(data: WorkbookData, output_path: str, options: dict) -> No
 
 # ── CLI ──────────────────────────────────────────────────────────────────
 
+
 def build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="stm_to_excel",
@@ -1157,11 +1227,15 @@ def build_arg_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("stm_files", nargs="+", help="Input .stm file(s)")
     parser.add_argument("-o", "--output", required=True, help="Output .xlsx path")
-    parser.add_argument("--targets", help="Comma-separated target schema names to include")
+    parser.add_argument(
+        "--targets", help="Comma-separated target schema names to include"
+    )
     parser.add_argument("--title", help="Override workbook title")
     parser.add_argument("--timestamp", help="Override generation timestamp (ISO 8601)")
     parser.add_argument("--no-issues", action="store_true", help="Omit the Issues tab")
-    parser.add_argument("--no-schemas", action="store_true", help="Omit schema reference tabs")
+    parser.add_argument(
+        "--no-schemas", action="store_true", help="Omit schema reference tabs"
+    )
     return parser
 
 

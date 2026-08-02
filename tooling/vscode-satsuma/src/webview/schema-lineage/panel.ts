@@ -60,9 +60,7 @@ export class SchemaLineagePanel {
       {
         enableScripts: true,
         retainContextWhenHidden: true,
-        localResourceRoots: [
-          vscode.Uri.file(join(extensionUri.fsPath, "dist", "webview")),
-        ],
+        localResourceRoots: [vscode.Uri.file(join(extensionUri.fsPath, "dist", "webview"))],
       },
     );
 
@@ -162,8 +160,7 @@ export class SchemaLineagePanel {
   private isDarkTheme(): boolean {
     const themeKind = vscode.window.activeColorTheme.kind;
     return (
-      themeKind === vscode.ColorThemeKind.Dark ||
-      themeKind === vscode.ColorThemeKind.HighContrast
+      themeKind === vscode.ColorThemeKind.Dark || themeKind === vscode.ColorThemeKind.HighContrast
     );
   }
 
@@ -179,24 +176,12 @@ export class SchemaLineagePanel {
   private getHtml(): string {
     const scriptUri = this.panel.webview.asWebviewUri(
       vscode.Uri.file(
-        join(
-          this.extensionUri.fsPath,
-          "dist",
-          "webview",
-          "schema-lineage",
-          "schema-lineage.js",
-        ),
+        join(this.extensionUri.fsPath, "dist", "webview", "schema-lineage", "schema-lineage.js"),
       ),
     );
     const styleUri = this.panel.webview.asWebviewUri(
       vscode.Uri.file(
-        join(
-          this.extensionUri.fsPath,
-          "dist",
-          "webview",
-          "schema-lineage",
-          "schema-lineage.css",
-        ),
+        join(this.extensionUri.fsPath, "dist", "webview", "schema-lineage", "schema-lineage.css"),
       ),
     );
     const nonce = getNonce();

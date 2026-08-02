@@ -51,7 +51,9 @@ describe("extractMetadata()", () => {
     const val = n("value_text", [n("nl_string", [], '"INTERNAL"')], '"INTERNAL"');
     const kv = n("tag_with_value", [key, val]);
     const meta = metaBlock([kv]);
-    assert.deepEqual(extractMetadata(meta), [{ kind: "kv", key: "classification", value: "INTERNAL" }]);
+    assert.deepEqual(extractMetadata(meta), [
+      { kind: "kv", key: "classification", value: "INTERNAL" },
+    ]);
   });
 
   // sl-cvx9: value_text legally mixes quoted strings with surrounding tokens
@@ -70,7 +72,9 @@ describe("extractMetadata()", () => {
     );
     const kv = n("tag_with_value", [key, val]);
     const meta = metaBlock([kv]);
-    assert.deepEqual(extractMetadata(meta), [{ kind: "kv", key: "default", value: '"unknown" if null' }]);
+    assert.deepEqual(extractMetadata(meta), [
+      { kind: "kv", key: "default", value: '"unknown" if null' },
+    ]);
   });
 
   it("preserves all strings in a multi-string value (sl-cvx9)", () => {

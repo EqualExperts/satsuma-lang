@@ -111,9 +111,7 @@ describe("buildModelFromSources — cross-file lineage from in-memory documents"
     // The merged model carries the importee's location for its contributed
     // schema, which the single-file model does not.
     const lineageUris = new Set(
-      lineage.namespaces.flatMap((ns) =>
-        ns.schemas.map((s) => s.location?.uri).filter(Boolean),
-      ),
+      lineage.namespaces.flatMap((ns) => ns.schemas.map((s) => s.location?.uri).filter(Boolean)),
     );
     assert.ok(
       lineageUris.has(importeeUri),
@@ -204,9 +202,7 @@ describe("buildModelResultFromSources — unresolved-import diagnostics", () => 
   // model — consumers picking either entry point see the same VizModel.
   it("buildModelFromSources returns the same model as the result form", () => {
     const uri = `${base}buffer.stm`;
-    const documents = [
-      { uri, source: "schema users { id INT }\nschema customers { id INT }" },
-    ];
+    const documents = [{ uri, source: "schema users { id INT }\nschema customers { id INT }" }];
     assert.deepEqual(
       buildModelFromSources(uri, documents),
       buildModelResultFromSources(uri, documents).model,

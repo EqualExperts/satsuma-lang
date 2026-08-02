@@ -30,6 +30,7 @@ MAX_OUTPUT_CHARS = 100_000
 
 # ── Helpers ──────────────────────────────────────────────────────────
 
+
 def open_workbook(path: str) -> openpyxl.Workbook:
     p = Path(path)
     if not p.exists():
@@ -105,10 +106,14 @@ def truncate_output(text: str) -> str:
     if len(text) <= MAX_OUTPUT_CHARS:
         return text
     truncated = text[:MAX_OUTPUT_CHARS]
-    return truncated + f"\n\n**WARNING**: Output truncated at {MAX_OUTPUT_CHARS:,} characters.\n"
+    return (
+        truncated
+        + f"\n\n**WARNING**: Output truncated at {MAX_OUTPUT_CHARS:,} characters.\n"
+    )
 
 
 # ── Subcommands ──────────────────────────────────────────────────────
+
 
 def cmd_survey(args: argparse.Namespace) -> str:
     """Survey workbook structure: tabs, row/col counts, previews."""
@@ -151,9 +156,7 @@ def cmd_survey(args: argparse.Namespace) -> str:
         if preview_rows > 0 and cols > 0:
             lines.append("")
             lines.append("**Preview (first 3 rows)**:\n")
-            headers = [
-                get_column_letter(c) for c in range(1, cols + 1)
-            ]
+            headers = [get_column_letter(c) for c in range(1, cols + 1)]
             table_rows = []
             for r in range(1, preview_rows + 1):
                 table_rows.append(
@@ -198,7 +201,9 @@ def cmd_headers(args: argparse.Namespace) -> str:
         )
         if non_empty_r2 > non_empty_r1:
             header_row = 2
-            lines.append(f"*Header row detected at row {header_row} (row 1 appears to be a title)*\n")
+            lines.append(
+                f"*Header row detected at row {header_row} (row 1 appears to be a title)*\n"
+            )
 
     # Column headers
     col_headers = []
@@ -216,8 +221,10 @@ def cmd_headers(args: argparse.Namespace) -> str:
     sample_end = min(sample_start + 4, rows)
     if sample_start <= rows:
         lines.append(f"**Sample rows** ({sample_start}-{sample_end}):\n")
-        headers = [cell_value(ws.cell(row=header_row, column=c)) or get_column_letter(c)
-                    for c in range(1, cols + 1)]
+        headers = [
+            cell_value(ws.cell(row=header_row, column=c)) or get_column_letter(c)
+            for c in range(1, cols + 1)
+        ]
         table_rows = []
         for r in range(sample_start, sample_end + 1):
             table_rows.append(
@@ -337,10 +344,7 @@ def cmd_formatting(args: argparse.Namespace) -> str:
         lines.append("")
 
     # Hidden rows
-    hidden_rows = [
-        r for r in range(1, rows + 1)
-        if ws.row_dimensions[r].hidden
-    ]
+    hidden_rows = [r for r in range(1, rows + 1) if ws.row_dimensions[r].hidden]
     if hidden_rows:
         if len(hidden_rows) <= 20:
             lines.append(f"**Hidden rows**: {', '.join(str(r) for r in hidden_rows)}")
@@ -350,7 +354,8 @@ def cmd_formatting(args: argparse.Namespace) -> str:
 
     # Hidden columns
     hidden_cols = [
-        get_column_letter(c) for c in range(1, cols + 1)
+        get_column_letter(c)
+        for c in range(1, cols + 1)
         if ws.column_dimensions[get_column_letter(c)].hidden
     ]
     if hidden_cols:
@@ -358,7 +363,9 @@ def cmd_formatting(args: argparse.Namespace) -> str:
         lines.append("")
 
     # Data validation rules
-    validations = list(ws.data_validations.dataValidation) if ws.data_validations else []
+    validations = (
+        list(ws.data_validations.dataValidation) if ws.data_validations else []
+    )
     if validations:
         lines.append(f"**Data validation rules**: {len(validations)}\n")
         for dv in validations[:10]:
@@ -369,14 +376,21 @@ def cmd_formatting(args: argparse.Namespace) -> str:
 
     # Row groupings (outline levels)
     grouped_rows = [
-        r for r in range(1, rows + 1)
+        r
+        for r in range(1, rows + 1)
         if ws.row_dimensions[r].outlineLevel and ws.row_dimensions[r].outlineLevel > 0
     ]
     if grouped_rows:
         lines.append(f"**Row groupings**: {len(grouped_rows)} rows with outline levels")
         lines.append("")
 
-    if not fill_counter and not font_styles and not cf_rules and not hidden_rows and not hidden_cols:
+    if (
+        not fill_counter
+        and not font_styles
+        and not cf_rules
+        and not hidden_rows
+        and not hidden_cols
+    ):
         lines.append("No notable formatting detected.")
 
     return truncate_output("\n".join(lines))
@@ -397,7 +411,10 @@ def cmd_range(args: argparse.Namespace) -> str:
             row_start = int(parts[0])
             row_end = int(parts[1])
         else:
-            print(f"Error: invalid row range '{args.rows}'. Use START:END.", file=sys.stderr)
+            print(
+                f"Error: invalid row range '{args.rows}'. Use START:END.",
+                file=sys.stderr,
+            )
             sys.exit(1)
 
     # Parse column range
@@ -408,7 +425,9 @@ def cmd_range(args: argparse.Namespace) -> str:
             col_start = column_index_from_string(parts[0].upper())
             col_end = column_index_from_string(parts[1].upper())
         else:
-            print(f"Error: invalid column range '{args.cols}'. Use A:H.", file=sys.stderr)
+            print(
+                f"Error: invalid column range '{args.cols}'. Use A:H.", file=sys.stderr
+            )
             sys.exit(1)
 
     # Clamp
@@ -418,7 +437,9 @@ def cmd_range(args: argparse.Namespace) -> str:
     col_end = min(col_end, cols)
 
     lines: list[str] = []
-    lines.append(f"# Range: {args.tab} [rows {row_start}:{row_end}, cols {get_column_letter(col_start)}:{get_column_letter(col_end)}]\n")
+    lines.append(
+        f"# Range: {args.tab} [rows {row_start}:{row_end}, cols {get_column_letter(col_start)}:{get_column_letter(col_end)}]\n"
+    )
 
     # Use row 1 (or detected header row) as column headers
     headers = [
@@ -429,7 +450,10 @@ def cmd_range(args: argparse.Namespace) -> str:
     table_rows = []
     for r in range(row_start, row_end + 1):
         table_rows.append(
-            [cell_value(ws.cell(row=r, column=c)) for c in range(col_start, col_end + 1)]
+            [
+                cell_value(ws.cell(row=r, column=c))
+                for c in range(col_start, col_end + 1)
+            ]
         )
 
     lines.append(md_table(headers, table_rows))
@@ -479,6 +503,7 @@ def cmd_lookup(args: argparse.Namespace) -> str:
 
 # ── CLI ──────────────────────────────────────────────────────────────
 
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="excel_tool",
@@ -511,7 +536,9 @@ def build_parser() -> argparse.ArgumentParser:
     p_lookup = sub.add_parser("lookup", help="Extract full lookup tab content")
     p_lookup.add_argument("file", help="Path to .xlsx file")
     p_lookup.add_argument("tab", help="Tab/sheet name")
-    p_lookup.add_argument("--max-rows", type=int, default=500, help="Max data rows (default 500)")
+    p_lookup.add_argument(
+        "--max-rows", type=int, default=500, help="Max data rows (default 500)"
+    )
 
     return parser
 

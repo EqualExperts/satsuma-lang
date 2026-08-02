@@ -2,10 +2,7 @@ import * as vscode from "vscode";
 import { runCli } from "./cli-runner";
 import { resolveEntryFile } from "./entry-file";
 
-export function registerValidateCommand(
-  context: vscode.ExtensionContext,
-  cliPath: string,
-): void {
+export function registerValidateCommand(context: vscode.ExtensionContext, cliPath: string): void {
   const diagnostics = vscode.languages.createDiagnosticCollection("satsuma-validate-cmd");
   context.subscriptions.push(diagnostics);
 
@@ -63,9 +60,7 @@ export function registerValidateCommand(
         diagnostics.set(vscode.Uri.parse(uriStr), diags);
       }
 
-      vscode.window.showInformationMessage(
-        `Satsuma: ${entries.length} diagnostic(s) found.`,
-      );
+      vscode.window.showInformationMessage(`Satsuma: ${entries.length} diagnostic(s) found.`);
     }),
   );
 }

@@ -1,8 +1,20 @@
 import { LitElement, html, svg, css, unsafeCSS } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import { unsafeHTML } from "lit/directives/unsafe-html.js";
-import type { VizModel, SourceLocation, NamespaceGroup, MappingBlock, SchemaCard } from "./model.js";
-import { computeLayout, computeOverviewLayout, type LayoutResult, type OverviewLayoutResult, type SourceBlockLayout } from "./layout/elk-layout.js";
+import type {
+  VizModel,
+  SourceLocation,
+  NamespaceGroup,
+  MappingBlock,
+  SchemaCard,
+} from "./model.js";
+import {
+  computeLayout,
+  computeOverviewLayout,
+  type LayoutResult,
+  type OverviewLayoutResult,
+  type SourceBlockLayout,
+} from "./layout/elk-layout.js";
 import { SzOpenMappingEvent } from "./edges/sz-overview-edge-layer.js";
 import tokens from "./tokens.css";
 import { renderMarkdown } from "./markdown.js";
@@ -31,9 +43,22 @@ export {
   NAMESPACE_PILL_HEIGHT,
 } from "./layout/geometry.js";
 import { countMappingArrows } from "./field-coverage.js";
-export { buildMappingCoveredFields, buildMappedFieldsIndex, countMappingArrows, resolveSchemaLocalFieldPath, schemaHasFieldPath } from "./field-coverage.js";
+export {
+  buildMappingCoveredFields,
+  buildMappedFieldsIndex,
+  countMappingArrows,
+  resolveSchemaLocalFieldPath,
+  schemaHasFieldPath,
+} from "./field-coverage.js";
 export { metricAsSchemaCard, metricFieldEntries } from "./metric-adapter.js";
-export type { LayoutResult, LayoutNode, LayoutEdge, SourceBlockLayout, OverviewLayoutResult, OverviewEdge } from "./layout/elk-layout.js";
+export type {
+  LayoutResult,
+  LayoutNode,
+  LayoutEdge,
+  SourceBlockLayout,
+  OverviewLayoutResult,
+  OverviewEdge,
+} from "./layout/elk-layout.js";
 
 /**
  * Replace every `var(--*)` reference in an exported SVG with the literal
@@ -43,10 +68,7 @@ export type { LayoutResult, LayoutNode, LayoutEdge, SourceBlockLayout, OverviewL
  * component (sl-7pdf). References that resolve to nothing are left intact
  * rather than silently emptied.
  */
-export function inlineCssVariables(
-  svg: string,
-  resolve: (name: string) => string,
-): string {
+export function inlineCssVariables(svg: string, resolve: (name: string) => string): string {
   return svg.replace(/var\((--[\w-]+)\)/g, (whole, name: string) => {
     const value = resolve(name).trim();
     return value === "" ? whole : value;
@@ -102,13 +124,17 @@ export function buildExportSvg(layout: LayoutResult, edgeSvgContent: string): st
   </style>
   <rect width="${w}" height="${h}" fill="var(--sz-bg)"/>
   ${edgeSvgContent}
-  ${[...layout.nodes.values()].map((n) => `
+  ${[...layout.nodes.values()]
+    .map(
+      (n) => `
   <g transform="translate(${n.x},${n.y})">
     <rect class="card" width="${n.width}" height="${n.height}" fill="var(--sz-card-bg)" stroke="var(--sz-card-border)" rx="8"/>
     <rect class="header" width="${n.width}" height="40" fill="var(--sz-orange)" rx="8"/>
     <rect x="0" y="32" width="${n.width}" height="8" fill="var(--sz-orange)"/>
     <text class="card-name" x="12" y="26">${escapeXml(n.id)}</text>
-  </g>`).join("")}
+  </g>`,
+    )
+    .join("")}
 </svg>`;
 }
 
@@ -341,8 +367,12 @@ export class SatsumaViz extends LitElement {
     }
 
     @keyframes fadeIn {
-      from { opacity: 0; }
-      to { opacity: 1; }
+      from {
+        opacity: 0;
+      }
+      to {
+        opacity: 1;
+      }
     }
 
     /* Flexbox fallback when no layout computed yet */
@@ -623,13 +653,25 @@ export class SatsumaViz extends LitElement {
 
     /* Slide-in animation for expanded cards */
     @keyframes slideInLeft {
-      from { opacity: 0; transform: translateX(-40px); }
-      to { opacity: 1; transform: translateX(0); }
+      from {
+        opacity: 0;
+        transform: translateX(-40px);
+      }
+      to {
+        opacity: 1;
+        transform: translateX(0);
+      }
     }
 
     @keyframes slideInRight {
-      from { opacity: 0; transform: translateX(40px); }
-      to { opacity: 1; transform: translateX(0); }
+      from {
+        opacity: 0;
+        transform: translateX(40px);
+      }
+      to {
+        opacity: 1;
+        transform: translateX(0);
+      }
     }
 
     .positioned-card.expanded {
@@ -932,7 +974,13 @@ export class SatsumaViz extends LitElement {
   private _mappedFieldsBySchema = new Map<string, Set<string>>();
 
   @state()
-  private _renderedNamespaceBoxes: Array<{ name: string; x: number; y: number; w: number; h: number }> = [];
+  private _renderedNamespaceBoxes: Array<{
+    name: string;
+    x: number;
+    y: number;
+    w: number;
+    h: number;
+  }> = [];
 
   /**
    * Minimap input for the mapping detail view, measured from the rendered
@@ -1012,14 +1060,14 @@ export class SatsumaViz extends LitElement {
     }
 
     if (
-      changed.has("_layout")
-      || changed.has("_overviewLayout")
-      || changed.has("_viewMode")
-      || changed.has("model")
-      || changed.has("_nsFilter")
-      || changed.has("_fileFilter")
-      || changed.has("_showNotes")
-      || changed.has("_selectedMapping")
+      changed.has("_layout") ||
+      changed.has("_overviewLayout") ||
+      changed.has("_viewMode") ||
+      changed.has("model") ||
+      changed.has("_nsFilter") ||
+      changed.has("_fileFilter") ||
+      changed.has("_showNotes") ||
+      changed.has("_selectedMapping")
     ) {
       requestAnimationFrame(() => {
         this._measureNamespaceBoxes();
@@ -1028,11 +1076,11 @@ export class SatsumaViz extends LitElement {
     }
 
     if (
-      changed.has("model")
-      || changed.has("_layout")
-      || changed.has("_overviewLayout")
-      || changed.has("_layoutError")
-      || changed.has("_viewMode")
+      changed.has("model") ||
+      changed.has("_layout") ||
+      changed.has("_overviewLayout") ||
+      changed.has("_layoutError") ||
+      changed.has("_viewMode")
     ) {
       this._publishAutomationState();
     }
@@ -1205,12 +1253,24 @@ export class SatsumaViz extends LitElement {
     });
 
     if (!this.model) {
-      return html`<div class="empty" data-testid="viz-empty" data-ready-state=${automationState.readyState}>No mapping file loaded</div>`;
+      return html`<div
+        class="empty"
+        data-testid="viz-empty"
+        data-ready-state=${automationState.readyState}
+      >
+        No mapping file loaded
+      </div>`;
     }
 
     const { namespaces } = this.model;
     if (namespaces.length === 0) {
-      return html`<div class="empty" data-testid="viz-empty" data-ready-state=${automationState.readyState}>No schemas found in this file</div>`;
+      return html`<div
+        class="empty"
+        data-testid="viz-empty"
+        data-ready-state=${automationState.readyState}
+      >
+        No schemas found in this file
+      </div>`;
     }
 
     const filtered = this._filterNamespaces(namespaces);
@@ -1220,7 +1280,13 @@ export class SatsumaViz extends LitElement {
     if (!this._layout && !this._overviewLayout && !this._layoutError) {
       return html`
         ${this._renderToolbar(namespaces)}
-        <div class="loading" data-testid="viz-loading" data-ready-state=${automationState.readyState}>Computing layout...</div>
+        <div
+          class="loading"
+          data-testid="viz-loading"
+          data-ready-state=${automationState.readyState}
+        >
+          Computing layout...
+        </div>
       `;
     }
 
@@ -1229,8 +1295,7 @@ export class SatsumaViz extends LitElement {
       return html`
         ${this._renderToolbar(namespaces)}
         <div class=${toggleClasses}>
-          ${this._renderFileNotes()}
-          ${this._renderFlexFallback(filtered)}
+          ${this._renderFileNotes()} ${this._renderFlexFallback(filtered)}
         </div>
       `;
     }
@@ -1242,7 +1307,8 @@ export class SatsumaViz extends LitElement {
         <div class="${toggleClasses} view-content">
           ${this._renderFileNotes()}
           <div class="notes-pane-wrapper">
-            <div class="viewport"
+            <div
+              class="viewport"
               data-testid="viz-viewport"
               @wheel=${this._onWheel}
               @mousedown=${this._onMouseDown}
@@ -1250,7 +1316,8 @@ export class SatsumaViz extends LitElement {
               @mouseup=${this._onMouseUp}
               @mouseleave=${this._onMouseUp}
             >
-              <div class="viewport-inner"
+              <div
+                class="viewport-inner"
                 style="transform: translate(${this._panX}px, ${this._panY}px) scale(${this._zoom});"
               >
                 <div class="detail-inner" style="padding: 16px;">
@@ -1270,12 +1337,12 @@ export class SatsumaViz extends LitElement {
     // Overview mode: compact schema cards with thick mapping arrows
     if (this._overviewLayout) {
       return html`
-        ${this._renderToolbar(namespaces)}
-        ${this._renderBreadcrumbs()}
+        ${this._renderToolbar(namespaces)} ${this._renderBreadcrumbs()}
         <div class="${toggleClasses} view-content">
           ${this._renderFileNotes()}
           <div class="notes-pane-wrapper">
-            <div class="viewport"
+            <div
+              class="viewport"
               data-testid="viz-viewport"
               @wheel=${this._onWheel}
               @mousedown=${this._onMouseDown}
@@ -1283,7 +1350,8 @@ export class SatsumaViz extends LitElement {
               @mouseup=${this._onMouseUp}
               @mouseleave=${this._onMouseUp}
             >
-              <div class="viewport-inner"
+              <div
+                class="viewport-inner"
                 style="transform: translate(${this._panX}px, ${this._panY}px) scale(${this._zoom});"
               >
                 ${this._renderOverview(this._overviewLayout, filtered)}
@@ -1305,12 +1373,12 @@ export class SatsumaViz extends LitElement {
     const showPane = this._showNotes && (hasComments || hasFileNotes);
 
     return html`
-      ${this._renderToolbar(namespaces)}
-      ${this._renderBreadcrumbs()}
+      ${this._renderToolbar(namespaces)} ${this._renderBreadcrumbs()}
       <div class=${toggleClasses}>
         ${this._renderFileNotes()}
         <div class="notes-pane-wrapper">
-          <div class="viewport"
+          <div
+            class="viewport"
             data-testid="viz-viewport"
             @wheel=${this._onWheel}
             @mousedown=${this._onMouseDown}
@@ -1318,7 +1386,8 @@ export class SatsumaViz extends LitElement {
             @mouseup=${this._onMouseUp}
             @mouseleave=${this._onMouseUp}
           >
-            <div class="viewport-inner"
+            <div
+              class="viewport-inner"
               style="transform: translate(${this._panX}px, ${this._panY}px) scale(${this._zoom});"
             >
               ${this._renderPositioned(this._layout!, filtered)}
@@ -1341,67 +1410,106 @@ export class SatsumaViz extends LitElement {
 
     return html`
       <div class="toolbar">
-        ${inDetail
-          ? html`
-              <button class="toolbar-btn" @click=${this._backToOverview}
-                title="Back to overview">&#9664; Overview</button>
-              <div class="toolbar-sep"></div>
-              <span class="toolbar-title">${this._selectedMapping?.id ?? "Mapping Detail"}</span>
-            `
-          : html`<span class="toolbar-title">&#9673; Mapping Viz</span>`}
+        ${
+          inDetail
+            ? html`
+                <button class="toolbar-btn" @click=${this._backToOverview} title="Back to overview">
+                  &#9664; Overview
+                </button>
+                <div class="toolbar-sep"></div>
+                <span class="toolbar-title">${this._selectedMapping?.id ?? "Mapping Detail"}</span>
+              `
+            : html`<span class="toolbar-title">&#9673; Mapping Viz</span>`
+        }
         <div class="toolbar-sep"></div>
         <button
           class="toolbar-btn"
           data-testid="toolbar-toggle-file-notes"
           ?data-active=${this._showNotes}
-          @click=${() => { this._showNotes = !this._showNotes; }}
+          @click=${() => {
+            this._showNotes = !this._showNotes;
+          }}
           title="Show or hide file notes"
-        >Show File Notes</button>
+        >
+          Show File Notes
+        </button>
         <div class="toolbar-sep"></div>
-        ${!inDetail
-          ? html`<button class="toolbar-btn" data-testid="toolbar-fit" @click=${this._fit} title="Fit all content in viewport">Fit</button>`
-          : ""}
-        <button class="toolbar-btn" data-testid="toolbar-refresh" @click=${this._refresh} title="Re-fetch visualization data">&#8635; Refresh</button>
-        ${!inDetail
-          ? html`<button class="toolbar-btn" data-testid="toolbar-export" @click=${this._exportSvg} title="Export the overview as an SVG file">&#x21E9; Export SVG</button>`
-          : ""}
-        ${hasNamespaces && !inDetail
-          ? html`
-              <div class="toolbar-sep"></div>
-              <select
-                class="toolbar-select"
-                data-testid="toolbar-namespace-filter"
-                @change=${this._onNsFilterChange}
-                title="Filter by namespace"
+        ${
+          !inDetail
+            ? html`<button
+                class="toolbar-btn"
+                data-testid="toolbar-fit"
+                @click=${this._fit}
+                title="Fit all content in viewport"
               >
-                <option value="" ?selected=${this._nsFilter === null}>All namespaces</option>
-                ${namedNs.map(
-                  (ns) => html`<option value=${ns.name!} ?selected=${this._nsFilter === ns.name}>${ns.name}</option>`
-                )}
-              </select>
-            `
-          : ""}
-        ${this._getSourceFiles().length > 1 && !inDetail
-          ? html`
-              <div class="toolbar-sep"></div>
-              <select
-                class="toolbar-select"
-                data-testid="toolbar-file-filter"
-                @change=${this._onFileFilterChange}
-                title="Filter by source file"
+                Fit
+              </button>`
+            : ""
+        }
+        <button
+          class="toolbar-btn"
+          data-testid="toolbar-refresh"
+          @click=${this._refresh}
+          title="Re-fetch visualization data"
+        >
+          &#8635; Refresh
+        </button>
+        ${
+          !inDetail
+            ? html`<button
+                class="toolbar-btn"
+                data-testid="toolbar-export"
+                @click=${this._exportSvg}
+                title="Export the overview as an SVG file"
               >
-                <option value="" ?selected=${this._fileFilter === null}>All files</option>
-                ${this._getSourceFiles().map(
-                  (uri) => {
+                &#x21E9; Export SVG
+              </button>`
+            : ""
+        }
+        ${
+          hasNamespaces && !inDetail
+            ? html`
+                <div class="toolbar-sep"></div>
+                <select
+                  class="toolbar-select"
+                  data-testid="toolbar-namespace-filter"
+                  @change=${this._onNsFilterChange}
+                  title="Filter by namespace"
+                >
+                  <option value="" ?selected=${this._nsFilter === null}>All namespaces</option>
+                  ${namedNs.map(
+                    (ns) =>
+                      html`<option value=${ns.name!} ?selected=${this._nsFilter === ns.name}>
+                        ${ns.name}
+                      </option>`,
+                  )}
+                </select>
+              `
+            : ""
+        }
+        ${
+          this._getSourceFiles().length > 1 && !inDetail
+            ? html`
+                <div class="toolbar-sep"></div>
+                <select
+                  class="toolbar-select"
+                  data-testid="toolbar-file-filter"
+                  @change=${this._onFileFilterChange}
+                  title="Filter by source file"
+                >
+                  <option value="" ?selected=${this._fileFilter === null}>All files</option>
+                  ${this._getSourceFiles().map((uri) => {
                     const name = uri.split("/").pop() ?? uri;
                     const isCurrent = uri === this.model?.uri;
                     const label = isCurrent ? `${name} (current)` : name;
-                    return html`<option value=${uri} ?selected=${this._fileFilter === uri}>${label}</option>`;
-                  }
-                )}
-              </select>
-            `
-          : ""}
+                    return html`<option value=${uri} ?selected=${this._fileFilter === uri}>
+                      ${label}
+                    </option>`;
+                  })}
+                </select>
+              `
+            : ""
+        }
         <div class="toolbar-spacer"></div>
       </div>
     `;
@@ -1583,14 +1691,20 @@ export class SatsumaViz extends LitElement {
             const name = m.uri.split("/").pop() ?? m.uri;
             return html`
               <span class="breadcrumb-sep">&#9654;</span>
-              <span class="breadcrumb-item" title="${m.uri} (via ${schemaId})"
+              <span
+                class="breadcrumb-item"
+                title="${m.uri} (via ${schemaId})"
                 @click=${() => this.addExpandedModels(schemaId, models)}
-              >${name}</span>
+                >${name}</span
+              >
             `;
-          })
+          }),
         )}
-        <button class="breadcrumb-collapse" @click=${this._collapseAll}
-          title="Collapse back to single-file view">
+        <button
+          class="breadcrumb-collapse"
+          @click=${this._collapseAll}
+          title="Collapse back to single-file view"
+        >
           &#10005; Collapse all
         </button>
       </div>
@@ -1600,8 +1714,11 @@ export class SatsumaViz extends LitElement {
   /** Render the overview: compact schema cards + thick overview edges. */
   private _renderOverview(overview: OverviewLayoutResult, namespaces: NamespaceGroup[]) {
     return html`
-      <div class="canvas" style="width: ${overview.width + 48}px; height: ${overview.height + 48}px; padding: 24px;"
-        @sz-compact-toggled=${this._onCompactToggled}>
+      <div
+        class="canvas"
+        style="width: ${overview.width + 48}px; height: ${overview.height + 48}px; padding: 24px;"
+        @sz-compact-toggled=${this._onCompactToggled}
+      >
         <!-- Cards and edges share .card-layer so both use the same coordinate
              origin by construction — a sibling edge layer anchored to the
              canvas padding box renders 24px above the in-flow cards (sl-wixe). -->
@@ -1619,9 +1736,13 @@ export class SatsumaViz extends LitElement {
               const node = overview.nodes.find((n) => n.id === s.qualifiedId);
               if (!node) return html``;
               return html`
-                <div class="positioned-card" data-node-id=${s.qualifiedId} style="left: ${node.x}px; top: ${node.y}px; width: ${node.width}px;"
+                <div
+                  class="positioned-card"
+                  data-node-id=${s.qualifiedId}
+                  style="left: ${node.x}px; top: ${node.y}px; width: ${node.width}px;"
                   @mouseenter=${() => this._onOverviewNodeHover(s.qualifiedId)}
-                  @mouseleave=${() => this._onOverviewNodeLeave()}>
+                  @mouseleave=${() => this._onOverviewNodeLeave()}
+                >
                   <sz-schema-card
                     data-testid=${`overview-schema-card-${sanitizeTestIdSegment(s.qualifiedId)}`}
                     .testIdPrefix=${`overview-schema-card-${sanitizeTestIdSegment(s.qualifiedId)}`}
@@ -1637,10 +1758,18 @@ export class SatsumaViz extends LitElement {
               const node = overview.nodes.find((n) => n.id === f.id);
               if (!node) return html``;
               return html`
-                <div class="positioned-card" data-node-id=${f.id} style="left: ${node.x}px; top: ${node.y}px; width: ${node.width}px;"
+                <div
+                  class="positioned-card"
+                  data-node-id=${f.id}
+                  style="left: ${node.x}px; top: ${node.y}px; width: ${node.width}px;"
                   @mouseenter=${() => this._onOverviewNodeHover(f.id)}
-                  @mouseleave=${() => this._onOverviewNodeLeave()}>
-                  <sz-fragment-card .fragment=${f} .namespaceLabel=${ns.name} compact></sz-fragment-card>
+                  @mouseleave=${() => this._onOverviewNodeLeave()}
+                >
+                  <sz-fragment-card
+                    .fragment=${f}
+                    .namespaceLabel=${ns.name}
+                    compact
+                  ></sz-fragment-card>
                 </div>
               `;
             }),
@@ -1648,9 +1777,13 @@ export class SatsumaViz extends LitElement {
               const node = overview.nodes.find((n) => n.id === m.qualifiedId);
               if (!node) return html``;
               return html`
-                <div class="positioned-card" data-node-id=${m.qualifiedId} style="left: ${node.x}px; top: ${node.y}px; width: ${node.width}px;"
+                <div
+                  class="positioned-card"
+                  data-node-id=${m.qualifiedId}
+                  style="left: ${node.x}px; top: ${node.y}px; width: ${node.width}px;"
                   @mouseenter=${() => this._onOverviewNodeHover(m.qualifiedId)}
-                  @mouseleave=${() => this._onOverviewNodeLeave()}>
+                  @mouseleave=${() => this._onOverviewNodeLeave()}
+                >
                   <sz-metric-card
                     data-testid=${`overview-metric-card-${sanitizeTestIdSegment(m.qualifiedId)}`}
                     .metric=${m}
@@ -1674,11 +1807,22 @@ export class SatsumaViz extends LitElement {
                   @mouseenter=${() => this._onOverviewNodeHover(mappingNodeId)}
                   @mouseleave=${() => this._onOverviewNodeLeave()}
                 >
-                  <div class="overview-mapping-card" data-testid=${`overview-mapping-card-${sanitizeTestIdSegment(m.id)}`} title=${m.id}>
-                    <div style="display:flex;flex-direction:column;align-items:flex-start;gap:4px;min-width:0;">
-                      ${ns.name
-                        ? html`<span style="display:inline-block;font-size:10px;font-weight:700;padding:1px 6px;border-radius:999px;background:var(--sz-namespace-pill-bg);color:var(--sz-namespace-pill-text);">${ns.name}</span>`
-                        : ""}
+                  <div
+                    class="overview-mapping-card"
+                    data-testid=${`overview-mapping-card-${sanitizeTestIdSegment(m.id)}`}
+                    title=${m.id}
+                  >
+                    <div
+                      style="display:flex;flex-direction:column;align-items:flex-start;gap:4px;min-width:0;"
+                    >
+                      ${
+                        ns.name
+                          ? html`<span
+                              style="display:inline-block;font-size:10px;font-weight:700;padding:1px 6px;border-radius:999px;background:var(--sz-namespace-pill-bg);color:var(--sz-namespace-pill-text);"
+                              >${ns.name}</span
+                            >`
+                          : ""
+                      }
                       <div style="display:flex;align-items:center;gap:8px;min-width:0;">
                         <svg class="overview-mapping-icon" viewBox="0 0 16 16" fill="currentColor">
                           <path d="M2 3h3v2H2v2l-2-3 2-3v2z" opacity="0.95"></path>
@@ -1687,7 +1831,9 @@ export class SatsumaViz extends LitElement {
                           <path d="M4.5 9h7v1.5h-7z" opacity="0.78"></path>
                         </svg>
                         <span class="overview-mapping-name">${m.id}</span>
-                        <span style="opacity:0.6;font-size:11px;font-weight:400;">${countMappingArrows(m)} &#8594;s</span>
+                        <span style="opacity:0.6;font-size:11px;font-weight:400;"
+                          >${countMappingArrows(m)} &#8594;s</span
+                        >
                       </div>
                     </div>
                   </div>
@@ -1703,7 +1849,7 @@ export class SatsumaViz extends LitElement {
   /** Compute namespace bounding boxes from the overview layout. */
   private _computeOverviewNamespaceBoxes(
     overview: OverviewLayoutResult,
-    namespaces: NamespaceGroup[]
+    namespaces: NamespaceGroup[],
   ): Array<{ name: string; x: number; y: number; w: number; h: number }> {
     if (this._renderedNamespaceBoxes.length > 0) {
       return this._renderedNamespaceBoxes;
@@ -1720,7 +1866,10 @@ export class SatsumaViz extends LitElement {
         ...ns.mappings.map((m) => this._overviewMappingNodeId(ns.name, m.id)),
       ];
 
-      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      let minX = Infinity,
+        minY = Infinity,
+        maxX = -Infinity,
+        maxY = -Infinity;
       let found = false;
 
       for (const id of ids) {
@@ -1919,40 +2068,54 @@ export class SatsumaViz extends LitElement {
     return html`
       <div class="notes-pane">
         <div class="notes-pane-header">Notes &amp; Comments</div>
-        ${fileNotes.length > 0
-          ? html`
-              <div class="notes-pane-section">File Notes</div>
-              ${fileNotes.map((n) => html`<div class="note-card">${unsafeHTML(renderMarkdown(n.text))}</div>`)}
-            `
-          : ""}
-        ${allComments.warnings.length > 0
-          ? html`
-              <div class="notes-pane-section">&#9888; Warnings (${allComments.warnings.length})</div>
-              ${allComments.warnings.map(
-                (w) => html`
-                  <div class="comment-card warning" @click=${() => this._navigateTo(w.location)}
-                    title="Click to navigate">
-                    ${w.text}
-                    <div class="comment-card-source">${w.source}</div>
-                  </div>
-                `
-              )}
-            `
-          : ""}
-        ${allComments.questions.length > 0
-          ? html`
-              <div class="notes-pane-section">? Questions (${allComments.questions.length})</div>
-              ${allComments.questions.map(
-                (q) => html`
-                  <div class="comment-card question" @click=${() => this._navigateTo(q.location)}
-                    title="Click to navigate">
-                    ${q.text}
-                    <div class="comment-card-source">${q.source}</div>
-                  </div>
-                `
-              )}
-            `
-          : ""}
+        ${
+          fileNotes.length > 0
+            ? html`
+                <div class="notes-pane-section">File Notes</div>
+                ${fileNotes.map((n) => html`<div class="note-card">${unsafeHTML(renderMarkdown(n.text))}</div>`)}
+              `
+            : ""
+        }
+        ${
+          allComments.warnings.length > 0
+            ? html`
+                <div class="notes-pane-section">
+                  &#9888; Warnings (${allComments.warnings.length})
+                </div>
+                ${allComments.warnings.map(
+                  (w) => html`
+                    <div
+                      class="comment-card warning"
+                      @click=${() => this._navigateTo(w.location)}
+                      title="Click to navigate"
+                    >
+                      ${w.text}
+                      <div class="comment-card-source">${w.source}</div>
+                    </div>
+                  `,
+                )}
+              `
+            : ""
+        }
+        ${
+          allComments.questions.length > 0
+            ? html`
+                <div class="notes-pane-section">? Questions (${allComments.questions.length})</div>
+                ${allComments.questions.map(
+                  (q) => html`
+                    <div
+                      class="comment-card question"
+                      @click=${() => this._navigateTo(q.location)}
+                      title="Click to navigate"
+                    >
+                      ${q.text}
+                      <div class="comment-card-source">${q.source}</div>
+                    </div>
+                  `,
+                )}
+              `
+            : ""
+        }
       </div>
     `;
   }
@@ -1972,7 +2135,11 @@ export class SatsumaViz extends LitElement {
     const vh = (vpH / this._zoom) * scale;
 
     return html`
-      <div class="minimap" data-testid="viz-minimap" @click=${(e: MouseEvent) => this._onMinimapClick(e, scale)}>
+      <div
+        class="minimap"
+        data-testid="viz-minimap"
+        @click=${(e: MouseEvent) => this._onMinimapClick(e, scale)}
+      >
         <svg width=${mmW} height=${mmH} viewBox="0 0 ${mmW} ${mmH}">
           ${map.rects.map(
             (n) => svg`
@@ -1982,10 +2149,11 @@ export class SatsumaViz extends LitElement {
                 fill="var(--sz-card-border-strong)"
                 rx="1"
               />
-            `
+            `,
           )}
         </svg>
-        <div class="minimap-viewport"
+        <div
+          class="minimap-viewport"
           style="left: ${vx}px; top: ${vy}px; width: ${vw}px; height: ${vh}px;"
         ></div>
       </div>
@@ -2029,9 +2197,7 @@ export class SatsumaViz extends LitElement {
 
     for (const f of sb.filters) {
       results.push(html`
-        <div class="source-block-filter" style="left: ${x}px; top: ${y}px;">
-          &#x25B7; ${f}
-        </div>
+        <div class="source-block-filter" style="left: ${x}px; top: ${y}px;">&#x25B7; ${f}</div>
       `);
       y += 20;
     }
@@ -2083,22 +2249,28 @@ export class SatsumaViz extends LitElement {
     // Namespace filter
     if (this._nsFilter) {
       result = result.filter(
-        (ns) => ns.name === this._nsFilter || (!ns.name && result.some((n) => n.name === this._nsFilter))
+        (ns) =>
+          ns.name === this._nsFilter || (!ns.name && result.some((n) => n.name === this._nsFilter)),
       );
     }
 
     // File filter — narrow schemas/mappings/metrics/fragments to those from the selected file.
     if (this._fileFilter) {
-      result = result.map(ns => ({
-        ...ns,
-        schemas: ns.schemas.filter(s => s.location.uri === this._fileFilter),
-        mappings: ns.mappings.filter(m => m.location.uri === this._fileFilter),
-        metrics: ns.metrics.filter(m => m.location.uri === this._fileFilter),
-        fragments: ns.fragments.filter(f => f.location.uri === this._fileFilter),
-      })).filter(ns =>
-        ns.schemas.length > 0 || ns.mappings.length > 0 ||
-        ns.metrics.length > 0 || ns.fragments.length > 0
-      );
+      result = result
+        .map((ns) => ({
+          ...ns,
+          schemas: ns.schemas.filter((s) => s.location.uri === this._fileFilter),
+          mappings: ns.mappings.filter((m) => m.location.uri === this._fileFilter),
+          metrics: ns.metrics.filter((m) => m.location.uri === this._fileFilter),
+          fragments: ns.fragments.filter((f) => f.location.uri === this._fileFilter),
+        }))
+        .filter(
+          (ns) =>
+            ns.schemas.length > 0 ||
+            ns.mappings.length > 0 ||
+            ns.metrics.length > 0 ||
+            ns.fragments.length > 0,
+        );
     }
 
     return result;
@@ -2126,13 +2298,22 @@ export class SatsumaViz extends LitElement {
     const notes = this.model.fileNotes;
     return html`
       <div class="file-notes">
-        <div class="file-notes-toggle" data-testid="file-notes-toggle" @click=${this._toggleFileNotes}>
+        <div
+          class="file-notes-toggle"
+          data-testid="file-notes-toggle"
+          @click=${this._toggleFileNotes}
+        >
           <span class="arrow" ?data-expanded=${this._fileNotesExpanded}>&#9654;</span>
           <span>&#128221; File Notes (${notes.length})</span>
         </div>
-        ${this._fileNotesExpanded
-          ? notes.map((n) => html`<div class="file-note-item">${unsafeHTML(renderMarkdown(n.text))}</div>`)
-          : ""}
+        ${
+          this._fileNotesExpanded
+            ? notes.map(
+                (n) =>
+                  html`<div class="file-note-item">${unsafeHTML(renderMarkdown(n.text))}</div>`,
+              )
+            : ""
+        }
       </div>
     `;
   }
@@ -2155,7 +2336,10 @@ export class SatsumaViz extends LitElement {
     }
 
     return html`
-      <div class="canvas" style="width: ${layout.width + 48}px; height: ${layout.height + 48}px; padding: 24px;">
+      <div
+        class="canvas"
+        style="width: ${layout.width + 48}px; height: ${layout.height + 48}px; padding: 24px;"
+      >
         <!-- Everything positioned from layout coordinates lives inside
              .card-layer so cards, edges, and labels share one coordinate
              origin by construction — siblings anchored to the canvas padding
@@ -2179,26 +2363,35 @@ export class SatsumaViz extends LitElement {
               if (!node) return [html``];
               const mapped = this._mappedFieldsBySchema.get(s.qualifiedId) ?? new Set();
               const isExpanded = expandedIds.has(s.qualifiedId);
-              const results = [html`
-                <div class="positioned-card ${isExpanded ? "expanded" : ""}" data-node-id=${s.qualifiedId} style="left: ${node.x}px; top: ${node.y}px; width: ${node.width}px;">
-                  <sz-schema-card
-                    data-testid=${`detail-schema-card-${sanitizeTestIdSegment(s.qualifiedId)}`}
-                    .testIdPrefix=${`detail-schema-card-${sanitizeTestIdSegment(s.qualifiedId)}`}
-                    .schema=${s}
-                    .mappedFields=${mapped}
-                    .namespaceLabel=${ns.name}
-                  ></sz-schema-card>
-                </div>
-              `];
+              const results = [
+                html`
+                  <div
+                    class="positioned-card ${isExpanded ? "expanded" : ""}"
+                    data-node-id=${s.qualifiedId}
+                    style="left: ${node.x}px; top: ${node.y}px; width: ${node.width}px;"
+                  >
+                    <sz-schema-card
+                      data-testid=${`detail-schema-card-${sanitizeTestIdSegment(s.qualifiedId)}`}
+                      .testIdPrefix=${`detail-schema-card-${sanitizeTestIdSegment(s.qualifiedId)}`}
+                      .schema=${s}
+                      .mappedFields=${mapped}
+                      .namespaceLabel=${ns.name}
+                    ></sz-schema-card>
+                  </div>
+                `,
+              ];
               // Block-level comment badges
               let badgeOffset = 0;
               for (const c of s.comments) {
                 results.push(html`
-                  <div class="block-comment-badge ${c.kind}"
+                  <div
+                    class="block-comment-badge ${c.kind}"
                     style="left: ${node.x + node.width + 8}px; top: ${node.y + badgeOffset}px;"
                     title=${c.text}
                     @click=${() => this._navigateTo(c.location)}
-                  >${c.kind === "warning" ? "⚠" : "?"} ${c.text}</div>
+                  >
+                    ${c.kind === "warning" ? "⚠" : "?"} ${c.text}
+                  </div>
                 `);
                 badgeOffset += 24;
               }
@@ -2209,7 +2402,11 @@ export class SatsumaViz extends LitElement {
               if (!node) return html``;
               const isExpanded = expandedIds.has(f.id);
               return html`
-                <div class="positioned-card ${isExpanded ? "expanded" : ""}" data-node-id=${f.id} style="left: ${node.x}px; top: ${node.y}px; width: ${node.width}px;">
+                <div
+                  class="positioned-card ${isExpanded ? "expanded" : ""}"
+                  data-node-id=${f.id}
+                  style="left: ${node.x}px; top: ${node.y}px; width: ${node.width}px;"
+                >
                   <sz-fragment-card .fragment=${f} .namespaceLabel=${ns.name}></sz-fragment-card>
                 </div>
               `;
@@ -2219,7 +2416,11 @@ export class SatsumaViz extends LitElement {
               if (!node) return html``;
               const isExpanded = expandedIds.has(m.qualifiedId);
               return html`
-                <div class="positioned-card ${isExpanded ? "expanded" : ""}" data-node-id=${m.qualifiedId} style="left: ${node.x}px; top: ${node.y}px; width: ${node.width}px;">
+                <div
+                  class="positioned-card ${isExpanded ? "expanded" : ""}"
+                  data-node-id=${m.qualifiedId}
+                  style="left: ${node.x}px; top: ${node.y}px; width: ${node.width}px;"
+                >
                   <sz-metric-card .metric=${m} .namespaceLabel=${ns.name}></sz-metric-card>
                 </div>
               `;
@@ -2241,7 +2442,7 @@ export class SatsumaViz extends LitElement {
                   ${this._renderFlexCards(ns)}
                 </div>
               `
-            : this._renderFlexCards(ns)
+            : this._renderFlexCards(ns),
         )}
       </div>
     `;
@@ -2260,17 +2461,18 @@ export class SatsumaViz extends LitElement {
         ></sz-schema-card>`;
       })}
       ${ns.fragments.map(
-        (f) => html`<sz-fragment-card .fragment=${f} .namespaceLabel=${ns.name}></sz-fragment-card>`
+        (f) =>
+          html`<sz-fragment-card .fragment=${f} .namespaceLabel=${ns.name}></sz-fragment-card>`,
       )}
       ${ns.metrics.map(
-        (m) => html`<sz-metric-card .metric=${m} .namespaceLabel=${ns.name}></sz-metric-card>`
+        (m) => html`<sz-metric-card .metric=${m} .namespaceLabel=${ns.name}></sz-metric-card>`,
       )}
     `;
   }
 
   private _computeNamespaceBoxes(
     layout: LayoutResult,
-    namespaces: NamespaceGroup[]
+    namespaces: NamespaceGroup[],
   ): Array<{ name: string; x: number; y: number; w: number; h: number }> {
     if (this._renderedNamespaceBoxes.length > 0) {
       return this._renderedNamespaceBoxes;
@@ -2287,7 +2489,10 @@ export class SatsumaViz extends LitElement {
         ...ns.mappings.map((m) => this._overviewMappingNodeId(ns.name, m.id)),
       ];
 
-      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      let minX = Infinity,
+        minY = Infinity,
+        maxX = -Infinity,
+        maxY = -Infinity;
       let found = false;
 
       for (const id of ids) {
@@ -2346,7 +2551,9 @@ export class SatsumaViz extends LitElement {
       let found = false;
 
       for (const id of ids) {
-        const el = canvas.querySelector(`.positioned-card[data-node-id="${CSS.escape(id)}"]`) as HTMLElement | null;
+        const el = canvas.querySelector(
+          `.positioned-card[data-node-id="${CSS.escape(id)}"]`,
+        ) as HTMLElement | null;
         if (!el) continue;
         found = true;
         minX = Math.min(minX, el.offsetLeft);
@@ -2434,8 +2641,8 @@ export class SatsumaViz extends LitElement {
       ".source-block-label",
       ".source-block-filter",
     ];
-    const elements = selectors.flatMap((selector) =>
-      Array.from(canvas.querySelectorAll(selector)) as HTMLElement[]
+    const elements = selectors.flatMap(
+      (selector) => Array.from(canvas.querySelectorAll(selector)) as HTMLElement[],
     );
 
     if (elements.length === 0) {

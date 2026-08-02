@@ -120,10 +120,10 @@ describe("first-load seeding", () => {
       assert.equal(doc.kind, "builtin");
       assert.equal(doc.edited, false);
     }
-    assert.deepEqual(
-      docs.map((d) => d.uri).sort(),
-      ["file:///examples/demo/customers.stm", "file:///examples/demo/pipeline.stm"],
-    );
+    assert.deepEqual(docs.map((d) => d.uri).sort(), [
+      "file:///examples/demo/customers.stm",
+      "file:///examples/demo/pipeline.stm",
+    ]);
   });
 
   // The URI contract that makes cross-file lineage work: a sibling-relative

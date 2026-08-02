@@ -57,10 +57,16 @@ def load_fixtures() -> list[Fixture]:
 
 def validate_example_coverage(fixtures: list[Fixture]) -> None:
     expected = {path.resolve() for path in sorted(EXAMPLES_ROOT.glob("*.stm"))}
-    covered = {fixture.source for fixture in fixtures if fixture.source.parent == EXAMPLES_ROOT}
+    covered = {
+        fixture.source for fixture in fixtures if fixture.source.parent == EXAMPLES_ROOT
+    }
 
-    missing = sorted(path.relative_to(REPO_ROOT).as_posix() for path in expected - covered)
-    extra = sorted(path.relative_to(REPO_ROOT).as_posix() for path in covered - expected)
+    missing = sorted(
+        path.relative_to(REPO_ROOT).as_posix() for path in expected - covered
+    )
+    extra = sorted(
+        path.relative_to(REPO_ROOT).as_posix() for path in covered - expected
+    )
 
     if missing or extra:
         details: list[str] = []
@@ -98,6 +104,7 @@ def parse_fixture(fixture: Fixture) -> tuple[bool, str]:
         str(fixture.source),
     ]
     import os
+
     env = os.environ.copy()
     env["XDG_CACHE_HOME"] = str(REPO_ROOT / ".cache")
     result = subprocess.run(
@@ -110,14 +117,20 @@ def parse_fixture(fixture: Fixture) -> tuple[bool, str]:
     )
 
     # Filter out wrapper script info lines (Using ROOT_DIR, Using XDG_CACHE_HOME)
-    tree_lines = [line for line in result.stdout.splitlines() if not line.startswith("Using ")]
+    tree_lines = [
+        line for line in result.stdout.splitlines() if not line.startswith("Using ")
+    ]
     tree = "\n".join(tree_lines).strip()
-    diag_lines = [line for line in result.stderr.splitlines() if not line.startswith("Using ")]
+    diag_lines = [
+        line for line in result.stderr.splitlines() if not line.startswith("Using ")
+    ]
     diagnostics = "\n".join(diag_lines).strip()
     combined = "\n".join(part for part in (tree, diagnostics) if part)
 
     if result.returncode != 0 and not (fixture.allow_error or fixture.allow_missing):
-        return False, failure_message("parse command exited non-zero", fixture, combined)
+        return False, failure_message(
+            "parse command exited non-zero", fixture, combined
+        )
 
     if fixture.expect_root and not tree.startswith(f"({fixture.expect_root} "):
         return False, failure_message(
@@ -127,16 +140,24 @@ def parse_fixture(fixture: Fixture) -> tuple[bool, str]:
         )
 
     if not fixture.allow_error and "(ERROR " in tree:
-        return False, failure_message("parse tree contains ERROR nodes", fixture, combined, "(ERROR ")
+        return False, failure_message(
+            "parse tree contains ERROR nodes", fixture, combined, "(ERROR "
+        )
 
     if not fixture.allow_missing and "(MISSING " in tree:
-        return False, failure_message("parse tree contains MISSING nodes", fixture, combined, "(MISSING ")
+        return False, failure_message(
+            "parse tree contains MISSING nodes", fixture, combined, "(MISSING "
+        )
 
     if fixture.require_error and "(ERROR " not in combined:
-        return False, failure_message("expected ERROR nodes in recovered parse", fixture, combined)
+        return False, failure_message(
+            "expected ERROR nodes in recovered parse", fixture, combined
+        )
 
     if fixture.require_missing and "(MISSING " not in combined:
-        return False, failure_message("expected MISSING nodes in recovered parse", fixture, combined)
+        return False, failure_message(
+            "expected MISSING nodes in recovered parse", fixture, combined
+        )
 
     for expected in fixture.expect_contains:
         if expected not in combined:
@@ -149,7 +170,9 @@ def parse_fixture(fixture: Fixture) -> tuple[bool, str]:
     return True, combined
 
 
-def failure_message(reason: str, fixture: Fixture, output: str, needle: str | None = None) -> str:
+def failure_message(
+    reason: str, fixture: Fixture, output: str, needle: str | None = None
+) -> str:
     excerpt = excerpt_output(output, needle)
     rel_source = fixture.source.relative_to(REPO_ROOT).as_posix()
     return "\n".join(

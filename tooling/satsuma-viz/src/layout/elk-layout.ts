@@ -101,7 +101,7 @@ export interface OverviewLayoutResult {
 // Header and namespace-pill heights are a hard contract with the card
 // components (edge anchors are computed from them), so they are imported
 // from the shared geometry module (see top of file) instead of re-declared.
-const LABEL_HEIGHT = 24;  // .label padding (4+6) + font ~14px
+const LABEL_HEIGHT = 24; // .label padding (4+6) + font ~14px
 const FIELD_HEIGHT = 28;
 const FIELDS_PADDING_TOP = 4; // .fields { padding: 4px 0; }
 const FIELDS_PADDING_BOTTOM = 4;
@@ -141,9 +141,10 @@ function preambleHeight(
   // in the card CSS to the shared geometry constants used here.
   const pillCount = schema.metadata.filter((m) => m.key !== "note").length;
   if (pillCount > 0) {
-    h += METADATA_PILLS_CHROME
-      + pillCount * META_PILL_ROW_HEIGHT
-      + (pillCount - 1) * META_PILL_ROW_GAP;
+    h +=
+      METADATA_PILLS_CHROME +
+      pillCount * META_PILL_ROW_HEIGHT +
+      (pillCount - 1) * META_PILL_ROW_GAP;
   }
   return h;
 }
@@ -181,16 +182,17 @@ function estimateTextWidth(text: string, charWidth: number): number {
 }
 
 function estimateOverviewLabelWidth(mappingId: string, namespaceName?: string | null): number {
-  const labelWidth = Math.ceil(estimateTextWidth(mappingId, OVERVIEW_LABEL_CHAR_WIDTH) + OVERVIEW_LABEL_PADDING);
+  const labelWidth = Math.ceil(
+    estimateTextWidth(mappingId, OVERVIEW_LABEL_CHAR_WIDTH) + OVERVIEW_LABEL_PADDING,
+  );
   // Namespace pill sits in its own row; take the wider of the two
   const pillWidth = namespaceName
-    ? Math.ceil(estimateTextWidth(namespaceName, OVERVIEW_PILL_CHAR_WIDTH) + OVERVIEW_NAMESPACE_PILL_PADDING)
+    ? Math.ceil(
+        estimateTextWidth(namespaceName, OVERVIEW_PILL_CHAR_WIDTH) +
+          OVERVIEW_NAMESPACE_PILL_PADDING,
+      )
     : 0;
-  return clamp(
-    Math.max(labelWidth, pillWidth),
-    CARD_MIN_WIDTH,
-    OVERVIEW_LABEL_MAX_WIDTH,
-  );
+  return clamp(Math.max(labelWidth, pillWidth), CARD_MIN_WIDTH, OVERVIEW_LABEL_MAX_WIDTH);
 }
 
 function overviewMappingNodeId(namespaceName: string | null, mappingId: string): string {
@@ -233,7 +235,10 @@ function estimateLines(text: string, charsPerLine: number): number {
   const segments = text
     .split("\n")
     .map((line) => Math.max(1, Math.ceil(line.trim().length / charsPerLine)));
-  return Math.max(1, segments.reduce((sum, lines) => sum + lines, 0));
+  return Math.max(
+    1,
+    segments.reduce((sum, lines) => sum + lines, 0),
+  );
 }
 
 function estimateNoteBlockHeight(text: string, expanded: boolean): number {
@@ -248,20 +253,26 @@ function estimateSchemaWidth(schema: SchemaCard): number {
   const titleWidth =
     FULL_HEADER_BASE_WIDTH +
     estimateTextWidth(schema.id, FULL_TITLE_CHAR_WIDTH) +
-    estimateTextWidth(`${countFields(schema.fields)}/${countFields(schema.fields)}`, OVERVIEW_COUNT_CHAR_WIDTH);
+    estimateTextWidth(
+      `${countFields(schema.fields)}/${countFields(schema.fields)}`,
+      OVERVIEW_COUNT_CHAR_WIDTH,
+    );
 
-  const labelWidth = schema.label
-    ? estimateTextWidth(schema.label, FULL_META_CHAR_WIDTH) + 48
-    : 0;
+  const labelWidth = schema.label ? estimateTextWidth(schema.label, FULL_META_CHAR_WIDTH) + 48 : 0;
 
   // Metadata pills are width-contained (see estimateCompactSchemaWidth).
   const fieldWidth = measureFieldWidth(schema.fields);
   const spreadWidth = spreads.reduce(
-    (max, spread) => Math.max(max, estimateTextWidth(`spreads ${spread}`, FULL_META_CHAR_WIDTH) + 48),
+    (max, spread) =>
+      Math.max(max, estimateTextWidth(`spreads ${spread}`, FULL_META_CHAR_WIDTH) + 48),
     0,
   );
   const noteWidth = notes.reduce(
-    (max, note) => Math.max(max, estimateTextWidth(note.text.replace(/\s+/g, " ").trim(), FULL_NOTE_CHAR_WIDTH) + 56),
+    (max, note) =>
+      Math.max(
+        max,
+        estimateTextWidth(note.text.replace(/\s+/g, " ").trim(), FULL_NOTE_CHAR_WIDTH) + 56,
+      ),
     0,
   );
 
@@ -285,21 +296,30 @@ function estimateMetricWidth(metric: MetricCard): number {
     0,
   );
   const fieldWidth = metric.fields.reduce(
-    (max, field) => Math.max(
-      max,
-      FULL_FIELD_BASE_WIDTH +
-        16 +
-        estimateTextWidth(field.name, FULL_FIELD_CHAR_WIDTH) +
-        estimateTextWidth(field.type, FULL_TYPE_CHAR_WIDTH),
-    ),
+    (max, field) =>
+      Math.max(
+        max,
+        FULL_FIELD_BASE_WIDTH +
+          16 +
+          estimateTextWidth(field.name, FULL_FIELD_CHAR_WIDTH) +
+          estimateTextWidth(field.type, FULL_TYPE_CHAR_WIDTH),
+      ),
     0,
   );
   const noteWidth = notes.reduce(
-    (max, note) => Math.max(max, estimateTextWidth(note.text.replace(/\s+/g, " ").trim(), FULL_NOTE_CHAR_WIDTH) + 56),
+    (max, note) =>
+      Math.max(
+        max,
+        estimateTextWidth(note.text.replace(/\s+/g, " ").trim(), FULL_NOTE_CHAR_WIDTH) + 56,
+      ),
     0,
   );
 
-  return clamp(Math.ceil(Math.max(titleWidth, metaWidth, fieldWidth, noteWidth)), CARD_MIN_WIDTH, CARD_MAX_WIDTH);
+  return clamp(
+    Math.ceil(Math.max(titleWidth, metaWidth, fieldWidth, noteWidth)),
+    CARD_MIN_WIDTH,
+    CARD_MAX_WIDTH,
+  );
 }
 
 function estimateFragmentWidth(fragment: FragmentCard): number {
@@ -309,20 +329,29 @@ function estimateFragmentWidth(fragment: FragmentCard): number {
     estimateTextWidth(fragment.id, FULL_TITLE_CHAR_WIDTH) +
     estimateTextWidth(`${fragment.fields.length} fields`, OVERVIEW_COUNT_CHAR_WIDTH);
   const fieldWidth = fragment.fields.reduce(
-    (max, field) => Math.max(
-      max,
-      FULL_FIELD_BASE_WIDTH +
-        estimateTextWidth(field.name, FULL_FIELD_CHAR_WIDTH) +
-        estimateTextWidth(field.type, FULL_TYPE_CHAR_WIDTH),
-    ),
+    (max, field) =>
+      Math.max(
+        max,
+        FULL_FIELD_BASE_WIDTH +
+          estimateTextWidth(field.name, FULL_FIELD_CHAR_WIDTH) +
+          estimateTextWidth(field.type, FULL_TYPE_CHAR_WIDTH),
+      ),
     0,
   );
   const noteWidth = notes.reduce(
-    (max, note) => Math.max(max, estimateTextWidth(note.text.replace(/\s+/g, " ").trim(), FULL_NOTE_CHAR_WIDTH) + 56),
+    (max, note) =>
+      Math.max(
+        max,
+        estimateTextWidth(note.text.replace(/\s+/g, " ").trim(), FULL_NOTE_CHAR_WIDTH) + 56,
+      ),
     0,
   );
 
-  return clamp(Math.ceil(Math.max(titleWidth, fieldWidth, noteWidth)), CARD_MIN_WIDTH, CARD_MAX_WIDTH);
+  return clamp(
+    Math.ceil(Math.max(titleWidth, fieldWidth, noteWidth)),
+    CARD_MIN_WIDTH,
+    CARD_MAX_WIDTH,
+  );
 }
 
 function estimateMetricHeight(metric: MetricCard, hasNamespace = false): number {
@@ -332,21 +361,45 @@ function estimateMetricHeight(metric: MetricCard, hasNamespace = false): number 
     (!metric.label && metric.grain ? 1 : 0) +
     (metric.slices.length > 0 ? 1 : 0);
   const metaHeight = metaRows > 0 ? FULL_META_BASE_HEIGHT + metaRows * FULL_META_ROW_HEIGHT : 0;
-  const notesHeight = notes.reduce((sum, note) => sum + estimateNoteBlockHeight(note.text, false), 0);
+  const notesHeight = notes.reduce(
+    (sum, note) => sum + estimateNoteBlockHeight(note.text, false),
+    0,
+  );
 
-  return (hasNamespace ? NAMESPACE_PILL_HEIGHT : 0) + HEADER_HEIGHT + metaHeight + FIELDS_PADDING_TOP + metric.fields.length * FIELD_HEIGHT + FIELDS_PADDING_BOTTOM + notesHeight;
+  return (
+    (hasNamespace ? NAMESPACE_PILL_HEIGHT : 0) +
+    HEADER_HEIGHT +
+    metaHeight +
+    FIELDS_PADDING_TOP +
+    metric.fields.length * FIELD_HEIGHT +
+    FIELDS_PADDING_BOTTOM +
+    notesHeight
+  );
 }
 
 function estimateFragmentHeight(fragment: FragmentCard, hasNamespace = false): number {
   const notes = fragment.notes ?? [];
-  const notesHeight = notes.reduce((sum, note) => sum + estimateNoteBlockHeight(note.text, false), 0);
-  return (hasNamespace ? NAMESPACE_PILL_HEIGHT : 0) + HEADER_HEIGHT + FIELDS_PADDING_TOP + fragment.fields.length * FIELD_HEIGHT + FIELDS_PADDING_BOTTOM + notesHeight;
+  const notesHeight = notes.reduce(
+    (sum, note) => sum + estimateNoteBlockHeight(note.text, false),
+    0,
+  );
+  return (
+    (hasNamespace ? NAMESPACE_PILL_HEIGHT : 0) +
+    HEADER_HEIGHT +
+    FIELDS_PADDING_TOP +
+    fragment.fields.length * FIELD_HEIGHT +
+    FIELDS_PADDING_BOTTOM +
+    notesHeight
+  );
 }
 
 function estimateSchemaHeight(schema: SchemaCard, hasNamespace = false): number {
   const notes = schema.notes ?? [];
   const spreads = schema.spreads ?? [];
-  const notesHeight = notes.reduce((sum, note) => sum + estimateNoteBlockHeight(note.text, true), 0);
+  const notesHeight = notes.reduce(
+    (sum, note) => sum + estimateNoteBlockHeight(note.text, true),
+    0,
+  );
   const spreadsHeight = spreads.length * FULL_SPREAD_HEIGHT;
   return (
     preambleHeight(schema, hasNamespace) +
@@ -642,7 +695,12 @@ function addMappingEdges(mappings: MappingBlock[], edges: ElkEdge[], ctx: GraphC
    * path ("customer.email") — while ports are keyed by schema-local path, so
    * the ref must be resolved against the card's declared fields first (sl-l7u0).
    */
-  const findPort = (nodeId: string, fieldRef: string, side: "src" | "tgt", scopeRefs: string[]): string | null => {
+  const findPort = (
+    nodeId: string,
+    fieldRef: string,
+    side: "src" | "tgt",
+    scopeRefs: string[],
+  ): string | null => {
     const card = ctx.cardsByNode.get(nodeId);
     if (!card) return null;
     const localPath = resolveSchemaLocalFieldPath(fieldRef, card, scopeRefs);
@@ -712,9 +770,7 @@ function addMappingEdges(mappings: MappingBlock[], edges: ElkEdge[], ctx: GraphC
           [
             ...block.nestedEach.map((b): [EachBlock, EdgeScope] => [b, "each"]),
             ...block.nestedFlatten.map((b): [FlattenBlock, EdgeScope] => [b, "flatten"]),
-            ...block.nestedArrows.map(
-              (b): [NestedArrowBlock, EdgeScope | undefined] => [b, scope],
-            ),
+            ...block.nestedArrows.map((b): [NestedArrowBlock, EdgeScope | undefined] => [b, scope]),
           ],
           `${prefix}:${j}:nested`,
         );
@@ -735,11 +791,7 @@ function addMappingEdges(mappings: MappingBlock[], edges: ElkEdge[], ctx: GraphC
   }
 }
 
-function extractLayout(
-  result: ElkLayoutResult,
-  _model: VizModel,
-  ctx: GraphContext,
-): LayoutResult {
+function extractLayout(result: ElkLayoutResult, _model: VizModel, ctx: GraphContext): LayoutResult {
   const nodes = new Map<string, LayoutNode>();
   const edges: LayoutEdge[] = [];
 
@@ -857,11 +909,14 @@ export async function computeOverviewLayout(
   const edges: ElkEdge[] = [];
   const overviewNodeKinds = new Map<string, LayoutNode["kind"]>();
   const overviewNodeHasNamespace = new Set<string>();
-  const overviewEdgeMeta = new Map<string, {
-    sourceNode: string;
-    targetNode: string;
-    mapping: MappingBlock;
-  }>();
+  const overviewEdgeMeta = new Map<
+    string,
+    {
+      sourceNode: string;
+      targetNode: string;
+      mapping: MappingBlock;
+    }
+  >();
   const nodeIds = new Set<string>();
 
   // Pass 1: build all nodes and populate nodeIds before creating any edges.
@@ -994,7 +1049,7 @@ export async function computeOverviewLayout(
     edges,
   };
 
-  const result = await elk.layout(elkGraph) as unknown as ElkLayoutResult;
+  const result = (await elk.layout(elkGraph)) as unknown as ElkLayoutResult;
 
   // Extract positioned nodes
   const nodes: LayoutNode[] = [];
@@ -1008,13 +1063,10 @@ export async function computeOverviewLayout(
         x,
         y,
         width: n.width ?? CARD_MIN_WIDTH,
-        height: n.height ?? (HEADER_HEIGHT + FIELDS_PADDING_BOTTOM),
-        kind: overviewNodeKinds.get(n.id)
-          ?? (n.id.startsWith("mapping:")
-            ? "mapping"
-            : nodeIds.has(n.id)
-              ? "schema"
-              : undefined),
+        height: n.height ?? HEADER_HEIGHT + FIELDS_PADDING_BOTTOM,
+        kind:
+          overviewNodeKinds.get(n.id) ??
+          (n.id.startsWith("mapping:") ? "mapping" : nodeIds.has(n.id) ? "schema" : undefined),
         hasNamespace: overviewNodeHasNamespace.has(n.id),
         ports: new Map(),
       });
@@ -1045,12 +1097,7 @@ export async function computeOverviewLayout(
         const src = overviewVisualAnchor(sourceNode, "source");
         const tgt = overviewVisualAnchor(targetNode, "target");
         const midX = (src.x + tgt.x) / 2;
-        const cleanPoints = [
-          src,
-          { x: midX, y: src.y },
-          { x: midX, y: tgt.y },
-          tgt,
-        ];
+        const cleanPoints = [src, { x: midX, y: src.y }, { x: midX, y: tgt.y }, tgt];
         overviewEdges.push({
           id: e.id,
           sourceNode: meta.sourceNode,
@@ -1079,7 +1126,10 @@ export async function computeOverviewLayout(
   };
 }
 
-function overviewVisualAnchor(node: LayoutNode, side: "source" | "target"): { x: number; y: number } {
+function overviewVisualAnchor(
+  node: LayoutNode,
+  side: "source" | "target",
+): { x: number; y: number } {
   const x = side === "source" ? node.x + node.width : node.x;
   const namespaceOffset = node.hasNamespace ? NAMESPACE_PILL_HEIGHT : 0;
 

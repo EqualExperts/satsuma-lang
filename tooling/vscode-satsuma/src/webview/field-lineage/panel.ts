@@ -44,9 +44,7 @@ export class FieldLineagePanel {
       {
         enableScripts: true,
         retainContextWhenHidden: true,
-        localResourceRoots: [
-          vscode.Uri.file(join(extensionUri.fsPath, "dist", "webview")),
-        ],
+        localResourceRoots: [vscode.Uri.file(join(extensionUri.fsPath, "dist", "webview"))],
       },
     );
 
@@ -231,8 +229,7 @@ export class FieldLineagePanel {
   private isDarkTheme(): boolean {
     const themeKind = vscode.window.activeColorTheme.kind;
     return (
-      themeKind === vscode.ColorThemeKind.Dark ||
-      themeKind === vscode.ColorThemeKind.HighContrast
+      themeKind === vscode.ColorThemeKind.Dark || themeKind === vscode.ColorThemeKind.HighContrast
     );
   }
 
@@ -248,24 +245,12 @@ export class FieldLineagePanel {
   private getHtml(): string {
     const scriptUri = this.panel.webview.asWebviewUri(
       vscode.Uri.file(
-        join(
-          this.extensionUri.fsPath,
-          "dist",
-          "webview",
-          "field-lineage",
-          "field-lineage.js",
-        ),
+        join(this.extensionUri.fsPath, "dist", "webview", "field-lineage", "field-lineage.js"),
       ),
     );
     const styleUri = this.panel.webview.asWebviewUri(
       vscode.Uri.file(
-        join(
-          this.extensionUri.fsPath,
-          "dist",
-          "webview",
-          "field-lineage",
-          "field-lineage.css",
-        ),
+        join(this.extensionUri.fsPath, "dist", "webview", "field-lineage", "field-lineage.css"),
       ),
     );
     const nonce = getNonce();
@@ -291,8 +276,7 @@ export class FieldLineagePanel {
 
 function getNonce(): string {
   let text = "";
-  const chars =
-    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
   for (let i = 0; i < 32; i++) {
     text += chars.charAt(Math.floor(Math.random() * chars.length));
   }

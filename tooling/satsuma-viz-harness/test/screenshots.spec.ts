@@ -95,13 +95,13 @@ async function loadFixture(page: Page, fixtureUri: string): Promise<void> {
   await page.locator("#fixture-picker-btn").click();
   await page.locator(`.fixture-item[data-uri="${fixtureUri}"]`).click();
   await page.locator("[data-testid='viz-root']").waitFor({ state: "visible" });
-  await page
-    .locator("[data-testid='viz-root']")
-    .waitFor({ state: "visible", timeout: 20_000 });
+  await page.locator("[data-testid='viz-root']").waitFor({ state: "visible", timeout: 20_000 });
   // Wait for the layout pipeline to finish before screenshotting — otherwise
   // we capture the loading state instead of the rendered viz.
   await page.waitForFunction(
-    () => document.querySelector("[data-testid='viz-root']")?.getAttribute("data-ready-state") === "ready",
+    () =>
+      document.querySelector("[data-testid='viz-root']")?.getAttribute("data-ready-state") ===
+      "ready",
     null,
     { timeout: 20_000 },
   );
@@ -126,7 +126,9 @@ async function openMapping(page: Page, mappingId: string): Promise<void> {
 
 async function waitForReady(page: Page): Promise<void> {
   await page.waitForFunction(
-    () => document.querySelector("[data-testid='viz-root']")?.getAttribute("data-ready-state") === "ready",
+    () =>
+      document.querySelector("[data-testid='viz-root']")?.getAttribute("data-ready-state") ===
+      "ready",
     null,
     { timeout: 15_000 },
   );
@@ -252,14 +254,12 @@ for (const theme of THEMES) {
       // Drive the file filter to the metric_sources.stm option, mirroring the
       // approach used in the toolbar file-filter test in harness.test.ts.
       const fileFilter = page.locator("[data-testid='toolbar-file-filter']");
-      const options = await fileFilter
-        .locator("option")
-        .evaluateAll((opts) =>
-          (opts as HTMLOptionElement[]).map((o) => ({
-            value: o.value,
-            label: o.textContent,
-          })),
-        );
+      const options = await fileFilter.locator("option").evaluateAll((opts) =>
+        (opts as HTMLOptionElement[]).map((o) => ({
+          value: o.value,
+          label: o.textContent,
+        })),
+      );
       const sourcesOption = options.find((o) => o.label?.includes("metric_sources.stm"));
       if (!sourcesOption) {
         throw new Error(`metric_sources.stm option not found; got ${JSON.stringify(options)}`);

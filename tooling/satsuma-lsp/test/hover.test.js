@@ -3,7 +3,9 @@ const assert = require("node:assert/strict");
 const { initTestParser, parse } = require("./helper");
 const { computeHover } = require("../dist/hover");
 
-before(async () => { await initTestParser(); });
+before(async () => {
+  await initTestParser();
+});
 
 /** Shorthand: get the markdown hover text at a position. */
 function hover(source, line, col) {
@@ -18,11 +20,7 @@ describe("computeHover", () => {
   });
 
   it("shows schema summary on block label", () => {
-    const md = hover(
-      "schema customers {\n  id UUID (pk)\n  name VARCHAR(200)\n}",
-      0,
-      8,
-    );
+    const md = hover("schema customers {\n  id UUID (pk)\n  name VARCHAR(200)\n}", 0, 8);
     assert.ok(md);
     assert.ok(md.includes("**schema** `customers`"));
     assert.ok(md.includes("2 field(s)"));
@@ -34,11 +32,7 @@ describe("computeHover", () => {
   it("shows the schema summary when the cursor sits at the end of the block label (sl-ogd5)", () => {
     // Word-end regression: column 16 is immediately after the final "s" of
     // "customers"; hover must resolve the label, not the following node.
-    const md = hover(
-      "schema customers {\n  id UUID (pk)\n  name VARCHAR(200)\n}",
-      0,
-      16,
-    );
+    const md = hover("schema customers {\n  id UUID (pk)\n  name VARCHAR(200)\n}", 0, 16);
     assert.ok(md, "expected hover content at end-of-identifier cursor");
     assert.ok(md.includes("**schema** `customers`"));
   });
@@ -55,11 +49,7 @@ describe("computeHover", () => {
   });
 
   it("shows field info with type and parent", () => {
-    const md = hover(
-      "schema customers {\n  email VARCHAR(255) (pii)\n}",
-      1,
-      3,
-    );
+    const md = hover("schema customers {\n  email VARCHAR(255) (pii)\n}", 1, 3);
     assert.ok(md);
     assert.ok(md.includes("**field** `email`"));
     assert.ok(md.includes("Type: `VARCHAR(255)`"));
@@ -93,11 +83,7 @@ describe("computeHover", () => {
   });
 
   it("shows transform summary with body", () => {
-    const md = hover(
-      "transform clean {\n  trim | lowercase\n}",
-      0,
-      11,
-    );
+    const md = hover("transform clean {\n  trim | lowercase\n}", 0, 11);
     assert.ok(md);
     assert.ok(md.includes("**transform** `clean`"));
     assert.ok(md.includes("trim"));
@@ -162,11 +148,7 @@ describe("computeHover", () => {
   });
 
   it("shows namespace info", () => {
-    const md = hover(
-      "namespace crm {\n  schema customers {\n    id UUID\n  }\n}",
-      0,
-      11,
-    );
+    const md = hover("namespace crm {\n  schema customers {\n    id UUID\n  }\n}", 0, 11);
     assert.ok(md);
     assert.ok(md.includes("**namespace** `crm`"));
   });
@@ -198,11 +180,7 @@ describe("computeHover", () => {
   });
 
   it("handles list_of record fields", () => {
-    const md = hover(
-      "schema order {\n  items list_of record {\n    sku STRING\n  }\n}",
-      1,
-      3,
-    );
+    const md = hover("schema order {\n  items list_of record {\n    sku STRING\n  }\n}", 1, 3);
     assert.ok(md);
     assert.ok(md.includes("**field** `items`"));
     assert.ok(md.includes("Structure: `list_of record`"));

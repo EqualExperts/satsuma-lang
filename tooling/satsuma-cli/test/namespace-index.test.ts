@@ -144,7 +144,11 @@ describe("per-namespace duplicate detection", () => {
       ],
     });
     const index = buildIndex([data]);
-    assert.equal(index.duplicates.length, 0, "Same name in different namespaces should not conflict");
+    assert.equal(
+      index.duplicates.length,
+      0,
+      "Same name in different namespaces should not conflict",
+    );
     assert.ok(index.schemas.has("crm::customer"));
     assert.ok(index.schemas.has("billing::customer"));
   });
@@ -157,7 +161,11 @@ describe("per-namespace duplicate detection", () => {
       ],
     });
     const index = buildIndex([data]);
-    assert.equal(index.duplicates.length, 0, "Same name in namespace and global should not conflict");
+    assert.equal(
+      index.duplicates.length,
+      0,
+      "Same name in namespace and global should not conflict",
+    );
     assert.ok(index.schemas.has("customer"));
     assert.ok(index.schemas.has("crm::customer"));
   });
@@ -274,14 +282,16 @@ describe("namespace-aware reference resolution", () => {
         { name: "pos_oracle", namespace: "pos", fields: [], row: 0 },
         { name: "hub_store", namespace: "vault", fields: [], row: 5 },
       ],
-      mappings: [{
-        name: "load",
-        namespace: "vault",
-        sources: ["pos::pos_oracle"],
-        targets: ["hub_store"],
-        arrowCount: 0,
-        row: 10,
-      }],
+      mappings: [
+        {
+          name: "load",
+          namespace: "vault",
+          sources: ["pos::pos_oracle"],
+          targets: ["hub_store"],
+          arrowCount: 0,
+          row: 10,
+        },
+      ],
     });
     const index = buildIndex([data]);
     const warnings = collectSemanticWarnings(index);
@@ -295,14 +305,16 @@ describe("namespace-aware reference resolution", () => {
         { name: "shared_lookup", namespace: null, fields: [], row: 0 },
         { name: "hub_store", namespace: "vault", fields: [], row: 5 },
       ],
-      mappings: [{
-        name: "load",
-        namespace: "vault",
-        sources: ["shared_lookup"],
-        targets: ["hub_store"],
-        arrowCount: 0,
-        row: 10,
-      }],
+      mappings: [
+        {
+          name: "load",
+          namespace: "vault",
+          sources: ["shared_lookup"],
+          targets: ["hub_store"],
+          arrowCount: 0,
+          row: 10,
+        },
+      ],
     });
     const index = buildIndex([data]);
     const warnings = collectSemanticWarnings(index);
@@ -316,14 +328,16 @@ describe("namespace-aware reference resolution", () => {
         { name: "pos_oracle", namespace: "pos", fields: [], row: 0 },
         { name: "hub_store", namespace: "vault", fields: [], row: 5 },
       ],
-      mappings: [{
-        name: "bad_ref",
-        namespace: "vault",
-        sources: ["pos_oracle"],
-        targets: ["hub_store"],
-        arrowCount: 0,
-        row: 10,
-      }],
+      mappings: [
+        {
+          name: "bad_ref",
+          namespace: "vault",
+          sources: ["pos_oracle"],
+          targets: ["hub_store"],
+          arrowCount: 0,
+          row: 10,
+        },
+      ],
     });
     const index = buildIndex([data]);
     const warnings = collectSemanticWarnings(index);
@@ -339,21 +353,26 @@ describe("namespace-aware reference resolution", () => {
         { name: "customer", namespace: "billing", fields: [], row: 5 },
         { name: "target", namespace: null, fields: [], row: 10 },
       ],
-      mappings: [{
-        name: "load",
-        namespace: null,
-        sources: ["customer"],
-        targets: ["target"],
-        arrowCount: 0,
-        row: 15,
-      }],
+      mappings: [
+        {
+          name: "load",
+          namespace: null,
+          sources: ["customer"],
+          targets: ["target"],
+          arrowCount: 0,
+          row: 15,
+        },
+      ],
     });
     const index = buildIndex([data]);
     const warnings = collectSemanticWarnings(index);
     const refWarnings = warnings.filter((w: any) => w.rule === "undefined-ref");
     assert.equal(refWarnings.length, 1);
     assert.ok(refWarnings[0].message.includes("hint"), "Should include a hint");
-    assert.ok(refWarnings[0].message.includes("crm::customer") || refWarnings[0].message.includes("billing::customer"));
+    assert.ok(
+      refWarnings[0].message.includes("crm::customer") ||
+        refWarnings[0].message.includes("billing::customer"),
+    );
   });
 
   it("resolves qualified reference directly", () => {
@@ -362,14 +381,16 @@ describe("namespace-aware reference resolution", () => {
         { name: "pos_oracle", namespace: "pos", fields: [], row: 0 },
         { name: "target", namespace: null, fields: [], row: 5 },
       ],
-      mappings: [{
-        name: "load",
-        namespace: null,
-        sources: ["pos::pos_oracle"],
-        targets: ["target"],
-        arrowCount: 0,
-        row: 10,
-      }],
+      mappings: [
+        {
+          name: "load",
+          namespace: null,
+          sources: ["pos::pos_oracle"],
+          targets: ["target"],
+          arrowCount: 0,
+          row: 10,
+        },
+      ],
     });
     const index = buildIndex([data]);
     const warnings = collectSemanticWarnings(index);
@@ -379,17 +400,17 @@ describe("namespace-aware reference resolution", () => {
 
   it("warns for qualified reference to non-existent namespace", () => {
     const data = makeFileData({
-      schemas: [
-        { name: "target", namespace: null, fields: [], row: 0 },
+      schemas: [{ name: "target", namespace: null, fields: [], row: 0 }],
+      mappings: [
+        {
+          name: "load",
+          namespace: null,
+          sources: ["nonexistent::schema"],
+          targets: ["target"],
+          arrowCount: 0,
+          row: 5,
+        },
       ],
-      mappings: [{
-        name: "load",
-        namespace: null,
-        sources: ["nonexistent::schema"],
-        targets: ["target"],
-        arrowCount: 0,
-        row: 5,
-      }],
     });
     const index = buildIndex([data]);
     const warnings = collectSemanticWarnings(index);
@@ -430,14 +451,16 @@ describe("backward compatibility: global-only workspaces", () => {
         { name: "orders", namespace: null, fields: [{ name: "id", type: "INT" }], row: 0 },
         { name: "customers", namespace: null, fields: [{ name: "name", type: "VARCHAR" }], row: 5 },
       ],
-      mappings: [{
-        name: "load",
-        namespace: null,
-        sources: ["orders"],
-        targets: ["customers"],
-        arrowCount: 0,
-        row: 10,
-      }],
+      mappings: [
+        {
+          name: "load",
+          namespace: null,
+          sources: ["orders"],
+          targets: ["customers"],
+          arrowCount: 0,
+          row: 10,
+        },
+      ],
     });
     const index = buildIndex([data]);
     assert.ok(index.schemas.has("orders"));
@@ -468,27 +491,31 @@ describe("schema field merging across files", () => {
   it("merges fields from duplicate schema declarations", () => {
     const data1 = makeFileData({
       filePath: "hub-customer.stm",
-      schemas: [{
-        name: "pos_oracle",
-        namespace: null,
-        fields: [
-          { name: "CUSTOMER_ID", type: "VARCHAR(20)" },
-          { name: "FIRST_NAME", type: "VARCHAR(100)" },
-        ],
-        row: 49,
-      }],
+      schemas: [
+        {
+          name: "pos_oracle",
+          namespace: null,
+          fields: [
+            { name: "CUSTOMER_ID", type: "VARCHAR(20)" },
+            { name: "FIRST_NAME", type: "VARCHAR(100)" },
+          ],
+          row: 49,
+        },
+      ],
     });
     const data2 = makeFileData({
       filePath: "hub-store.stm",
-      schemas: [{
-        name: "pos_oracle",
-        namespace: null,
-        fields: [
-          { name: "STORE_ID", type: "VARCHAR(20)" },
-          { name: "STORE_NAME", type: "VARCHAR(100)" },
-        ],
-        row: 20,
-      }],
+      schemas: [
+        {
+          name: "pos_oracle",
+          namespace: null,
+          fields: [
+            { name: "STORE_ID", type: "VARCHAR(20)" },
+            { name: "STORE_NAME", type: "VARCHAR(100)" },
+          ],
+          row: 20,
+        },
+      ],
     });
     const index = buildIndex([data1, data2]);
     const schema = index.schemas.get("pos_oracle");
@@ -504,58 +531,74 @@ describe("schema field merging across files", () => {
   it("does not duplicate fields present in both declarations", () => {
     const data1 = makeFileData({
       filePath: "a.stm",
-      schemas: [{
-        name: "shared",
-        namespace: null,
-        fields: [
-          { name: "id", type: "INT" },
-          { name: "name", type: "VARCHAR" },
-        ],
-        row: 0,
-      }],
+      schemas: [
+        {
+          name: "shared",
+          namespace: null,
+          fields: [
+            { name: "id", type: "INT" },
+            { name: "name", type: "VARCHAR" },
+          ],
+          row: 0,
+        },
+      ],
     });
     const data2 = makeFileData({
       filePath: "b.stm",
-      schemas: [{
-        name: "shared",
-        namespace: null,
-        fields: [
-          { name: "id", type: "INT" },
-          { name: "email", type: "VARCHAR" },
-        ],
-        row: 5,
-      }],
+      schemas: [
+        {
+          name: "shared",
+          namespace: null,
+          fields: [
+            { name: "id", type: "INT" },
+            { name: "email", type: "VARCHAR" },
+          ],
+          row: 5,
+        },
+      ],
     });
     const index = buildIndex([data1, data2]);
     const schema = index.schemas.get("shared")!;
     const fieldNames = schema.fields.map((f: any) => f.name);
-    assert.equal(fieldNames.filter((n: any) => n === "id").length, 1, "Should not duplicate shared field");
+    assert.equal(
+      fieldNames.filter((n: any) => n === "id").length,
+      1,
+      "Should not duplicate shared field",
+    );
     assert.equal(schema.fields.length, 3, "id + name + email");
   });
 
   it("merges hasSpreads flag across declarations", () => {
     const data1 = makeFileData({
       filePath: "a.stm",
-      schemas: [{
-        name: "src",
-        namespace: null,
-        fields: [{ name: "id", type: "INT" }],
-        hasSpreads: false,
-        row: 0,
-      }],
+      schemas: [
+        {
+          name: "src",
+          namespace: null,
+          fields: [{ name: "id", type: "INT" }],
+          hasSpreads: false,
+          row: 0,
+        },
+      ],
     });
     const data2 = makeFileData({
       filePath: "b.stm",
-      schemas: [{
-        name: "src",
-        namespace: null,
-        fields: [{ name: "name", type: "VARCHAR" }],
-        hasSpreads: true,
-        row: 5,
-      }],
+      schemas: [
+        {
+          name: "src",
+          namespace: null,
+          fields: [{ name: "name", type: "VARCHAR" }],
+          hasSpreads: true,
+          row: 5,
+        },
+      ],
     });
     const index = buildIndex([data1, data2]);
-    assert.equal(index.schemas.get("src")!.hasSpreads, true, "hasSpreads should be true if any declaration has spreads");
+    assert.equal(
+      index.schemas.get("src")!.hasSpreads,
+      true,
+      "hasSpreads should be true if any declaration has spreads",
+    );
   });
 
   it("merged schema fields resolve correctly in field-not-in-schema check", () => {
@@ -575,48 +618,58 @@ describe("schema field merging across files", () => {
           row: 70,
         },
       ],
-      mappings: [{
-        name: "pos to hub_customer",
-        namespace: null,
-        sources: ["pos_oracle"],
-        targets: ["hub_customer"],
-        arrowCount: 1,
-        row: 80,
-      }],
-      arrowRecords: [{
-        mapping: "pos to hub_customer",
-        namespace: null,
-        sources: ["CUSTOMER_ID"],
-        target: "customer_id",
-        row: 85,
-      }],
+      mappings: [
+        {
+          name: "pos to hub_customer",
+          namespace: null,
+          sources: ["pos_oracle"],
+          targets: ["hub_customer"],
+          arrowCount: 1,
+          row: 80,
+        },
+      ],
+      arrowRecords: [
+        {
+          mapping: "pos to hub_customer",
+          namespace: null,
+          sources: ["CUSTOMER_ID"],
+          target: "customer_id",
+          row: 85,
+        },
+      ],
     });
     const data2 = makeFileData({
       filePath: "hub-store.stm",
-      schemas: [{
-        name: "pos_oracle",
-        namespace: null,
-        fields: [
-          { name: "STORE_ID", type: "VARCHAR(20)" },
-          { name: "STORE_NAME", type: "VARCHAR(100)" },
-        ],
-        row: 20,
-      }],
-      mappings: [{
-        name: "pos to hub_store",
-        namespace: null,
-        sources: ["pos_oracle"],
-        targets: ["hub_store"],
-        arrowCount: 1,
-        row: 40,
-      }],
-      arrowRecords: [{
-        mapping: "pos to hub_store",
-        namespace: null,
-        sources: ["STORE_NAME"],
-        target: null,
-        row: 45,
-      }],
+      schemas: [
+        {
+          name: "pos_oracle",
+          namespace: null,
+          fields: [
+            { name: "STORE_ID", type: "VARCHAR(20)" },
+            { name: "STORE_NAME", type: "VARCHAR(100)" },
+          ],
+          row: 20,
+        },
+      ],
+      mappings: [
+        {
+          name: "pos to hub_store",
+          namespace: null,
+          sources: ["pos_oracle"],
+          targets: ["hub_store"],
+          arrowCount: 1,
+          row: 40,
+        },
+      ],
+      arrowRecords: [
+        {
+          mapping: "pos to hub_store",
+          namespace: null,
+          sources: ["STORE_NAME"],
+          target: null,
+          row: 45,
+        },
+      ],
     });
     // Add the hub_store target schema in data2
     data2.schemas.push({
@@ -660,14 +713,16 @@ describe("schema field merging across files", () => {
           row: 20,
         },
       ],
-      mappings: [{
-        name: "customer to hub_customer",
-        namespace: null,
-        sources: ["customer"],
-        targets: ["hub_customer"],
-        arrowCount: 2,
-        row: 30,
-      }],
+      mappings: [
+        {
+          name: "customer to hub_customer",
+          namespace: null,
+          sources: ["customer"],
+          targets: ["hub_customer"],
+          arrowCount: 2,
+          row: 30,
+        },
+      ],
       arrowRecords: [
         {
           mapping: "customer to hub_customer",
@@ -682,33 +737,39 @@ describe("schema field merging across files", () => {
     // File B declares the same "customer" schema with "address" having child "city"
     const data2 = makeFileData({
       filePath: "file-b.stm",
-      schemas: [{
-        name: "customer",
-        namespace: null,
-        fields: [
-          {
-            name: "address",
-            type: "record",
-            children: [{ name: "city", type: "VARCHAR(100)" }],
-          },
-        ],
-        row: 1,
-      }],
-      mappings: [{
-        name: "customer to hub_customer_b",
-        namespace: null,
-        sources: ["customer"],
-        targets: ["hub_customer"],
-        arrowCount: 1,
-        row: 10,
-      }],
-      arrowRecords: [{
-        mapping: "customer to hub_customer_b",
-        namespace: null,
-        sources: ["address.city"],
-        target: "address_city",
-        row: 15,
-      }],
+      schemas: [
+        {
+          name: "customer",
+          namespace: null,
+          fields: [
+            {
+              name: "address",
+              type: "record",
+              children: [{ name: "city", type: "VARCHAR(100)" }],
+            },
+          ],
+          row: 1,
+        },
+      ],
+      mappings: [
+        {
+          name: "customer to hub_customer_b",
+          namespace: null,
+          sources: ["customer"],
+          targets: ["hub_customer"],
+          arrowCount: 1,
+          row: 10,
+        },
+      ],
+      arrowRecords: [
+        {
+          mapping: "customer to hub_customer_b",
+          namespace: null,
+          sources: ["address.city"],
+          target: "address_city",
+          row: 15,
+        },
+      ],
     });
 
     const index = buildIndex([data1, data2]);
@@ -726,7 +787,11 @@ describe("schema field merging across files", () => {
     // Verify no false field-not-in-schema warnings
     const warnings = collectSemanticWarnings(index);
     const fieldWarnings = warnings.filter((w: any) => w.rule === "field-not-in-schema");
-    assert.equal(fieldWarnings.length, 0, "Nested record children should merge without false warnings");
+    assert.equal(
+      fieldWarnings.length,
+      0,
+      "Nested record children should merge without false warnings",
+    );
   });
 });
 
@@ -749,9 +814,10 @@ describe("fieldArrows index: nested child arrow keys (sl-9gvb)", () => {
     const parsed = parseFile(resolve(EXAMPLES, "cobol-to-avro/pipeline.stm"));
     const data = extractFileData(parsed);
     const index = buildIndex([data]);
-    assert.ok(index.fieldArrows.has("PHONE_TYPE"),
-      "should index bare PHONE_TYPE");
-    assert.ok(index.fieldArrows.has("cobol_customer_master.PHONE_NUMBERS.PHONE_TYPE"),
-      "should index fully qualified PHONE_TYPE");
+    assert.ok(index.fieldArrows.has("PHONE_TYPE"), "should index bare PHONE_TYPE");
+    assert.ok(
+      index.fieldArrows.has("cobol_customer_master.PHONE_NUMBERS.PHONE_TYPE"),
+      "should index fully qualified PHONE_TYPE",
+    );
   });
 });

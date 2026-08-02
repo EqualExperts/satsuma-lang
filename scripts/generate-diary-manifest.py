@@ -39,15 +39,19 @@ for root, dirs, files in os.walk("site/satsuma-diaries"):
         with open(entry_json_path, "w", encoding="utf-8") as fp:
             json.dump({"date": date, "title": title, "markdown": markdown}, fp)
 
-        entries.append({
-            "date": date,
-            "title": title,
-            "contentPath": f"satsuma-diaries/content/{date}.json",
-        })
+        entries.append(
+            {
+                "date": date,
+                "title": title,
+                "contentPath": f"satsuma-diaries/content/{date}.json",
+            }
+        )
 
 entries.sort(key=lambda x: x["date"], reverse=True)
 
 with open("site/_data/diaries.json", "w", encoding="utf-8") as f:
     json.dump(entries, f, indent=2)
 
-print(f"Diary manifest: {len(entries)} entries written; content JSON files in {content_dir}/")
+print(
+    f"Diary manifest: {len(entries)} entries written; content JSON files in {content_dir}/"
+)

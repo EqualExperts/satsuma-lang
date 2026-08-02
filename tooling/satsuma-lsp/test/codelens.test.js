@@ -4,7 +4,9 @@ const { initTestParser, parse } = require("./helper");
 const { computeCodeLenses } = require("../dist/codelens");
 const { createWorkspaceIndex, indexFile } = require("../dist/workspace-index");
 
-before(async () => { await initTestParser(); });
+before(async () => {
+  await initTestParser();
+});
 
 function buildIndex(files) {
   const idx = createWorkspaceIndex();
@@ -58,7 +60,8 @@ describe("computeCodeLenses", () => {
     const result = lenses(
       {
         "file:///a.stm": "schema customers {\n  id UUID\n}",
-        "file:///b.stm": "mapping `self` {\n  source { customers }\n  target { customers }\n  id -> id\n}",
+        "file:///b.stm":
+          "mapping `self` {\n  source { customers }\n  target { customers }\n  id -> id\n}",
       },
       "file:///a.stm",
     );
@@ -69,16 +72,15 @@ describe("computeCodeLenses", () => {
   });
 
   it("adds clickable lineage actions for schemas", () => {
-    const result = lenses(
-      { "file:///a.stm": "schema customers {\n  id UUID\n}" },
-      "file:///a.stm",
-    );
+    const result = lenses({ "file:///a.stm": "schema customers {\n  id UUID\n}" }, "file:///a.stm");
     const lineageFrom = result.find((lens) => lens.command.title === "Lineage from");
     const lineageTo = result.find((lens) => lens.command.title === "Lineage to");
 
     assert.ok(lineageFrom);
     assert.equal(lineageFrom.command.command, "satsuma.showLineage");
-    assert.deepEqual(lineageFrom.command.arguments, [{ schemaName: "customers", direction: "from" }]);
+    assert.deepEqual(lineageFrom.command.arguments, [
+      { schemaName: "customers", direction: "from" },
+    ]);
 
     assert.ok(lineageTo);
     assert.equal(lineageTo.command.command, "satsuma.showLineage");
@@ -151,9 +153,7 @@ mapping \`test\` {
       },
       "file:///a.stm",
     );
-    const transformLens = result.find((l) =>
-      l.command.title.includes("used in"),
-    );
+    const transformLens = result.find((l) => l.command.title.includes("used in"));
     assert.ok(transformLens);
   });
 
@@ -174,10 +174,7 @@ mapping \`test\` {
   });
 
   it("lens range points to block label", () => {
-    const result = lenses(
-      { "file:///a.stm": "schema customers {\n  id UUID\n}" },
-      "file:///a.stm",
-    );
+    const result = lenses({ "file:///a.stm": "schema customers {\n  id UUID\n}" }, "file:///a.stm");
     assert.equal(result.length, 3);
     assert.equal(result[0].range.start.line, 0);
   });

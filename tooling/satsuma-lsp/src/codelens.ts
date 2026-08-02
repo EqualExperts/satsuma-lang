@@ -1,26 +1,14 @@
-import {
-  CodeLens,
-  Command,
-  Range,
-} from "vscode-languageserver";
+import { CodeLens, Command, Range } from "vscode-languageserver";
 import type { SyntaxNode, Tree } from "./parser-utils";
 import { nodeRange, child, children, labelText, walkDescendants } from "./parser-utils";
 import { isMetricSchema, sourceRefStructuralText } from "@satsuma/core";
-import {
-  WorkspaceIndex,
-  findReferences,
-  findMappingsUsing,
-} from "./workspace-index";
+import { WorkspaceIndex, findReferences, findMappingsUsing } from "./workspace-index";
 
 /**
  * Compute CodeLens annotations for all top-level blocks in a file.
  * Uses the workspace index for counts — no CLI calls.
  */
-export function computeCodeLenses(
-  tree: Tree,
-  uri: string,
-  index: WorkspaceIndex,
-): CodeLens[] {
+export function computeCodeLenses(tree: Tree, uri: string, index: WorkspaceIndex): CodeLens[] {
   const lenses: CodeLens[] = [];
   for (const node of tree.rootNode.namedChildren) {
     collectLenses(node, null, uri, index, lenses);
@@ -94,32 +82,24 @@ function schemaLenses(
   return [
     {
       range,
-      command: makeCommand(
-        "Lineage from",
-        "satsuma.showLineage",
-        { schemaName: qualName, direction: "from" },
-      ),
+      command: makeCommand("Lineage from", "satsuma.showLineage", {
+        schemaName: qualName,
+        direction: "from",
+      }),
     },
     {
       range,
-      command: makeCommand(
-        "Lineage to",
-        "satsuma.showLineage",
-        { schemaName: qualName, direction: "to" },
-      ),
+      command: makeCommand("Lineage to", "satsuma.showLineage", {
+        schemaName: qualName,
+        direction: "to",
+      }),
     },
     { range, command: makeCommand(title) },
   ];
 }
 
-function fragmentLens(
-  qualName: string,
-  range: Range,
-  index: WorkspaceIndex,
-): CodeLens {
-  const spreadRefs = findReferences(index, qualName).filter(
-    (r) => r.context === "spread",
-  );
+function fragmentLens(qualName: string, range: Range, index: WorkspaceIndex): CodeLens {
+  const spreadRefs = findReferences(index, qualName).filter((r) => r.context === "spread");
   const title = `spread in ${spreadRefs.length} place(s)`;
   return { range, command: makeCommand(title) };
 }
@@ -155,36 +135,21 @@ function metricLens(node: SyntaxNode, range: Range): CodeLens {
     });
   }
 
-  const title =
-    sourceNames.length > 0
-      ? `sources: ${sourceNames.join(", ")}`
-      : "metric";
+  const title = sourceNames.length > 0 ? `sources: ${sourceNames.join(", ")}` : "metric";
 
   return { range, command: makeCommand(title) };
 }
 
-function transformLens(
-  qualName: string,
-  range: Range,
-  index: WorkspaceIndex,
-): CodeLens {
-  const spreadRefs = findReferences(index, qualName).filter(
-    (r) => r.context === "spread",
-  );
+function transformLens(qualName: string, range: Range, index: WorkspaceIndex): CodeLens {
+  const spreadRefs = findReferences(index, qualName).filter((r) => r.context === "spread");
   const title = `used in ${spreadRefs.length} place(s)`;
   return { range, command: makeCommand(title) };
 }
 
 // ---------- Helpers ----------
 
-function makeCommand(
-  title: string,
-  command = "",
-  ...arguments_: unknown[]
-): Command {
-  return arguments_.length > 0
-    ? { title, command, arguments: arguments_ }
-    : { title, command };
+function makeCommand(title: string, command = "", ...arguments_: unknown[]): Command {
+  return arguments_.length > 0 ? { title, command, arguments: arguments_ } : { title, command };
 }
 
 function extractRefNames(body: SyntaxNode, blockType: string): string[] {

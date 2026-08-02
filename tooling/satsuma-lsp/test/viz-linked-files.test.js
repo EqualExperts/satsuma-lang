@@ -16,7 +16,9 @@ const {
   resolveDefinition,
 } = require("@satsuma/viz-backend");
 
-before(async () => { await initTestParser(); });
+before(async () => {
+  await initTestParser();
+});
 
 /** Mirror the satsuma/vizLinkedFiles handler logic. */
 function linkedFiles(files, schemaId, currentUri) {

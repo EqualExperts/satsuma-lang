@@ -1,4 +1,4 @@
-module.exports = function(eleventyConfig) {
+module.exports = function (eleventyConfig) {
   // Ignore non-page files
   eleventyConfig.ignores.add("SITE-DEV.md");
   // Diary markdown sources are not templates — ignore so Eleventy doesn't try
@@ -23,15 +23,17 @@ module.exports = function(eleventyConfig) {
   // Returns [{label: "March 2026", entries: [...]}, ...] so the template
   // can iterate over groups without needing variable mutation inside loops,
   // which Nunjucks doesn't support cleanly.
-  eleventyConfig.addFilter("groupByMonth", function(entries) {
+  eleventyConfig.addFilter("groupByMonth", function (entries) {
     const groups = [];
     let current = null;
-    for (const entry of (entries || [])) {
+    for (const entry of entries || []) {
       const ym = entry.date.slice(0, 7); // "2026-03"
       if (!current || current.yearMonth !== ym) {
         const [year, month] = ym.split("-");
-        const label = new Date(parseInt(year), parseInt(month) - 1, 1)
-          .toLocaleDateString("en-GB", { month: "long", year: "numeric" });
+        const label = new Date(parseInt(year), parseInt(month) - 1, 1).toLocaleDateString("en-GB", {
+          month: "long",
+          year: "numeric",
+        });
         current = { yearMonth: ym, label, entries: [] };
         groups.push(current);
       }
@@ -41,9 +43,11 @@ module.exports = function(eleventyConfig) {
   });
 
   // Format "2026-03-29" → "29 Mar" for diary sidebar entry labels
-  eleventyConfig.addFilter("formatDiaryDate", function(dateStr) {
-    return new Date(dateStr + "T12:00:00Z")
-      .toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+  eleventyConfig.addFilter("formatDiaryDate", function (dateStr) {
+    return new Date(dateStr + "T12:00:00Z").toLocaleDateString("en-GB", {
+      day: "numeric",
+      month: "short",
+    });
   });
 
   return {
@@ -52,9 +56,9 @@ module.exports = function(eleventyConfig) {
       output: "_site",
       includes: "_includes",
       layouts: "_layouts",
-      data: "_data"
+      data: "_data",
     },
     htmlTemplateEngine: "njk",
-    markdownTemplateEngine: "njk"
+    markdownTemplateEngine: "njk",
   };
 };

@@ -14,7 +14,9 @@ const { initTestParser, parse } = require("./helper");
 const { createWorkspaceIndex, indexFile } = require("../dist/workspace-index");
 const { computeMappingCoverage } = require("../dist/coverage");
 
-before(async () => { await initTestParser(); });
+before(async () => {
+  await initTestParser();
+});
 
 /** Run computeMappingCoverage on a single-file source text. */
 function coverage(source, mappingName, uri = "file:///test.stm") {
@@ -45,7 +47,10 @@ describe("LSP coverage adapter", () => {
     const result = coverage(SRC, "load");
     assert.deepEqual(
       result.schemas.map((s) => [s.role, s.schemaId]),
-      [["source", "src"], ["target", "tgt"]],
+      [
+        ["source", "src"],
+        ["target", "tgt"],
+      ],
     );
   });
 
@@ -80,7 +85,11 @@ mapping load {
     const source = coverage(src, "load").schemas.find((s) => s.role === "source");
     assert.deepEqual(
       source.fields.map((f) => [f.path, f.mapped]),
-      [["address", true], ["address.line1", true], ["address.line2", false]],
+      [
+        ["address", true],
+        ["address.line1", true],
+        ["address.line2", false],
+      ],
     );
   });
 });

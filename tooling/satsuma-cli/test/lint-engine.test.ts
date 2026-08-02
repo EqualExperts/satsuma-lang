@@ -37,7 +37,11 @@ interface MockNLRef {
 }
 
 /** Build a minimal ExtractedWorkspace for lint testing. */
-function makeIndex({ schemas = [], mappings = [], nlRefData = [] }: {
+function makeIndex({
+  schemas = [],
+  mappings = [],
+  nlRefData = [],
+}: {
   schemas?: MockSchema[];
   mappings?: MockMapping[];
   nlRefData?: MockNLRef[];
@@ -60,7 +64,11 @@ function makeIndex({ schemas = [], mappings = [], nlRefData = [] }: {
     warnings: [],
     questions: [],
     fieldArrows: new Map(),
-    referenceGraph: { usedByMappings: new Map(), fragmentsUsedIn: new Map(), metricsReferences: new Map() },
+    referenceGraph: {
+      usedByMappings: new Map(),
+      fragmentsUsedIn: new Map(),
+      metricsReferences: new Map(),
+    },
     namespaceNames: new Set(),
     nlRefData,
     duplicates: [],
@@ -78,21 +86,25 @@ describe("lint: hidden-source-in-nl", () => {
         { name: "source::finance_gl", fields: [{ name: "posted_by" }] },
         { name: "staging::stg_gl", fields: [{ name: "department" }] },
       ],
-      mappings: [{
-        name: "staging::stage gl",
-        namespace: "staging",
-        sources: ["source::finance_gl"],
-        targets: ["staging::stg_gl"],
-      }],
-      nlRefData: [{
-        text: "Lookup @department from @source::hr_employees",
-        mapping: "stage gl",
-        namespace: "staging",
-        targetField: "department",
-        file: "test.stm",
-        line: 10,
-        column: 6,
-      }],
+      mappings: [
+        {
+          name: "staging::stage gl",
+          namespace: "staging",
+          sources: ["source::finance_gl"],
+          targets: ["staging::stg_gl"],
+        },
+      ],
+      nlRefData: [
+        {
+          text: "Lookup @department from @source::hr_employees",
+          mapping: "stage gl",
+          namespace: "staging",
+          targetField: "department",
+          file: "test.stm",
+          line: 10,
+          column: 6,
+        },
+      ],
     });
 
     const diags = runLint(index, { select: ["hidden-source-in-nl"] });
@@ -109,21 +121,25 @@ describe("lint: hidden-source-in-nl", () => {
         { name: "source::finance_gl", fields: [{ name: "posted_by" }] },
         { name: "staging::stg_gl", fields: [{ name: "department" }] },
       ],
-      mappings: [{
-        name: "staging::stage gl",
-        namespace: "staging",
-        sources: ["source::finance_gl"],
-        targets: ["staging::stg_gl"],
-      }],
-      nlRefData: [{
-        text: "Copy from @source::finance_gl",
-        mapping: "stage gl",
-        namespace: "staging",
-        targetField: "department",
-        file: "test.stm",
-        line: 10,
-        column: 6,
-      }],
+      mappings: [
+        {
+          name: "staging::stage gl",
+          namespace: "staging",
+          sources: ["source::finance_gl"],
+          targets: ["staging::stg_gl"],
+        },
+      ],
+      nlRefData: [
+        {
+          text: "Copy from @source::finance_gl",
+          mapping: "stage gl",
+          namespace: "staging",
+          targetField: "department",
+          file: "test.stm",
+          line: 10,
+          column: 6,
+        },
+      ],
     });
 
     const diags = runLint(index, { select: ["hidden-source-in-nl"] });
@@ -144,20 +160,24 @@ describe("lint: hidden-source-in-nl", () => {
         { name: "source::finance_gl", fields: [{ name: "posted_by" }] },
         { name: "staging::stg_gl", fields: [{ name: "department" }] },
       ],
-      mappings: [{
-        name: "stage gl",
-        sources: ["source::finance_gl"],
-        targets: ["staging::stg_gl"],
-      }],
-      nlRefData: [{
-        text: "Lookup from @source::hr_employees",
-        mapping: "stage gl",
-        namespace: null,
-        targetField: "department",
-        file: "test.stm",
-        line: 10,
-        column: 6,
-      }],
+      mappings: [
+        {
+          name: "stage gl",
+          sources: ["source::finance_gl"],
+          targets: ["staging::stg_gl"],
+        },
+      ],
+      nlRefData: [
+        {
+          text: "Lookup from @source::hr_employees",
+          mapping: "stage gl",
+          namespace: null,
+          targetField: "department",
+          file: "test.stm",
+          line: 10,
+          column: 6,
+        },
+      ],
     });
 
     const diags = runLint(index, { select: ["hidden-source-in-nl"] });
@@ -190,20 +210,24 @@ describe("lint: hidden-source-in-nl", () => {
         { name: "source::finance_gl", fields: [{ name: "posted_by" }] },
         { name: "staging::stg_gl", fields: [{ name: "department" }] },
       ],
-      mappings: [{
-        name: "stage gl",
-        sources: ["source::finance_gl"],
-        targets: ["staging::stg_gl"],
-      }],
-      nlRefData: [{
-        text: "Lookup from @source::hr_employees",
-        mapping: "stage gl",
-        namespace: null,
-        targetField: "stg_gl.department",
-        file: "test.stm",
-        line: 10,
-        column: 6,
-      }],
+      mappings: [
+        {
+          name: "stage gl",
+          sources: ["source::finance_gl"],
+          targets: ["staging::stg_gl"],
+        },
+      ],
+      nlRefData: [
+        {
+          text: "Lookup from @source::hr_employees",
+          mapping: "stage gl",
+          namespace: null,
+          targetField: "stg_gl.department",
+          file: "test.stm",
+          line: 10,
+          column: 6,
+        },
+      ],
     });
 
     const diags = runLint(index, { select: ["hidden-source-in-nl"] });
@@ -238,20 +262,24 @@ describe("lint: hidden-source-in-nl", () => {
         { name: "source::finance_gl", fields: [{ name: "posted_by" }] },
         { name: "staging::stg_gl", fields: [{ name: "department" }] },
       ],
-      mappings: [{
-        name: "stage gl",
-        sources: ["source::finance_gl"],
-        targets: ["staging::stg_gl"],
-      }],
-      nlRefData: [{
-        text: "Lookup from @source::hr_employees",
-        mapping: "stage gl",
-        namespace: null,
-        targetField: null,
-        file: "test.stm",
-        line: 10,
-        column: 6,
-      }],
+      mappings: [
+        {
+          name: "stage gl",
+          sources: ["source::finance_gl"],
+          targets: ["staging::stg_gl"],
+        },
+      ],
+      nlRefData: [
+        {
+          text: "Lookup from @source::hr_employees",
+          mapping: "stage gl",
+          namespace: null,
+          targetField: null,
+          file: "test.stm",
+          line: 10,
+          column: 6,
+        },
+      ],
     });
 
     const diags = runLint(index, { select: ["hidden-source-in-nl"] });
@@ -276,20 +304,24 @@ describe("lint: hidden-source-in-nl", () => {
         { name: "source::finance_gl", fields: [{ name: "posted_by" }] },
         { name: "staging::stg_gl", fields: [{ name: "department" }] },
       ],
-      mappings: [{
-        name: "stage gl",
-        sources: ["source::finance_gl", "source::hr_employees"],
-        targets: ["staging::stg_gl"],
-      }],
-      nlRefData: [{
-        text: "Lookup from @source::hr_employees",
-        mapping: "stage gl",
-        namespace: null,
-        targetField: "department",
-        file: "test.stm",
-        line: 10,
-        column: 6,
-      }],
+      mappings: [
+        {
+          name: "stage gl",
+          sources: ["source::finance_gl", "source::hr_employees"],
+          targets: ["staging::stg_gl"],
+        },
+      ],
+      nlRefData: [
+        {
+          text: "Lookup from @source::hr_employees",
+          mapping: "stage gl",
+          namespace: null,
+          targetField: "department",
+          file: "test.stm",
+          line: 10,
+          column: 6,
+        },
+      ],
     });
 
     // After fix, schema is in source list so no diagnostics
@@ -307,30 +339,31 @@ describe("lint: hidden-source-in-nl", () => {
           fields: [
             {
               name: "PERSONAL_NAME",
-              children: [
-                { name: "FIRST_NAME" },
-                { name: "LAST_NAME" },
-              ],
+              children: [{ name: "FIRST_NAME" }, { name: "LAST_NAME" }],
             },
             { name: "email" },
           ],
         },
         { name: "tgt_person", fields: [{ name: "first_name" }] },
       ],
-      mappings: [{
-        name: "map_person",
-        sources: ["src_contact"],
-        targets: ["tgt_person"],
-      }],
-      nlRefData: [{
-        text: "Copy from @PERSONAL_NAME.FIRST_NAME",
-        mapping: "map_person",
-        namespace: null,
-        targetField: "first_name",
-        file: "test.stm",
-        line: 5,
-        column: 6,
-      }],
+      mappings: [
+        {
+          name: "map_person",
+          sources: ["src_contact"],
+          targets: ["tgt_person"],
+        },
+      ],
+      nlRefData: [
+        {
+          text: "Copy from @PERSONAL_NAME.FIRST_NAME",
+          mapping: "map_person",
+          namespace: null,
+          targetField: "first_name",
+          file: "test.stm",
+          line: 5,
+          column: 6,
+        },
+      ],
     });
 
     const diags = runLint(index, { select: ["hidden-source-in-nl"] });
@@ -346,20 +379,24 @@ describe("lint: hidden-source-in-nl", () => {
         { name: "other_schema", fields: [{ name: "some_field" }] },
         { name: "tgt_person", fields: [{ name: "first_name" }] },
       ],
-      mappings: [{
-        name: "map_person",
-        sources: ["src_contact"],
-        targets: ["tgt_person"],
-      }],
-      nlRefData: [{
-        text: "Lookup from @other_schema.some_field",
-        mapping: "map_person",
-        namespace: null,
-        targetField: "first_name",
-        file: "test.stm",
-        line: 5,
-        column: 6,
-      }],
+      mappings: [
+        {
+          name: "map_person",
+          sources: ["src_contact"],
+          targets: ["tgt_person"],
+        },
+      ],
+      nlRefData: [
+        {
+          text: "Lookup from @other_schema.some_field",
+          mapping: "map_person",
+          namespace: null,
+          targetField: "first_name",
+          file: "test.stm",
+          line: 5,
+          column: 6,
+        },
+      ],
     });
 
     const diags = runLint(index, { select: ["hidden-source-in-nl"] });
@@ -377,21 +414,25 @@ describe("lint: unresolved-nl-ref", () => {
         { name: "source::orders", fields: [{ name: "order_id" }] },
         { name: "staging::stg_orders", fields: [{ name: "order_id" }] },
       ],
-      mappings: [{
-        name: "staging::stage orders",
-        namespace: "staging",
-        sources: ["source::orders"],
-        targets: ["staging::stg_orders"],
-      }],
-      nlRefData: [{
-        text: "Lookup from @nonexistent_thing",
-        mapping: "stage orders",
-        namespace: "staging",
-        targetField: "order_id",
-        file: "test.stm",
-        line: 5,
-        column: 6,
-      }],
+      mappings: [
+        {
+          name: "staging::stage orders",
+          namespace: "staging",
+          sources: ["source::orders"],
+          targets: ["staging::stg_orders"],
+        },
+      ],
+      nlRefData: [
+        {
+          text: "Lookup from @nonexistent_thing",
+          mapping: "stage orders",
+          namespace: "staging",
+          targetField: "order_id",
+          file: "test.stm",
+          line: 5,
+          column: 6,
+        },
+      ],
     });
 
     const diags = runLint(index, { select: ["unresolved-nl-ref"] });
@@ -406,21 +447,25 @@ describe("lint: unresolved-nl-ref", () => {
         { name: "source::orders", fields: [{ name: "order_id" }] },
         { name: "staging::stg_orders", fields: [{ name: "order_id" }] },
       ],
-      mappings: [{
-        name: "staging::stage orders",
-        namespace: "staging",
-        sources: ["source::orders"],
-        targets: ["staging::stg_orders"],
-      }],
-      nlRefData: [{
-        text: "Copy @order_id from source",
-        mapping: "stage orders",
-        namespace: "staging",
-        targetField: "order_id",
-        file: "test.stm",
-        line: 5,
-        column: 6,
-      }],
+      mappings: [
+        {
+          name: "staging::stage orders",
+          namespace: "staging",
+          sources: ["source::orders"],
+          targets: ["staging::stg_orders"],
+        },
+      ],
+      nlRefData: [
+        {
+          text: "Copy @order_id from source",
+          mapping: "stage orders",
+          namespace: "staging",
+          targetField: "order_id",
+          file: "test.stm",
+          line: 5,
+          column: 6,
+        },
+      ],
     });
 
     const diags = runLint(index, { select: ["unresolved-nl-ref"] });
@@ -431,18 +476,18 @@ describe("lint: unresolved-nl-ref", () => {
     // Bug sl-vjvf: unresolved @refs in file-level notes were previously skipped.
     // They should now produce unresolved-nl-ref warnings like any other note context.
     const index = makeIndex({
-      schemas: [
-        { name: "source::orders", fields: [{ name: "order_id" }] },
+      schemas: [{ name: "source::orders", fields: [{ name: "order_id" }] }],
+      nlRefData: [
+        {
+          text: "The @flatten transform is used for @pii compliance",
+          mapping: "note:",
+          namespace: null,
+          targetField: null,
+          file: "test.stm",
+          line: 1,
+          column: 0,
+        },
       ],
-      nlRefData: [{
-        text: "The @flatten transform is used for @pii compliance",
-        mapping: "note:",
-        namespace: null,
-        targetField: null,
-        file: "test.stm",
-        line: 1,
-        column: 0,
-      }],
     });
 
     const diags = runLint(index, { select: ["unresolved-nl-ref"] });
@@ -451,18 +496,18 @@ describe("lint: unresolved-nl-ref", () => {
 
   it("still flags unresolved refs in metric/schema note blocks", () => {
     const index = makeIndex({
-      schemas: [
-        { name: "source::orders", fields: [{ name: "order_id" }] },
+      schemas: [{ name: "source::orders", fields: [{ name: "order_id" }] }],
+      nlRefData: [
+        {
+          text: "Lookup from @nonexistent_thing",
+          mapping: "note:source::orders",
+          namespace: null,
+          targetField: null,
+          file: "test.stm",
+          line: 5,
+          column: 6,
+        },
       ],
-      nlRefData: [{
-        text: "Lookup from @nonexistent_thing",
-        mapping: "note:source::orders",
-        namespace: null,
-        targetField: null,
-        file: "test.stm",
-        line: 5,
-        column: 6,
-      }],
     });
 
     const diags = runLint(index, { select: ["unresolved-nl-ref"] });
@@ -476,9 +521,7 @@ describe("lint: unresolved-nl-ref", () => {
 describe("lint: duplicate-definition", () => {
   it("flags schema declared twice in same namespace", () => {
     const index = makeIndex({
-      schemas: [
-        { name: "staging::orders", fields: [{ name: "order_id" }] },
-      ],
+      schemas: [{ name: "staging::orders", fields: [{ name: "order_id" }] }],
     });
     index.duplicates = [
       {
@@ -579,21 +622,25 @@ describe("lint engine: rule filtering", () => {
         { name: "source::orders", fields: [{ name: "order_id" }] },
         { name: "staging::stg_orders", fields: [{ name: "order_id" }] },
       ],
-      mappings: [{
-        name: "staging::stage orders",
-        namespace: "staging",
-        sources: ["source::orders"],
-        targets: ["staging::stg_orders"],
-      }],
-      nlRefData: [{
-        text: "Lookup from @nonexistent_thing",
-        mapping: "stage orders",
-        namespace: "staging",
-        targetField: "order_id",
-        file: "test.stm",
-        line: 5,
-        column: 6,
-      }],
+      mappings: [
+        {
+          name: "staging::stage orders",
+          namespace: "staging",
+          sources: ["source::orders"],
+          targets: ["staging::stg_orders"],
+        },
+      ],
+      nlRefData: [
+        {
+          text: "Lookup from @nonexistent_thing",
+          mapping: "stage orders",
+          namespace: "staging",
+          targetField: "order_id",
+          file: "test.stm",
+          line: 5,
+          column: 6,
+        },
+      ],
     });
 
     const all = runLint(index);
@@ -611,21 +658,25 @@ describe("lint diagnostic shape", () => {
         { name: "source::orders", fields: [{ name: "order_id" }] },
         { name: "staging::stg_orders", fields: [{ name: "order_id" }] },
       ],
-      mappings: [{
-        name: "staging::stage orders",
-        namespace: "staging",
-        sources: ["source::orders"],
-        targets: ["staging::stg_orders"],
-      }],
-      nlRefData: [{
-        text: "Lookup from @nonexistent_thing",
-        mapping: "stage orders",
-        namespace: "staging",
-        targetField: "order_id",
-        file: "test.stm",
-        line: 5,
-        column: 6,
-      }],
+      mappings: [
+        {
+          name: "staging::stage orders",
+          namespace: "staging",
+          sources: ["source::orders"],
+          targets: ["staging::stg_orders"],
+        },
+      ],
+      nlRefData: [
+        {
+          text: "Lookup from @nonexistent_thing",
+          mapping: "stage orders",
+          namespace: "staging",
+          targetField: "order_id",
+          file: "test.stm",
+          line: 5,
+          column: 6,
+        },
+      ],
     });
 
     const diags = runLint(index);

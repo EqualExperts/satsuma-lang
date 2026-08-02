@@ -65,7 +65,7 @@ function structureOf(node) {
 // ── Corpus Round-Trip (Idempotency + Structural Equivalence) ─────────────────
 
 describe("corpus round-trip", () => {
-  const stmFiles = readdirSync(examplesDir, { recursive: true }).filter(f => f.endsWith(".stm"));
+  const stmFiles = readdirSync(examplesDir, { recursive: true }).filter((f) => f.endsWith(".stm"));
 
   for (const file of stmFiles) {
     describe(`examples/${file}`, () => {
@@ -84,7 +84,7 @@ describe("corpus round-trip", () => {
         assert.equal(
           structureOf(tree1.rootNode),
           structureOf(tree2.rootNode),
-          "parse trees should be structurally identical"
+          "parse trees should be structurally identical",
         );
       });
     });
@@ -182,7 +182,7 @@ schema b { y STRING }`;
     const out = fmt(src);
     assert.ok(out.includes("INT") && out.includes("// trailing comment"));
     // Check 2-space minimum gap
-    const line = out.split("\n").find(l => l.includes("trailing comment"));
+    const line = out.split("\n").find((l) => l.includes("trailing comment"));
     assert.ok(line);
     assert.match(line, /\S {2}\/\/ trailing comment/);
   });
@@ -202,7 +202,10 @@ describe("block-level comment preservation", () => {
   b STRING
 }`;
     const out = fmt(src);
-    assert.ok(out.includes("//! Data quality warning"), "first comment before first field must be preserved");
+    assert.ok(
+      out.includes("//! Data quality warning"),
+      "first comment before first field must be preserved",
+    );
     assert.ok(out.includes("//! Second warning"), "mid-body comment must also be preserved");
   });
 
@@ -256,8 +259,14 @@ schema test_metric (metric, source orders) {
   // Second comment
 }`;
     const out = fmt(src);
-    assert.ok(out.includes("// First comment in metric body"), "leading gap comment in metric must be preserved");
-    assert.ok(out.includes("// Second comment"), "trailing gap comment in metric must be preserved");
+    assert.ok(
+      out.includes("// First comment in metric body"),
+      "leading gap comment in metric must be preserved",
+    );
+    assert.ok(
+      out.includes("// Second comment"),
+      "trailing gap comment in metric must be preserved",
+    );
   });
 
   it("preserves first AND trailing comments in transform bodies (sl-17lk)", () => {
@@ -267,8 +276,14 @@ schema test_metric (metric, source orders) {
   // Trailing comment
 }`;
     const out = fmt(src);
-    assert.ok(out.includes("// Comment before first pipe step"), "leading gap comment in transform must be preserved");
-    assert.ok(out.includes("// Trailing comment"), "trailing gap comment in transform must be preserved");
+    assert.ok(
+      out.includes("// Comment before first pipe step"),
+      "leading gap comment in transform must be preserved",
+    );
+    assert.ok(
+      out.includes("// Trailing comment"),
+      "trailing gap comment in transform must be preserved",
+    );
   });
 
   it("preserves first comment in nested record bodies (sl-necw)", () => {
@@ -281,7 +296,10 @@ schema test_metric (metric, source orders) {
   }
 }`;
     const out = fmt(src);
-    assert.ok(out.includes("// Street address components"), "first comment inside nested record must be preserved");
+    assert.ok(
+      out.includes("// Street address components"),
+      "first comment inside nested record must be preserved",
+    );
   });
 
   it("preserves first comment in list_of record bodies", () => {
@@ -292,7 +310,10 @@ schema test_metric (metric, source orders) {
   }
 }`;
     const out = fmt(src);
-    assert.ok(out.includes("// Item fields"), "first comment inside list_of record must be preserved");
+    assert.ok(
+      out.includes("// Item fields"),
+      "first comment inside list_of record must be preserved",
+    );
   });
 
   it("is idempotent for blocks with leading gap comments", () => {
@@ -302,7 +323,11 @@ schema test_metric (metric, source orders) {
 }`;
     const out1 = fmt(src);
     const out2 = fmt(out1);
-    assert.equal(out1, out2, "format(format(x)) must equal format(x) when leading gap comments exist");
+    assert.equal(
+      out1,
+      out2,
+      "format(format(x)) must equal format(x) when leading gap comments exist",
+    );
   });
 
   it("is idempotent for metric schema blocks with gap comments", () => {
@@ -346,9 +371,15 @@ schema m (metric, source s) {
   }
 }`;
     const out = fmt(src);
-    assert.ok(out.includes("// strip whitespace first"), "comment between { and pipe chain must survive");
+    assert.ok(
+      out.includes("// strip whitespace first"),
+      "comment between { and pipe chain must survive",
+    );
     assert.ok(out.includes("// fold to lowercase next"), "comment between pipe steps must survive");
-    assert.ok(out.includes("// then case-fold"), "trailing inline comment on last step must survive");
+    assert.ok(
+      out.includes("// then case-fold"),
+      "trailing inline comment on last step must survive",
+    );
     assert.equal(out, fmt(out), "arrow body comments must be idempotent");
   });
 
@@ -361,7 +392,10 @@ schema m (metric, source s) {
   | lowercase
 }`;
     const out = fmt(src);
-    assert.ok(out.includes("// normalise case before comparing"), "comment between pipe steps must survive");
+    assert.ok(
+      out.includes("// normalise case before comparing"),
+      "comment between pipe steps must survive",
+    );
     assert.equal(out, fmt(out), "in-chain transform comments must be idempotent");
   });
 
@@ -376,8 +410,14 @@ schema m (metric, source s) {
   a -> b
 }`;
     const out = fmt(src);
-    assert.ok(out.includes("// primary table"), "own-line comment before a source ref must survive");
-    assert.ok(out.includes("// joined secondary"), "inline comment after a source ref must survive");
+    assert.ok(
+      out.includes("// primary table"),
+      "own-line comment before a source ref must survive",
+    );
+    assert.ok(
+      out.includes("// joined secondary"),
+      "inline comment after a source ref must survive",
+    );
     assert.equal(out, fmt(out), "source block comments must be idempotent");
   });
 
@@ -390,8 +430,14 @@ schema m (metric, source s) {
   id INT
 }`;
     const out = fmt(src);
-    assert.ok(out.includes("// physical store"), "inline comment after a metadata entry must survive");
-    assert.ok(out.includes("// governance owner is data-eng"), "own-line comment between entries must survive");
+    assert.ok(
+      out.includes("// physical store"),
+      "inline comment after a metadata entry must survive",
+    );
+    assert.ok(
+      out.includes("// governance owner is data-eng"),
+      "own-line comment between entries must survive",
+    );
     assert.equal(out, fmt(out), "metadata comments must be idempotent");
   });
 
@@ -402,7 +448,10 @@ schema m (metric, source s) {
   "Second line"  // trailing
 }`;
     const out = fmt(src);
-    assert.ok(out.includes("// reviewed 2026-06"), "own-line comment before a note string must survive");
+    assert.ok(
+      out.includes("// reviewed 2026-06"),
+      "own-line comment before a note string must survive",
+    );
     assert.ok(out.includes("// trailing"), "inline comment after a note string must survive");
     assert.equal(out, fmt(out), "note block comments must be idempotent");
   });
@@ -418,8 +467,14 @@ mapping m { // why this mapping exists
   id -> id
 }`;
     const out = fmt(src);
-    assert.ok(out.includes("// why this schema exists"), "brace-line comment on schema must survive");
-    assert.ok(out.includes("// why this mapping exists"), "brace-line comment on mapping must survive");
+    assert.ok(
+      out.includes("// why this schema exists"),
+      "brace-line comment on schema must survive",
+    );
+    assert.ok(
+      out.includes("// why this mapping exists"),
+      "brace-line comment on mapping must survive",
+    );
     assert.equal(out, fmt(out), "brace-line comments must be idempotent");
   });
 });
@@ -438,7 +493,10 @@ schema b { y STRING }`;
   it("preserves blank line between file header and section comment (cbh-0lhj)", () => {
     const src = `// File header\n\n// Section comment\nschema a { x INT }`;
     const out = fmt(src);
-    assert.ok(out.includes("// File header\n\n// Section comment"), "should preserve blank line between header and section comment");
+    assert.ok(
+      out.includes("// File header\n\n// Section comment"),
+      "should preserve blank line between header and section comment",
+    );
   });
 
   it("no blank lines between consecutive imports", () => {
@@ -693,7 +751,10 @@ describe("edge cases", () => {
     const out = fmt(src);
     assert.ok(out.includes("each orders -> out_orders {"));
     assert.ok(out.includes("  each items -> out_items {"), "inner each header must survive");
-    assert.ok(out.includes("    sku -> out_sku"), "inner each arrows must survive at depth-2 indent");
+    assert.ok(
+      out.includes("    sku -> out_sku"),
+      "inner each arrows must survive at depth-2 indent",
+    );
     assert.equal(out, fmt(out), "nested each output must be idempotent");
   });
 
@@ -709,7 +770,10 @@ describe("edge cases", () => {
 }`;
     const out = fmt(src);
     assert.ok(out.includes("  flatten items -> .rows {"), "inner flatten header must survive");
-    assert.ok(out.includes("    name -> name"), "inner flatten arrows must survive at depth-2 indent");
+    assert.ok(
+      out.includes("    name -> name"),
+      "inner flatten arrows must survive at depth-2 indent",
+    );
     assert.equal(out, fmt(out), "nested flatten output must be idempotent");
   });
 
@@ -720,7 +784,7 @@ describe("edge cases", () => {
   value DECIMAL(14,2) (measure additive)
 }`;
     const out = fmt(src);
-    assert.ok(out.includes('schema mrr ('));
+    assert.ok(out.includes("schema mrr ("));
     assert.ok(out.includes('metric_name "MRR"'));
     assert.ok(out.includes("value  DECIMAL(14,2)  (measure additive)"));
   });
@@ -783,7 +847,7 @@ describe("edge cases", () => {
 // ── Golden Fixture Tests ─────────────────────────────────────────────────────
 
 describe("golden fixture round-trip (all corpus)", () => {
-  const stmFiles = readdirSync(examplesDir, { recursive: true }).filter(f => f.endsWith(".stm"));
+  const stmFiles = readdirSync(examplesDir, { recursive: true }).filter((f) => f.endsWith(".stm"));
 
   for (const file of stmFiles) {
     it(`format(parse(examples/${file})) parses without errors`, () => {

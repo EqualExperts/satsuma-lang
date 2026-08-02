@@ -9,14 +9,32 @@ import { describe, it, beforeEach, afterEach } from "node:test";
 
 // ── Mock CST helpers ──────────────────────────────────────────────────────────
 
-function n(type: string, namedChildren: any[] = [], text = "", row = 0, anonymousChildren: string[] = []) {
+function n(
+  type: string,
+  namedChildren: any[] = [],
+  text = "",
+  row = 0,
+  anonymousChildren: string[] = [],
+) {
   const children: any[] = [];
-  children.push(...anonymousChildren.map((t: string) => ({ type: t, text: t, isNamed: false, namedChildren: [], children: [] })));
+  children.push(
+    ...anonymousChildren.map((t: string) => ({
+      type: t,
+      text: t,
+      isNamed: false,
+      namedChildren: [],
+      children: [],
+    })),
+  );
   children.push(...namedChildren.map((c: any) => ({ ...c, isNamed: true })));
   return { type, text, startPosition: { row, column: 0 }, namedChildren, children, isNamed: true };
 }
-function ident(t: string) { return n("identifier", [], t); }
-function quoted(t: string) { return n("backtick_name", [], `'${t}'`); }
+function ident(t: string) {
+  return n("identifier", [], t);
+}
+function quoted(t: string) {
+  return n("backtick_name", [], `'${t}'`);
+}
 function _blockLabel(name: string) {
   const inner = name.startsWith("'") ? quoted(name.slice(1, -1)) : ident(name);
   return n("block_label", [inner]);
@@ -25,8 +43,12 @@ function spreadLabel(name: string) {
   if (name.startsWith("'")) return n("spread_label", [quoted(name.slice(1, -1))]);
   return n("spread_label", name.split(" ").map(ident));
 }
-function fieldName(name: string) { return n("field_name", [ident(name)]); }
-function typeExpr(t: string) { return n("type_expr", [], t); }
+function fieldName(name: string) {
+  return n("field_name", [ident(name)]);
+}
+function typeExpr(t: string) {
+  return n("type_expr", [], t);
+}
 function fieldDecl(name: string, type: string, meta: any = null) {
   const children = [fieldName(name), typeExpr(type)];
   if (meta) children.push(meta);
@@ -90,10 +112,7 @@ function collectFields(bodyNode: any, indent = 0): { indent: number; text: strin
 
 describe("collectFields", () => {
   it("renders flat fields with padding", () => {
-    const body = n("schema_body", [
-      fieldDecl("id", "INT"),
-      fieldDecl("name", "VARCHAR(100)"),
-    ]);
+    const body = n("schema_body", [fieldDecl("id", "INT"), fieldDecl("name", "VARCHAR(100)")]);
     const lines = collectFields(body, 1);
     assert.equal(lines.length, 2);
     assert.ok(lines[0].text.startsWith("  id"));
@@ -156,11 +175,20 @@ describe("collectFields", () => {
 describe("fields-only format", () => {
   let output: string[] = [];
   let origLog: typeof console.log;
-  beforeEach(() => { output = []; origLog = console.log; console.log = (...a: any[]) => output.push(a.join(" ")); });
-  afterEach(() => { console.log = origLog; });
+  beforeEach(() => {
+    output = [];
+    origLog = console.log;
+    console.log = (...a: any[]) => output.push(a.join(" "));
+  });
+  afterEach(() => {
+    console.log = origLog;
+  });
 
   it("prints name and type tab-padded", () => {
-    const fields = [{ name: "customer_id", type: "UUID" }, { name: "email", type: "VARCHAR(255)" }];
+    const fields = [
+      { name: "customer_id", type: "UUID" },
+      { name: "email", type: "VARCHAR(255)" },
+    ];
     for (const f of fields) console.log(`${f.name.padEnd(24)}${f.type}`);
     assert.ok(output[0].startsWith("customer_id"));
     assert.ok(output[0].includes("UUID"));
@@ -172,7 +200,10 @@ describe("fields-only format", () => {
 
 describe("schema not-found", () => {
   it("finds case-insensitive match", () => {
-    const schemas = new Map([["Orders", {}], ["customers", {}]]);
+    const schemas = new Map([
+      ["Orders", {}],
+      ["customers", {}],
+    ]);
     const name = "orders";
     const keys = [...schemas.keys()];
     const close = keys.find((k) => k.toLowerCase() === name.toLowerCase());

@@ -21,10 +21,7 @@ import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { dirname } from "node:path";
 import { run as _run } from "./helpers.js";
-import {
-  computeSymbolDependencies,
-  computeImportReachability,
-} from "@satsuma/core";
+import { computeSymbolDependencies, computeImportReachability } from "@satsuma/core";
 import type { SemanticIndex } from "@satsuma/core";
 
 const describe = (name: string, fn: () => void) => _describe(name, { concurrency: true }, fn);
@@ -40,7 +37,13 @@ const run = (...args: string[]) => _run(CLI, ...args);
 function makeSemanticIndex(opts: {
   schemas?: Array<{ key: string; file: string; namespace?: string; spreads?: string[] }>;
   fragments?: Array<{ key: string; file: string; namespace?: string; spreads?: string[] }>;
-  mappings?: Array<{ key: string; file: string; namespace?: string; sources: string[]; targets: string[] }>;
+  mappings?: Array<{
+    key: string;
+    file: string;
+    namespace?: string;
+    sources: string[];
+    targets: string[];
+  }>;
   metrics?: Array<{ key: string; file: string; namespace?: string; sources?: string[] }>;
   transforms?: Array<{ key: string; file: string }>;
 }): SemanticIndex {
@@ -122,8 +125,10 @@ describe("computeSymbolDependencies", () => {
       fragments: [{ key: "shared_fields", file: "a.stm" }],
     });
     const deps = computeSymbolDependencies(index);
-    assert.ok(deps.get("my_schema")?.has("shared_fields"),
-      "schema should depend on its spread fragment");
+    assert.ok(
+      deps.get("my_schema")?.has("shared_fields"),
+      "schema should depend on its spread fragment",
+    );
   });
 
   it("records mapping → source and target schema dependencies", () => {
@@ -133,10 +138,14 @@ describe("computeSymbolDependencies", () => {
         { key: "src_schema", file: "a.stm" },
         { key: "tgt_schema", file: "a.stm" },
       ],
-      mappings: [{
-        key: "my_mapping", file: "a.stm",
-        sources: ["src_schema"], targets: ["tgt_schema"],
-      }],
+      mappings: [
+        {
+          key: "my_mapping",
+          file: "a.stm",
+          sources: ["src_schema"],
+          targets: ["tgt_schema"],
+        },
+      ],
     });
     const deps = computeSymbolDependencies(index);
     const mappingDeps = deps.get("my_mapping");
@@ -153,8 +162,10 @@ describe("computeSymbolDependencies", () => {
       ],
     });
     const deps = computeSymbolDependencies(index);
-    assert.ok(deps.get("extended_fields")?.has("base_fields"),
-      "fragment should depend on its spread fragment");
+    assert.ok(
+      deps.get("extended_fields")?.has("base_fields"),
+      "fragment should depend on its spread fragment",
+    );
   });
 
   it("records metric → source schema dependency", () => {
@@ -164,8 +175,10 @@ describe("computeSymbolDependencies", () => {
       metrics: [{ key: "revenue", file: "a.stm", sources: ["revenue_data"] }],
     });
     const deps = computeSymbolDependencies(index);
-    assert.ok(deps.get("revenue")?.has("revenue_data"),
-      "metric should depend on its source schema");
+    assert.ok(
+      deps.get("revenue")?.has("revenue_data"),
+      "metric should depend on its source schema",
+    );
   });
 
   it("returns empty deps for symbols with no references", () => {
@@ -195,10 +208,14 @@ describe("computeImportReachability", () => {
       ["/b.stm", []],
     ]);
     const result = computeImportReachability(index, fileImports);
-    assert.ok(result.reachableSymbols.get("/a.stm")?.has("local_a"),
-      "a.stm should see its own symbol");
-    assert.ok(!result.reachableSymbols.get("/a.stm")?.has("local_b"),
-      "a.stm should NOT see b.stm's symbol without an import");
+    assert.ok(
+      result.reachableSymbols.get("/a.stm")?.has("local_a"),
+      "a.stm should see its own symbol",
+    );
+    assert.ok(
+      !result.reachableSymbols.get("/a.stm")?.has("local_b"),
+      "a.stm should NOT see b.stm's symbol without an import",
+    );
   });
 
   it("explicitly imported symbols are reachable", () => {
@@ -214,8 +231,10 @@ describe("computeImportReachability", () => {
       ["/top.stm", [{ names: ["imported_schema"], resolvedFile: "/base.stm" }]],
     ]);
     const result = computeImportReachability(index, fileImports);
-    assert.ok(result.reachableSymbols.get("/top.stm")?.has("imported_schema"),
-      "top.stm should see explicitly imported symbol");
+    assert.ok(
+      result.reachableSymbols.get("/top.stm")?.has("imported_schema"),
+      "top.stm should see explicitly imported symbol",
+    );
   });
 
   it("transitive dependencies of imported symbols are reachable", () => {
@@ -234,10 +253,11 @@ describe("computeImportReachability", () => {
     });
     const result = computeImportReachability(index2, fileImports);
     const topReachable = result.reachableSymbols.get("/top.stm");
-    assert.ok(topReachable?.has("my_schema"),
-      "imported schema should be reachable");
-    assert.ok(topReachable?.has("shared_fields"),
-      "spread fragment (transitive dep) should be reachable");
+    assert.ok(topReachable?.has("my_schema"), "imported schema should be reachable");
+    assert.ok(
+      topReachable?.has("shared_fields"),
+      "spread fragment (transitive dep) should be reachable",
+    );
   });
 
   it("unrelated symbols in transitively reachable files are NOT reachable (sl-cf9t repro)", () => {
@@ -266,10 +286,14 @@ describe("computeImportReachability", () => {
     });
     const result = computeImportReachability(fullIndex, fileImports);
     const topReachable = result.reachableSymbols.get("/top.stm");
-    assert.ok(topReachable?.has("middle_schema"),
-      "middle_schema should be reachable (explicitly imported)");
-    assert.ok(!topReachable?.has("my_transform"),
-      "my_transform should NOT be reachable (not a dependency of middle_schema)");
+    assert.ok(
+      topReachable?.has("middle_schema"),
+      "middle_schema should be reachable (explicitly imported)",
+    );
+    assert.ok(
+      !topReachable?.has("my_transform"),
+      "my_transform should NOT be reachable (not a dependency of middle_schema)",
+    );
   });
 
   it("resolves namespace-qualified import names", () => {
@@ -285,8 +309,10 @@ describe("computeImportReachability", () => {
       ["/top.stm", [{ names: ["ns::my_schema"], resolvedFile: "/base.stm" }]],
     ]);
     const result = computeImportReachability(index, fileImports);
-    assert.ok(result.reachableSymbols.get("/top.stm")?.has("ns::my_schema"),
-      "namespace-qualified import should be reachable");
+    assert.ok(
+      result.reachableSymbols.get("/top.stm")?.has("ns::my_schema"),
+      "namespace-qualified import should be reachable",
+    );
   });
 
   it("resolves bare import names to namespace-qualified keys", () => {
@@ -303,8 +329,10 @@ describe("computeImportReachability", () => {
       ["/top.stm", [{ names: ["my_schema"], resolvedFile: "/base.stm" }]],
     ]);
     const result = computeImportReachability(index, fileImports);
-    assert.ok(result.reachableSymbols.get("/top.stm")?.has("ns::my_schema"),
-      "bare name should resolve to namespace-qualified key in imported file");
+    assert.ok(
+      result.reachableSymbols.get("/top.stm")?.has("ns::my_schema"),
+      "bare name should resolve to namespace-qualified key in imported file",
+    );
   });
 
   it("chains transitive dependencies through multiple import hops", () => {
@@ -326,8 +354,10 @@ describe("computeImportReachability", () => {
     const result = computeImportReachability(index, fileImports);
     const topReachable = result.reachableSymbols.get("/top.stm");
     assert.ok(topReachable?.has("middle_schema"), "imported schema should be reachable");
-    assert.ok(topReachable?.has("shared_fields"),
-      "fragment spread by imported schema should be transitively reachable");
+    assert.ok(
+      topReachable?.has("shared_fields"),
+      "fragment spread by imported schema should be transitively reachable",
+    );
   });
 });
 
@@ -338,11 +368,7 @@ describe("satsuma validate import-scope (sl-cf9t)", () => {
     // Repro case from sl-cf9t: top.stm uses my_transform via middle.stm's
     // import graph, but my_transform is not a dependency of middle_schema.
     const dir = createTempWorkspace({
-      "base.stm": [
-        "transform my_transform {",
-        "  trim | lowercase",
-        "}",
-      ].join("\n"),
+      "base.stm": ["transform my_transform {", "  trim | lowercase", "}"].join("\n"),
       "middle.stm": [
         'import { my_transform } from "./base.stm"',
         "",
@@ -373,11 +399,7 @@ describe("satsuma validate import-scope (sl-cf9t)", () => {
   it("passes when all referenced symbols are properly imported", async () => {
     // Correctly importing my_transform should produce no import-scope errors.
     const dir = createTempWorkspace({
-      "base.stm": [
-        "transform my_transform {",
-        "  trim | lowercase",
-        "}",
-      ].join("\n"),
+      "base.stm": ["transform my_transform {", "  trim | lowercase", "}"].join("\n"),
       "pipeline.stm": [
         'import { my_transform } from "./base.stm"',
         "",
@@ -396,8 +418,10 @@ describe("satsuma validate import-scope (sl-cf9t)", () => {
     });
     const { stdout, stderr, code: _code } = await run("validate", join(dir, "pipeline.stm"));
     const output = stdout + stderr;
-    assert.ok(!output.includes("import-scope"),
-      `should not report import-scope violation for properly imported symbols, got: ${output}`);
+    assert.ok(
+      !output.includes("import-scope"),
+      `should not report import-scope violation for properly imported symbols, got: ${output}`,
+    );
   });
 
   it("allows references to locally-defined symbols without imports", async () => {
@@ -416,8 +440,10 @@ describe("satsuma validate import-scope (sl-cf9t)", () => {
     });
     const { stdout, stderr, code: _code } = await run("validate", join(dir, "standalone.stm"));
     const output = stdout + stderr;
-    assert.ok(!output.includes("import-scope"),
-      `single-file workspace should not produce import-scope errors, got: ${output}`);
+    assert.ok(
+      !output.includes("import-scope"),
+      `single-file workspace should not produce import-scope errors, got: ${output}`,
+    );
   });
 
   it("reports error for fragment spread from unreachable file", async () => {

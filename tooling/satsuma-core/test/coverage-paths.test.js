@@ -87,7 +87,11 @@ describe("buildCoveredFieldPaths() — the direct/derived model", () => {
     // something that was. A flat set cannot tell these apart.
     const covered = buildCoveredFieldPaths(["address.city"]);
     assert.equal(isDirectlyCovered("address.city", covered), true);
-    assert.equal(isDirectlyCovered("address", covered), false, "'address' is an ancestor, not direct");
+    assert.equal(
+      isDirectlyCovered("address", covered),
+      false,
+      "'address' is an ancestor, not direct",
+    );
     assert.equal(isCoveredPath("address", covered), true, "…but it still counts as covered");
   });
 
@@ -190,10 +194,7 @@ describe("schemaLocalFieldPath()", () => {
   it("treats a sibling schema's bare-name prefix as belonging to that sibling", () => {
     // The bare form has to be recognised on the rival side too, or a namespaced
     // multi-source mapping credits every arrow to every schema.
-    assert.equal(
-      schemaLocalFieldPath("orders.total", ["crm::customers"], ["crm::orders"]),
-      null,
-    );
+    assert.equal(schemaLocalFieldPath("orders.total", ["crm::customers"], ["crm::orders"]), null);
   });
 
   it("returns null for a bare reference that is just the schema's name", () => {
@@ -208,7 +209,10 @@ describe("schemaLocalFieldPath()", () => {
   it("keeps a bare reference that names a declared field, not the schema", () => {
     // A single-source mapping's `id -> id` is a field reference even when the
     // schema is called `id`; the declaration settles it.
-    assert.equal(schemaLocalFieldPath("id", ["id"], [], (n) => n === "id"), "id");
+    assert.equal(
+      schemaLocalFieldPath("id", ["id"], [], (n) => n === "id"),
+      "id",
+    );
   });
 
   it("prefers a declared field over a schema prefix of the same name", () => {

@@ -54,14 +54,11 @@ export interface FileCoverageMarkers {
  * hover labels (source fields are "used / not used as source"; target
  * fields are "mapped / unmapped"). Keys are the URIs reported by the LSP.
  */
-export function groupCoverageByUri(
-  schemas: CoverageSchema[],
-): Map<string, FileCoverageMarkers> {
+export function groupCoverageByUri(schemas: CoverageSchema[]): Map<string, FileCoverageMarkers> {
   const byUri = new Map<string, FileCoverageMarkers>();
   for (const schema of schemas) {
     const mappedLabel = schema.role === "source" ? "used as source" : "mapped";
-    const unmappedLabel =
-      schema.role === "source" ? "not used as source" : "unmapped";
+    const unmappedLabel = schema.role === "source" ? "not used as source" : "unmapped";
     for (const f of schema.fields) {
       let bucket = byUri.get(f.uri);
       if (!bucket) {

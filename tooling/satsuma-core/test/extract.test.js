@@ -36,8 +36,14 @@ import {
 
 function n(type, namedChildren = [], text = "", row = 0, anonymousChildren = [], column = 0) {
   const allChildren = [
-    ...anonymousChildren.map(t => ({ type: t, text: t, isNamed: false, namedChildren: [], children: [] })),
-    ...namedChildren.map(c => ({ ...c, isNamed: true })),
+    ...anonymousChildren.map((t) => ({
+      type: t,
+      text: t,
+      isNamed: false,
+      namedChildren: [],
+      children: [],
+    })),
+    ...namedChildren.map((c) => ({ ...c, isNamed: true })),
   ];
   return {
     type,
@@ -76,7 +82,14 @@ function fieldName(name) {
 }
 
 function fieldDecl(name, type, row = 0, column = 0) {
-  return n("field_decl", [fieldName(name), n("type_expr", [], type)], `${name} ${type}`, row, [], column);
+  return n(
+    "field_decl",
+    [fieldName(name), n("type_expr", [], type)],
+    `${name} ${type}`,
+    row,
+    [],
+    column,
+  );
 }
 
 function nlString(literal) {
@@ -430,7 +443,14 @@ describe("extractTransforms()", () => {
     const root = n("program", [transformBlock]);
 
     assert.deepStrictEqual(extractTransforms(root), [
-      { name: "enrich", body: "lookup(dim)", canonicalBody: "lookup(dim)", namespace: null, row: 0, startColumn: 0 },
+      {
+        name: "enrich",
+        body: "lookup(dim)",
+        canonicalBody: "lookup(dim)",
+        namespace: null,
+        row: 0,
+        startColumn: 0,
+      },
     ]);
   });
 
@@ -457,8 +477,11 @@ describe("extractTransforms()", () => {
     // text. The quoted key and the value are NL content and must pass
     // through verbatim, including casing and inner whitespace.
     const entry = (k, v) => n("map_entry", [n("map_key", [], k), n("map_value", [], v)]);
-    const mapLit = n("map_literal", [entry('"A B"', "first class"), entry("_", "other")],
-      'map {\n  "A B": first class\n  _: other\n}');
+    const mapLit = n(
+      "map_literal",
+      [entry('"A B"', "first class"), entry("_", "other")],
+      'map {\n  "A B": first class\n  _: other\n}',
+    );
     const pipeChain = n("pipe_chain", [n("pipe_step", [mapLit], mapLit.text)], mapLit.text);
     const transformBlock = n("transform_block", [blockLabel("classify"), pipeChain]);
     const root = n("program", [transformBlock]);
@@ -514,7 +537,13 @@ describe("extractFieldTree() — nested records", () => {
     const innerBody = n("schema_body", [innerField]);
     const nameNode = n("field_name", [ident("address")]);
     // record field: has schema_body child and 'record' anonymous child
-    const recordField = n("field_decl", [nameNode, innerBody], "address record { city STRING }", 0, ["record"]);
+    const recordField = n(
+      "field_decl",
+      [nameNode, innerBody],
+      "address record { city STRING }",
+      0,
+      ["record"],
+    );
 
     const body = n("schema_body", [recordField]);
     const result = extractFieldTree(body);
@@ -529,7 +558,13 @@ describe("extractFieldTree() — nested records", () => {
     const innerField = fieldDecl("sku", "STRING");
     const innerBody = n("schema_body", [innerField]);
     const nameNode = n("field_name", [ident("items")]);
-    const listRecordField = n("field_decl", [nameNode, innerBody], "items list_of record { sku STRING }", 0, ["list_of", "record"]);
+    const listRecordField = n(
+      "field_decl",
+      [nameNode, innerBody],
+      "items list_of record { sku STRING }",
+      0,
+      ["list_of", "record"],
+    );
 
     const body = n("schema_body", [listRecordField]);
     const result = extractFieldTree(body);
@@ -602,12 +637,20 @@ describe("FieldDecl metadata enrichment (sl-cvs2)", () => {
 
   it("extracts a key-value entry (e.g. ref) from field metadata", () => {
     // Validates that tag_with_value pairs become {kind: 'kv', key, value}.
-    const kvVal = n("value_text", [n("dotted_name", [], "dim_customer.customer_id")], "dim_customer.customer_id");
+    const kvVal = n(
+      "value_text",
+      [n("dotted_name", [], "dim_customer.customer_id")],
+      "dim_customer.customer_id",
+    );
     const kvPair = n("tag_with_value", [ident("ref"), kvVal]);
     const meta = n("metadata_block", [kvPair]);
     const fd = n("field_decl", [fieldName("customer_id"), n("type_expr", [], "STRING(36)"), meta]);
     const result = extractSchemas(schemaWith([fd]));
-    assert.deepEqual(result[0].fields[0].metadata[0], { kind: "kv", key: "ref", value: "dim_customer.customer_id" });
+    assert.deepEqual(result[0].fields[0].metadata[0], {
+      kind: "kv",
+      key: "ref",
+      value: "dim_customer.customer_id",
+    });
   });
 
   it("extracts an enum entry with all values from field metadata", () => {
@@ -616,7 +659,10 @@ describe("FieldDecl metadata enrichment (sl-cvs2)", () => {
     const meta = n("metadata_block", [enumBody]);
     const fd = n("field_decl", [fieldName("period"), n("type_expr", [], "STRING(10)"), meta]);
     const result = extractSchemas(schemaWith([fd]));
-    assert.deepEqual(result[0].fields[0].metadata[0], { kind: "enum", values: ["monthly", "quarterly", "annual"] });
+    assert.deepEqual(result[0].fields[0].metadata[0], {
+      kind: "enum",
+      values: ["monthly", "quarterly", "annual"],
+    });
   });
 
   it("leaves metadata undefined when the field has no metadata_block", () => {
@@ -630,7 +676,11 @@ describe("FieldDecl metadata enrichment (sl-cvs2)", () => {
   it("extracts metadata from inner fields of a record field", () => {
     // Validates that record-field children are walked and their own metadata is preserved.
     const innerMeta = n("metadata_block", [n("tag_token", [], "required")]);
-    const innerFd = n("field_decl", [fieldName("street"), n("type_expr", [], "VARCHAR(200)"), innerMeta]);
+    const innerFd = n("field_decl", [
+      fieldName("street"),
+      n("type_expr", [], "VARCHAR(200)"),
+      innerMeta,
+    ]);
     const recField = recordFieldDecl("address", { body: [innerFd] });
     const result = extractSchemas(schemaWith([recField]));
     assert.deepEqual(result[0].fields[0].children[0].metadata[0], { kind: "tag", tag: "required" });
@@ -861,7 +911,6 @@ describe("extractQuestions — row and empty case (sl-cvs2)", () => {
     assert.equal(result[0].text, "is this field PII?");
     assert.equal(result[0].row, 8);
   });
-
 });
 
 // ── extractNamespaces ───────────────────────────────────────────────────────
@@ -987,11 +1036,16 @@ describe("extractImports — name forms and arity (sl-cvs2)", () => {
 
   it("extracts multiple ns::name qualified imports from one declaration", () => {
     // Validates that multiple qualified names in a single import_decl are collected in order.
-    const imp = n("import_decl", [
-      n("import_name", [qualifiedName("src", "customers")]),
-      n("import_name", [qualifiedName("mart", "dim_customers")]),
-      n("import_path", [nlString("source.stm")]),
-    ], "", 2);
+    const imp = n(
+      "import_decl",
+      [
+        n("import_name", [qualifiedName("src", "customers")]),
+        n("import_name", [qualifiedName("mart", "dim_customers")]),
+        n("import_path", [nlString("source.stm")]),
+      ],
+      "",
+      2,
+    );
     const root = n("source_file", [imp]);
     const result = extractImports(root);
     assert.deepEqual(result[0].names, ["src::customers", "mart::dim_customers"]);
@@ -1012,21 +1066,24 @@ describe("extractImports — name forms and arity (sl-cvs2)", () => {
 
   it("returns one entry per import_decl when multiple declarations are present", () => {
     // Validates that distinct import_decls produce distinct entries (not merged).
-    const imp1 = n("import_decl", [
-      n("import_name", [ident("foo")]),
-      n("import_path", [nlString("a.stm")]),
-    ], "", 0);
-    const imp2 = n("import_decl", [
-      n("import_name", [ident("bar")]),
-      n("import_path", [nlString("b.stm")]),
-    ], "", 1);
+    const imp1 = n(
+      "import_decl",
+      [n("import_name", [ident("foo")]), n("import_path", [nlString("a.stm")])],
+      "",
+      0,
+    );
+    const imp2 = n(
+      "import_decl",
+      [n("import_name", [ident("bar")]), n("import_path", [nlString("b.stm")])],
+      "",
+      1,
+    );
     const root = n("source_file", [imp1, imp2]);
     const result = extractImports(root);
     assert.equal(result.length, 2);
     assert.equal(result[0].path, "a.stm");
     assert.equal(result[1].path, "b.stm");
   });
-
 });
 
 // ── extractImports: MISSING-name recovery (sl-0nvt) ─────────────────────────

@@ -135,7 +135,9 @@ function normalizeAnonMappingKeys(index: ExtractedWorkspace): ExtractedWorkspace
       [...index.fieldArrows].map(([field, records]) => [
         field,
         records.map((r) =>
-          r.mapping && rename.has(r.mapping) ? { ...r, mapping: rename.get(r.mapping) ?? r.mapping } : r,
+          r.mapping && rename.has(r.mapping)
+            ? { ...r, mapping: rename.get(r.mapping) ?? r.mapping }
+            : r,
         ),
       ]),
     ),
@@ -210,12 +212,22 @@ function diffBlockMap<T, C>(
  * even small wording changes are typically meaningful for documentation
  * intent and should be surfaced to the reviewer.
  */
-function diffSchema(a: SchemaRecord, b: SchemaRecord, notesA: Set<string>, notesB: Set<string>): SchemaChange[] {
+function diffSchema(
+  a: SchemaRecord,
+  b: SchemaRecord,
+  notesA: Set<string>,
+  notesB: Set<string>,
+): SchemaChange[] {
   const changes: SchemaChange[] = [];
 
   // Compare schema-level note text (note "..." in metadata block)
   if ((a.note ?? "") !== (b.note ?? "")) {
-    changes.push({ kind: "note-changed", field: "(note)", from: a.note || "(none)", to: b.note || "(none)" });
+    changes.push({
+      kind: "note-changed",
+      field: "(note)",
+      from: a.note || "(none)",
+      to: b.note || "(none)",
+    });
   }
 
   // Compare fields
@@ -246,22 +258,42 @@ function diffSchema(a: SchemaRecord, b: SchemaRecord, notesA: Set<string>, notes
  * is reported as a change because it can affect serialization order in
  * downstream consumers.
  */
-function diffMetric(a: MetricRecord, b: MetricRecord, notesA: Set<string>, notesB: Set<string>): SchemaChange[] {
+function diffMetric(
+  a: MetricRecord,
+  b: MetricRecord,
+  notesA: Set<string>,
+  notesB: Set<string>,
+): SchemaChange[] {
   const changes: SchemaChange[] = [];
 
   // Compare metric header attributes (sl-1meq)
   const aSources = JSON.stringify(a.sources);
   const bSources = JSON.stringify(b.sources);
   if (aSources !== bSources) {
-    changes.push({ kind: "source-changed", field: "(source)", from: a.sources.join(", ") || "(none)", to: b.sources.join(", ") || "(none)" });
+    changes.push({
+      kind: "source-changed",
+      field: "(source)",
+      from: a.sources.join(", ") || "(none)",
+      to: b.sources.join(", ") || "(none)",
+    });
   }
   if ((a.grain ?? "") !== (b.grain ?? "")) {
-    changes.push({ kind: "grain-changed", field: "(grain)", from: a.grain || "(none)", to: b.grain || "(none)" });
+    changes.push({
+      kind: "grain-changed",
+      field: "(grain)",
+      from: a.grain || "(none)",
+      to: b.grain || "(none)",
+    });
   }
   const aSlices = JSON.stringify(a.slices);
   const bSlices = JSON.stringify(b.slices);
   if (aSlices !== bSlices) {
-    changes.push({ kind: "slices-changed", field: "(slices)", from: a.slices.join(", ") || "(none)", to: b.slices.join(", ") || "(none)" });
+    changes.push({
+      kind: "slices-changed",
+      field: "(slices)",
+      from: a.slices.join(", ") || "(none)",
+      to: b.slices.join(", ") || "(none)",
+    });
   }
 
   // Compare fields
@@ -349,7 +381,12 @@ function diffFieldList(aFields: FieldDecl[], bFields: FieldDecl[], prefix = ""):
       const aMeta = serializeMetadata(field.metadata);
       const bMeta = serializeMetadata(bField.metadata);
       if (aMeta !== bMeta) {
-        changes.push({ kind: "metadata-changed", field: qualName, from: aMeta || "(none)", to: bMeta || "(none)" });
+        changes.push({
+          kind: "metadata-changed",
+          field: qualName,
+          from: aMeta || "(none)",
+          to: bMeta || "(none)",
+        });
       }
       // Recurse into nested children
       if (field.children || bField.children) {
@@ -388,7 +425,14 @@ function diffFieldList(aFields: FieldDecl[], bFields: FieldDecl[], prefix = ""):
  *
  *  3. Note changes — by string equality, same as schemas (sl-van1).
  */
-function diffMapping(a: MappingRecord, b: MappingRecord, arrowsA: ArrowRecord[], arrowsB: ArrowRecord[], notesA: Set<string>, notesB: Set<string>): MappingChange[] {
+function diffMapping(
+  a: MappingRecord,
+  b: MappingRecord,
+  arrowsA: ArrowRecord[],
+  arrowsB: ArrowRecord[],
+  notesA: Set<string>,
+  notesB: Set<string>,
+): MappingChange[] {
   const changes: MappingChange[] = [];
 
   if (a.arrowCount !== b.arrowCount) {
@@ -473,17 +517,19 @@ function diffNoteSet(notesA: Set<string>, notesB: Set<string>): SchemaChange[] {
 
   for (const text of notesB) {
     if (!notesA.has(text)) {
-      const preview = text.length > NOTE_PREVIEW_MAX_LENGTH
-        ? text.slice(0, NOTE_PREVIEW_MAX_LENGTH) + "..."
-        : text;
+      const preview =
+        text.length > NOTE_PREVIEW_MAX_LENGTH
+          ? text.slice(0, NOTE_PREVIEW_MAX_LENGTH) + "..."
+          : text;
       changes.push({ kind: "note-added", field: "(note)", from: preview });
     }
   }
   for (const text of notesA) {
     if (!notesB.has(text)) {
-      const preview = text.length > NOTE_PREVIEW_MAX_LENGTH
-        ? text.slice(0, NOTE_PREVIEW_MAX_LENGTH) + "..."
-        : text;
+      const preview =
+        text.length > NOTE_PREVIEW_MAX_LENGTH
+          ? text.slice(0, NOTE_PREVIEW_MAX_LENGTH) + "..."
+          : text;
       changes.push({ kind: "note-removed", field: "(note)", from: preview });
     }
   }
@@ -515,12 +561,14 @@ function diffNotes(notesA: NoteRecord[], notesB: NoteRecord[]): NoteDelta {
 
 function serializeMetadata(metadata: FieldDecl["metadata"]): string {
   if (!metadata || metadata.length === 0) return "";
-  return metadata.map((m) => {
-    if (m.kind === "tag") return m.tag;
-    if (m.kind === "kv") return `${m.key} ${m.value}`;
-    if (m.kind === "enum") return `enum {${m.values.join(", ")}}`;
-    if (m.kind === "note") return `note "${m.text}"`;
-    if (m.kind === "slice") return `slice {${m.values.join(", ")}}`;
-    return JSON.stringify(m);
-  }).join(", ");
+  return metadata
+    .map((m) => {
+      if (m.kind === "tag") return m.tag;
+      if (m.kind === "kv") return `${m.key} ${m.value}`;
+      if (m.kind === "enum") return `enum {${m.values.join(", ")}}`;
+      if (m.kind === "note") return `note "${m.text}"`;
+      if (m.kind === "slice") return `slice {${m.values.join(", ")}}`;
+      return JSON.stringify(m);
+    })
+    .join(", ");
 }

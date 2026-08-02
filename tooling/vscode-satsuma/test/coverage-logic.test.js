@@ -45,10 +45,7 @@ describe("groupCoverageByUri", () => {
     // Fields from different schemas land in different files; an icon in the
     // wrong file would mislabel a different schema's field entirely.
     const byUri = groupCoverageByUri(sampleSchemas());
-    assert.deepEqual([...byUri.keys()].sort(), [
-      "file:///ws/src.stm",
-      "file:///ws/tgt.stm",
-    ]);
+    assert.deepEqual([...byUri.keys()].sort(), ["file:///ws/src.stm", "file:///ws/tgt.stm"]);
     assert.equal(byUri.get("file:///ws/src.stm").mapped.length, 1);
     assert.equal(byUri.get("file:///ws/src.stm").unmapped.length, 1);
     // Three mapped entries in tgt.stm: customer_id, the `address` record and
@@ -61,10 +58,7 @@ describe("groupCoverageByUri", () => {
     // A source field is "used", a target field is "mapped" — swapping the
     // vocabulary makes the hover claim the opposite data-flow direction.
     const byUri = groupCoverageByUri(sampleSchemas());
-    assert.equal(
-      byUri.get("file:///ws/src.stm").mapped[0].hoverMessage,
-      "**id** — used as source",
-    );
+    assert.equal(byUri.get("file:///ws/src.stm").mapped[0].hoverMessage, "**id** — used as source");
     assert.equal(
       byUri.get("file:///ws/src.stm").unmapped[0].hoverMessage,
       "**internal_note** — not used as source",
@@ -93,14 +87,17 @@ describe("computeTargetCoverageStats", () => {
     // the tier split so a reviewer can tell declared coverage from an @ref.
     const declaredOnly = [
       {
-        schemaId: "t", role: "target",
+        schemaId: "t",
+        role: "target",
         fields: [{ path: "a", uri: "file:///t.stm", line: 1, mapped: true, tier: "declared" }],
       },
     ];
-    assert.deepEqual(
-      computeTargetCoverageStats(declaredOnly),
-      { mapped: 1, total: 1, pct: 100, mappedNl: 0 },
-    );
+    assert.deepEqual(computeTargetCoverageStats(declaredOnly), {
+      mapped: 1,
+      total: 1,
+      pct: 100,
+      mappedNl: 0,
+    });
   });
 
   it("returns undefined when the result has no target schema", () => {
@@ -111,9 +108,7 @@ describe("computeTargetCoverageStats", () => {
   });
 
   it("reports 0% for an empty target schema instead of dividing by zero", () => {
-    const stats = computeTargetCoverageStats([
-      { schemaId: "empty", role: "target", fields: [] },
-    ]);
+    const stats = computeTargetCoverageStats([{ schemaId: "empty", role: "target", fields: [] }]);
     assert.deepEqual(stats, { mapped: 0, total: 0, pct: 0, mappedNl: 0 });
   });
 });

@@ -3,7 +3,9 @@ const assert = require("node:assert/strict");
 const { initTestParser, parse } = require("./helper");
 const { computeDocumentSymbols } = require("../dist/symbols");
 
-before(async () => { await initTestParser(); });
+before(async () => {
+  await initTestParser();
+});
 
 // SymbolKind constants from LSP spec
 const SymbolKind = {

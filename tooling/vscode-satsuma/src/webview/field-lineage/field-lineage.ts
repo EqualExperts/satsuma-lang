@@ -18,9 +18,9 @@ const elk = new ELK();
 // ── Layout constants ───────────────────────────────────────────────────────
 
 const NODE_W = 200;
-const NODE_H = 80;   // header 30 + field 26 + via 24
+const NODE_H = 80; // header 30 + field 26 + via 24
 const FOCAL_W = 220;
-const FOCAL_H = 68;  // header 30 + field 38 (larger, no via label)
+const FOCAL_H = 68; // header 30 + field 38 (larger, no via label)
 const CANVAS_PADDING = 40;
 
 // ── Type declarations ──────────────────────────────────────────────────────
@@ -170,8 +170,8 @@ function buildElkGraph(payload: Payload): ElkNode {
 // ── Canvas ─────────────────────────────────────────────────────────────────
 
 function buildCanvas(laid: ElkNode, payload: Payload): HTMLDivElement {
-  const w = (laid.width ?? 800);
-  const h = (laid.height ?? 400);
+  const w = laid.width ?? 800;
+  const h = laid.height ?? 400;
 
   const wrap = document.createElement("div");
   wrap.className = "canvas-wrap";
@@ -184,7 +184,12 @@ function buildCanvas(laid: ElkNode, payload: Payload): HTMLDivElement {
   // Build node position lookup
   const nodePos = new Map<string, NodePos>();
   for (const n of (laid.children ?? []) as ElkNode[]) {
-    nodePos.set(n.id!, { x: n.x ?? 0, y: n.y ?? 0, width: n.width ?? NODE_W, height: n.height ?? NODE_H });
+    nodePos.set(n.id!, {
+      x: n.x ?? 0,
+      y: n.y ?? 0,
+      width: n.width ?? NODE_W,
+      height: n.height ?? NODE_H,
+    });
   }
 
   // Upstream cards
@@ -428,9 +433,17 @@ function buildToolbar(breadcrumb: string[]): HTMLDivElement {
   dirWrap.className = "toolbar-control dir-toggle";
 
   const dirOptions: Array<{ value: Direction; label: string; title: string }> = [
-    { value: "upstream",   label: "← Upstream",   title: "Show only upstream (where this field's data comes from)" },
-    { value: "both",       label: "↔ Both",        title: "Show both upstream and downstream" },
-    { value: "downstream", label: "Downstream →",  title: "Show only downstream (where this field's data goes to)" },
+    {
+      value: "upstream",
+      label: "← Upstream",
+      title: "Show only upstream (where this field's data comes from)",
+    },
+    { value: "both", label: "↔ Both", title: "Show both upstream and downstream" },
+    {
+      value: "downstream",
+      label: "Downstream →",
+      title: "Show only downstream (where this field's data goes to)",
+    },
   ];
 
   for (const opt of dirOptions) {
@@ -442,7 +455,10 @@ function buildToolbar(breadcrumb: string[]): HTMLDivElement {
     btn.addEventListener("click", () => {
       sessionDirection = opt.value as Direction;
       dirWrap.querySelectorAll(".dir-btn").forEach((b) => {
-        (b as HTMLElement).classList.toggle("active", (b as HTMLElement).dataset["dir"] === opt.value);
+        (b as HTMLElement).classList.toggle(
+          "active",
+          (b as HTMLElement).dataset["dir"] === opt.value,
+        );
       });
       if (lastPayload) {
         render(applyFilters(lastPayload));
@@ -524,7 +540,6 @@ function formatMappingKey(key: string): string {
   }
   return key.startsWith("::") ? key.slice(2) : key;
 }
-
 
 // Minimal ELK type stubs for the @ts-nocheck context
 interface ElkNode {

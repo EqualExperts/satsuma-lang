@@ -46,9 +46,7 @@ function checkHiddenSourceInNl(index: ExtractedWorkspace): LintDiagnostic[] {
 
   for (const item of index.nlRefData) {
     const refs = extractAtRefs(item.text);
-    const mappingKey = item.namespace
-      ? `${item.namespace}::${item.mapping}`
-      : item.mapping;
+    const mappingKey = item.namespace ? `${item.namespace}::${item.mapping}` : item.mapping;
     const mapping = index.mappings.get(mappingKey);
     if (!mapping) continue;
 
@@ -73,7 +71,10 @@ function checkHiddenSourceInNl(index: ExtractedWorkspace): LintDiagnostic[] {
         if (resolution.resolvedTo?.kind === "schema") {
           referencedSchema = resolution.resolvedTo.name;
         }
-      } else if (classification === "dotted-field" || classification === "namespace-qualified-field") {
+      } else if (
+        classification === "dotted-field" ||
+        classification === "namespace-qualified-field"
+      ) {
         // Dotted field ref like `hidden.code` — extract the schema part.
         // Use the FIRST dot (after any `::` prefix) so that nested sub-field
         // paths like `schema.RECORD.CHILD` correctly yield the schema name
@@ -90,9 +91,10 @@ function checkHiddenSourceInNl(index: ExtractedWorkspace): LintDiagnostic[] {
 
       if (referencedSchema && !isSchemaInMappingSources(referencedSchema, mapping)) {
         const { line, column } = computeNLRefPosition(item, offset);
-        const displayRef = item.namespace && referencedSchema.startsWith(`${item.namespace}::`)
-          ? referencedSchema.slice(item.namespace.length + 2)
-          : referencedSchema;
+        const displayRef =
+          item.namespace && referencedSchema.startsWith(`${item.namespace}::`)
+            ? referencedSchema.slice(item.namespace.length + 2)
+            : referencedSchema;
         const sourceBlockFix = makeAddSourceFix(mappingKey, referencedSchema);
         const fixApply = item.targetField
           ? composeFixes(
@@ -138,9 +140,7 @@ function checkHiddenSourceInNl(index: ExtractedWorkspace): LintDiagnostic[] {
  */
 function makeAddSourceFix(mappingKey: string, schemaRef: string): (source: string) => string {
   const nsIdx = mappingKey.indexOf("::");
-  const displayName = nsIdx !== -1
-    ? mappingKey.slice(nsIdx + 2)
-    : mappingKey;
+  const displayName = nsIdx !== -1 ? mappingKey.slice(nsIdx + 2) : mappingKey;
   const mappingNs = nsIdx !== -1 ? mappingKey.slice(0, nsIdx) : null;
 
   // Convert canonical ref (::name) back to source-level form for insertion
@@ -340,11 +340,33 @@ function makeAddArrowSourceFix(
 // This list covers the commonly-used built-ins as of v2. It may not be exhaustive;
 // if a valid function triggers a warning, add it here and cite the spec section.
 const KNOWN_PIPELINE_FUNCTIONS = new Set([
-  "trim", "lowercase", "uppercase", "coalesce", "round", "split", "first",
-  "last", "to_utc", "to_iso8601", "parse", "null_if_empty", "null_if_invalid",
-  "drop_if_invalid", "drop_if_null", "warn_if_invalid", "warn_if_null",
-  "error_if_invalid", "error_if_null", "validate_email", "now_utc",
-  "title_case", "escape_html", "truncate", "to_number", "prepend", "max_length",
+  "trim",
+  "lowercase",
+  "uppercase",
+  "coalesce",
+  "round",
+  "split",
+  "first",
+  "last",
+  "to_utc",
+  "to_iso8601",
+  "parse",
+  "null_if_empty",
+  "null_if_invalid",
+  "drop_if_invalid",
+  "drop_if_null",
+  "warn_if_invalid",
+  "warn_if_null",
+  "error_if_invalid",
+  "error_if_null",
+  "validate_email",
+  "now_utc",
+  "title_case",
+  "escape_html",
+  "truncate",
+  "to_number",
+  "prepend",
+  "max_length",
 ]);
 
 function checkUnresolvedNlRef(index: ExtractedWorkspace): LintDiagnostic[] {
@@ -353,9 +375,7 @@ function checkUnresolvedNlRef(index: ExtractedWorkspace): LintDiagnostic[] {
 
   for (const item of index.nlRefData) {
     const refs = extractAtRefs(item.text);
-    const mappingKey = item.namespace
-      ? `${item.namespace}::${item.mapping}`
-      : item.mapping;
+    const mappingKey = item.namespace ? `${item.namespace}::${item.mapping}` : item.mapping;
     const mapping = index.mappings.get(mappingKey);
 
     const mappingContext = {
@@ -376,9 +396,10 @@ function checkUnresolvedNlRef(index: ExtractedWorkspace): LintDiagnostic[] {
 
     if (isNoteContext) {
       const entityName = stripNLRefScopePrefix(item.mapping);
-      const nsEntityName = item.namespace && entityName !== "(file-level note)"
-        ? `${item.namespace}::${entityName}`
-        : entityName;
+      const nsEntityName =
+        item.namespace && entityName !== "(file-level note)"
+          ? `${item.namespace}::${entityName}`
+          : entityName;
 
       if (item.mapping.startsWith("note:metric:")) {
         scopeLabel = "metric";
@@ -531,7 +552,7 @@ export function applyFixes(
         appliedFixes.push(d.fix!);
       }
     }
-  /* eslint-enable @typescript-eslint/no-non-null-assertion */
+    /* eslint-enable @typescript-eslint/no-non-null-assertion */
 
     if (source !== originalSource) {
       fixedFiles.set(file, source);

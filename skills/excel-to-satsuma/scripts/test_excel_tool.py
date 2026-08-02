@@ -25,6 +25,7 @@ def run(args: list[str]) -> subprocess.CompletedProcess:
 
 # ── survey ────────────────────────────────────────────────────────
 
+
 class TestSurvey:
     def test_single_tab(self):
         r = run(["survey", str(SIMPLE)])
@@ -36,8 +37,14 @@ class TestSurvey:
         r = run(["survey", str(MULTI)])
         assert r.returncode == 0
         assert "**Tabs**: 6" in r.stdout
-        for tab in ["Instructions", "Order Header Mapping", "Order Line Mapping",
-                     "Status Codes", "Priority Codes", "Changelog"]:
+        for tab in [
+            "Instructions",
+            "Order Header Mapping",
+            "Order Line Mapping",
+            "Status Codes",
+            "Priority Codes",
+            "Changelog",
+        ]:
             assert tab in r.stdout
 
     def test_preview_rows(self):
@@ -62,6 +69,7 @@ class TestSurvey:
 
 
 # ── headers ───────────────────────────────────────────────────────
+
 
 class TestHeaders:
     def test_simple(self):
@@ -95,6 +103,7 @@ class TestHeaders:
 
 # ── formatting ────────────────────────────────────────────────────
 
+
 class TestFormatting:
     def test_detects_fill_colours(self):
         r = run(["formatting", str(MULTI), "Order Header Mapping"])
@@ -114,6 +123,7 @@ class TestFormatting:
 
 # ── range ─────────────────────────────────────────────────────────
 
+
 class TestRange:
     def test_full_range(self):
         r = run(["range", str(SIMPLE), "Field Mapping"])
@@ -127,19 +137,40 @@ class TestRange:
         assert r.stdout.count("ORDER_ID") >= 1
 
     def test_col_range(self):
-        r = run(["range", str(MULTI), "Order Header Mapping", "--rows", "2:4", "--cols", "A:C"])
+        r = run(
+            [
+                "range",
+                str(MULTI),
+                "Order Header Mapping",
+                "--rows",
+                "2:4",
+                "--cols",
+                "A:C",
+            ]
+        )
         assert r.returncode == 0
         # Should only have 3 columns of data
         assert "ORDER_ID" in r.stdout
 
     def test_row_and_col_range(self):
-        r = run(["range", str(MULTI), "Order Header Mapping", "--rows", "2:3", "--cols", "A:E"])
+        r = run(
+            [
+                "range",
+                str(MULTI),
+                "Order Header Mapping",
+                "--rows",
+                "2:3",
+                "--cols",
+                "A:E",
+            ]
+        )
         assert r.returncode == 0
         assert "ORDER_ID" in r.stdout
         assert "CUST_ID" in r.stdout
 
 
 # ── lookup ────────────────────────────────────────────────────────
+
 
 class TestLookup:
     def test_status_codes(self):
@@ -164,6 +195,7 @@ class TestLookup:
 
 
 # ── integration: all 3 test spreadsheets ──────────────────────────
+
 
 class TestAllSpreadsheets:
     @pytest.mark.parametrize("xlsx", [SIMPLE, MULTI, HEALTH])

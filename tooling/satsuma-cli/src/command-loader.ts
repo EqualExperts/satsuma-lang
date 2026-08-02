@@ -29,9 +29,6 @@ import { pathToFileURL } from "node:url";
  *                            "commands/summary.js".
  * @returns A `file://` URL string suitable for `import()`.
  */
-export function commandModuleSpecifier(
-  entryDir: string,
-  relativeModulePath: string,
-): string {
+export function commandModuleSpecifier(entryDir: string, relativeModulePath: string): string {
   return pathToFileURL(join(entryDir, relativeModulePath)).href;
 }

@@ -12,7 +12,14 @@ import { describe, it } from "node:test";
 import { classifyTransform, classifyArrow } from "../dist/classify.js";
 
 function n(type, namedChildren = [], text = "") {
-  return { type, text, isNamed: true, namedChildren, children: namedChildren, startPosition: { row: 0, column: 0 } };
+  return {
+    type,
+    text,
+    isNamed: true,
+    namedChildren,
+    children: namedChildren,
+    startPosition: { row: 0, column: 0 },
+  };
 }
 
 function pipeStep(innerType, innerChildren = [], text = "") {

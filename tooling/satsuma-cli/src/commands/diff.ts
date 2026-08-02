@@ -25,33 +25,41 @@ type ChangeKind = SchemaChange["kind"] | MappingChange["kind"] | TransformChange
  * single-line description. Replaces the prior 14-branch if-else chain
  * (sl-3kmd) and gives TypeScript exhaustiveness checking via `satisfies`.
  */
-const CHANGE_PRINTERS: Record<ChangeKind, (c: SchemaChange | MappingChange | TransformChange) => string> = {
+const CHANGE_PRINTERS: Record<
+  ChangeKind,
+  (c: SchemaChange | MappingChange | TransformChange) => string
+> = {
   // Schema / metric field changes
-  "field-added":     (c) => `      + field ${(c as SchemaChange).field}`,
-  "field-removed":   (c) => `      - field ${(c as SchemaChange).field}`,
-  "type-changed":    (c) => `      ~ ${(c as SchemaChange).field}: ${String(c.from)} -> ${String(c.to)}`,
-  "metadata-changed":(c) => `      ~ ${(c as SchemaChange).field} metadata: ${String(c.from)} -> ${String(c.to)}`,
+  "field-added": (c) => `      + field ${(c as SchemaChange).field}`,
+  "field-removed": (c) => `      - field ${(c as SchemaChange).field}`,
+  "type-changed": (c) =>
+    `      ~ ${(c as SchemaChange).field}: ${String(c.from)} -> ${String(c.to)}`,
+  "metadata-changed": (c) =>
+    `      ~ ${(c as SchemaChange).field} metadata: ${String(c.from)} -> ${String(c.to)}`,
 
   // Metric header attributes
-  "source-changed":  (c) => `      ~ source: ${String(c.from)} -> ${String(c.to)}`,
-  "grain-changed":   (c) => `      ~ grain: ${String(c.from)} -> ${String(c.to)}`,
-  "slices-changed":  (c) => `      ~ slices: ${String(c.from)} -> ${String(c.to)}`,
+  "source-changed": (c) => `      ~ source: ${String(c.from)} -> ${String(c.to)}`,
+  "grain-changed": (c) => `      ~ grain: ${String(c.from)} -> ${String(c.to)}`,
+  "slices-changed": (c) => `      ~ slices: ${String(c.from)} -> ${String(c.to)}`,
 
   // Mapping arrow changes
-  "arrow-count-changed":     (c) => `      ~ arrows: ${String(c.from)} -> ${String(c.to)}`,
-  "sources-changed":         (c) => `      ~ sources: ${(c.from as string[]).join(", ")} -> ${(c.to as string[]).join(", ")}`,
-  "targets-changed":         (c) => `      ~ targets: ${(c.from as string[]).join(", ")} -> ${(c.to as string[]).join(", ")}`,
-  "arrow-added":             (c) => `      + arrow ${String((c as MappingChange).arrow)}`,
-  "arrow-removed":           (c) => `      - arrow ${String((c as MappingChange).arrow)}`,
-  "arrow-transform-changed": (c) => `      ~ arrow ${String((c as MappingChange).arrow)}: ${String(c.from)} -> ${String(c.to)}`,
+  "arrow-count-changed": (c) => `      ~ arrows: ${String(c.from)} -> ${String(c.to)}`,
+  "sources-changed": (c) =>
+    `      ~ sources: ${(c.from as string[]).join(", ")} -> ${(c.to as string[]).join(", ")}`,
+  "targets-changed": (c) =>
+    `      ~ targets: ${(c.from as string[]).join(", ")} -> ${(c.to as string[]).join(", ")}`,
+  "arrow-added": (c) => `      + arrow ${String((c as MappingChange).arrow)}`,
+  "arrow-removed": (c) => `      - arrow ${String((c as MappingChange).arrow)}`,
+  "arrow-transform-changed": (c) =>
+    `      ~ arrow ${String((c as MappingChange).arrow)}: ${String(c.from)} -> ${String(c.to)}`,
 
   // Note changes (schema-level note tag and block notes)
-  "note-changed":  (c) => `      ~ note: ${String(c.from)} -> ${String(c.to)}`,
-  "note-added":    (c) => `      + note ${JSON.stringify(String(c.from))}`,
-  "note-removed":  (c) => `      - note ${JSON.stringify(String(c.from))}`,
+  "note-changed": (c) => `      ~ note: ${String(c.from)} -> ${String(c.to)}`,
+  "note-added": (c) => `      + note ${JSON.stringify(String(c.from))}`,
+  "note-removed": (c) => `      - note ${JSON.stringify(String(c.from))}`,
 
   // Transform body changes
-  "body-changed":  (c) => `      ~ body: ${String(c.from)} -> ${String(c.to)}`,
+  "body-changed": (c) => `      ~ body: ${String(c.from)} -> ${String(c.to)}`,
 } satisfies Record<ChangeKind, (c: SchemaChange | MappingChange | TransformChange) => string>;
 
 export function register(program: Command): void {
@@ -61,7 +69,9 @@ export function register(program: Command): void {
     .option("--json", "structured JSON output")
     .option("--names-only", "list changed block names only")
     .option("--stat", "summary counts only")
-    .addHelpText("after", `
+    .addHelpText(
+      "after",
+      `
 Compares two Satsuma files structurally (not text diff). Only the two
 files themselves are compared — imports are not followed.
 
@@ -79,63 +89,78 @@ Examples:
   satsuma diff v1/pipeline.stm v2/pipeline.stm      # compare two versions
   satsuma diff old.stm new.stm --stat               # summary counts
   satsuma diff old.stm new.stm --json               # full structural delta
-  satsuma diff old.stm new.stm --names-only         # just changed block names`)
-    .action(runCommand(async (pathA: string, pathB: string, opts: { json?: boolean; namesOnly?: boolean; stat?: boolean }) => {
-      let filesA: string[], filesB: string[];
-      try {
-        filesA = await resolveInput(pathA, { followImports: false });
-        filesB = await resolveInput(pathB, { followImports: false });
-      } catch (err: unknown) {
-        // diff is one of the three commands that resolve directly rather
-        // than through loadWorkspace — it needs `followImports: false` and
-        // two separate inputs (see load-workspace.ts header).
-        throw new CommandError(
-          `Error resolving paths: ${(err as Error).message}`,
-          EXIT_PARSE_ERROR,
-        );
-      }
+  satsuma diff old.stm new.stm --names-only         # just changed block names`,
+    )
+    .action(
+      runCommand(
+        async (
+          pathA: string,
+          pathB: string,
+          opts: { json?: boolean; namesOnly?: boolean; stat?: boolean },
+        ) => {
+          let filesA: string[], filesB: string[];
+          try {
+            filesA = await resolveInput(pathA, { followImports: false });
+            filesB = await resolveInput(pathB, { followImports: false });
+          } catch (err: unknown) {
+            // diff is one of the three commands that resolve directly rather
+            // than through loadWorkspace — it needs `followImports: false` and
+            // two separate inputs (see load-workspace.ts header).
+            throw new CommandError(
+              `Error resolving paths: ${(err as Error).message}`,
+              EXIT_PARSE_ERROR,
+            );
+          }
 
-      const indexA = buildIndex(filesA.map((f) => parseFile(f)));
-      const indexB = buildIndex(filesB.map((f) => parseFile(f)));
-      const delta = diffIndex(indexA, indexB);
+          const indexA = buildIndex(filesA.map((f) => parseFile(f)));
+          const indexB = buildIndex(filesB.map((f) => parseFile(f)));
+          const delta = diffIndex(indexA, indexB);
 
-      if (opts.json) {
-        console.log(JSON.stringify(delta, null, 2));
-        return;
-      }
+          if (opts.json) {
+            console.log(JSON.stringify(delta, null, 2));
+            return;
+          }
 
-      const sectionHasChanges = (s: { added: unknown[]; removed: unknown[]; changed: unknown[] }) =>
-        s.added.length > 0 || s.removed.length > 0 || s.changed.length > 0;
-      const notesChanged = delta.notes.added.length > 0 || delta.notes.removed.length > 0;
-      const hasChanges =
-        sectionHasChanges(delta.schemas) ||
-        sectionHasChanges(delta.mappings) ||
-        sectionHasChanges(delta.metrics) ||
-        sectionHasChanges(delta.fragments) ||
-        sectionHasChanges(delta.transforms) ||
-        notesChanged;
+          const sectionHasChanges = (s: {
+            added: unknown[];
+            removed: unknown[];
+            changed: unknown[];
+          }) => s.added.length > 0 || s.removed.length > 0 || s.changed.length > 0;
+          const notesChanged = delta.notes.added.length > 0 || delta.notes.removed.length > 0;
+          const hasChanges =
+            sectionHasChanges(delta.schemas) ||
+            sectionHasChanges(delta.mappings) ||
+            sectionHasChanges(delta.metrics) ||
+            sectionHasChanges(delta.fragments) ||
+            sectionHasChanges(delta.transforms) ||
+            notesChanged;
 
-      if (!hasChanges) {
-        console.log("No structural differences.");
-        return;
-      }
+          if (!hasChanges) {
+            console.log("No structural differences.");
+            return;
+          }
 
-      if (opts.stat) {
-        printStat(delta);
-        return;
-      }
+          if (opts.stat) {
+            printStat(delta);
+            return;
+          }
 
-      if (opts.namesOnly) {
-        printNamesOnly(delta);
-        return;
-      }
+          if (opts.namesOnly) {
+            printNamesOnly(delta);
+            return;
+          }
 
-      printDefault(delta);
-    }));
+          printDefault(delta);
+        },
+      ),
+    );
 }
 
 function printStat(delta: Delta): void {
-  function statSection(label: string, section: { added: unknown[]; removed: unknown[]; changed: unknown[] }): void {
+  function statSection(
+    label: string,
+    section: { added: unknown[]; removed: unknown[]; changed: unknown[] },
+  ): void {
     if (section.added.length > 0) console.log(`  ${section.added.length} ${label} added`);
     if (section.removed.length > 0) console.log(`  ${section.removed.length} ${label} removed`);
     if (section.changed.length > 0) console.log(`  ${section.changed.length} ${label} changed`);
@@ -151,7 +176,11 @@ function printStat(delta: Delta): void {
 
 function printNamesOnly(delta: Delta): void {
   const names = new Set<string>();
-  function collectNames(section: { added: string[]; removed: string[]; changed: Array<{ name: string }> }): void {
+  function collectNames(section: {
+    added: string[];
+    removed: string[];
+    changed: Array<{ name: string }>;
+  }): void {
     for (const n of section.added) names.add(n);
     for (const n of section.removed) names.add(n);
     for (const c of section.changed) names.add(c.name);
@@ -189,9 +218,11 @@ function printNotes(delta: Delta): void {
   console.log();
 }
 
-function printSection(label: string, section: BlockDelta<SchemaChange | MappingChange | TransformChange>): void {
-  const total =
-    section.added.length + section.removed.length + section.changed.length;
+function printSection(
+  label: string,
+  section: BlockDelta<SchemaChange | MappingChange | TransformChange>,
+): void {
+  const total = section.added.length + section.removed.length + section.changed.length;
   if (total === 0) return;
 
   console.log(`${label}:`);

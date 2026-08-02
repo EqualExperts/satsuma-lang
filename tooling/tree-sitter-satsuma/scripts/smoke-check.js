@@ -18,7 +18,7 @@
 "use strict";
 
 const Parser = require("tree-sitter");
-const STM = require("../");          // tree-sitter-satsuma binding (built from grammar.js)
+const STM = require("../"); // tree-sitter-satsuma binding (built from grammar.js)
 const fs = require("fs");
 const path = require("path");
 
@@ -63,8 +63,8 @@ function isMetricSchema(schemaNode) {
   const meta = schemaNode.namedChildren.find((n) => n.type === "metadata_block");
   if (!meta) return false;
   return meta.namedChildren.some(
-    (n) => n.type === "tag_token" && n.namedChildren[0]?.type === "identifier" &&
-           n.text === "metric",
+    (n) =>
+      n.type === "tag_token" && n.namedChildren[0]?.type === "identifier" && n.text === "metric",
   );
 }
 
@@ -112,16 +112,14 @@ function parseFile(filePath) {
       name: blockLabel(n, src),
     })),
     // In v2, metrics are schema_block nodes with the bare `metric` tag in metadata.
-    metrics: collectNodes(root, "schema_block").filter(isMetricSchema).map((n) => ({
-      name: blockLabel(n, src),
-      display: metricDisplayName(n, src),
-    })),
-    warnings: collectNodes(root, "warning_comment").map((n) =>
-      text(n, src).slice(3).trim(),
-    ),
-    questions: collectNodes(root, "question_comment").map((n) =>
-      text(n, src).slice(3).trim(),
-    ),
+    metrics: collectNodes(root, "schema_block")
+      .filter(isMetricSchema)
+      .map((n) => ({
+        name: blockLabel(n, src),
+        display: metricDisplayName(n, src),
+      })),
+    warnings: collectNodes(root, "warning_comment").map((n) => text(n, src).slice(3).trim()),
+    questions: collectNodes(root, "question_comment").map((n) => text(n, src).slice(3).trim()),
   };
 
   return { summary, errors };
@@ -132,9 +130,7 @@ function parseFile(filePath) {
 const args = process.argv.slice(2);
 
 if (args.length === 0) {
-  console.error(
-    "Usage: node scripts/smoke-check.js <file.stm | directory> [...]",
-  );
+  console.error("Usage: node scripts/smoke-check.js <file.stm | directory> [...]");
   process.exit(1);
 }
 
@@ -178,8 +174,6 @@ if (results.length === 1) {
 }
 
 if (totalErrors > 0) {
-  process.stderr.write(
-    `\n${totalErrors} total parse error(s) across ${files.length} file(s)\n`,
-  );
+  process.stderr.write(`\n${totalErrors} total parse error(s) across ${files.length} file(s)\n`);
   process.exit(1);
 }

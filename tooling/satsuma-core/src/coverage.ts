@@ -234,7 +234,9 @@ export function computeMappingCoverage(
   for (const schemaId of targetIds) {
     const def = resolveSchema(schemaId);
     if (!def) continue;
-    schemas.push(coverageForSchema(def, schemaId, "target", targetIds, declaredTgt, nl.arrowBodyOnly));
+    schemas.push(
+      coverageForSchema(def, schemaId, "target", targetIds, declaredTgt, nl.arrowBodyOnly),
+    );
   }
 
   return { schemas };
@@ -422,7 +424,10 @@ function findMappingBlock(tree: Tree, name: string): LocatedMapping | null {
 }
 
 /** Schema references declared in the mapping's `source {}` or `target {}` block. */
-function getSchemaIdsFromBlock(body: SyntaxNode, blockType: "source_block" | "target_block"): string[] {
+function getSchemaIdsFromBlock(
+  body: SyntaxNode,
+  blockType: "source_block" | "target_block",
+): string[] {
   for (const node of body.namedChildren) {
     if (node.type === blockType) {
       const ids: string[] = [];

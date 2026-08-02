@@ -183,7 +183,12 @@ describe("VizModel fixture validation", () => {
       text: "copy @customers.email",
       steps: ["copy @customers.email"],
       atRefs: [
-        { ref: "@customers", classification: "schema_ref", resolved: true, resolvedTo: { kind: "schema", name: "customers" } },
+        {
+          ref: "@customers",
+          classification: "schema_ref",
+          resolved: true,
+          resolvedTo: { kind: "schema", name: "customers" },
+        },
       ],
     };
     /** @type {import("@satsuma/viz-model").TransformInfo} */

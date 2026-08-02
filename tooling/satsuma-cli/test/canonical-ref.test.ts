@@ -1,7 +1,14 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { canonicalRef, canonicalEntityName } from "@satsuma/core";
-import { buildIndex, canonicalKey, distinctArrowRecords, resolveCanonicalKey, resolveScopedEntityRef, resolveIndexKey } from "#src/index-builder.js";
+import {
+  buildIndex,
+  canonicalKey,
+  distinctArrowRecords,
+  resolveCanonicalKey,
+  resolveScopedEntityRef,
+  resolveIndexKey,
+} from "#src/index-builder.js";
 
 describe("canonicalRef", () => {
   it("returns ::schema.field when no namespace", () => {
@@ -198,7 +205,16 @@ describe("distinctArrowRecords", () => {
       { name: "t", namespace: null, fields: [], row: 1 },
     ],
     metrics: [],
-    mappings: [{ name: "m", namespace: null, sources: ["s"], targets: ["t"], arrowCount: arrowRecords.length, row: 2 }],
+    mappings: [
+      {
+        name: "m",
+        namespace: null,
+        sources: ["s"],
+        targets: ["t"],
+        arrowCount: arrowRecords.length,
+        row: 2,
+      },
+    ],
     fragments: [],
     transforms: [],
     warnings: [],

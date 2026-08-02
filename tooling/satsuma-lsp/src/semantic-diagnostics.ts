@@ -14,10 +14,7 @@
 
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { dirname, resolve } from "node:path";
-import {
-  Diagnostic,
-  DiagnosticSeverity,
-} from "vscode-languageserver";
+import { Diagnostic, DiagnosticSeverity } from "vscode-languageserver";
 import type { Tree } from "./parser-utils";
 import type { WorkspaceIndex, DefinitionEntry } from "./workspace-index";
 import {
@@ -26,9 +23,7 @@ import {
   createScopedIndex,
   getImportReachableUris,
 } from "./workspace-index";
-import {
-  validateSemanticWorkspace,
-} from "@satsuma/core";
+import { validateSemanticWorkspace } from "@satsuma/core";
 import type {
   SemanticIndex,
   SemanticSchema,
@@ -99,8 +94,9 @@ export function computeMissingImportDiagnostics(
   uri: string,
   wsIndex: WorkspaceIndex,
 ): Diagnostic[] {
-  return computeSemanticValidationDiagnostics(uri, wsIndex)
-    .filter((d) => d.code === MISSING_IMPORT_RULE);
+  return computeSemanticValidationDiagnostics(uri, wsIndex).filter(
+    (d) => d.code === MISSING_IMPORT_RULE,
+  );
 }
 
 // ---------- Core semantic diagnostics (adapter) ----------
@@ -128,21 +124,17 @@ export function computeSemanticValidationDiagnostics(
   });
 
   // Filter to diagnostics for the specified file and convert to LSP format
-  return coreDiags
-    .filter((d) => d.file === uri)
-    .map(semanticDiagToLsp);
+  return coreDiags.filter((d) => d.file === uri).map(semanticDiagToLsp);
 }
 
 /**
  * Backward-compatible wrapper kept for tests and call sites that still name
  * the old adapter. It now uses the unified core validation entry point.
  */
-export function computeCoreSemanticDiagnostics(
-  uri: string,
-  wsIndex: WorkspaceIndex,
-): Diagnostic[] {
-  return computeSemanticValidationDiagnostics(uri, wsIndex)
-    .filter((d) => d.code !== MISSING_IMPORT_RULE);
+export function computeCoreSemanticDiagnostics(uri: string, wsIndex: WorkspaceIndex): Diagnostic[] {
+  return computeSemanticValidationDiagnostics(uri, wsIndex).filter(
+    (d) => d.code !== MISSING_IMPORT_RULE,
+  );
 }
 
 function missingImportMessage(uri: string, violation: ImportScopeViolation): string {
@@ -172,9 +164,7 @@ function semanticDiagToLsp(d: SemanticDiagnostic): Diagnostic {
  * ResolvedFileImport format. Resolves relative import paths to absolute
  * file URIs using the importing file's directory as the base.
  */
-function buildFileImportsMap(
-  wsIndex: WorkspaceIndex,
-): Map<string, ResolvedFileImport[]> {
+function buildFileImportsMap(wsIndex: WorkspaceIndex): Map<string, ResolvedFileImport[]> {
   const result = new Map<string, ResolvedFileImport[]>();
 
   for (const [importerUri, entries] of wsIndex.imports) {
@@ -223,8 +213,13 @@ function buildSemanticIndex(wsIndex: WorkspaceIndex): SemanticIndex {
   const metrics = new Map<string, SemanticMetric>();
   const transforms = new Map<string, unknown>();
   const duplicates: Array<{
-    kind: string; name: string; file: string; row: number;
-    previousKind: string; previousFile: string; previousRow: number;
+    kind: string;
+    name: string;
+    file: string;
+    row: number;
+    previousKind: string;
+    previousFile: string;
+    previousRow: number;
   }> = [];
 
   for (const [name, entries] of wsIndex.definitions) {
@@ -313,7 +308,7 @@ function buildSemanticIndex(wsIndex: WorkspaceIndex): SemanticIndex {
     mappings,
     metrics,
     transforms,
-    fieldArrows: new Map(),   // Not available from LSP workspace index
+    fieldArrows: new Map(), // Not available from LSP workspace index
     duplicates,
   };
 }

@@ -25,8 +25,8 @@ const dotDotEntries = contents.split("\n").filter((e) => e.includes(".."));
 if (dotDotEntries.length > 0) {
   throw new Error(
     `verify-pack: tarball contains entries with '..' in their paths — ` +
-    `npm will reject these on install.\n` +
-    dotDotEntries.map((e) => `  ${e}`).join("\n")
+      `npm will reject these on install.\n` +
+      dotDotEntries.map((e) => `  ${e}`).join("\n"),
   );
 }
 
@@ -54,7 +54,7 @@ const verbose = execFileSync("tar", ["-tvf", tarballPath, "package/dist/index.js
 if (!/^-rwx/.test(verbose)) {
   throw new Error(
     `verify-pack: dist/index.js is not executable in the tarball. ` +
-    `Permissions: ${verbose.split(/\s+/)[0]}`
+      `Permissions: ${verbose.split(/\s+/)[0]}`,
   );
 }
 

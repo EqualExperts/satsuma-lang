@@ -22,9 +22,7 @@ function ident(text: string): MockNode {
 }
 
 function blockLabel(name: string): MockNode {
-  const inner = name.startsWith("'")
-    ? n("backtick_name", [], name)
-    : n("identifier", [], name);
+  const inner = name.startsWith("'") ? n("backtick_name", [], name) : n("identifier", [], name);
   return n("block_label", [inner]);
 }
 
@@ -106,10 +104,7 @@ describe("extractArrowRecords", () => {
   });
 
   it("extracts an NL arrow with bare identifier steps", () => {
-    const steps = [
-      pipeStep("pipe_text", "trim"),
-      pipeStep("pipe_text", "lowercase"),
-    ];
+    const steps = [pipeStep("pipe_text", "trim"), pipeStep("pipe_text", "lowercase")];
     const arrow = mapArrow("EMAIL", "email", steps, 20);
     const mapping = mappingBlock("m1", [arrow]);
     const root = n("source_file", [mapping]);
@@ -215,7 +210,12 @@ describe("extractArrowRecords", () => {
   });
 
   it("extracts multiple sources from multi-source arrow", () => {
-    const arrow = n("map_arrow", [srcPath("first_name"), srcPath("last_name"), tgtPath("full_name")], "", 40);
+    const arrow = n(
+      "map_arrow",
+      [srcPath("first_name"), srcPath("last_name"), tgtPath("full_name")],
+      "",
+      40,
+    );
     const mapping = mappingBlock("m1", [arrow]);
     const root = n("source_file", [mapping]);
 
@@ -226,7 +226,12 @@ describe("extractArrowRecords", () => {
   });
 
   it("extracts three sources from multi-source arrow", () => {
-    const arrow = n("map_arrow", [srcPath("city"), srcPath("state"), srcPath("zip"), tgtPath("address")], "", 41);
+    const arrow = n(
+      "map_arrow",
+      [srcPath("city"), srcPath("state"), srcPath("zip"), tgtPath("address")],
+      "",
+      41,
+    );
     const mapping = mappingBlock("m1", [arrow]);
     const root = n("source_file", [mapping]);
 
@@ -246,7 +251,12 @@ describe("extractArrowRecords", () => {
   });
 
   it("produces canonical form for namespaced source paths", () => {
-    const arrow = n("map_arrow", [srcPathNs("crm", "customers", "email"), tgtPath("email_addr")], "", 30);
+    const arrow = n(
+      "map_arrow",
+      [srcPathNs("crm", "customers", "email"), tgtPath("email_addr")],
+      "",
+      30,
+    );
     const mapping = mappingBlock("m1", [arrow]);
     const root = n("source_file", [mapping]);
 
@@ -289,9 +299,7 @@ describe("extractArrowRecords against real examples", () => {
     }
 
     // Check an NL arrow with bare identifier steps
-    const trimArrow = records.find(
-      (r) => r.sources[0] === "FIRST_NM" && r.target === "first_name",
-    );
+    const trimArrow = records.find((r) => r.sources[0] === "FIRST_NM" && r.target === "first_name");
     assert.ok(trimArrow, "should find FIRST_NM -> first_name");
     assert.equal(trimArrow.classification, "nl");
     assert.equal(trimArrow.derived, false);
@@ -303,9 +311,7 @@ describe("extractArrowRecords against real examples", () => {
     assert.equal(phoneArrow.classification, "nl");
 
     // Check an NL arrow with quoted text
-    const notesArrow = records.find(
-      (r) => r.sources[0] === "NOTES" && r.target === "notes",
-    );
+    const notesArrow = records.find((r) => r.sources[0] === "NOTES" && r.target === "notes");
     assert.ok(notesArrow);
     assert.equal(notesArrow.classification, "nl");
 
@@ -359,7 +365,9 @@ describe("extractArrowRecords against real examples", () => {
     // extractArrowRecords returns one record per leaf arrow (map_arrow,
     // computed_arrow, nested_arrow). Flatten/each containers are not
     // themselves arrows — they wrap child arrows.
-    const { tree } = parseFile(resolve(EXAMPLES, "filter-flatten-governance/filter-flatten-governance.stm"));
+    const { tree } = parseFile(
+      resolve(EXAMPLES, "filter-flatten-governance/filter-flatten-governance.stm"),
+    );
     const records = extractArrowRecords(tree.rootNode);
     const mapping = records.filter((r) => r.mapping === "order line facts");
     // 3 outer map arrows + 5 flatten children + 1 nested container + 3 computed = 12

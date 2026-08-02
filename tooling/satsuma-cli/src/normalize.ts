@@ -85,7 +85,7 @@ export function matchFields(sourceFields: FieldDecl[], targetFields: FieldDecl[]
       const leaf = f.name.split(".").pop()!;
       return !matchedTargetNorms.has(norm) && !matchedTargetNorms.has(normalizeName(leaf));
     })
-  /* eslint-enable @typescript-eslint/no-non-null-assertion */
+    /* eslint-enable @typescript-eslint/no-non-null-assertion */
     .map((f) => f.name);
 
   return { matched, sourceOnly, targetOnly };

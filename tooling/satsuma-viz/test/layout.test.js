@@ -176,10 +176,7 @@ describe("computeLayout", () => {
     const tgt = result.nodes.get("target");
 
     // ELK layered layout with RIGHT direction: source should be left of target
-    assert.ok(
-      src.x < tgt.x,
-      `Source x (${src.x}) should be less than target x (${tgt.x})`
-    );
+    assert.ok(src.x < tgt.x, `Source x (${src.x}) should be less than target x (${tgt.x})`);
 
     // Should produce edges
     assert.ok(result.edges.length >= 0, "Should have edges array");
@@ -388,13 +385,10 @@ describe("computeLayout", () => {
 
     const result = await computeLayout(model);
 
-    assert.ok(
-      result.nodes.has("crm::customers"),
-      "Should have namespaced schema node"
-    );
+    assert.ok(result.nodes.has("crm::customers"), "Should have namespaced schema node");
     assert.ok(
       !result.nodes.has("ns:crm"),
-      "Namespace layout container should not exist in result nodes"
+      "Namespace layout container should not exist in result nodes",
     );
   });
 
@@ -452,21 +446,35 @@ describe("computeLayout", () => {
     const model = {
       uri: "file:///test.stm",
       fileNotes: [],
-      namespaces: [{
-        name: null,
-        schemas: [{
-          ...schema(
-            "branch_product_daily_as_is",
-            [field("branch_id"), field("branch_name"), field("effective_from", "DATE")],
-          ),
-          metadata: [{ key: "report", value: "" }, { key: "tool", value: "powerbi" }],
-          notes: [{ text: "Long report note that should reserve extra card height in the detailed lineage view.", isMultiline: false, location: loc }],
-          spreads: ["audit_fields"],
-        }],
-        mappings: [],
-        metrics: [],
-        fragments: [],
-      }],
+      namespaces: [
+        {
+          name: null,
+          schemas: [
+            {
+              ...schema("branch_product_daily_as_is", [
+                field("branch_id"),
+                field("branch_name"),
+                field("effective_from", "DATE"),
+              ]),
+              metadata: [
+                { key: "report", value: "" },
+                { key: "tool", value: "powerbi" },
+              ],
+              notes: [
+                {
+                  text: "Long report note that should reserve extra card height in the detailed lineage view.",
+                  isMultiline: false,
+                  location: loc,
+                },
+              ],
+              spreads: ["audit_fields"],
+            },
+          ],
+          mappings: [],
+          metrics: [],
+          fragments: [],
+        },
+      ],
     };
 
     const result = await computeLayout(model);
@@ -487,36 +495,64 @@ describe("computeLayout", () => {
     const model = {
       uri: "file:///test.stm",
       fileNotes: [],
-      namespaces: [{
-        name: null,
-        schemas: [],
-        mappings: [],
-        metrics: [{
-          id: "branch_product_revenue_variance",
-          qualifiedId: "branch_product_revenue_variance",
-          label: "Revenue Variance",
-          source: ["orders"],
-          grain: "daily",
-          slices: ["region", "branch", "product"],
-          filter: null,
-          fields: [
-            { name: "variance_amount", type: "DECIMAL(14,2)", measure: "additive", notes: [], location: loc },
-            { name: "variance_pct", type: "DECIMAL(9,4)", measure: "non_additive", notes: [], location: loc },
+      namespaces: [
+        {
+          name: null,
+          schemas: [],
+          mappings: [],
+          metrics: [
+            {
+              id: "branch_product_revenue_variance",
+              qualifiedId: "branch_product_revenue_variance",
+              label: "Revenue Variance",
+              source: ["orders"],
+              grain: "daily",
+              slices: ["region", "branch", "product"],
+              filter: null,
+              fields: [
+                {
+                  name: "variance_amount",
+                  type: "DECIMAL(14,2)",
+                  measure: "additive",
+                  notes: [],
+                  location: loc,
+                },
+                {
+                  name: "variance_pct",
+                  type: "DECIMAL(9,4)",
+                  measure: "non_additive",
+                  notes: [],
+                  location: loc,
+                },
+              ],
+              notes: [
+                {
+                  text: "Used by operational reporting and downstream dashboards.",
+                  isMultiline: false,
+                  location: loc,
+                },
+              ],
+              comments: [],
+              location: loc,
+            },
           ],
-          notes: [{ text: "Used by operational reporting and downstream dashboards.", isMultiline: false, location: loc }],
-          comments: [],
-          location: loc,
-        }],
-        fragments: [],
-      }],
+          fragments: [],
+        },
+      ],
     };
 
     const result = await computeLayout(model);
     const node = result.nodes.get("branch_product_revenue_variance");
 
     assert.ok(node, "Should have metric node");
-    assert.ok(node.height > 120, `Metric node height (${node.height}) should include meta and notes`);
-    assert.ok(node.width > 240, `Metric node width (${node.width}) should expand for long names/content`);
+    assert.ok(
+      node.height > 120,
+      `Metric node height (${node.height}) should include meta and notes`,
+    );
+    assert.ok(
+      node.width > 240,
+      `Metric node width (${node.width}) should expand for long names/content`,
+    );
   });
 
   it("produces positive dimensions for the overall layout", async () => {
@@ -578,20 +614,34 @@ describe("computeLayout edge metadata survives namespaces and concurrency (sl-i8
     // sl-i8mo: edge bookkeeping was module-level and cleared once per
     // namespace, so ANY later namespace group — even one without mappings —
     // erased every earlier edge's source/target/arrow metadata.
-    const result = await computeLayout(model(
-      ns(null, {
-        schemas: [schema("src", [field("email")]), schema("tgt", [field("email")])],
-        mappings: [mapping("m1", ["src"], "tgt", [arrow("email", "email")])],
-      }),
-      ns("crm", { schemas: [schema("customers", [field("id")], "crm::customers")] }),
-    ));
+    const result = await computeLayout(
+      model(
+        ns(null, {
+          schemas: [schema("src", [field("email")]), schema("tgt", [field("email")])],
+          mappings: [mapping("m1", ["src"], "tgt", [arrow("email", "email")])],
+        }),
+        ns("crm", { schemas: [schema("customers", [field("id")], "crm::customers")] }),
+      ),
+    );
 
     assert.equal(result.edges.length, 1, "the global mapping should produce one edge");
     const edge = result.edges[0];
-    assert.equal(edge.sourceNode, "src", "edge must keep its source node after a later namespace is processed");
-    assert.equal(edge.targetNode, "tgt", "edge must keep its target node after a later namespace is processed");
+    assert.equal(
+      edge.sourceNode,
+      "src",
+      "edge must keep its source node after a later namespace is processed",
+    );
+    assert.equal(
+      edge.targetNode,
+      "tgt",
+      "edge must keep its target node after a later namespace is processed",
+    );
     assert.equal(edge.sourceField, "email");
-    assert.equal(edge.arrow.targetField, "email", "edge must keep its real arrow, not the dummy fallback");
+    assert.equal(
+      edge.arrow.targetField,
+      "email",
+      "edge must keep its real arrow, not the dummy fallback",
+    );
   });
 
   it("returns each call's own edge metadata when layouts run concurrently", async () => {
@@ -599,10 +649,13 @@ describe("computeLayout edge metadata survives namespaces and concurrency (sl-i8
     // could repopulate state between another call's graph build and its
     // post-await extraction. Identical mapping ids make a stale read visible:
     // model A's edge would pick up model B's metadata.
-    const modelFor = (suffix) => model(ns(null, {
-      schemas: [schema(`src_${suffix}`, [field("id")]), schema(`tgt_${suffix}`, [field("id")])],
-      mappings: [mapping("m1", [`src_${suffix}`], `tgt_${suffix}`, [arrow("id", "id")])],
-    }));
+    const modelFor = (suffix) =>
+      model(
+        ns(null, {
+          schemas: [schema(`src_${suffix}`, [field("id")]), schema(`tgt_${suffix}`, [field("id")])],
+          mappings: [mapping("m1", [`src_${suffix}`], `tgt_${suffix}`, [arrow("id", "id")])],
+        }),
+      );
 
     const [a, b] = await Promise.all([computeLayout(modelFor("a")), computeLayout(modelFor("b"))]);
 
@@ -629,44 +682,67 @@ describe("computeLayout field ports for dotted, prefixed, and namespaced paths (
     // sl-l7u0: ports were keyed by bare field name while the edge lookup used
     // the authored ref verbatim, so "src.email" found no port and the edge
     // was silently dropped.
-    const result = await computeLayout(model(
-      [schema("src", [field("email")]), schema("tgt", [field("email")])],
-      [mapping("m1", ["src"], "tgt", [arrow("src.email", "email")])],
-    ));
+    const result = await computeLayout(
+      model(
+        [schema("src", [field("email")]), schema("tgt", [field("email")])],
+        [mapping("m1", ["src"], "tgt", [arrow("src.email", "email")])],
+      ),
+    );
 
-    assert.equal(result.edges.length, 1, "prefixed source ref must resolve to the declared field's port");
+    assert.equal(
+      result.edges.length,
+      1,
+      "prefixed source ref must resolve to the declared field's port",
+    );
     assert.equal(result.edges[0].sourceNode, "src");
   });
 
   it("renders an edge whose target is a nested dotted field path", async () => {
     const tgt = schema("tgt", [{ ...field("customer", "record"), children: [field("email")] }]);
-    const result = await computeLayout(model(
-      [schema("src", [field("email")]), tgt],
-      [mapping("m1", ["src"], "tgt", [arrow("email", "customer.email")])],
-    ));
+    const result = await computeLayout(
+      model(
+        [schema("src", [field("email")]), tgt],
+        [mapping("m1", ["src"], "tgt", [arrow("email", "customer.email")])],
+      ),
+    );
 
-    assert.equal(result.edges.length, 1, "nested dotted target path must resolve to the child field's port");
+    assert.equal(
+      result.edges.length,
+      1,
+      "nested dotted target path must resolve to the child field's port",
+    );
     assert.equal(result.edges[0].targetField, "customer.email");
   });
 
   it("attaches a multi-source arrow to the source schema that declares the field", async () => {
     // Pre-fix the edge was always pinned to sourceRefs[0]; a ref like "b.id"
     // then looked up a non-existent port on schema a and the edge vanished.
-    const result = await computeLayout(model(
-      [schema("a", [field("x")]), schema("b", [field("id")]), schema("tgt", [field("id")])],
-      [mapping("m1", ["a", "b"], "tgt", [arrow("b.id", "id")])],
-    ));
+    const result = await computeLayout(
+      model(
+        [schema("a", [field("x")]), schema("b", [field("id")]), schema("tgt", [field("id")])],
+        [mapping("m1", ["a", "b"], "tgt", [arrow("b.id", "id")])],
+      ),
+    );
 
     assert.equal(result.edges.length, 1);
-    assert.equal(result.edges[0].sourceNode, "b", "the edge must start at the schema declaring the field");
+    assert.equal(
+      result.edges[0].sourceNode,
+      "b",
+      "the edge must start at the schema declaring the field",
+    );
   });
 
   it("keeps ports distinct for same-named fields at different nesting levels", async () => {
     // Pre-fix both rows produced the id "node:email:src" and the later port
     // silently overwrote the earlier one in LayoutNode.ports.
-    const result = await computeLayout(model(
-      [schema("s", [field("email"), { ...field("customer", "record"), children: [field("email")] }])],
-    ));
+    const result = await computeLayout(
+      model([
+        schema("s", [
+          field("email"),
+          { ...field("customer", "record"), children: [field("email")] },
+        ]),
+      ]),
+    );
 
     const ports = result.nodes.get("s").ports;
     const top = ports.get("email:src");
@@ -682,17 +758,22 @@ describe("computeLayout field ports for dotted, prefixed, and namespaced paths (
     const result = await computeLayout({
       uri: "file:///test.stm",
       fileNotes: [],
-      namespaces: [{
-        name: "crm",
-        schemas: [schema("customers", [field("id")], "crm::customers")],
-        mappings: [],
-        metrics: [],
-        fragments: [],
-      }],
+      namespaces: [
+        {
+          name: "crm",
+          schemas: [schema("customers", [field("id")], "crm::customers")],
+          mappings: [],
+          metrics: [],
+          fragments: [],
+        },
+      ],
     });
 
     const ports = result.nodes.get("crm::customers").ports;
-    assert.ok(ports.get("id:src"), "field key must be the local path, undamaged by '::' in the node id");
+    assert.ok(
+      ports.get("id:src"),
+      "field key must be the local path, undamaged by '::' in the node id",
+    );
     assert.ok(ports.get("id:tgt"));
   });
 });
@@ -711,21 +792,23 @@ describe("computeOverviewLayout", () => {
     const model = {
       uri: "file:///test.stm",
       fileNotes: [],
-      namespaces: [{
-        name: null,
-        schemas: [schema("src"), schema("tgt")],
-        mappings: [mapping("m1", ["src"], "tgt", [arrow("id", "id")])],
-        metrics: [],
-        fragments: [],
-      }],
+      namespaces: [
+        {
+          name: null,
+          schemas: [schema("src"), schema("tgt")],
+          mappings: [mapping("m1", ["src"], "tgt", [arrow("id", "id")])],
+          metrics: [],
+          fragments: [],
+        },
+      ],
     };
 
     const result = await computeOverviewLayout(model);
 
     assert.ok(result.nodes.length >= 3, "Should include schema nodes plus a mapping node");
-    const srcNode = result.nodes.find(n => n.id === "src");
-    const tgtNode = result.nodes.find(n => n.id === "tgt");
-    const mappingNode = result.nodes.find(n => n.id === "mapping:_:m1");
+    const srcNode = result.nodes.find((n) => n.id === "src");
+    const tgtNode = result.nodes.find((n) => n.id === "tgt");
+    const mappingNode = result.nodes.find((n) => n.id === "mapping:_:m1");
     assert.ok(srcNode, "Should have src node");
     assert.ok(tgtNode, "Should have tgt node");
     assert.ok(mappingNode, "Should have a mapping node");
@@ -740,20 +823,20 @@ describe("computeOverviewLayout", () => {
     const model = {
       uri: "file:///test.stm",
       fileNotes: [],
-      namespaces: [{
-        name: null,
-        schemas: [
-          schema("src", [field("a"), field("b"), field("c")]),
-          schema("tgt", [field("x"), field("y"), field("z")]),
-        ],
-        mappings: [mapping("m1", ["src"], "tgt", [
-          arrow("a", "x"),
-          arrow("b", "y"),
-          arrow("c", "z"),
-        ])],
-        metrics: [],
-        fragments: [],
-      }],
+      namespaces: [
+        {
+          name: null,
+          schemas: [
+            schema("src", [field("a"), field("b"), field("c")]),
+            schema("tgt", [field("x"), field("y"), field("z")]),
+          ],
+          mappings: [
+            mapping("m1", ["src"], "tgt", [arrow("a", "x"), arrow("b", "y"), arrow("c", "z")]),
+          ],
+          metrics: [],
+          fragments: [],
+        },
+      ],
     };
 
     const result = await computeOverviewLayout(model);
@@ -768,13 +851,15 @@ describe("computeOverviewLayout", () => {
     const model = {
       uri: "file:///test.stm",
       fileNotes: [],
-      namespaces: [{
-        name: null,
-        schemas: [schema("s1"), schema("s2"), schema("tgt")],
-        mappings: [mapping("m1", ["s1", "s2"], "tgt", [arrow("id", "id")])],
-        metrics: [],
-        fragments: [],
-      }],
+      namespaces: [
+        {
+          name: null,
+          schemas: [schema("s1"), schema("s2"), schema("tgt")],
+          mappings: [mapping("m1", ["s1", "s2"], "tgt", [arrow("id", "id")])],
+          metrics: [],
+          fragments: [],
+        },
+      ],
     };
 
     const result = await computeOverviewLayout(model);
@@ -782,7 +867,7 @@ describe("computeOverviewLayout", () => {
     assert.equal(result.edges.length, 3, "Two source inputs plus one target edge");
     const inboundSources = result.edges
       .filter((e) => e.targetNode === "mapping:_:m1")
-      .map(e => e.sourceNode)
+      .map((e) => e.sourceNode)
       .sort();
     assert.deepEqual(inboundSources, ["s1", "s2"]);
     assert.ok(result.edges.some((e) => e.sourceNode === "mapping:_:m1" && e.targetNode === "tgt"));
@@ -797,17 +882,19 @@ describe("computeOverviewLayout", () => {
     const model = {
       uri: "file:///test.stm",
       fileNotes: [],
-      namespaces: [{
-        name: null,
-        schemas: [
-          schema("s1", [field("a"), field("b"), field("c"), field("d")]),
-          schema("s2"),
-          schema("tgt"),
-        ],
-        mappings: [mapping("m1", ["s1", "s2"], "tgt", [arrow("a", "id")])],
-        metrics: [],
-        fragments: [],
-      }],
+      namespaces: [
+        {
+          name: null,
+          schemas: [
+            schema("s1", [field("a"), field("b"), field("c"), field("d")]),
+            schema("s2"),
+            schema("tgt"),
+          ],
+          mappings: [mapping("m1", ["s1", "s2"], "tgt", [arrow("a", "id")])],
+          metrics: [],
+          fragments: [],
+        },
+      ],
     };
 
     const compact = await computeOverviewLayout(model);
@@ -838,33 +925,37 @@ describe("computeOverviewLayout", () => {
     const model = {
       uri: "file:///test.stm",
       fileNotes: [],
-      namespaces: [{
-        name: "crm",
-        schemas: [schema("customers", [field("id")], "crm::customers")],
-        mappings: [],
-        metrics: [],
-        fragments: [],
-      }],
+      namespaces: [
+        {
+          name: "crm",
+          schemas: [schema("customers", [field("id")], "crm::customers")],
+          mappings: [],
+          metrics: [],
+          fragments: [],
+        },
+      ],
     };
 
     const result = await computeOverviewLayout(model);
 
-    const node = result.nodes.find(n => n.id === "crm::customers");
+    const node = result.nodes.find((n) => n.id === "crm::customers");
     assert.ok(node, "Should have namespaced schema node");
-    assert.ok(!result.nodes.find(n => n.id === "ns:crm"), "No namespace node in output");
+    assert.ok(!result.nodes.find((n) => n.id === "ns:crm"), "No namespace node in output");
   });
 
   it("produces positive overall dimensions", async () => {
     const model = {
       uri: "file:///test.stm",
       fileNotes: [],
-      namespaces: [{
-        name: null,
-        schemas: [schema("a")],
-        mappings: [],
-        metrics: [],
-        fragments: [],
-      }],
+      namespaces: [
+        {
+          name: null,
+          schemas: [schema("a")],
+          mappings: [],
+          metrics: [],
+          fragments: [],
+        },
+      ],
     };
 
     const result = await computeOverviewLayout(model);
@@ -876,22 +967,25 @@ describe("computeOverviewLayout", () => {
     const model = {
       uri: "file:///test.stm",
       fileNotes: [],
-      namespaces: [{
-        name: null,
-        schemas: [
-          schema("src"),
-          {
-            ...schema(
-              "order_headers_parquet_with_a_long_name",
-              [field("id"), field("customer_id"), field("created_at")],
-            ),
-            metadata: [{ key: "format", value: "parquet" }],
-          },
-        ],
-        mappings: [],
-        metrics: [],
-        fragments: [],
-      }],
+      namespaces: [
+        {
+          name: null,
+          schemas: [
+            schema("src"),
+            {
+              ...schema("order_headers_parquet_with_a_long_name", [
+                field("id"),
+                field("customer_id"),
+                field("created_at"),
+              ]),
+              metadata: [{ key: "format", value: "parquet" }],
+            },
+          ],
+          mappings: [],
+          metrics: [],
+          fragments: [],
+        },
+      ],
     };
 
     const result = await computeOverviewLayout(model);
@@ -911,13 +1005,15 @@ describe("computeOverviewLayout", () => {
     const model = {
       uri: "file:///test.stm",
       fileNotes: [],
-      namespaces: [{
-        name: null,
-        schemas: [schema("src"), schema("tgt")],
-        mappings: [mapping(longMappingId, ["src"], "tgt", [arrow("id", "id")])],
-        metrics: [],
-        fragments: [],
-      }],
+      namespaces: [
+        {
+          name: null,
+          schemas: [schema("src"), schema("tgt")],
+          mappings: [mapping(longMappingId, ["src"], "tgt", [arrow("id", "id")])],
+          metrics: [],
+          fragments: [],
+        },
+      ],
     };
 
     const result = await computeOverviewLayout(model);
@@ -942,17 +1038,25 @@ describe("computeOverviewLayout", () => {
     const model = {
       uri: "file:///test.stm",
       fileNotes: [],
-      namespaces: [{
-        name: null,
-        schemas: [schema("src"), schema("tgt")],
-        mappings: [mapping("m1", ["src", "Join text that is not a schema"], "tgt", [arrow("id", "id")])],
-        metrics: [],
-        fragments: [],
-      }],
+      namespaces: [
+        {
+          name: null,
+          schemas: [schema("src"), schema("tgt")],
+          mappings: [
+            mapping("m1", ["src", "Join text that is not a schema"], "tgt", [arrow("id", "id")]),
+          ],
+          metrics: [],
+          fragments: [],
+        },
+      ],
     };
 
     const result = await computeOverviewLayout(model);
-    assert.equal(result.edges.length, 2, "Should keep the valid inbound edge plus the mapping-to-target edge");
+    assert.equal(
+      result.edges.length,
+      2,
+      "Should keep the valid inbound edge plus the mapping-to-target edge",
+    );
     assert.ok(result.edges.some((e) => e.sourceNode === "src" && e.targetNode === "mapping:_:m1"));
     assert.ok(result.edges.some((e) => e.sourceNode === "mapping:_:m1" && e.targetNode === "tgt"));
   });

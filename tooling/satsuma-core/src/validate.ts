@@ -25,7 +25,14 @@
  */
 
 import { capitalize } from "./string-utils.js";
-import { extractAtRefs, classifyRef, resolveRef, isSchemaInMappingSources, stripNLRefScopePrefix, computeNLRefPosition } from "./nl-ref.js";
+import {
+  extractAtRefs,
+  classifyRef,
+  resolveRef,
+  isSchemaInMappingSources,
+  stripNLRefScopePrefix,
+  computeNLRefPosition,
+} from "./nl-ref.js";
 import type { DefinitionLookup } from "./nl-ref.js";
 import { expandSpreads, collectFieldPaths } from "./spread-expand.js";
 import type { SpreadEntity, EntityRefResolver, SpreadEntityLookup } from "./spread-expand.js";
@@ -235,8 +242,9 @@ export function validateSemanticWorkspace(
   index: SemanticIndex,
   options: SemanticValidationOptions = {},
 ): SemanticDiagnostic[] {
-  const reachability = options.reachability
-    ?? (options.fileImports ? computeImportReachability(index, options.fileImports) : undefined);
+  const reachability =
+    options.reachability ??
+    (options.fileImports ? computeImportReachability(index, options.fileImports) : undefined);
   return collectSemanticDiagnosticsWithOptions(index, {
     ...options,
     reachability,
@@ -318,7 +326,7 @@ function checkDuplicates(index: SemanticIndex, diagnostics: SemanticDiagnostic[]
 function checkFragmentSpreads(index: SemanticIndex, diagnostics: SemanticDiagnostic[]): void {
   for (const [name, schema] of index.schemas) {
     const currentNs = schema.namespace ?? null;
-    for (const spread of (schema.spreads ?? [])) {
+    for (const spread of schema.spreads ?? []) {
       if (!resolveScopedEntityRef(spread, currentNs, index.fragments as Map<string, unknown>)) {
         diagnostics.push({
           file: schema.file,
@@ -342,8 +350,8 @@ function checkFragmentSpreads(index: SemanticIndex, diagnostics: SemanticDiagnos
  */
 function checkMappingRefs(index: SemanticIndex, diagnostics: SemanticDiagnostic[]): void {
   const allDefinitions = new Map([
-    ...index.schemas as Map<string, unknown>,
-    ...index.fragments as Map<string, unknown>,
+    ...(index.schemas as Map<string, unknown>),
+    ...(index.fragments as Map<string, unknown>),
   ]);
 
   for (const [name, mapping] of index.mappings) {
@@ -352,16 +360,32 @@ function checkMappingRefs(index: SemanticIndex, diagnostics: SemanticDiagnostic[
       if (!resolveScopedEntityRef(src, currentNs, allDefinitions)) {
         let msg = `Mapping '${name}' references undefined source '${src}'`;
         const hints = suggestAlternatives(src, allDefinitions);
-        if (hints.length > 0) msg += `\n  hint: did you mean ${hints.map((h) => `'${h}'`).join(" or ")}?`;
-        diagnostics.push({ file: mapping.file, line: mapping.row + 1, column: 1, severity: "warning", rule: "undefined-ref", message: msg });
+        if (hints.length > 0)
+          msg += `\n  hint: did you mean ${hints.map((h) => `'${h}'`).join(" or ")}?`;
+        diagnostics.push({
+          file: mapping.file,
+          line: mapping.row + 1,
+          column: 1,
+          severity: "warning",
+          rule: "undefined-ref",
+          message: msg,
+        });
       }
     }
     for (const tgt of mapping.targets) {
       if (!resolveScopedEntityRef(tgt, currentNs, allDefinitions)) {
         let msg = `Mapping '${name}' references undefined target '${tgt}'`;
         const hints = suggestAlternatives(tgt, allDefinitions);
-        if (hints.length > 0) msg += `\n  hint: did you mean ${hints.map((h) => `'${h}'`).join(" or ")}?`;
-        diagnostics.push({ file: mapping.file, line: mapping.row + 1, column: 1, severity: "warning", rule: "undefined-ref", message: msg });
+        if (hints.length > 0)
+          msg += `\n  hint: did you mean ${hints.map((h) => `'${h}'`).join(" or ")}?`;
+        diagnostics.push({
+          file: mapping.file,
+          line: mapping.row + 1,
+          column: 1,
+          severity: "warning",
+          rule: "undefined-ref",
+          message: msg,
+        });
       }
     }
   }
@@ -375,7 +399,7 @@ function checkMappingRefs(index: SemanticIndex, diagnostics: SemanticDiagnostic[
 function checkMetricRefs(index: SemanticIndex, diagnostics: SemanticDiagnostic[]): void {
   for (const [name, metric] of index.metrics) {
     const currentNs = metric.namespace ?? null;
-    for (const src of (metric.sources ?? [])) {
+    for (const src of metric.sources ?? []) {
       if (!resolveScopedEntityRef(src, currentNs, index.schemas as Map<string, unknown>)) {
         diagnostics.push({
           file: metric.file,
@@ -475,9 +499,8 @@ function checkNLRefs(index: SemanticIndex, diagnostics: SemanticDiagnostic[]): v
  */
 function noteDisplayScope(mapping: string, namespace: string | null): string {
   const entityName = stripNLRefScopePrefix(mapping);
-  const qualifiedName = namespace && entityName !== "(file-level note)"
-    ? `${namespace}::${entityName}`
-    : entityName;
+  const qualifiedName =
+    namespace && entityName !== "(file-level note)" ? `${namespace}::${entityName}` : entityName;
 
   if (mapping === "note:") return "file-level note";
   if (mapping.startsWith("note:metric:")) return `metric '${qualifiedName}'`;
@@ -530,7 +553,10 @@ function checkArrowFieldRefs(index: SemanticIndex, diagnostics: SemanticDiagnost
   const uniqueArrows: SemanticArrow[] = [];
   for (const [, arrows] of index.fieldArrows) {
     for (const arrow of arrows) {
-      if (!seenArrows.has(arrow)) { seenArrows.add(arrow); uniqueArrows.push(arrow); }
+      if (!seenArrows.has(arrow)) {
+        seenArrows.add(arrow);
+        uniqueArrows.push(arrow);
+      }
     }
   }
 
@@ -561,7 +587,15 @@ function checkArrowFieldRefs(index: SemanticIndex, diagnostics: SemanticDiagnost
     for (const s of resolvedSrcKeys) {
       collectFieldPaths(index.schemas.get(s)?.fields ?? [], "", srcFieldPaths);
     }
-    const srcHasUnresolved = expandSpreads(resolvedSrcKeys, currentNs, resolveRef, lookupFragment, srcFieldPaths, diagnostics as never[], lookupSchema);
+    const srcHasUnresolved = expandSpreads(
+      resolvedSrcKeys,
+      currentNs,
+      resolveRef,
+      lookupFragment,
+      srcFieldPaths,
+      diagnostics as never[],
+      lookupSchema,
+    );
 
     // Multi-source mappings let arrows qualify a path with the authored
     // source name (s2.created_at). The qualified set must include
@@ -571,19 +605,43 @@ function checkArrowFieldRefs(index: SemanticIndex, diagnostics: SemanticDiagnost
     // this pass discards them to avoid duplicates.
     if (resolvedSrcKeys.length > 1) {
       for (let i = 0; i < mapping.sources.length; i++) {
-        const key = resolveScopedEntityRef(mapping.sources[i]!, currentNs, index.schemas as Map<string, unknown>);
+        const key = resolveScopedEntityRef(
+          mapping.sources[i]!,
+          currentNs,
+          index.schemas as Map<string, unknown>,
+        );
         if (!key) continue;
         const perSourcePaths = new Set<string>();
         collectFieldPaths(index.schemas.get(key)?.fields ?? [], "", perSourcePaths);
-        expandSpreads([key], currentNs, resolveRef, lookupFragment, perSourcePaths, [], lookupSchema);
+        expandSpreads(
+          [key],
+          currentNs,
+          resolveRef,
+          lookupFragment,
+          perSourcePaths,
+          [],
+          lookupSchema,
+        );
         for (const p of perSourcePaths) srcFieldPaths.add(`${mapping.sources[i]}.${p}`);
       }
     }
 
     const tgtFieldPaths = new Set<string>();
-    collectFieldPaths(resolvedTgtKey ? (index.schemas.get(resolvedTgtKey)?.fields ?? []) : [], "", tgtFieldPaths);
+    collectFieldPaths(
+      resolvedTgtKey ? (index.schemas.get(resolvedTgtKey)?.fields ?? []) : [],
+      "",
+      tgtFieldPaths,
+    );
     const tgtHasUnresolved = resolvedTgtKey
-      ? expandSpreads([resolvedTgtKey], currentNs, resolveRef, lookupFragment, tgtFieldPaths, diagnostics as never[], lookupSchema)
+      ? expandSpreads(
+          [resolvedTgtKey],
+          currentNs,
+          resolveRef,
+          lookupFragment,
+          tgtFieldPaths,
+          diagnostics as never[],
+          lookupSchema,
+        )
       : false;
 
     // Add convention-inferred fields so they don't trigger false positives.
@@ -592,10 +650,15 @@ function checkArrowFieldRefs(index: SemanticIndex, diagnostics: SemanticDiagnost
       if (sch) for (const f of getConventionFields(sch)) srcFieldPaths.add(f);
     }
     for (let i = 0; i < mapping.sources.length; i++) {
-      const key = resolveScopedEntityRef(mapping.sources[i]!, currentNs, index.schemas as Map<string, unknown>);
+      const key = resolveScopedEntityRef(
+        mapping.sources[i]!,
+        currentNs,
+        index.schemas as Map<string, unknown>,
+      );
       if (!key) continue;
       const sch = index.schemas.get(key);
-      if (sch) for (const f of getConventionFields(sch)) srcFieldPaths.add(`${mapping.sources[i]}.${f}`);
+      if (sch)
+        for (const f of getConventionFields(sch)) srcFieldPaths.add(`${mapping.sources[i]}.${f}`);
     }
     if (resolvedTgtKey) {
       const sch = index.schemas.get(resolvedTgtKey);
@@ -605,30 +668,40 @@ function checkArrowFieldRefs(index: SemanticIndex, diagnostics: SemanticDiagnost
     for (const arrow of uniqueArrows) {
       // Named mappings match by bare name; anonymous mappings (name=null) match
       // by the synthetic index key (e.g. "<anon>@path:row") stored in arrow.mapping.
-      const mappingMatch = mapping.name !== null
-        ? arrow.mapping === mapping.name
-        : arrow.mapping === bareIndexKey;
+      const mappingMatch =
+        mapping.name !== null ? arrow.mapping === mapping.name : arrow.mapping === bareIndexKey;
       if (!mappingMatch || (arrow.namespace ?? null) !== currentNs) continue;
       if (arrow.file !== mapping.file) continue; // guard against cross-file duplicate mapping names
 
       for (const source of arrow.sources) {
         if (
-          srcSchema && index.schemas.has(srcSchema) && !srcHasUnresolved &&
+          srcSchema &&
+          index.schemas.has(srcSchema) &&
+          !srcHasUnresolved &&
           !resolveFieldPath(source, resolvedSrcKeys, index, srcFieldPaths)
         ) {
           diagnostics.push({
-            file: arrow.file, line: arrow.line + 1, column: 1, severity: "warning",
+            file: arrow.file,
+            line: arrow.line + 1,
+            column: 1,
+            severity: "warning",
             rule: "field-not-in-schema",
             message: `Arrow source '${source}' not declared in schema '${blamedSourceSchema(source, resolvedSrcKeys, srcSchema)}'`,
           });
         }
       }
       if (
-        arrow.target && resolvedTgtKey && index.schemas.has(resolvedTgtKey) && !tgtHasUnresolved &&
+        arrow.target &&
+        resolvedTgtKey &&
+        index.schemas.has(resolvedTgtKey) &&
+        !tgtHasUnresolved &&
         !resolveFieldPath(arrow.target, [resolvedTgtKey], index, tgtFieldPaths)
       ) {
         diagnostics.push({
-          file: arrow.file, line: arrow.line + 1, column: 1, severity: "warning",
+          file: arrow.file,
+          line: arrow.line + 1,
+          column: 1,
+          severity: "warning",
           rule: "field-not-in-schema",
           message: `Arrow target '${arrow.target}' not declared in schema '${resolvedTgtKey}'`,
         });
@@ -656,7 +729,10 @@ function checkTransformSpreads(index: SemanticIndex, diagnostics: SemanticDiagno
           const currentNs = arrow.namespace ?? null;
           if (!resolveScopedEntityRef(spreadName, currentNs, index.transforms)) {
             diagnostics.push({
-              file: arrow.file, line: arrow.line + 1, column: 1, severity: "warning",
+              file: arrow.file,
+              line: arrow.line + 1,
+              column: 1,
+              severity: "warning",
               rule: "undefined-ref",
               message: `Arrow in mapping '${arrow.mapping}' spreads undefined transform '${spreadName}'`,
             });
@@ -675,10 +751,26 @@ function checkTransformSpreads(index: SemanticIndex, diagnostics: SemanticDiagno
  */
 function checkRefMetadata(index: SemanticIndex, diagnostics: SemanticDiagnostic[]): void {
   for (const [schemaName, schema] of index.schemas) {
-    checkFieldRefMetadata(schema.fields, schemaName, schema.file, schema.row, schema.namespace ?? null, index, diagnostics);
+    checkFieldRefMetadata(
+      schema.fields,
+      schemaName,
+      schema.file,
+      schema.row,
+      schema.namespace ?? null,
+      index,
+      diagnostics,
+    );
   }
   for (const [fragName, frag] of index.fragments) {
-    checkFieldRefMetadata(frag.fields, fragName, frag.file, frag.row, frag.namespace ?? null, index, diagnostics);
+    checkFieldRefMetadata(
+      frag.fields,
+      fragName,
+      frag.file,
+      frag.row,
+      frag.namespace ?? null,
+      index,
+      diagnostics,
+    );
   }
 }
 
@@ -696,9 +788,14 @@ function checkFieldRefMetadata(
       for (const m of field.metadata) {
         if (m.kind === "kv" && m.key === "ref") {
           const refTarget = m.value.replace(/^@/, "").split(".")[0]!;
-          if (!resolveScopedEntityRef(refTarget, currentNs, index.schemas as Map<string, unknown>)) {
+          if (
+            !resolveScopedEntityRef(refTarget, currentNs, index.schemas as Map<string, unknown>)
+          ) {
             diagnostics.push({
-              file, line: row + 1, column: 1, severity: "warning",
+              file,
+              line: row + 1,
+              column: 1,
+              severity: "warning",
               rule: "undefined-ref",
               message: `Field '${field.name}' in '${entityName}' references undefined schema '${refTarget}' via (ref ${m.value})`,
             });
@@ -734,8 +831,8 @@ function checkImportScope(
   policy: ImportScopeDiagnosticPolicy = {},
 ): void {
   const allDefinitions = new Map<string, unknown>([
-    ...index.schemas as Map<string, unknown>,
-    ...index.fragments as Map<string, unknown>,
+    ...(index.schemas as Map<string, unknown>),
+    ...(index.fragments as Map<string, unknown>),
   ]);
 
   // Helper: check if a resolved symbol key is reachable from a given file.
@@ -773,24 +870,41 @@ function checkImportScope(
       column: 1,
       severity: "error",
       rule: policy.rule ?? "import-scope",
-      message: policy.message?.(violation)
-        ?? `${capitalize(entityKind)} '${entityName}' references ${refKind} '${resolved}' which is not reachable from this file's imports`,
+      message:
+        policy.message?.(violation) ??
+        `${capitalize(entityKind)} '${entityName}' references ${refKind} '${resolved}' which is not reachable from this file's imports`,
     });
   }
 
   // --- Schema spread fragments ---
   for (const [name, schema] of index.schemas) {
-    for (const spread of (schema.spreads ?? [])) {
-      checkRef(spread, schema.namespace ?? null, index.fragments as Map<string, unknown>,
-        schema.file, "schema", name, schema.row, "fragment");
+    for (const spread of schema.spreads ?? []) {
+      checkRef(
+        spread,
+        schema.namespace ?? null,
+        index.fragments as Map<string, unknown>,
+        schema.file,
+        "schema",
+        name,
+        schema.row,
+        "fragment",
+      );
     }
   }
 
   // --- Fragment spread fragments ---
   for (const [name, fragment] of index.fragments) {
-    for (const spread of (fragment.spreads ?? [])) {
-      checkRef(spread, fragment.namespace ?? null, index.fragments as Map<string, unknown>,
-        fragment.file, "fragment", name, fragment.row, "fragment");
+    for (const spread of fragment.spreads ?? []) {
+      checkRef(
+        spread,
+        fragment.namespace ?? null,
+        index.fragments as Map<string, unknown>,
+        fragment.file,
+        "fragment",
+        name,
+        fragment.row,
+        "fragment",
+      );
     }
   }
 
@@ -798,19 +912,45 @@ function checkImportScope(
   for (const [name, mapping] of index.mappings) {
     const ns = mapping.namespace ?? null;
     for (const src of mapping.sources) {
-      checkRef(src, ns, allDefinitions, mapping.file, "mapping", name ?? "<anonymous>", mapping.row, "source");
+      checkRef(
+        src,
+        ns,
+        allDefinitions,
+        mapping.file,
+        "mapping",
+        name ?? "<anonymous>",
+        mapping.row,
+        "source",
+      );
     }
     for (const tgt of mapping.targets) {
-      checkRef(tgt, ns, allDefinitions, mapping.file, "mapping", name ?? "<anonymous>", mapping.row, "target");
+      checkRef(
+        tgt,
+        ns,
+        allDefinitions,
+        mapping.file,
+        "mapping",
+        name ?? "<anonymous>",
+        mapping.row,
+        "target",
+      );
     }
   }
 
   // --- Metric source refs ---
   for (const [name, metric] of index.metrics) {
     const ns = metric.namespace ?? null;
-    for (const src of (metric.sources ?? [])) {
-      checkRef(src, ns, index.schemas as Map<string, unknown>,
-        metric.file, "metric", name, metric.row, "source");
+    for (const src of metric.sources ?? []) {
+      checkRef(
+        src,
+        ns,
+        index.schemas as Map<string, unknown>,
+        metric.file,
+        "metric",
+        name,
+        metric.row,
+        "source",
+      );
     }
   }
 
@@ -835,16 +975,18 @@ function checkImportScope(
               column: 1,
               severity: "error",
               rule: policy.rule ?? "import-scope",
-              message: policy.message?.({
-                file: arrow.file,
-                row: arrow.line,
-                entityKind: "arrow",
-                entityName: arrow.mapping ?? "<anonymous>",
-                refKind: "transform",
-                ref: spreadName,
-                resolved,
-                definitionFile: definitionFileFor(index.transforms.get(resolved)),
-              }) ?? `Arrow in mapping '${arrow.mapping}' references transform '${resolved}' which is not reachable from this file's imports`,
+              message:
+                policy.message?.({
+                  file: arrow.file,
+                  row: arrow.line,
+                  entityKind: "arrow",
+                  entityName: arrow.mapping ?? "<anonymous>",
+                  refKind: "transform",
+                  ref: spreadName,
+                  resolved,
+                  definitionFile: definitionFileFor(index.transforms.get(resolved)),
+                }) ??
+                `Arrow in mapping '${arrow.mapping}' references transform '${resolved}' which is not reachable from this file's imports`,
             });
           }
         }
@@ -873,9 +1015,7 @@ function definitionFileFor(definition: unknown): string | null {
  *
  * Kept in sync with CONSTRAINT_TAGS in @satsuma/viz-model (badge rendering).
  */
-const CONSTRAINT_FLAG_TOKENS = new Set([
-  "pk", "required", "unique", "indexed", "pii", "encrypt",
-]);
+const CONSTRAINT_FLAG_TOKENS = new Set(["pk", "required", "unique", "indexed", "pii", "encrypt"]);
 
 /** Matches `NAME(args)` type text, capturing the bare name and the raw args. */
 const TYPE_WITH_ARGS = /^([A-Za-z_][A-Za-z0-9_-]*)\((.*)\)$/;
@@ -905,9 +1045,7 @@ function checkFieldTypeParens(
     const match = field.type?.match(TYPE_WITH_ARGS);
     if (match) {
       const [, typeName, rawArgs] = match;
-      const flagged = rawArgs!
-        .split(/[,\s]+/)
-        .filter((arg) => CONSTRAINT_FLAG_TOKENS.has(arg));
+      const flagged = rawArgs!.split(/[,\s]+/).filter((arg) => CONSTRAINT_FLAG_TOKENS.has(arg));
       if (flagged.length > 0) {
         const constraints = flagged.map((f) => `'${f}'`).join(", ");
         diagnostics.push({
@@ -963,7 +1101,13 @@ const DV_LINK_FIELDS = ["load_date", "record_source"] as const;
 const DV_SAT_FIELDS = ["load_date", "load_end_date", "hash_diff", "record_source"] as const;
 
 /** Slowly-changing dimension tracking columns added to Kimball dimensions under scd: 2 or scd: 6. */
-const KIMBALL_SCD_FIELDS = ["surrogate_key", "valid_from", "valid_to", "is_current", "row_hash"] as const;
+const KIMBALL_SCD_FIELDS = [
+  "surrogate_key",
+  "valid_from",
+  "valid_to",
+  "is_current",
+  "row_hash",
+] as const;
 
 /** ETL audit columns present on all Kimball fact tables. */
 const KIMBALL_FACT_FIELDS = ["etl_batch_id", "loaded_at"] as const;
@@ -982,7 +1126,9 @@ const KIMBALL_FACT_FIELDS = ["etl_batch_id", "loaded_at"] as const;
 function getConventionFields(schema: SemanticSchema): Set<string> {
   const fields = new Set<string>();
   const meta = schema.blockMetadata ?? [];
-  const tags = new Set(meta.filter((m): m is MetaEntry & { kind: "tag" } => m.kind === "tag").map((m) => m.tag));
+  const tags = new Set(
+    meta.filter((m): m is MetaEntry & { kind: "tag" } => m.kind === "tag").map((m) => m.tag),
+  );
   const kvs = meta.filter((m): m is MetaEntry & { kind: "kv" } => m.kind === "kv");
 
   // --- Data Vault 2.0 conventions ---
@@ -1037,20 +1183,40 @@ function getConventionFields(schema: SemanticSchema): Set<string> {
  * SemanticIndex. Fragment refs resolve relative to `currentNs` — the
  * namespace of whichever entity owns the spread being expanded.
  */
-function makeSpreadLookups(index: SemanticIndex, currentNs: string | null): {
+function makeSpreadLookups(
+  index: SemanticIndex,
+  currentNs: string | null,
+): {
   resolveRef: EntityRefResolver;
   lookupFragment: SpreadEntityLookup;
   lookupSchema: SpreadEntityLookup;
 } {
   return {
-    resolveRef: (ref, _ns) => resolveScopedEntityRef(ref, currentNs, index.fragments as Map<string, unknown>),
+    resolveRef: (ref, _ns) =>
+      resolveScopedEntityRef(ref, currentNs, index.fragments as Map<string, unknown>),
     lookupFragment: (key): SpreadEntity | undefined => {
       const f = index.fragments.get(key);
-      return f ? { fields: f.fields, hasSpreads: f.hasSpreads ?? false, spreads: f.spreads, file: f.file, row: f.row } : undefined;
+      return f
+        ? {
+            fields: f.fields,
+            hasSpreads: f.hasSpreads ?? false,
+            spreads: f.spreads,
+            file: f.file,
+            row: f.row,
+          }
+        : undefined;
     },
     lookupSchema: (key): SpreadEntity | undefined => {
       const s = index.schemas.get(key);
-      return s ? { fields: s.fields, hasSpreads: s.hasSpreads ?? false, spreads: s.spreads, file: s.file, row: s.row } : undefined;
+      return s
+        ? {
+            fields: s.fields,
+            hasSpreads: s.hasSpreads ?? false,
+            spreads: s.spreads,
+            file: s.file,
+            row: s.row,
+          }
+        : undefined;
     },
   };
 }
@@ -1065,11 +1231,13 @@ function qualifiedSourceSchema(path: string, schemaNames: string[]): string | nu
   const dotIdx = path.indexOf(".");
   if (dotIdx <= 0) return null;
   const qualifier = path.slice(0, dotIdx);
-  return schemaNames.find((s) => {
-    if (s === qualifier) return true;
-    const nsIdx = s.indexOf("::");
-    return nsIdx !== -1 && s.slice(nsIdx + 2) === qualifier;
-  }) ?? null;
+  return (
+    schemaNames.find((s) => {
+      if (s === qualifier) return true;
+      const nsIdx = s.indexOf("::");
+      return nsIdx !== -1 && s.slice(nsIdx + 2) === qualifier;
+    }) ?? null
+  );
 }
 
 /**
@@ -1092,7 +1260,12 @@ function blamedSourceSchema(path: string, schemaNames: string[], firstSource: st
  *  - Qualified paths like "source_schema.field" are resolved by stripping the
  *    prefix; the qualified schema's spread-inherited fields count too (sl-kkao).
  */
-function resolveFieldPath(path: string, schemaNames: string[], index: SemanticIndex, fieldPaths: Set<string>): boolean {
+function resolveFieldPath(
+  path: string,
+  schemaNames: string[],
+  index: SemanticIndex,
+  fieldPaths: Set<string>,
+): boolean {
   if (path.startsWith(".")) return true;
   if (fieldPaths.has(path)) return true;
   if (schemaNames.includes(path)) return true;
@@ -1106,8 +1279,19 @@ function resolveFieldPath(path: string, schemaNames: string[], index: SemanticIn
     if (schema?.hasSpreads) {
       // Spread expansion diagnostics are already emitted when the caller
       // builds its field path sets — discard them here to avoid duplicates.
-      const { resolveRef, lookupFragment, lookupSchema } = makeSpreadLookups(index, schema.namespace ?? null);
-      expandSpreads([matchedSchema], schema.namespace ?? null, resolveRef, lookupFragment, qualPaths, [], lookupSchema);
+      const { resolveRef, lookupFragment, lookupSchema } = makeSpreadLookups(
+        index,
+        schema.namespace ?? null,
+      );
+      expandSpreads(
+        [matchedSchema],
+        schema.namespace ?? null,
+        resolveRef,
+        lookupFragment,
+        qualPaths,
+        [],
+        lookupSchema,
+      );
     }
     if (qualPaths.has(rest)) return true;
   }
@@ -1123,7 +1307,14 @@ function makeSemanticLookup(index: SemanticIndex): DefinitionLookup {
     hasSchema: (key) => index.schemas.has(key),
     getSchema: (key) => {
       const s = index.schemas.get(key);
-      return s ? { fields: s.fields, hasSpreads: s.hasSpreads ?? false, spreads: s.spreads, namespace: s.namespace } : null;
+      return s
+        ? {
+            fields: s.fields,
+            hasSpreads: s.hasSpreads ?? false,
+            spreads: s.spreads,
+            namespace: s.namespace,
+          }
+        : null;
     },
     hasFragment: (key) => index.fragments.has(key),
     getFragment: (key) => {
@@ -1135,6 +1326,17 @@ function makeSemanticLookup(index: SemanticIndex): DefinitionLookup {
       const m = index.mappings.get(key);
       return m ? { sources: m.sources, targets: m.targets, namespace: m.namespace ?? null } : null;
     },
-    iterateSchemas: () => index.schemas.entries() as unknown as Iterable<[string, { fields: FieldDecl[]; hasSpreads: boolean; namespace?: string | null; spreads?: string[] }]>,
+    iterateSchemas: () =>
+      index.schemas.entries() as unknown as Iterable<
+        [
+          string,
+          {
+            fields: FieldDecl[];
+            hasSpreads: boolean;
+            namespace?: string | null;
+            spreads?: string[];
+          },
+        ]
+      >,
   };
 }

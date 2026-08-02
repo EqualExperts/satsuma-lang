@@ -321,13 +321,7 @@ connection.onPrepareRename((params) => {
   const uri = params.textDocument.uri;
   const tree = trees.get(uri);
   if (!tree) return null;
-  return prepareRename(
-    tree,
-    params.position.line,
-    params.position.character,
-    uri,
-    scopeIndex(uri),
-  );
+  return prepareRename(tree, params.position.line, params.position.character, uri, scopeIndex(uri));
 });
 
 connection.onRenameRequest((params) => {
@@ -371,14 +365,11 @@ connection.onRequest("satsuma/blockNames", () => {
 });
 
 /** Return the VizModel for a document (for mapping visualization). */
-connection.onRequest(
-  "satsuma/vizModel",
-  (params: { uri: string }) => {
-    const tree = trees.get(params.uri);
-    if (!tree) return null;
-    return buildVizModel(params.uri, tree, scopeIndex(params.uri));
-  },
-);
+connection.onRequest("satsuma/vizModel", (params: { uri: string }) => {
+  const tree = trees.get(params.uri);
+  if (!tree) return null;
+  return buildVizModel(params.uri, tree, scopeIndex(params.uri));
+});
 
 /**
  * Return a merged VizModel spanning the full transitive lineage reachable from
@@ -388,12 +379,9 @@ connection.onRequest(
  * open in any editor are parsed straight from disk, so the lineage really is
  * the full import closure, not just the open tabs (sl-mg63).
  */
-connection.onRequest(
-  "satsuma/vizFullLineage",
-  (params: { uri: string }) => {
-    return computeFullLineage(params.uri, wsIndex, (uri) => trees.get(uri) ?? parseTreeFromDisk(uri));
-  },
-);
+connection.onRequest("satsuma/vizFullLineage", (params: { uri: string }) => {
+  return computeFullLineage(params.uri, wsIndex, (uri) => trees.get(uri) ?? parseTreeFromDisk(uri));
+});
 
 /** Return linked file URIs for cross-file lineage expansion in the viz. */
 connection.onRequest(
@@ -413,34 +401,28 @@ connection.onRequest(
 );
 
 /** Return field locations for a schema/fragment (for coverage decorations). */
-connection.onRequest(
-  "satsuma/fieldLocations",
-  (params: { name: string }) => {
-    const defs = resolveDefinition(wsIndex, params.name, null);
-    if (defs.length === 0) return [];
-    const def = defs[0]!;
-    const result: { name: string; uri: string; line: number }[] = [];
-    function collect(fields: typeof def.fields, prefix: string): void {
-      for (const f of fields) {
-        const dotPath = prefix ? `${prefix}.${f.name}` : f.name;
-        result.push({ name: dotPath, uri: def.uri, line: f.range.start.line });
-        if (f.children.length > 0) collect(f.children, dotPath);
-      }
+connection.onRequest("satsuma/fieldLocations", (params: { name: string }) => {
+  const defs = resolveDefinition(wsIndex, params.name, null);
+  if (defs.length === 0) return [];
+  const def = defs[0]!;
+  const result: { name: string; uri: string; line: number }[] = [];
+  function collect(fields: typeof def.fields, prefix: string): void {
+    for (const f of fields) {
+      const dotPath = prefix ? `${prefix}.${f.name}` : f.name;
+      result.push({ name: dotPath, uri: def.uri, line: f.range.start.line });
+      if (f.children.length > 0) collect(f.children, dotPath);
     }
-    collect(def.fields, "");
-    return result;
-  },
-);
+  }
+  collect(def.fields, "");
+  return result;
+});
 
 /** Return per-field coverage for both source and target schemas of a mapping. */
-connection.onRequest(
-  "satsuma/mappingCoverage",
-  (params: { uri: string; mappingName: string }) => {
-    const tree = trees.get(params.uri);
-    if (!tree) return { schemas: [] };
-    return computeMappingCoverage(params.uri, tree, params.mappingName, scopeIndex(params.uri));
-  },
-);
+connection.onRequest("satsuma/mappingCoverage", (params: { uri: string; mappingName: string }) => {
+  const tree = trees.get(params.uri);
+  if (!tree) return { schemas: [] };
+  return computeMappingCoverage(params.uri, tree, params.mappingName, scopeIndex(params.uri));
+});
 
 connection.onRequest(
   "satsuma/actionContext",
@@ -497,9 +479,7 @@ function sendMergedDiagnostics(uri: string, tree: Tree): void {
   // Deduplicate: core semantic diagnostics may overlap with CLI validate
   // diagnostics. Use rule + line as the dedup key, preferring CLI results
   // (they may have more precise position data from full file parsing).
-  const validateKeys = new Set(
-    validateDiags.map((d) => `${d.code}:${d.range.start.line}`),
-  );
+  const validateKeys = new Set(validateDiags.map((d) => `${d.code}:${d.range.start.line}`));
   const dedupedSemanticDiags = semanticDiags.filter(
     (d) => !validateKeys.has(`${d.code}:${d.range.start.line}`),
   );
@@ -508,11 +488,7 @@ function sendMergedDiagnostics(uri: string, tree: Tree): void {
   // diagnostic conversion and freezes all diagnostics for the file (sl-sme1).
   connection.sendDiagnostics({
     uri,
-    diagnostics: ensureNonEmptyMessages([
-      ...parseDiags,
-      ...validateDiags,
-      ...dedupedSemanticDiags,
-    ]),
+    diagnostics: ensureNonEmptyMessages([...parseDiags, ...validateDiags, ...dedupedSemanticDiags]),
   });
 }
 

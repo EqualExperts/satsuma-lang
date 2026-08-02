@@ -34,12 +34,10 @@ async function openOrderLinesDetail(page: Page): Promise<void> {
     { timeout: 20_000 },
   );
   // dispatchEvent: overview cards can sit under the minimap overlay.
-  await page
-    .locator("[data-testid='overview-mapping-card-order-lines']")
-    .dispatchEvent("click");
-  await expect(
-    page.locator("[data-testid='mapping-detail-order-lines']").first(),
-  ).toBeVisible({ timeout: 10_000 });
+  await page.locator("[data-testid='overview-mapping-card-order-lines']").dispatchEvent("click");
+  await expect(page.locator("[data-testid='mapping-detail-order-lines']").first()).toBeVisible({
+    timeout: 10_000,
+  });
 }
 
 function sourceCard(page: Page) {

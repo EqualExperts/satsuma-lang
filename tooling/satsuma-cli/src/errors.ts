@@ -84,9 +84,7 @@ export function findSuggestion(name: string, available: string[]): string | null
   if (exact) return exact;
 
   // Prefix match
-  const prefix = available.find((k) =>
-    k.toLowerCase().startsWith(name.toLowerCase().slice(0, 3)),
-  );
+  const prefix = available.find((k) => k.toLowerCase().startsWith(name.toLowerCase().slice(0, 3)));
   return prefix ?? null;
 }
 

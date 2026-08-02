@@ -27,8 +27,7 @@ export function highlightAtRefs(text: string): string {
  */
 export function renderMarkdown(text: string): string {
   // Escape HTML special chars
-  const esc = (s: string) =>
-    s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
   // Apply inline formatting to an already-escaped string
   const inline = (s: string) =>

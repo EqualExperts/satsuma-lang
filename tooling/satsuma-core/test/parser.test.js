@@ -90,7 +90,9 @@ describe("parser singleton — post-init", () => {
     // guarantee, so if brackets were ever re-admitted to the grammar this test
     // failing is the signal that path normalisation needs revisiting.
     const parser = getParser();
-    const tree = parser.parse("mapping load {\n  source { src }\n  target { tgt }\n  items[].id -> sku\n}\n");
+    const tree = parser.parse(
+      "mapping load {\n  source { src }\n  target { tgt }\n  items[].id -> sku\n}\n",
+    );
     assert.equal(tree.rootNode.hasError, true, "bracket paths must not parse in v2");
   });
 });

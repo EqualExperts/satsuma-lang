@@ -91,9 +91,8 @@ describe("overview edge anchor geometry", () => {
   });
 
   it("shifts anchors below the namespace pill row for namespaced cards", async () => {
-    const { computeOverviewLayout, HEADER_HEIGHT, NAMESPACE_PILL_HEIGHT } = await import(
-      "../dist/satsuma-viz.js"
-    );
+    const { computeOverviewLayout, HEADER_HEIGHT, NAMESPACE_PILL_HEIGHT } =
+      await import("../dist/satsuma-viz.js");
     const result = await computeOverviewLayout(
       model("crm", ["src", "tgt"], [mapping("m1", ["crm::src"], "crm::tgt")]),
     );
@@ -118,9 +117,7 @@ describe("overview edge anchor geometry", () => {
   });
 
   it("reserves pill-row height in node heights only for namespaced nodes", async () => {
-    const { computeOverviewLayout, NAMESPACE_PILL_HEIGHT } = await import(
-      "../dist/satsuma-viz.js"
-    );
+    const { computeOverviewLayout, NAMESPACE_PILL_HEIGHT } = await import("../dist/satsuma-viz.js");
     const globalScope = await computeOverviewLayout(
       model(null, ["src", "tgt"], [mapping("m1", ["src"], "tgt")]),
     );
@@ -132,10 +129,7 @@ describe("overview edge anchor geometry", () => {
     // cards AND mapping pills. The renderer pins cards to these node heights,
     // so any other delta means the chrome and the layout have diverged.
     const h = (layout, id) => layout.nodes.find((n) => n.id === id).height;
-    assert.equal(
-      h(namespaced, "crm::src") - h(globalScope, "src"),
-      NAMESPACE_PILL_HEIGHT,
-    );
+    assert.equal(h(namespaced, "crm::src") - h(globalScope, "src"), NAMESPACE_PILL_HEIGHT);
     assert.equal(
       h(namespaced, "mapping:crm:m1") - h(globalScope, "mapping:_:m1"),
       NAMESPACE_PILL_HEIGHT,

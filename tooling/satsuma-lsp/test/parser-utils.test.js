@@ -12,7 +12,9 @@ const assert = require("node:assert/strict");
 const { initTestParser, parse } = require("./helper");
 const { nodeAtPosition } = require("../dist/parser-utils");
 
-before(async () => { await initTestParser(); });
+before(async () => {
+  await initTestParser();
+});
 
 // Column reference for the fixture below (line 4):
 //   "  source { customers }"

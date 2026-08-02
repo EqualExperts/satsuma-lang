@@ -43,16 +43,16 @@ test("a mapping targeting a metric renders the metric card in the TARGET column"
   await page
     .locator("[data-testid='overview-mapping-card-conversion-rate-pipeline']")
     .dispatchEvent("click");
-  const detail = page
-    .locator("[data-testid='mapping-detail-conversion-rate-pipeline']")
-    .first();
+  const detail = page.locator("[data-testid='mapping-detail-conversion-rate-pipeline']").first();
   await expect(detail).toBeVisible({ timeout: 10_000 });
 
   // The target column must contain the conversion_rate metric card — not be
   // empty — with its measure fields and metric metadata pills visible.
-  const targetCard = page.locator(
-    "[data-testid^='mapping-detail-conversion-rate-pipeline-target-schema-card-conversion-rate']",
-  ).first();
+  const targetCard = page
+    .locator(
+      "[data-testid^='mapping-detail-conversion-rate-pipeline-target-schema-card-conversion-rate']",
+    )
+    .first();
   await expect(targetCard).toBeVisible();
   await expect(targetCard).toContainText("pipeline_stage");
   await expect(targetCard).toContainText("value");
@@ -92,9 +92,7 @@ test("a mapping sourcing from a metric renders the metric card in the SOURCES co
   // overview card to appear (proves the model rebuilt with the new mapping).
   const buffer = await page.locator("#source-input").inputValue();
   await page.locator("#source-input").fill(buffer + METRIC_SOURCE_MAPPING);
-  const mappingCard = page.locator(
-    "[data-testid='overview-mapping-card-win-rate-report-load']",
-  );
+  const mappingCard = page.locator("[data-testid='overview-mapping-card-win-rate-report-load']");
   await expect(mappingCard).toBeVisible({ timeout: 10_000 });
 
   // The appended mapping lays out at the canvas edge — under the minimap.
@@ -102,9 +100,11 @@ test("a mapping sourcing from a metric renders the metric card in the SOURCES co
   const detail = page.locator("[data-testid='mapping-detail-win-rate-report-load']").first();
   await expect(detail).toBeVisible({ timeout: 10_000 });
 
-  const sourceCard = page.locator(
-    "[data-testid^='mapping-detail-win-rate-report-load-source-schema-card-conversion-rate']",
-  ).first();
+  const sourceCard = page
+    .locator(
+      "[data-testid^='mapping-detail-win-rate-report-load-source-schema-card-conversion-rate']",
+    )
+    .first();
   await expect(sourceCard).toBeVisible();
   await expect(sourceCard).toContainText("pipeline_stage");
   await expect(sourceCard).toContainText("value");

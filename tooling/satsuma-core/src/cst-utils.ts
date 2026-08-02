@@ -37,7 +37,11 @@ export function children(node: SyntaxNode, type: string): SyntaxNode[] {
 /**
  * Collect all descendants of a given type (depth-first).
  */
-export function allDescendants(node: SyntaxNode, type: string, acc: SyntaxNode[] = []): SyntaxNode[] {
+export function allDescendants(
+  node: SyntaxNode,
+  type: string,
+  acc: SyntaxNode[] = [],
+): SyntaxNode[] {
   for (const c of node.namedChildren) {
     if (c !== null) {
       if (c.type === type) acc.push(c);

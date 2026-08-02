@@ -14,22 +14,71 @@ import { describe, it, before } from "node:test";
 import * as assert from "node:assert/strict";
 
 const loc = { uri: "file:///test.stm", line: 1, character: 0 };
-const field = (name, type = "STRING") => ({ name, type, constraints: [], notes: [], comments: [], children: [], location: loc });
-const arrow = (source, target) => ({ sourceFields: [source], targetField: target, transform: null, metadata: [], comments: [], location: loc });
-const schema = (id, fields) => ({ id, qualifiedId: id, kind: "schema", label: null, fields, notes: [], comments: [], metadata: [], location: loc, hasExternalLineage: false, spreads: [] });
-const mapping = (id, sourceRefs, targetRef, arrows) => ({ id, sourceRefs, targetRef, arrows, eachBlocks: [], flattenBlocks: [], nestedArrows: [], sourceBlock: null, notes: [], comments: [], location: loc });
+const field = (name, type = "STRING") => ({
+  name,
+  type,
+  constraints: [],
+  notes: [],
+  comments: [],
+  children: [],
+  location: loc,
+});
+const arrow = (source, target) => ({
+  sourceFields: [source],
+  targetField: target,
+  transform: null,
+  metadata: [],
+  comments: [],
+  location: loc,
+});
+const schema = (id, fields) => ({
+  id,
+  qualifiedId: id,
+  kind: "schema",
+  label: null,
+  fields,
+  notes: [],
+  comments: [],
+  metadata: [],
+  location: loc,
+  hasExternalLineage: false,
+  spreads: [],
+});
+const mapping = (id, sourceRefs, targetRef, arrows) => ({
+  id,
+  sourceRefs,
+  targetRef,
+  arrows,
+  eachBlocks: [],
+  flattenBlocks: [],
+  nestedArrows: [],
+  sourceBlock: null,
+  notes: [],
+  comments: [],
+  location: loc,
+});
 
 const model = {
   uri: "file:///test.stm",
   fileNotes: [],
-  namespaces: [{
-    name: null,
-    notes: [],
-    schemas: [schema("src_users", [field("id"), field("email")]), schema("tgt_users", [field("user_id"), field("email")])],
-    fragments: [],
-    metrics: [],
-    mappings: [mapping("users_map", ["src_users"], "tgt_users", [arrow("id", "user_id"), arrow("email", "email")])],
-  }],
+  namespaces: [
+    {
+      name: null,
+      notes: [],
+      schemas: [
+        schema("src_users", [field("id"), field("email")]),
+        schema("tgt_users", [field("user_id"), field("email")]),
+      ],
+      fragments: [],
+      metrics: [],
+      mappings: [
+        mapping("users_map", ["src_users"], "tgt_users", [
+          arrow("id", "user_id"),
+          arrow("email", "email"),
+        ]),
+      ],
+    },
+  ],
 };
 
 /** Flatten a lit TemplateResult tree to a string for structural assertions. */

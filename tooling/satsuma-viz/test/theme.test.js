@@ -25,7 +25,7 @@ function getTokensByBlock() {
   const lightMatch = css.match(/:host\s*\{([\s\S]*?)\n\}/);
   const darkMatch = css.match(/:host\(\[theme="dark"\]\)\s*\{([\s\S]*?)\n\}/);
   assert.ok(lightMatch, "Expected to find :host token block in tokens.css");
-  assert.ok(darkMatch, "Expected to find :host([theme=\"dark\"]) token block in tokens.css");
+  assert.ok(darkMatch, 'Expected to find :host([theme="dark"]) token block in tokens.css');
 
   return {
     light: parseTokenBlockTokens(lightMatch[1]),
@@ -69,11 +69,7 @@ describe("theme token parity", () => {
 
     const missing = requiredDarkTokens.filter((tokenName) => !dark.has(tokenName));
 
-    assert.deepEqual(
-      missing,
-      [],
-      `Missing dark token overrides: ${missing.join(", ")}`,
-    );
+    assert.deepEqual(missing, [], `Missing dark token overrides: ${missing.join(", ")}`);
   });
 });
 
@@ -87,7 +83,7 @@ describe("satsuma-viz theme property", () => {
     assert.equal(el.theme, "light");
   });
 
-  it("reflects theme to the `theme` attribute so :host([theme=\"dark\"]) engages", async () => {
+  it('reflects theme to the `theme` attribute so :host([theme="dark"]) engages', async () => {
     // Reflection is the ONLY palette-switching mechanism: assigning theme must
     // write the `theme` attribute on the host so the tokens.css
     // `:host([theme="dark"])` override block applies. If reflect were dropped,

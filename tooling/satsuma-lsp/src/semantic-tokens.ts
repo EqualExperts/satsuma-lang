@@ -13,27 +13,27 @@ import type { SyntaxNode } from "./parser-utils";
 
 /** Ordered token types — index positions are referenced by the builder. */
 const tokenTypes: string[] = [
-  SemanticTokenTypes.keyword,       // 0
-  SemanticTokenTypes.type,          // 1
-  SemanticTokenTypes.function,      // 2
-  SemanticTokenTypes.variable,      // 3
-  SemanticTokenTypes.property,      // 4
-  SemanticTokenTypes.string,        // 5
-  SemanticTokenTypes.comment,       // 6
-  SemanticTokenTypes.decorator,     // 7
-  SemanticTokenTypes.namespace,     // 8
-  SemanticTokenTypes.operator,      // 9
-  SemanticTokenTypes.enumMember,    // 10
-  SemanticTokenTypes.number,        // 11 (unused, but standard)
+  SemanticTokenTypes.keyword, // 0
+  SemanticTokenTypes.type, // 1
+  SemanticTokenTypes.function, // 2
+  SemanticTokenTypes.variable, // 3
+  SemanticTokenTypes.property, // 4
+  SemanticTokenTypes.string, // 5
+  SemanticTokenTypes.comment, // 6
+  SemanticTokenTypes.decorator, // 7
+  SemanticTokenTypes.namespace, // 8
+  SemanticTokenTypes.operator, // 9
+  SemanticTokenTypes.enumMember, // 10
+  SemanticTokenTypes.number, // 11 (unused, but standard)
 ];
 
 /** Ordered token modifiers — bitmask positions. */
 const tokenModifiers: string[] = [
-  SemanticTokenModifiers.definition,    // 0
-  SemanticTokenModifiers.declaration,   // 1
-  SemanticTokenModifiers.readonly,      // 2
-  SemanticTokenModifiers.defaultLibrary,// 3
-  "nlRef",                              // 4 — @ref inside NL string
+  SemanticTokenModifiers.definition, // 0
+  SemanticTokenModifiers.declaration, // 1
+  SemanticTokenModifiers.readonly, // 2
+  SemanticTokenModifiers.defaultLibrary, // 3
+  "nlRef", // 4 — @ref inside NL string
 ];
 
 export const semanticTokensLegend: SemanticTokensLegend = {
@@ -54,45 +54,45 @@ interface TokenMapping {
  */
 const CAPTURE_MAP: Record<string, TokenMapping> = {
   // Keywords
-  "keyword":            { typeIndex: 0, modifierBits: 0 },
-  "keyword.import":     { typeIndex: 0, modifierBits: 0 },
-  "keyword.context":    { typeIndex: 0, modifierBits: 0 },
-  "keyword.operator":   { typeIndex: 0, modifierBits: 0 },
+  keyword: { typeIndex: 0, modifierBits: 0 },
+  "keyword.import": { typeIndex: 0, modifierBits: 0 },
+  "keyword.context": { typeIndex: 0, modifierBits: 0 },
+  "keyword.operator": { typeIndex: 0, modifierBits: 0 },
 
   // Block labels — definitions
-  "type.definition":    { typeIndex: 1, modifierBits: 1 << 0 },  // type + definition
-  "function.definition":{ typeIndex: 2, modifierBits: 1 << 0 },  // function + definition
-  "module":             { typeIndex: 8, modifierBits: 0 },        // namespace
+  "type.definition": { typeIndex: 1, modifierBits: 1 << 0 }, // type + definition
+  "function.definition": { typeIndex: 2, modifierBits: 1 << 0 }, // function + definition
+  module: { typeIndex: 8, modifierBits: 0 }, // namespace
 
   // Fields and variables
-  "variable.field":     { typeIndex: 4, modifierBits: 0 },        // property
-  "variable":           { typeIndex: 3, modifierBits: 0 },        // variable
+  "variable.field": { typeIndex: 4, modifierBits: 0 }, // property
+  variable: { typeIndex: 3, modifierBits: 0 }, // variable
 
   // Types
-  "type":               { typeIndex: 1, modifierBits: 0 },
+  type: { typeIndex: 1, modifierBits: 0 },
 
   // Metadata / decorators
-  "attribute":          { typeIndex: 7, modifierBits: 0 },        // decorator
+  attribute: { typeIndex: 7, modifierBits: 0 }, // decorator
 
   // Strings
-  "string":             { typeIndex: 5, modifierBits: 0 },
-  "string.special":     { typeIndex: 5, modifierBits: 0 },
-  "string.multiline":   { typeIndex: 5, modifierBits: 0 },
-  "string.path":        { typeIndex: 5, modifierBits: 0 },
+  string: { typeIndex: 5, modifierBits: 0 },
+  "string.special": { typeIndex: 5, modifierBits: 0 },
+  "string.multiline": { typeIndex: 5, modifierBits: 0 },
+  "string.path": { typeIndex: 5, modifierBits: 0 },
 
   // Comments
-  "comment":            { typeIndex: 6, modifierBits: 0 },
-  "comment.warning":    { typeIndex: 6, modifierBits: 0 },
-  "comment.question":   { typeIndex: 6, modifierBits: 0 },
+  comment: { typeIndex: 6, modifierBits: 0 },
+  "comment.warning": { typeIndex: 6, modifierBits: 0 },
+  "comment.question": { typeIndex: 6, modifierBits: 0 },
 
   // Constants (enum values, map keys/values, builtins)
-  "constant":           { typeIndex: 10, modifierBits: 0 },       // enumMember
-  "constant.builtin":   { typeIndex: 10, modifierBits: 1 << 3 },  // enumMember + defaultLibrary
+  constant: { typeIndex: 10, modifierBits: 0 }, // enumMember
+  "constant.builtin": { typeIndex: 10, modifierBits: 1 << 3 }, // enumMember + defaultLibrary
 
   // Operators / punctuation
-  "operator":           { typeIndex: 9, modifierBits: 0 },
-  "punctuation.bracket":{ typeIndex: 9, modifierBits: 0 },
-  "punctuation.delimiter":{ typeIndex: 9, modifierBits: 0 },
+  operator: { typeIndex: 9, modifierBits: 0 },
+  "punctuation.bracket": { typeIndex: 9, modifierBits: 0 },
+  "punctuation.delimiter": { typeIndex: 9, modifierBits: 0 },
 };
 
 // ---------- Query loading ----------
@@ -111,7 +111,8 @@ export function setHighlightsSource(source: string): void {
 
 function getHighlightsQuery(): Query {
   if (_query) return _query;
-  if (!_highlightsSource) throw new Error("highlights.scm not loaded — call setHighlightsSource() first");
+  if (!_highlightsSource)
+    throw new Error("highlights.scm not loaded — call setHighlightsSource() first");
   const language = getLanguage();
   _query = createQuery(language, _highlightsSource);
   return _query;
@@ -222,7 +223,10 @@ function collectNlRefNodes(root: SyntaxNode): Set<string> {
     if (cursor.gotoFirstChild()) continue;
     if (cursor.gotoNextSibling()) continue;
     while (true) {
-      if (!cursor.gotoParent()) { reachedRoot = true; break; }
+      if (!cursor.gotoParent()) {
+        reachedRoot = true;
+        break;
+      }
       if (cursor.gotoNextSibling()) break;
     }
   } while (!reachedRoot);
@@ -232,19 +236,16 @@ function collectNlRefNodes(root: SyntaxNode): Set<string> {
 
 /** Segment type for split string tokenisation. */
 interface Segment {
-  offset: number;    // byte offset within node text
+  offset: number; // byte offset within node text
   length: number;
-  isRef: boolean;    // true = @ref (variable), false = string
+  isRef: boolean; // true = @ref (variable), false = string
 }
 
 /**
  * For an nl_string or multiline_string that contains @refs,
  * emit interleaved string and variable tokens instead of one big string token.
  */
-function emitSplitStringTokens(
-  node: SyntaxNode,
-  builder: SemanticTokensBuilder,
-): void {
+function emitSplitStringTokens(node: SyntaxNode, builder: SemanticTokensBuilder): void {
   const text = node.text;
   const startRow = node.startPosition.row;
   const startCol = node.startPosition.column;
@@ -282,9 +283,9 @@ function emitSplitStringTokens(
   }
 
   // Emit each segment, splitting across lines as needed
-  const nlRefBit = 1 << 4;  // nlRef modifier bitmask
+  const nlRefBit = 1 << 4; // nlRef modifier bitmask
   for (const seg of segments) {
-    const typeIndex = seg.isRef ? 3 : 5;  // variable or string
+    const typeIndex = seg.isRef ? 3 : 5; // variable or string
     const modBits = seg.isRef ? nlRefBit : 0;
     const segText = text.slice(seg.offset, seg.offset + seg.length);
     const segLines = segText.split("\n");
@@ -292,7 +293,10 @@ function emitSplitStringTokens(
     // Find starting line for this segment
     let segLineIdx = 0;
     for (let l = lineOffsets.length - 1; l >= 0; l--) {
-      if (seg.offset >= lineOffsets[l]!) { segLineIdx = l; break; }
+      if (seg.offset >= lineOffsets[l]!) {
+        segLineIdx = l;
+        break;
+      }
     }
 
     for (let i = 0; i < segLines.length; i++) {

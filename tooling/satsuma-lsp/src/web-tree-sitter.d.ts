@@ -44,7 +44,11 @@ declare module "web-tree-sitter" {
     constructor();
     delete(): void;
     setLanguage(language: Language | null): this;
-    parse(input: string | ParseCallback, oldTree?: Tree | null, options?: ParseOptions): Tree | null;
+    parse(
+      input: string | ParseCallback,
+      oldTree?: Tree | null,
+      options?: ParseOptions,
+    ): Tree | null;
     reset(): void;
     getIncludedRanges(): Range[];
     getTimeoutMicros(): number;

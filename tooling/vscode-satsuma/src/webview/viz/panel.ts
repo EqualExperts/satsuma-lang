@@ -4,11 +4,7 @@ import { isSatsumaFilePath } from "@satsuma/core/source-files";
 import type { LanguageClient } from "vscode-languageclient/node";
 import { FieldLineagePanel } from "../field-lineage/panel";
 import { resolveEntryFile } from "../../commands/entry-file";
-import {
-  loadExpandedModels,
-  loadFullLineageModel,
-  vizThemeForKind,
-} from "./integration";
+import { loadExpandedModels, loadFullLineageModel, vizThemeForKind } from "./integration";
 import { RefreshGate } from "./refresh-gate";
 
 export class VizPanel {
@@ -27,11 +23,7 @@ export class VizPanel {
    */
   private readonly refreshGate = new RefreshGate();
 
-  static createOrShow(
-    extensionUri: vscode.Uri,
-    client: LanguageClient,
-    cliPath: string,
-  ): void {
+  static createOrShow(extensionUri: vscode.Uri, client: LanguageClient, cliPath: string): void {
     if (VizPanel.currentPanel) {
       VizPanel.currentPanel.panel.reveal(vscode.ViewColumn.Beside);
       VizPanel.currentPanel.refresh();
@@ -45,9 +37,7 @@ export class VizPanel {
       {
         enableScripts: true,
         retainContextWhenHidden: true,
-        localResourceRoots: [
-          vscode.Uri.file(join(extensionUri.fsPath, "dist", "webview")),
-        ],
+        localResourceRoots: [vscode.Uri.file(join(extensionUri.fsPath, "dist", "webview"))],
       },
     );
 
@@ -83,13 +73,11 @@ export class VizPanel {
     this.disposables.push(saveWatcher);
 
     // Refresh when active editor changes to an .stm file
-    const editorWatcher = vscode.window.onDidChangeActiveTextEditor(
-      (editor) => {
-        if (editor?.document.languageId === "satsuma") {
-          this.refresh();
-        }
-      },
-    );
+    const editorWatcher = vscode.window.onDidChangeActiveTextEditor((editor) => {
+      if (editor?.document.languageId === "satsuma") {
+        this.refresh();
+      }
+    });
     this.disposables.push(editorWatcher);
 
     // Live theme switching: when the user changes their VS Code colour theme
@@ -115,9 +103,7 @@ export class VizPanel {
     // and the .stm editor is no longer the active editor.
     const editor = vscode.window.activeTextEditor;
     const activeUri =
-      editor?.document.languageId === "satsuma"
-        ? editor.document.uri.toString()
-        : undefined;
+      editor?.document.languageId === "satsuma" ? editor.document.uri.toString() : undefined;
     const uri = activeUri ?? this._lastUri;
 
     if (!uri) {
@@ -209,9 +195,7 @@ export class VizPanel {
     // no workspace open, let the dialog choose its own starting location.
     const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri;
     const uri = await vscode.window.showSaveDialog({
-      defaultUri: workspaceRoot
-        ? vscode.Uri.joinPath(workspaceRoot, "mapping-viz.svg")
-        : undefined,
+      defaultUri: workspaceRoot ? vscode.Uri.joinPath(workspaceRoot, "mapping-viz.svg") : undefined,
       filters: { "SVG files": ["svg"] },
     });
     if (uri) {
@@ -223,9 +207,9 @@ export class VizPanel {
   private async expandLineage(schemaId: string): Promise<void> {
     const editor = vscode.window.activeTextEditor;
     const currentUri =
-      (editor?.document.languageId === "satsuma"
-        ? editor.document.uri.toString()
-        : undefined) ?? this._lastUri ?? "";
+      (editor?.document.languageId === "satsuma" ? editor.document.uri.toString() : undefined) ??
+      this._lastUri ??
+      "";
 
     // An expansion is computed against the model currently in the webview.
     // If a refresh starts while the request is in flight, the expansion
@@ -272,26 +256,10 @@ export class VizPanel {
 
   private getHtml(): string {
     const vizScriptUri = this.panel.webview.asWebviewUri(
-      vscode.Uri.file(
-        join(
-          this.extensionUri.fsPath,
-          "dist",
-          "webview",
-          "viz",
-          "viz.js",
-        ),
-      ),
+      vscode.Uri.file(join(this.extensionUri.fsPath, "dist", "webview", "viz", "viz.js")),
     );
     const styleUri = this.panel.webview.asWebviewUri(
-      vscode.Uri.file(
-        join(
-          this.extensionUri.fsPath,
-          "dist",
-          "webview",
-          "viz",
-          "viz.css",
-        ),
-      ),
+      vscode.Uri.file(join(this.extensionUri.fsPath, "dist", "webview", "viz", "viz.css")),
     );
     const nonce = getNonce();
 
@@ -313,8 +281,7 @@ export class VizPanel {
 
 function getNonce(): string {
   let text = "";
-  const chars =
-    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
   for (let i = 0; i < 32; i++) {
     text += chars.charAt(Math.floor(Math.random() * chars.length));
   }

@@ -29,12 +29,18 @@ const WASM_PATH = resolve(__dirname, "../../tree-sitter-satsuma/tree-sitter-sats
 describe("extractAtRefs()", () => {
   it("extracts @ref mentions", () => {
     const refs = extractAtRefs("Sum @amount grouped by @order_id");
-    assert.deepEqual(refs.map(r => r.ref), ["amount", "order_id"]);
+    assert.deepEqual(
+      refs.map((r) => r.ref),
+      ["amount", "order_id"],
+    );
   });
 
   it("extracts @ns::schema.field refs", () => {
     const refs = extractAtRefs("Join @crm::customers.id to @dim_customer.customer_id");
-    assert.deepEqual(refs.map(r => r.ref), ["crm::customers.id", "dim_customer.customer_id"]);
+    assert.deepEqual(
+      refs.map((r) => r.ref),
+      ["crm::customers.id", "dim_customer.customer_id"],
+    );
   });
 
   it("handles @`backtick-name` refs", () => {
@@ -48,8 +54,14 @@ describe("extractAtRefs()", () => {
     // indistinguishable from the path @tax.rate. `raw` keeps the quoting so
     // classification and resolution can treat the name as literal.
     const refs = extractAtRefs("uses @`tax.rate` and @plain.path");
-    assert.deepEqual(refs.map((r) => r.ref), ["tax.rate", "plain.path"]);
-    assert.deepEqual(refs.map((r) => r.raw), ["`tax.rate`", "plain.path"]);
+    assert.deepEqual(
+      refs.map((r) => r.ref),
+      ["tax.rate", "plain.path"],
+    );
+    assert.deepEqual(
+      refs.map((r) => r.raw),
+      ["`tax.rate`", "plain.path"],
+    );
   });
 
   it("returns empty for text with no refs", () => {
@@ -86,15 +98,27 @@ describe("extractAtRefs()", () => {
   it("extracts @ref at start of string", () => {
     // Start-of-string is one of the explicitly allowed positions.
     const refs = extractAtRefs("@customer_id is the key");
-    assert.deepEqual(refs.map(r => r.ref), ["customer_id"]);
+    assert.deepEqual(
+      refs.map((r) => r.ref),
+      ["customer_id"],
+    );
   });
 
   it("extracts @refs after opening punctuation like ( [ { , ;", () => {
     // Acceptance criterion from sl-gl21: opening punctuation must still
     // qualify as a valid prefix so refs in parenthesised text resolve.
-    assert.deepEqual(extractAtRefs("coalesce(@a, @b)").map(r => r.ref), ["a", "b"]);
-    assert.deepEqual(extractAtRefs("[@a; @b]").map(r => r.ref), ["a", "b"]);
-    assert.deepEqual(extractAtRefs("{@a}").map(r => r.ref), ["a"]);
+    assert.deepEqual(
+      extractAtRefs("coalesce(@a, @b)").map((r) => r.ref),
+      ["a", "b"],
+    );
+    assert.deepEqual(
+      extractAtRefs("[@a; @b]").map((r) => r.ref),
+      ["a", "b"],
+    );
+    assert.deepEqual(
+      extractAtRefs("{@a}").map((r) => r.ref),
+      ["a"],
+    );
   });
 
   // sl-74m6: quotes, `=` and `:` were excluded from the lookbehind as collateral
@@ -105,19 +129,31 @@ describe("extractAtRefs()", () => {
   it("extracts a @ref immediately after a double or single quote (sl-74m6)", () => {
     // Prose like `"@customers" table` quotes the ref itself — the ref must
     // still reach lineage and validation.
-    assert.deepEqual(extractAtRefs('"@customers" table').map(r => r.ref), ["customers"]);
-    assert.deepEqual(extractAtRefs("'@customers' table").map(r => r.ref), ["customers"]);
+    assert.deepEqual(
+      extractAtRefs('"@customers" table').map((r) => r.ref),
+      ["customers"],
+    );
+    assert.deepEqual(
+      extractAtRefs("'@customers' table").map((r) => r.ref),
+      ["customers"],
+    );
   });
 
   it("extracts a @ref immediately after = (sl-74m6)", () => {
     // SQL-ish condition text with no space around the operator:
     // `where id =@customers.id`.
-    assert.deepEqual(extractAtRefs("where id =@customers.id").map(r => r.ref), ["customers.id"]);
+    assert.deepEqual(
+      extractAtRefs("where id =@customers.id").map((r) => r.ref),
+      ["customers.id"],
+    );
   });
 
   it("extracts a @ref immediately after : (sl-74m6)", () => {
     // Key/value prose with no space after the colon: `key:@customers.id`.
-    assert.deepEqual(extractAtRefs("key:@customers.id").map(r => r.ref), ["customers.id"]);
+    assert.deepEqual(
+      extractAtRefs("key:@customers.id").map((r) => r.ref),
+      ["customers.id"],
+    );
   });
 
   it("extracts @refs across multiple lines (after newline counts as whitespace)", () => {
@@ -125,7 +161,10 @@ describe("extractAtRefs()", () => {
     // triple-quoted NL string must still be extracted. This pairs with the
     // multiline-position helper exercised below.
     const refs = extractAtRefs("first line\n@second_line ref");
-    assert.deepEqual(refs.map(r => r.ref), ["second_line"]);
+    assert.deepEqual(
+      refs.map((r) => r.ref),
+      ["second_line"],
+    );
   });
 });
 
@@ -191,7 +230,7 @@ describe("computeNLRefPosition()", () => {
     const item = { text: "first\n    @ref end", line: 2, column: 8 };
     const offset = item.text.indexOf("@");
     const pos = computeNLRefPosition(item, offset);
-    assert.equal(pos.line, 4);  // 2 + 1 newline + 1 (1-based)
+    assert.equal(pos.line, 4); // 2 + 1 newline + 1 (1-based)
     assert.equal(pos.column, 5);
   });
 });
@@ -256,7 +295,9 @@ function makeLookup(schemas = {}, fragments = {}, transforms = {}, mappings = {}
 
 describe("resolveRef()", () => {
   it("resolves a bare field against mapping sources", () => {
-    const lookup = makeLookup({ "::orders": { fields: [{ name: "order_id" }], hasSpreads: false } });
+    const lookup = makeLookup({
+      "::orders": { fields: [{ name: "order_id" }], hasSpreads: false },
+    });
     const ctx = { sources: ["::orders"], targets: [], namespace: null };
     const r = resolveRef("order_id", ctx, lookup);
     assert.equal(r.resolved, true);
@@ -344,7 +385,9 @@ describe("resolveRef()", () => {
   });
 
   it("resolves a backticked field name containing :: (sl-g6ga)", () => {
-    const lookup = makeLookup({ "::legacy": { fields: [{ name: "legacy::thing" }], hasSpreads: false } });
+    const lookup = makeLookup({
+      "::legacy": { fields: [{ name: "legacy::thing" }], hasSpreads: false },
+    });
     const ctx = { sources: ["::legacy"], targets: [], namespace: null };
     const r = resolveRef("`legacy::thing`", ctx, lookup);
     assert.equal(r.resolved, true);
@@ -367,7 +410,9 @@ describe("resolveRef()", () => {
   it("resolves a schema-qualified backticked field name (sl-g6ga)", () => {
     // Compound form: the separator dot picks the schema, the backticked
     // literal names the field exactly.
-    const lookup = makeLookup({ "::customers": { fields: [{ name: "tax.rate" }], hasSpreads: false } });
+    const lookup = makeLookup({
+      "::customers": { fields: [{ name: "tax.rate" }], hasSpreads: false },
+    });
     const ctx = { sources: ["::customers"], targets: [], namespace: null };
     const r = resolveRef("customers.`tax.rate`", ctx, lookup);
     assert.equal(r.resolved, true);
@@ -408,18 +453,21 @@ describe("resolveAllNLRefs()", () => {
     // as one literal name, not a schema.field path.
     const lookup = makeLookup(
       { "::rates": { fields: [{ name: "tax.rate" }], hasSpreads: false } },
-      {}, {},
+      {},
+      {},
       { my_mapping: { sources: ["::rates"], targets: [], namespace: null } },
     );
-    const items = [{
-      text: "apply @`tax.rate` here",
-      mapping: "my_mapping",
-      namespace: null,
-      targetField: null,
-      line: 5,
-      column: 0,
-      file: "test.stm",
-    }];
+    const items = [
+      {
+        text: "apply @`tax.rate` here",
+        mapping: "my_mapping",
+        namespace: null,
+        targetField: null,
+        line: 5,
+        column: 0,
+        file: "test.stm",
+      },
+    ];
     const results = resolveAllNLRefs(items, lookup);
     assert.equal(results.length, 1);
     assert.equal(results[0].ref, "tax.rate");
@@ -550,7 +598,10 @@ describe("extractNLRefData — bare pipe-text at_refs (bptar-l6n8)", () => {
     // Each at_ref is its own CST node; all of them must become items, each
     // anchored at its own position for diagnostics.
     const items = nlRefItems("mapping m {\n  a -> b { @x plus @y }\n}");
-    assert.deepEqual(items.map((i) => i.text), ["@x", "@y"]);
+    assert.deepEqual(
+      items.map((i) => i.text),
+      ["@x", "@y"],
+    );
     assert.notEqual(items[0].column, items[1].column);
   });
 
@@ -646,15 +697,16 @@ describe("NL ref positions account for string delimiters (sl-o3ea)", () => {
 
 describe("resolveRef() — nested field paths (sl-ez36)", () => {
   // schema src { order_id, address record { city, postcode } }
-  const nestedLookup = () => makeLookup({
-    "::src": {
-      fields: [
-        { name: "order_id" },
-        { name: "address", children: [{ name: "city" }, { name: "postcode" }] },
-      ],
-      hasSpreads: false,
-    },
-  });
+  const nestedLookup = () =>
+    makeLookup({
+      "::src": {
+        fields: [
+          { name: "order_id" },
+          { name: "address", children: [{ name: "city" }, { name: "postcode" }] },
+        ],
+        hasSpreads: false,
+      },
+    });
   const ctx = { sources: ["::src"], targets: [], namespace: null };
 
   it("reports the full path for a bare ref naming a nested field", () => {
@@ -679,10 +731,12 @@ describe("resolveRef() — nested field paths (sl-ez36)", () => {
     // prefix must be prepended: the ref names parcels.contents.sku.
     const lookup = makeLookup({
       "::src": {
-        fields: [{
-          name: "parcels",
-          children: [{ name: "contents", children: [{ name: "sku" }, { name: "qty" }] }],
-        }],
+        fields: [
+          {
+            name: "parcels",
+            children: [{ name: "contents", children: [{ name: "sku" }, { name: "qty" }] }],
+          },
+        ],
         hasSpreads: false,
       },
     });
@@ -698,10 +752,7 @@ describe("resolveRef() — nested field paths (sl-ez36)", () => {
     // change if the author reordered the fields.
     const lookup = makeLookup({
       "::src": {
-        fields: [
-          { name: "address", children: [{ name: "city" }] },
-          { name: "city" },
-        ],
+        fields: [{ name: "address", children: [{ name: "city" }] }, { name: "city" }],
         hasSpreads: false,
       },
     });
@@ -749,7 +800,8 @@ describe("extractNLRefData — container target qualification (sl-hrql)", () => 
   }
 
   it("qualifies a computed arrow target inside an each block", () => {
-    const src = 'mapping m {\n  each items -> lines {\n    -> .line_total { "Multiply @qty by @price" }\n  }\n}';
+    const src =
+      'mapping m {\n  each items -> lines {\n    -> .line_total { "Multiply @qty by @price" }\n  }\n}';
     assert.deepEqual(targetFields(src), ["lines.line_total"]);
   });
 
@@ -762,14 +814,16 @@ describe("extractNLRefData — container target qualification (sl-hrql)", () => 
   it("accumulates bases across two levels of nesting", () => {
     // flatten written relative (`.contents -> .packed_items`) names a list field
     // on the current element, so its base stacks on the enclosing each.
-    const src = 'mapping m {\n  each parcels -> parcels {\n    flatten .contents -> .packed_items {\n      -> .label { "Label from @sku" }\n    }\n  }\n}';
+    const src =
+      'mapping m {\n  each parcels -> parcels {\n    flatten .contents -> .packed_items {\n      -> .label { "Label from @sku" }\n    }\n  }\n}';
     assert.deepEqual(targetFields(src), ["parcels.packed_items.label"]);
   });
 
   it("establishes no base for a top-level flatten, whose target names the schema", () => {
     // Spec 4.6: `flatten contacts -> tgt` unnests into target schema roots, so
     // `contact_line` is already absolute and must not become `tgt.contact_line`.
-    const src = 'mapping m {\n  flatten contacts -> tgt {\n    -> contact_line { "Format @email" }\n  }\n}';
+    const src =
+      'mapping m {\n  flatten contacts -> tgt {\n    -> contact_line { "Format @email" }\n  }\n}';
     assert.deepEqual(targetFields(src), ["contact_line"]);
   });
 

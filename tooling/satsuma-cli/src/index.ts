@@ -19,16 +19,16 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 
 // Initialise the WASM parser before registering any commands.
 await initParser(join(__dirname, "tree-sitter-satsuma.wasm"));
-const pkg = JSON.parse(
-  readFileSync(join(__dirname, "../package.json"), "utf8"),
-) as { version: string };
+const pkg = JSON.parse(readFileSync(join(__dirname, "../package.json"), "utf8")) as {
+  version: string;
+};
 
 program
   .name("satsuma")
   .description(
     "Satsuma CLI — deterministic structural extraction for Satsuma workspaces.\n" +
-    "Extracts structural facts and delivers NL content verbatim. Does not interpret natural language.\n\n" +
-    "Run `satsuma <command> --help` for detailed usage, flags, and JSON output shape for each command.",
+      "Extracts structural facts and delivers NL content verbatim. Does not interpret natural language.\n\n" +
+      "Run `satsuma <command> --help` for detailed usage, flags, and JSON output shape for each command.",
   )
   .version(pkg.version)
   .showHelpAfterError(true);
@@ -76,7 +76,9 @@ const commands = [
 for (const cmd of commands) {
   // Import via a file:// URL, not a raw path: Node's ESM loader rejects bare
   // absolute paths like "C:\…\summary.js" on Windows (gh-265). See command-loader.
-  const mod = await import(commandModuleSpecifier(__dirname, cmd)) as { register: (program: Command) => void };
+  const mod = (await import(commandModuleSpecifier(__dirname, cmd))) as {
+    register: (program: Command) => void;
+  };
   mod.register(program);
 }
 

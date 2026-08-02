@@ -47,7 +47,15 @@ describe("satsuma lineage", () => {
   it("emits depth-limited downstream JSON without dangling edges", async () => {
     // Depth limits must truncate the DAG coherently: every edge endpoint should
     // still be present in the nodes array.
-    const { stdout, code } = await run("lineage", "--from", "source_a", "--depth", "1", "--json", LINEAGE_CHAIN);
+    const { stdout, code } = await run(
+      "lineage",
+      "--from",
+      "source_a",
+      "--depth",
+      "1",
+      "--json",
+      LINEAGE_CHAIN,
+    );
 
     assert.equal(code, 0);
     const data = JSON.parse(stdout);
@@ -67,7 +75,15 @@ describe("satsuma lineage", () => {
   it("prints compact downstream output as names only", async () => {
     // Compact mode is intended for scripts and quick scans, so it should omit
     // type annotations while preserving traversal order.
-    const { stdout, code } = await run("lineage", "--from", "source_a", "--depth", "1", "--compact", LINEAGE_CHAIN);
+    const { stdout, code } = await run(
+      "lineage",
+      "--from",
+      "source_a",
+      "--depth",
+      "1",
+      "--compact",
+      LINEAGE_CHAIN,
+    );
 
     assert.equal(code, 0);
     assert.deepEqual(stdout.trim().split(/\r?\n/), ["source_a", "a_to_b", "intermediate_b"]);
@@ -87,15 +103,28 @@ describe("satsuma lineage", () => {
     // Diamond graph: s0→s1→s2→s3 plus shortcut s0→s2. A first-visit-wins
     // visited set expands s2 at depth 2 (via s1) and never re-expands it when
     // the shortcut reaches it at depth 1, wrongly dropping s3 from --depth 2.
-    const { stdout, code } = await run("lineage", "--from", "s0", "--depth", "2", "--json", LINEAGE_DIAMOND);
+    const { stdout, code } = await run(
+      "lineage",
+      "--from",
+      "s0",
+      "--depth",
+      "2",
+      "--json",
+      LINEAGE_DIAMOND,
+    );
 
     assert.equal(code, 0);
     const data = JSON.parse(stdout);
     const names = data.nodes.map((node: { name: string }) => node.name);
-    assert.ok(names.includes("s3"), `s3 is two schema hops from s0 via the shortcut; got: ${names.join(", ")}`);
+    assert.ok(
+      names.includes("s3"),
+      `s3 is two schema hops from s0 via the shortcut; got: ${names.join(", ")}`,
+    );
     // Re-expansion must not duplicate nodes or edges in the emitted DAG.
     assert.equal(new Set(names).size, names.length, "nodes must be unique");
-    const edgeKeys = data.edges.map((edge: { from: string; to: string }) => `${edge.from}->${edge.to}`);
+    const edgeKeys = data.edges.map(
+      (edge: { from: string; to: string }) => `${edge.from}->${edge.to}`,
+    );
     assert.equal(new Set(edgeKeys).size, edgeKeys.length, "edges must be unique");
   });
 
@@ -109,8 +138,16 @@ describe("satsuma lineage", () => {
     const names = data.nodes.map((node: { name: string }) => node.name);
     assert.ok(names.includes("source_a"));
     assert.ok(names.includes("target_d"));
-    assert.ok(data.edges.some((edge: { from: string; to: string }) => edge.from === "source_a" && edge.to === "a_to_b"));
-    assert.ok(data.edges.some((edge: { from: string; to: string }) => edge.from === "c_to_d" && edge.to === "target_d"));
+    assert.ok(
+      data.edges.some(
+        (edge: { from: string; to: string }) => edge.from === "source_a" && edge.to === "a_to_b",
+      ),
+    );
+    assert.ok(
+      data.edges.some(
+        (edge: { from: string; to: string }) => edge.from === "c_to_d" && edge.to === "target_d",
+      ),
+    );
   });
 
   it("renders upstream text paths covering every JSON node when upstream contains a cycle (sl-h5cx)", async () => {
@@ -126,9 +163,15 @@ describe("satsuma lineage", () => {
     // fixture declares no namespace); --json keeps the canonical "::cycle_a".
     // The two spellings are deliberate — see displayKey() in index-builder.ts.
     const jsonNames = JSON.parse(json.stdout).nodes.map((node: { name: string }) => node.name);
-    assert.ok(jsonNames.length >= 4, `cycle fixture should yield all 4 nodes in JSON, got: ${jsonNames.join(", ")}`);
+    assert.ok(
+      jsonNames.length >= 4,
+      `cycle fixture should yield all 4 nodes in JSON, got: ${jsonNames.join(", ")}`,
+    );
     for (const name of jsonNames) {
-      assert.ok(text.stdout.includes(name), `text output must mention '${name}'; got:\n${text.stdout}`);
+      assert.ok(
+        text.stdout.includes(name),
+        `text output must mention '${name}'; got:\n${text.stdout}`,
+      );
     }
     // The upstream path itself must be visible, not just the target line.
     assert.match(text.stdout, /cycle_b -> b_to_a -> cycle_a/);
@@ -169,7 +212,13 @@ describe("satsuma lineage", () => {
 
   it("keeps not-found errors parseable in JSON mode", async () => {
     // JSON callers rely on structured error payloads even for failed lookups.
-    const { stdout, code } = await run("lineage", "--from", "missing_schema", "--json", LINEAGE_CHAIN);
+    const { stdout, code } = await run(
+      "lineage",
+      "--from",
+      "missing_schema",
+      "--json",
+      LINEAGE_CHAIN,
+    );
 
     assert.equal(code, 1);
     assert.deepEqual(JSON.parse(stdout), { error: "Node 'missing_schema' not found." });

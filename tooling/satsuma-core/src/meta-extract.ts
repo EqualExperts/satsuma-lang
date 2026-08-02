@@ -41,8 +41,7 @@ function normalizeMetadataValue(valueNode: SyntaxNode | null | undefined): strin
   const text = valueNode.text;
   if (
     text.length >= 2 &&
-    ((text.startsWith("\"") && text.endsWith("\"")) ||
-      (text.startsWith("`") && text.endsWith("`")))
+    ((text.startsWith('"') && text.endsWith('"')) || (text.startsWith("`") && text.endsWith("`")))
   ) {
     return text.slice(1, -1);
   }
@@ -67,10 +66,10 @@ export function extractMetadata(metaNode: SyntaxNode | null | undefined): MetaEn
       entries.push({ kind: "kv", key: key?.text ?? "", value });
     } else if (c.type === "enum_body") {
       const values = c.namedChildren
-        .filter((x) => x.type === "identifier" || x.type === "nl_string" || x.type === "number_literal")
-        .map((x) =>
-          x.type === "nl_string" ? x.text.slice(1, -1) : x.text,
-        );
+        .filter(
+          (x) => x.type === "identifier" || x.type === "nl_string" || x.type === "number_literal",
+        )
+        .map((x) => (x.type === "nl_string" ? x.text.slice(1, -1) : x.text));
       entries.push({ kind: "enum", values });
     } else if (c.type === "note_tag") {
       const strNode = c.namedChildren.find(
@@ -84,9 +83,7 @@ export function extractMetadata(metaNode: SyntaxNode | null | undefined): MetaEn
         entries.push({ kind: "note", text });
       }
     } else if (c.type === "slice_body") {
-      const values = c.namedChildren
-        .filter((x) => x.type === "identifier")
-        .map((x) => x.text);
+      const values = c.namedChildren.filter((x) => x.type === "identifier").map((x) => x.text);
       entries.push({ kind: "slice", values });
     }
   }

@@ -28,12 +28,7 @@
 module.exports = grammar({
   name: "satsuma",
 
-  extras: ($) => [
-    /[ \t\f\r\n]+/,
-    $.warning_comment,
-    $.question_comment,
-    $.comment,
-  ],
+  extras: ($) => [/[ \t\f\r\n]+/, $.warning_comment, $.question_comment, $.comment],
 
   word: ($) => $.identifier,
 
@@ -104,13 +99,7 @@ module.exports = grammar({
       ),
 
     _namespace_item: ($) =>
-      choice(
-        $.note_block,
-        $.schema_block,
-        $.fragment_block,
-        $.transform_block,
-        $.mapping_block,
-      ),
+      choice($.note_block, $.schema_block, $.fragment_block, $.transform_block, $.mapping_block),
 
     // ── Import ────────────────────────────────────────────────────────────
 
@@ -137,40 +126,19 @@ module.exports = grammar({
     // ── Schema block ──────────────────────────────────────────────────────
 
     schema_block: ($) =>
-      seq(
-        "schema",
-        $.block_label,
-        optional($.metadata_block),
-        "{",
-        optional($.schema_body),
-        "}",
-      ),
+      seq("schema", $.block_label, optional($.metadata_block), "{", optional($.schema_body), "}"),
 
     // ── Fragment block ────────────────────────────────────────────────────
     // Metadata is accepted on every definition block (spec 2.1 describes
     // metadata generically); fragment/transform parity with schema/mapping.
 
     fragment_block: ($) =>
-      seq(
-        "fragment",
-        $.block_label,
-        optional($.metadata_block),
-        "{",
-        optional($.schema_body),
-        "}",
-      ),
+      seq("fragment", $.block_label, optional($.metadata_block), "{", optional($.schema_body), "}"),
 
     // ── Transform block ───────────────────────────────────────────────────
 
     transform_block: ($) =>
-      seq(
-        "transform",
-        $.block_label,
-        optional($.metadata_block),
-        "{",
-        optional($.pipe_chain),
-        "}",
-      ),
+      seq("transform", $.block_label, optional($.metadata_block), "{", optional($.pipe_chain), "}"),
 
     // ── Mapping block ───────────────────────────────────────────────────
 
@@ -186,8 +154,7 @@ module.exports = grammar({
         "}",
       ),
 
-    mapping_body: ($) =>
-      repeat1($._mapping_body_item),
+    mapping_body: ($) => repeat1($._mapping_body_item),
 
     _mapping_body_item: ($) =>
       choice(
@@ -200,13 +167,7 @@ module.exports = grammar({
       ),
 
     // source { ref1, ref2 } or source { ref1 ref2 } or source { "join ..." }
-    source_block: ($) =>
-      seq(
-        "source",
-        "{",
-        repeat1(seq($._source_entry, optional(","))),
-        "}",
-      ),
+    source_block: ($) => seq("source", "{", repeat1(seq($._source_entry, optional(","))), "}"),
 
     _source_entry: ($) => $.source_ref,
 
@@ -218,14 +179,7 @@ module.exports = grammar({
 
     // target { ref } — single entry; trailing comma allowed for consistency
     // with source blocks (see "Comma policy" in the spec, sl-0nvt).
-    target_block: ($) =>
-      seq(
-        "target",
-        "{",
-        $._source_entry,
-        optional(","),
-        "}",
-      ),
+    target_block: ($) => seq("target", "{", $._source_entry, optional(","), "}"),
 
     // ── each/flatten blocks ─────────────────────────────────────────────
     // each src_path -> tgt_path (metadata)? { nested_block_item* }
@@ -262,33 +216,17 @@ module.exports = grammar({
     // Shared body item for each/flatten blocks: arrow declarations plus nested
     // each/flatten sub-blocks. Does not include source/target/note, which are
     // mapping-level constructs.
-    _nested_block_item: ($) =>
-      choice(
-        $._arrow_decl,
-        $.each_block,
-        $.flatten_block,
-      ),
+    _nested_block_item: ($) => choice($._arrow_decl, $.each_block, $.flatten_block),
 
     // ── Note block ────────────────────────────────────────────────────────
 
-    note_block: ($) =>
-      seq(
-        "note",
-        "{",
-        choice($.multiline_string, repeat1($.nl_string)),
-        "}",
-      ),
+    note_block: ($) => seq("note", "{", choice($.multiline_string, repeat1($.nl_string)), "}"),
 
     // ── Schema body ───────────────────────────────────────────────────────
 
     schema_body: ($) => repeat1($._schema_body_item),
 
-    _schema_body_item: ($) =>
-      choice(
-        $.field_decl,
-        $.fragment_spread,
-        $.note_block,
-      ),
+    _schema_body_item: ($) => choice($.field_decl, $.fragment_spread, $.note_block),
 
     // ── Field declaration (unified syntax) ──────────────────────────────
     // All fields follow: NAME [TYPE] [(metadata)] [{schema_body}]
@@ -322,21 +260,10 @@ module.exports = grammar({
         optional($.metadata_block),
       ),
 
-    _typeless_field: ($) =>
-      seq(
-        $.field_name,
-        $.metadata_block,
-      ),
+    _typeless_field: ($) => seq($.field_name, $.metadata_block),
 
     _record_field: ($) =>
-      seq(
-        $.field_name,
-        "record",
-        optional($.metadata_block),
-        "{",
-        optional($.schema_body),
-        "}",
-      ),
+      seq($.field_name, "record", optional($.metadata_block), "{", optional($.schema_body), "}"),
 
     _list_of_record_field: ($) =>
       seq(
@@ -350,12 +277,7 @@ module.exports = grammar({
       ),
 
     _list_of_scalar_field: ($) =>
-      seq(
-        $.field_name,
-        "list_of",
-        alias($.inline_type, $.type_expr),
-        optional($.metadata_block),
-      ),
+      seq($.field_name, "list_of", alias($.inline_type, $.type_expr), optional($.metadata_block)),
 
     field_name: ($) => choice($.identifier, $.backtick_name),
 
@@ -375,8 +297,7 @@ module.exports = grammar({
     // continuation_word is an external token that only matches when no newline
     // appears between the previous token and the candidate identifier, so
     // `...f\nextra x` correctly parses as spread "f" + field "extra x".
-    spread_label: ($) =>
-      choice($.qualified_name, $.backtick_name, $._spread_words),
+    spread_label: ($) => choice($.qualified_name, $.backtick_name, $._spread_words),
 
     _spread_words: ($) => seq($.identifier, repeat($.continuation_word)),
 
@@ -385,21 +306,11 @@ module.exports = grammar({
     // computed_arrow omits src_path (starts directly with ->).
     // nested_arrow body contains arrow_decls; map_arrow body contains pipe_chain.
 
-    _arrow_decl: ($) =>
-      choice(
-        $.computed_arrow,
-        $.nested_arrow,
-        $.map_arrow,
-      ),
+    _arrow_decl: ($) => choice($.computed_arrow, $.nested_arrow, $.map_arrow),
 
     // -> tgt_path (metadata)? { pipe_chain }?
     computed_arrow: ($) =>
-      seq(
-        "->",
-        $.tgt_path,
-        optional($.metadata_block),
-        optional($._arrow_transform_body),
-      ),
+      seq("->", $.tgt_path, optional($.metadata_block), optional($._arrow_transform_body)),
 
     // src_path -> tgt_path (metadata)? { arrow_decl* }
     nested_arrow: ($) =>
@@ -434,45 +345,27 @@ module.exports = grammar({
     tgt_path: ($) => $._path_expr,
 
     _path_expr: ($) =>
-      choice(
-        $.namespaced_path,
-        $.backtick_path,
-        $.relative_field_path,
-        $.field_path,
-      ),
+      choice($.namespaced_path, $.backtick_path, $.relative_field_path, $.field_path),
 
     // ns::identifier or ns::identifier.field...
     // token.immediate(".") ensures continuation dots must be adjacent (no
     // newlines) so multi-line bare arrows are not merged into one path.
     namespaced_path: ($) =>
-      prec.right(seq(
-        $.identifier,
-        "::",
-        $._path_seg,
-        repeat(seq(token.immediate("."), $._path_seg)),
-      )),
+      prec.right(
+        seq($.identifier, "::", $._path_seg, repeat(seq(token.immediate("."), $._path_seg))),
+      ),
 
     // `BacktickRef` or `BacktickRef`.field...
     backtick_path: ($) =>
-      prec.right(seq(
-        $.backtick_name,
-        repeat(seq(token.immediate("."), $._path_seg)),
-      )),
+      prec.right(seq($.backtick_name, repeat(seq(token.immediate("."), $._path_seg)))),
 
     // .field or .field.nested...
     relative_field_path: ($) =>
-      prec.right(seq(
-        ".",
-        $._path_seg,
-        repeat(seq(token.immediate("."), $._path_seg)),
-      )),
+      prec.right(seq(".", $._path_seg, repeat(seq(token.immediate("."), $._path_seg)))),
 
     // field or field.nested...
     field_path: ($) =>
-      prec.right(seq(
-        $.identifier,
-        repeat(seq(token.immediate("."), $._path_seg)),
-      )),
+      prec.right(seq($.identifier, repeat(seq(token.immediate("."), $._path_seg)))),
 
     _path_seg: ($) => choice($.identifier, $.backtick_name),
 
@@ -480,12 +373,7 @@ module.exports = grammar({
 
     pipe_chain: ($) => seq($.pipe_step, repeat(seq("|", $.pipe_step))),
 
-    pipe_step: ($) =>
-      choice(
-        $.fragment_spread,
-        $.map_literal,
-        $.pipe_text,
-      ),
+    pipe_step: ($) => choice($.fragment_spread, $.map_literal, $.pipe_text),
 
     // pipe_text: greedy repeat of NL-compatible tokens.
     //
@@ -497,13 +385,7 @@ module.exports = grammar({
     // value maps (`map { ... }`), which are parsed by sibling rules above.
     //
     // | and } naturally terminate it (not in the choice set).
-    pipe_text: ($) =>
-      repeat1(
-        choice(
-          $._pipe_text_atom,
-          $._parenthesized_pipe_text,
-        ),
-      ),
+    pipe_text: ($) => repeat1(choice($._pipe_text_atom, $._parenthesized_pipe_text)),
 
     _pipe_text_atom: ($) =>
       choice(
@@ -519,22 +401,11 @@ module.exports = grammar({
       ),
 
     _parenthesized_pipe_text: ($) =>
-      seq(
-        "(",
-        repeat(
-          choice(
-            $._pipe_text_atom,
-            $._parenthesized_pipe_text,
-            ",",
-          ),
-        ),
-        ")",
-      ),
+      seq("(", repeat(choice($._pipe_text_atom, $._parenthesized_pipe_text, ",")), ")"),
 
     // ── Map literal ───────────────────────────────────────────────────────
 
-    map_literal: ($) =>
-      seq("map", "{", repeat(seq($.map_entry, optional(","))), "}"),
+    map_literal: ($) => seq("map", "{", repeat(seq($.map_entry, optional(","))), "}"),
 
     map_entry: ($) => seq($.map_key, ":", $.map_value),
 
@@ -557,8 +428,7 @@ module.exports = grammar({
 
     // `=` is included so NL pipe text like `rate = 0.5` lexes; `==` wins by
     // maximal munch where both could match.
-    _comparison_op: (_) =>
-      token(choice(">=", "<=", ">", "<", "!=", "==", "=")),
+    _comparison_op: (_) => token(choice(">=", "<=", ">", "<", "!=", "==", "=")),
 
     // Each operator is its own anonymous token (no combined token() wrapper)
     // so the minus can be the external scanner's token, which refuses to lex
@@ -572,13 +442,7 @@ module.exports = grammar({
     // `R: retail B: x` is a loud error, not two entries.
     map_value: ($) =>
       seq(
-        choice(
-          $.nl_string,
-          $.multiline_string,
-          $.identifier,
-          $.number_literal,
-          "null",
-        ),
+        choice($.nl_string, $.multiline_string, $.identifier, $.number_literal, "null"),
         repeat(alias($.map_value_word, $.identifier)),
       ),
 
@@ -591,20 +455,10 @@ module.exports = grammar({
     // `()` (empty) is allowed; a trailing comma is allowed only after at
     // least one entry, so `(,)` is a parse error rather than silently empty.
     metadata_block: ($) =>
-      seq(
-        "(",
-        optional(seq(commaSep1($._metadata_entry), optional(","))),
-        ")",
-      ),
+      seq("(", optional(seq(commaSep1($._metadata_entry), optional(","))), ")"),
 
     _metadata_entry: ($) =>
-      choice(
-        $.enum_body,
-        $.slice_body,
-        $.note_tag,
-        $.tag_with_value,
-        $.tag_token,
-      ),
+      choice($.enum_body, $.slice_body, $.note_tag, $.tag_with_value, $.tag_token),
 
     enum_body: ($) =>
       seq(
@@ -615,21 +469,9 @@ module.exports = grammar({
         "}",
       ),
 
-    slice_body: ($) =>
-      seq(
-        "slice",
-        "{",
-        commaSep1($.identifier),
-        optional(","),
-        "}",
-      ),
+    slice_body: ($) => seq("slice", "{", commaSep1($.identifier), optional(","), "}"),
 
-
-    note_tag: ($) =>
-      seq(
-        "note",
-        choice($.multiline_string, $.nl_string),
-      ),
+    note_tag: ($) => seq("note", choice($.multiline_string, $.nl_string)),
 
     // tag_with_value: identifier followed by greedy value tokens
     tag_with_value: ($) => seq($.identifier, $.value_text),
@@ -657,18 +499,12 @@ module.exports = grammar({
           $.boolean_literal,
           alias($.value_word, $.identifier),
           $._comparison_op,
-          seq(
-            "{",
-            commaSep1(choice($.qualified_name, $.identifier)),
-            optional(","),
-            "}",
-          ),
+          seq("{", commaSep1(choice($.qualified_name, $.identifier)), optional(","), "}"),
         ),
       ),
 
     // ns::identifier.field... — namespace-qualified dotted ref path
-    qualified_dotted_name: ($) =>
-      seq($.qualified_name, repeat1(seq(".", $.identifier))),
+    qualified_dotted_name: ($) => seq($.qualified_name, repeat1(seq(".", $.identifier))),
 
     dotted_name: ($) =>
       prec.left(seq($.identifier, repeat1(seq(".", choice($.identifier, $.number_literal))))),

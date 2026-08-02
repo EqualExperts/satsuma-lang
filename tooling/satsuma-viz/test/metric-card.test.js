@@ -42,7 +42,11 @@ describe("sz-metric-card collapse vs navigate intent (sl-37f3)", () => {
     const { card, navigations } = await makeCard();
 
     let propagationStopped = false;
-    card._onToggleClick({ stopPropagation: () => { propagationStopped = true; } });
+    card._onToggleClick({
+      stopPropagation: () => {
+        propagationStopped = true;
+      },
+    });
 
     assert.equal(card._collapsed, true, "arrow click must flip the collapsed state");
     assert.equal(navigations.length, 0, "arrow click must never navigate");

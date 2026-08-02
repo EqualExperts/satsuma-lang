@@ -196,9 +196,14 @@ export class SzFragmentCard extends LitElement {
     // edge anchors missed the header — sl-wixe.) The row is pinned to the
     // shared NAMESPACE_PILL_HEIGHT the layout reserves for it.
     if (!this.namespaceLabel) return html``;
-    return html`<div style="height:${NAMESPACE_PILL_HEIGHT}px;box-sizing:border-box;display:flex;align-items:end;padding:0 12px;background:var(--sz-green);">
-        <span style="display:inline-block;font-size:10px;font-weight:700;padding:1px 8px;border-radius:999px;background:var(--sz-namespace-pill-chip-bg);color:var(--sz-orange-dark);">${this.namespaceLabel}</span>
-      </div>`;
+    return html`<div
+      style="height:${NAMESPACE_PILL_HEIGHT}px;box-sizing:border-box;display:flex;align-items:end;padding:0 12px;background:var(--sz-green);"
+    >
+      <span
+        style="display:inline-block;font-size:10px;font-weight:700;padding:1px 8px;border-radius:999px;background:var(--sz-namespace-pill-chip-bg);color:var(--sz-orange-dark);"
+        >${this.namespaceLabel}</span
+      >
+    </div>`;
   }
 
   override render() {
@@ -227,11 +232,14 @@ export class SzFragmentCard extends LitElement {
           <span class="header-icon">&#9674;</span>
           <span class="header-name">${fr.id}</span>
           <span class="header-count">${fr.fields.length} fields</span>
-          <span class="header-toggle" ?data-collapsed=${this._collapsed} @click=${this._onToggleClick}>&#9660;</span>
+          <span
+            class="header-toggle"
+            ?data-collapsed=${this._collapsed}
+            @click=${this._onToggleClick}
+            >&#9660;</span
+          >
         </div>
-        <div class="fields">
-          ${fr.fields.map((f) => this._renderField(f))}
-        </div>
+        <div class="fields">${fr.fields.map((f) => this._renderField(f))}</div>
         ${hasNotes ? this._renderNotes(fr.notes) : ""}
       </div>
     `;
@@ -244,9 +252,11 @@ export class SzFragmentCard extends LitElement {
           <span class="arrow" ?data-expanded=${this._notesExpanded}>&#9654;</span>
           <span>&#128221; ${notes.length === 1 ? "Note" : `${notes.length} Notes`}</span>
         </div>
-        ${this._notesExpanded
-          ? notes.map((n) => html`<div class="note-content">${n.text}</div>`)
-          : ""}
+        ${
+          this._notesExpanded
+            ? notes.map((n) => html`<div class="note-content">${n.text}</div>`)
+            : ""
+        }
       </div>
     `;
   }
@@ -263,9 +273,7 @@ export class SzFragmentCard extends LitElement {
         <span class="field-name">${f.name}</span>
         <span class="field-type">${f.type}</span>
         <span class="badges">
-          ${f.constraints.map(
-            (c) => html`<span class="badge">${c}</span>`
-          )}
+          ${f.constraints.map((c) => html`<span class="badge">${c}</span>`)}
         </span>
       </div>
     `;

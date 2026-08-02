@@ -48,7 +48,7 @@ export function parseSource(src: string): { src: string; tree: Tree; errorCount:
  * tree-sitter produces.  See @satsuma/core parse-errors.ts for details.
  */
 function countErrors(node: SyntaxNode): number {
-  let n = (node.type === "ERROR" || node.isMissing) ? 1 : 0;
+  let n = node.type === "ERROR" || node.isMissing ? 1 : 0;
   for (const child of node.namedChildren) n += countErrors(child);
   return n;
 }

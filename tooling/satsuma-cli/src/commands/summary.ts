@@ -22,11 +22,17 @@ import { countNlDerivedEdgesByMapping } from "../nl-ref-extract.js";
 import { canonicalEntityName } from "@satsuma/core";
 import type { FieldDecl, ExtractedWorkspace, SchemaRecord } from "../types.js";
 
-function totalFieldCount(schema: { fields: FieldDecl[]; namespace?: string | null }, index: ExtractedWorkspace): number {
-  const expanded = expandEntityFields(schema as Parameters<typeof expandEntityFields>[0], schema.namespace ?? null, index);
+function totalFieldCount(
+  schema: { fields: FieldDecl[]; namespace?: string | null },
+  index: ExtractedWorkspace,
+): number {
+  const expanded = expandEntityFields(
+    schema as Parameters<typeof expandEntityFields>[0],
+    schema.namespace ?? null,
+    index,
+  );
   return schema.fields.length + expanded.length;
 }
-
 
 export function register(program: Command): void {
   program
@@ -34,7 +40,9 @@ export function register(program: Command): void {
     .description("Summarise a Satsuma file and its imports")
     .option("--compact", "show names only")
     .option("--json", "output JSON")
-    .addHelpText("after", `
+    .addHelpText(
+      "after",
+      `
 JSON shape (--json):
   {
     "schemas":      [{"name": str, "fieldCount": int, "note": str|null, "file": str, "line": int}, ...],
@@ -52,18 +60,23 @@ JSON shape (--json):
 Examples:
   satsuma summary pipeline.stm           # human overview
   satsuma summary pipeline.stm --json    # structured index
-  satsuma summary pipeline.stm --compact # names only`)
-    .action(runCommand(async (pathArg: string | undefined, opts: { compact?: boolean; json?: boolean }) => {
-      const { files: parsed, index } = await loadWorkspace(pathArg);
+  satsuma summary pipeline.stm --compact # names only`,
+    )
+    .action(
+      runCommand(
+        async (pathArg: string | undefined, opts: { compact?: boolean; json?: boolean }) => {
+          const { files: parsed, index } = await loadWorkspace(pathArg);
 
-      if (opts.json) {
-        printJson(index, parsed.length, opts.compact);
-      } else if (opts.compact) {
-        printCompact(index);
-      } else {
-        printDefault(index, parsed.length);
-      }
-    }));
+          if (opts.json) {
+            printJson(index, parsed.length, opts.compact);
+          } else if (opts.compact) {
+            printCompact(index);
+          } else {
+            printDefault(index, parsed.length);
+          }
+        },
+      ),
+    );
 }
 
 // ── Formatters ────────────────────────────────────────────────────────────────
@@ -85,30 +98,57 @@ function printJson(index: ExtractedWorkspace, fileCount: number, compact?: boole
 
   const out: Record<string, unknown> = {
     schemas: [...nonMetricSchemas(index).values()].map((s) => {
-      const obj: Record<string, unknown> = { name: displayName(s), fieldCount: totalFieldCount(s, index) };
-      if (!compact) { obj.note = s.note; obj.file = s.file; obj.line = s.row + 1; }
+      const obj: Record<string, unknown> = {
+        name: displayName(s),
+        fieldCount: totalFieldCount(s, index),
+      };
+      if (!compact) {
+        obj.note = s.note;
+        obj.file = s.file;
+        obj.line = s.row + 1;
+      }
       return obj;
     }),
     metrics: [...index.metrics.values()].map((m) => {
       const obj: Record<string, unknown> = { name: displayName(m), fieldCount: m.fields.length };
-      if (!compact) { obj.displayName = m.displayName; obj.grain = m.grain; obj.sources = m.sources; obj.file = m.file; obj.line = m.row + 1; }
+      if (!compact) {
+        obj.displayName = m.displayName;
+        obj.grain = m.grain;
+        obj.sources = m.sources;
+        obj.file = m.file;
+        obj.line = m.row + 1;
+      }
       return obj;
     }),
     mappings: [...index.mappings.entries()].map(([key, m]) => {
       const nlDerived = nlDerivedCounts.get(key) ?? 0;
-      const obj: Record<string, unknown> = { name: displayName(m), arrowCount: m.arrowCount + nlDerived };
+      const obj: Record<string, unknown> = {
+        name: displayName(m),
+        arrowCount: m.arrowCount + nlDerived,
+      };
       if (nlDerived > 0) obj.nlDerivedArrowCount = nlDerived;
-      if (!compact) { obj.sources = m.sources; obj.targets = m.targets; obj.file = m.file; obj.line = m.row + 1; }
+      if (!compact) {
+        obj.sources = m.sources;
+        obj.targets = m.targets;
+        obj.file = m.file;
+        obj.line = m.row + 1;
+      }
       return obj;
     }),
     fragments: [...index.fragments.values()].map((f) => {
       const obj: Record<string, unknown> = { name: displayName(f), fieldCount: f.fields.length };
-      if (!compact) { obj.file = f.file; obj.line = f.row + 1; }
+      if (!compact) {
+        obj.file = f.file;
+        obj.line = f.row + 1;
+      }
       return obj;
     }),
     transforms: [...index.transforms.values()].map((t) => {
       const obj: Record<string, unknown> = { name: displayName(t) };
-      if (!compact) { obj.file = t.file; obj.line = t.row + 1; }
+      if (!compact) {
+        obj.file = t.file;
+        obj.line = t.row + 1;
+      }
       return obj;
     }),
     fileCount,
@@ -200,7 +240,11 @@ function printDefault(index: ExtractedWorkspace, fileCount: number): void {
   }
 
   const notes: string[] = [];
-  if (index.warnings.length > 0) notes.push(`${index.warnings.length} warning comment${index.warnings.length !== 1 ? "s" : ""}`);
-  if (index.questions.length > 0) notes.push(`${index.questions.length} question comment${index.questions.length !== 1 ? "s" : ""}`);
+  if (index.warnings.length > 0)
+    notes.push(`${index.warnings.length} warning comment${index.warnings.length !== 1 ? "s" : ""}`);
+  if (index.questions.length > 0)
+    notes.push(
+      `${index.questions.length} question comment${index.questions.length !== 1 ? "s" : ""}`,
+    );
   if (notes.length > 0) console.log(notes.join("  ·  "));
 }

@@ -37,7 +37,9 @@ describe("findSatsumaSourceFiles", () => {
   });
 
   it("finds .stm and .satsuma files at any depth (sl-v215)", () => {
-    const found = findSatsumaSourceFiles(root).map((p) => path.relative(root, p)).sort();
+    const found = findSatsumaSourceFiles(root)
+      .map((p) => path.relative(root, p))
+      .sort();
     assert.deepEqual(found, ["crm/orders.satsuma", "ingest.satsuma", "pipeline.stm"]);
   });
 
@@ -45,7 +47,10 @@ describe("findSatsumaSourceFiles", () => {
     // Dependency and VCS trees can contain .stm fixtures; indexing them would
     // pollute cross-file navigation with definitions outside the workspace.
     const found = findSatsumaSourceFiles(root);
-    assert.equal(found.some((p) => p.includes("node_modules") || p.includes(".git")), false);
+    assert.equal(
+      found.some((p) => p.includes("node_modules") || p.includes(".git")),
+      false,
+    );
   });
 
   it("returns an empty list for an unreadable or missing directory", () => {
