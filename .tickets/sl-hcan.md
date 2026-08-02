@@ -1,6 +1,6 @@
 ---
 id: sl-hcan
-status: open
+status: closed
 deps: [sl-0pun]
 links: []
 created: 2026-07-31T14:44:00Z
@@ -25,3 +25,12 @@ The three conventions shipping today:
 
 The viz card's _countFields/_countMapped stop computing their own figures and delegate to core summarizeFieldCoverage/leafFieldEntries per ADR-034; container states reported alongside as counts (records: {covered, partial, uncovered}) — useful review information but not a percentage; the depth-invariance invariant documented: a schema's percentage is unchanged by re-nesting, same leaves and same arrows give the same number; test asserting two schemas with the same four leaves, one flat and one nested three deep, report identical percentages; test asserting the same fixture reports the same number from the core rollup and the viz card (today 25% and 40%); once 3cc-t6uo also lands, all three surfaces agree; containers excluded from the denominator — 'amount' plus 'address record {city,line1,postcode}' with only address.city mapped reports 25%, not 40%; vscode and viz suites pass.
 
+
+## Notes
+
+**2026-08-02T20:22:35Z**
+
+**2026-08-02T20:22:35Z**
+
+Cause: sz-schema-card computed its own coverage figures with _countFields/_countMapped, counting every node including records in both halves of the ratio, so one covered leaf lifted the numerator once per ancestor level (2/5 where satsuma coverage reported 1/4) — the third of the three conventions ADR-034 forbids.
+Fix: added core fieldCoverageFromCoveredPaths (set-based entry building, asserted equal to computeMappingCoverage for the same arrows) and countContainerStates; the card now delegates to summarizeFieldCoverage/countContainerStates for both the expanded ratio and the compact field count, and names partly mapped records in the header tooltip (commit 6bb3fe1).
