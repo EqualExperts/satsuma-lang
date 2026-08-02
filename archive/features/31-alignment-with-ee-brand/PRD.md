@@ -1,6 +1,13 @@
 # Feature 31 — Alignment with the Equal Experts Brand
 
-> **Status: DRAFT** (2026-06-04)
+> **Status: IMPLEMENTED** (2026-06-04) — all seven scope sections delivered in
+> commit `83273c2`, which shipped the URL sweep, the maintainership reframe,
+> `assets/ee-brand/`, the README and site brand touches (including the mobile
+> menu), the canonical tagline, and the CHANGELOG callout for the changed
+> OpenLineage `_producer` URL. Archived 2026-08-02. This feature carries no
+> `tk` tickets of its own — it shipped as a single docs commit. EE typography
+> was deliberately out of scope here; that decision was later reversed for the
+> playground chrome only, under Feature 34's `sl-ga3c`.
 
 ## Goal
 

@@ -7,7 +7,7 @@ plays two roles:
 1. **Playwright host.** The harness hosts the production `@satsuma/viz` web
    component and provides a Playwright suite that drives the rendered viz the
    same way a user would. Feature 30
-   (`features/30-viz-test-suite-expansion/PRD.md`) expanded the suite into a
+   (`archive/features/30-viz-test-suite-expansion/PRD.md`) expanded the suite into a
    high-value regression net plus a deterministic screenshot review workflow.
 2. **Playground source.** The same browser client is published as a
    server-free live editor (`npm run build:playground`) where visitors edit
@@ -184,7 +184,7 @@ projects, and have different failure semantics.
   the documented state — *not* that pixels diverged from a stored reference.
 
 The ten review shots produced today are listed in
-`features/30-viz-test-suite-expansion/PRD.md` §"Screenshot artifacts for human
+`archive/features/30-viz-test-suite-expansion/PRD.md` §"Screenshot artifacts for human
 and VLM review".
 
 ---

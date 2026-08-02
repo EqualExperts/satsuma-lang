@@ -24,7 +24,7 @@ under `:host([theme="dark"])`. But the theming story around it is incomplete
 and inconsistent, so light mode today works only by accident, and only
 partially. This feature finishes the job rather than inventing a new palette.
 
-Feature 31 (`features/31-alignment-with-ee-brand/PRD.md`) resolved the brand
+Feature 31 (`archive/features/31-alignment-with-ee-brand/PRD.md`) resolved the brand
 question: **co-brand, do not re-skin** — Satsuma keeps its warm
 orange/peach/cream identity. The light palette in this feature is therefore
 the existing token set, completed and contrast-checked, not a redesign.

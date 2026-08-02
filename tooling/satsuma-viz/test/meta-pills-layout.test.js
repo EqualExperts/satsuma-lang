@@ -3,7 +3,7 @@
 //
 // The original layout put all metadata pills in one nowrap row, so a long
 // namespace URI set the card's intrinsic width and left a sea of white space
-// under the pills (meta-pill-wasted-space.jpg in features/34-live-editor-ux).
+// under the pills (meta-pill-wasted-space.jpg in archive/features/34-live-editor-ux).
 // Pills are now width-contained (contain: inline-size) and stack one per row.
 // These tests pin the layout side of that contract through
 // computeOverviewLayout: width ignores pills entirely; height grows by

@@ -6,7 +6,7 @@
  * `namespace http://…` values. In the original layout those pills sat in one
  * nowrap row that SET the card's intrinsic width, rendering the card several
  * times wider than its field list with dead white space below
- * (meta-pill-wasted-space.jpg in features/34-live-editor-ux). The contract
+ * (meta-pill-wasted-space.jpg in archive/features/34-live-editor-ux). The contract
  * now: one pill per row, the card's width is field/header-driven, and an
  * overlong value truncates inside the card with the full text in a tooltip.
  *

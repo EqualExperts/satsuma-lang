@@ -1,8 +1,8 @@
 ---
 id: 3cc-iedv
 status: open
-deps: []
-links: [3cc-t6uo]
+deps: [sl-r6b0]
+links: [3cc-t6uo, sl-r6b0]
 created: 2026-07-31T14:02:18Z
 type: bug
 priority: 3
@@ -21,3 +21,9 @@ A real fix needs the per-field computation to distinguish 'this exact path was w
 
 computeMappingCoverage distinguishes directly-covered paths from prefix-registered ancestors; a leaf beneath a directly-covered record reports mapped=true while a leaf beneath a record that is merely a prefix of a covered descendant still reports mapped=false; core coverage and rollup tests cover both; VS Code gutter behaviour reviewed against the change.
 
+
+## Notes
+
+**2026-08-02T15:44:02Z**
+
+Duplicate of the defect sl-r6b0 fixes: sl-r6b0 (PRD 38 R5, whole-subtree arrow coverage) already names this ticket in its description and carries 'this ticket closed with a note referencing that work' in its acceptance criteria. Linked and made dependent on sl-r6b0 rather than closed now — the defect is still live on main, so closing it before the fix ships would misreport coverage correctness. Close it when sl-r6b0 lands. Kept open deliberately; do not re-raise as a separate fix.

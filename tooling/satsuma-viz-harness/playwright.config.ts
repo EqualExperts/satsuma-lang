@@ -46,7 +46,7 @@ export default defineConfig({
     },
     {
       // Screenshot review project — emits the named PNG artifacts plus
-      // screenshots/manifest.json described in features/30-viz-test-suite-
+      // screenshots/manifest.json described in archive/features/30-viz-test-suite-
       // expansion/PRD.md §"Screenshot artifacts for human and VLM review".
       // Artifacts are review-only, NOT golden baselines (see sl-mm7v).
       name: "screenshots",

@@ -1,8 +1,16 @@
 # Feature 33 — Live Editor & "Try it Live!"
 
-> **Status: REVIEWED** (2026-06-09) — viability assessed against the codebase; the
-> enabling change re-scoped to a browser-safe import resolver (see §1 and the
-> *Pre-implementation findings* below).
+> **Status: IMPLEMENTED** (2026-06-10) — all fourteen tickets delivered (PR
+> #269), with ADR-027 (browser-side viz pipeline) and ADR-028 (client-only
+> document library) recorded under `sl-cahg`. The playground ships at
+> `playground/` on the published site, linked from the top nav as
+> "Try it Live!". Archived 2026-08-02. Feature 34 is the UX polish pass on
+> this feature's shipped output.
+>
+> The status line below was left at REVIEWED throughout implementation; the
+> *Pre-implementation findings* section that follows records the 2026-06-09
+> viability assessment that re-scoped the enabling change to a browser-safe
+> import resolver (see §1), and is retained as historical context.
 
 ## Pre-implementation findings (2026-06-09)
 
