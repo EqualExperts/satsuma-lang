@@ -263,6 +263,24 @@ Runs Semgrep SAST in a container using the `auto` ruleset at `ERROR` and
 scanning dashboard (requires GitHub Advanced Security). Allowlisted rule IDs
 are excluded via `--exclude-rule` flags.
 
+##### Why the release gate does not upload SARIF
+
+GitHub identifies a code scanning **configuration** by the calling workflow file
+plus the job id, not by the workflow that defines the job. When Release invokes
+this workflow, the upload would therefore land under
+`.github/workflows/release.yml:semgrep` rather than
+`.github/workflows/security.yml:semgrep`.
+
+Because Release only runs on pushes to `main`, that second configuration would
+exist on the default branch but never on a pull request. Code scanning cannot
+diff a PR against a baseline configuration the PR does not produce, so it gives
+up: the **Semgrep OSS** check reports `1 configuration not found` and resolves as
+_neutral_ — visible in the PR checks list as `skipping`, gating nothing.
+
+Release therefore passes `skip_sarif_upload: true` and uses the workflow purely
+as a gate. The push-triggered Security run publishes the SARIF for that same
+commit, so exactly one configuration is ever written to `main`. See sl-1wtv.
+
 ---
 
 ## Deploy Site Workflow

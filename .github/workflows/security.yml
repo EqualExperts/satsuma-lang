@@ -6,6 +6,21 @@ on:
   pull_request:
     branches: [main]
   workflow_call: # Allow release.yml to invoke this as a gate
+    inputs:
+      skip_sarif_upload:
+        # GitHub derives a code scanning "configuration" from the CALLING
+        # workflow file plus the job id, so a run invoked from release.yml
+        # publishes its SARIF as `.github/workflows/release.yml:semgrep` — a
+        # second configuration that only ever exists on main. Pull requests run
+        # this workflow directly, so that configuration has no counterpart on
+        # the PR and code scanning gives up on diffing: the "Semgrep OSS" check
+        # reports "1 configuration not found" and skips instead of gating.
+        # Callers must therefore opt out of the upload; the push-triggered run
+        # of this same workflow already publishes the results for that commit.
+        # See sl-1wtv.
+        description: "Run the scan as a gate only, without publishing SARIF to code scanning"
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -88,8 +103,13 @@ jobs:
             --severity WARNING \
             $EXCLUDE_ARGS
 
+      # Publishing to code scanning is skipped for callers that only want the
+      # gate (see the `skip_sarif_upload` input) — re-scanning to produce a
+      # SARIF nobody consumes just doubles the job's runtime.
+      # `inputs` is empty for push and pull_request events, so the negation is
+      # true there and both steps run as normal.
       - name: Generate SARIF
-        if: always()
+        if: always() && !inputs.skip_sarif_upload
         shell: bash
         run: |
           semgrep scan \
@@ -98,8 +118,11 @@ jobs:
             --severity WARNING \
             --sarif --sarif-output semgrep-results.sarif || true
 
+      # No explicit `category` here: the default, `.github/workflows/security.yml:semgrep`,
+      # is the configuration the repo's existing code scanning alert history is
+      # filed under. Changing it would orphan those alerts.
       - name: Upload SARIF
-        if: always()
+        if: always() && !inputs.skip_sarif_upload
         uses: github/codeql-action/upload-sarif@e4fba868fa4b1b91e1fdab776edc8cfbe6e9fb81 # v4
         with:
           sarif_file: semgrep-results.sarif
