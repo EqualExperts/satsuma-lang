@@ -5,6 +5,9 @@ import type { SchemaCard, FieldEntry } from "../model.js";
 import { SzNavigateEvent, SzFieldHoverEvent, SzFieldLineageEvent } from "../satsuma-viz.js";
 import { renderMarkdown } from "../markdown.js";
 import { isCoveredFieldPath } from "@satsuma/core/coverage-paths";
+import { fieldCoverageFromCoveredPaths } from "@satsuma/core/coverage";
+import { summarizeFieldCoverage, countContainerStates } from "@satsuma/core/coverage-rollup";
+import type { CoverageTotals, ContainerStateCounts } from "@satsuma/core/coverage-rollup";
 import {
   HEADER_HEIGHT,
   META_PILL_ROW_GAP,
@@ -597,8 +600,7 @@ export class SzSchemaCard extends LitElement {
 
     if (this.compact) return this._renderCompact(s);
 
-    const totalFields = this._countFields(s.fields);
-    const mappedCount = this._countMapped(s.fields);
+    const { totals, containers } = this._coverage(s);
     const hasNotes = s.notes.length > 0;
     const metaPills = s.metadata.filter((m) => m.key !== "note");
     const isReport = this._isReport(s);
@@ -613,7 +615,12 @@ export class SzSchemaCard extends LitElement {
         >
           ${this._headerIcon(isReport)}
           <span class="header-name">${s.id}</span>
-          <span class="header-count">${mappedCount}/${totalFields}</span>
+          <span
+            class="header-count"
+            data-testid=${`${this.testIdPrefix}-header-count`}
+            title=${this._coverageTitle(totals, containers)}
+            >${totals.covered}/${totals.total}</span
+          >
           <span
             class="header-toggle"
             ?data-collapsed=${this._collapsed}
@@ -806,28 +813,55 @@ export class SzSchemaCard extends LitElement {
       .join("\n");
   }
 
-  private _countFields(fields: FieldEntry[]): number {
-    let count = 0;
-    for (const f of fields) {
-      count++;
-      count += this._countFields(f.children);
-    }
-    return count;
+  /**
+   * The card's coverage figures, counted by core.
+   *
+   * **The card does not compute its own denominator** (ADR-034). It used to:
+   * `_countFields`/`_countMapped` counted every node, records included, so one
+   * covered leaf lifted the numerator once per ancestor level and a schema of
+   * `amount` plus `address record { city, line1, postcode }` with only
+   * `address.city` mapped read as 2/5 — 40% — where `satsuma coverage` reported
+   * 25% and the VS Code status bar reported something different again (sl-hcan).
+   * Coverage is counted in *leaves* because a record is structure, not data:
+   * counting it alongside its children counts the same data twice and lets
+   * nesting depth move the percentage on its own.
+   *
+   * Container states come back beside the ratio rather than inside it — a
+   * reviewer wants to know two records are partly mapped, but that fact must not
+   * enter the number.
+   */
+  private _coverage(s: SchemaCard): {
+    totals: CoverageTotals;
+    containers: ContainerStateCounts;
+  } {
+    const entries = fieldCoverageFromCoveredPaths(s.fields, s.location.uri, this.mappedFields);
+    return {
+      totals: summarizeFieldCoverage(entries),
+      containers: countContainerStates(entries),
+    };
   }
 
-  private _countMapped(fields: FieldEntry[], prefix = ""): number {
-    let count = 0;
-    for (const f of fields) {
-      const fieldPath = prefix ? `${prefix}.${f.name}` : f.name;
-      if (isCoveredFieldPath(fieldPath, this.mappedFields)) count++;
-      count += this._countMapped(f.children, fieldPath);
-    }
-    return count;
+  /**
+   * Tooltip spelling out what the `covered/total` header count means, since the
+   * bare ratio cannot say that records are excluded from it, nor that some of
+   * them are partly mapped. Partly-mapped records are the reviewable state — a
+   * record every leaf of which is covered needs no attention, and one with no
+   * covered leaf is already visible as uncovered rows — so only that count is
+   * worth a phrase of its own.
+   */
+  private _coverageTitle(totals: CoverageTotals, containers: ContainerStateCounts): string {
+    const ratio = `${totals.covered}/${totals.total} leaf fields mapped (${totals.pct}%)`;
+    if (containers.partial === 0) return ratio;
+    const noun = containers.partial === 1 ? "record" : "records";
+    return `${ratio} — ${containers.partial} ${noun} partly mapped`;
   }
 
   private _renderCompact(s: SchemaCard) {
     const displayName = s.id;
-    const totalFields = this._countFields(s.fields);
+    // Leaf count, the same unit the expanded card's ratio is denominated in
+    // (ADR-034). One card must not answer "how many fields?" two ways depending
+    // on whether it happens to be compact.
+    const totalFields = this._coverage(s).totals.total;
     const metaPills = s.metadata.filter((m) => m.key !== "note");
     const isReport = this._isReport(s);
 

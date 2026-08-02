@@ -657,6 +657,45 @@ interface TieredCoveredPaths {
 }
 
 /**
+ * Coverage entries for a declared field tree, judged against the flat
+ * covered-path set view (`buildCoveredFieldSet`).
+ *
+ * The entry point for a consumer that holds a *set* of covered paths rather
+ * than a mapping's CST — the viz card, which builds its set in the browser from
+ * the viz model. Without it that consumer has to re-derive the tri-state and
+ * leaf rules itself, and ADR-034 requires the opposite: `satsuma coverage`, the
+ * VS Code status bar and the viz card must report one number for one workspace,
+ * so every one of them counts through the shapes this module emits.
+ *
+ * Re-deriving the model from the flat set changes no answer. The set is defined
+ * as the union of the model's `direct` and `ancestors` sets, and
+ * {@link isCoveredPath} asks for membership of either, so a path is covered here
+ * exactly when it was covered in the model the set came from. Containers are
+ * judged from their leaves regardless of how their own path was registered.
+ *
+ * **Tier:** a flat set records no tier, so every covered leaf is reported as
+ * `declared`. That is accurate for the only caller today — the viz builds its
+ * set from declared arrows alone — but a consumer that starts folding resolved
+ * NL `@ref` coverage into its set must move to {@link computeMappingCoverage}
+ * rather than have it mislabelled here (ADR-036).
+ *
+ * **Whole-structure arrows are not expanded** (ADR-037): the expansion needs the
+ * arrow's declaration kind, which a set of paths has thrown away. A caller whose
+ * set may contain a whole-record arrow's target must expand it into that
+ * record's leaves before building the set, or the record will read as uncovered.
+ */
+export function fieldCoverageFromCoveredPaths(
+  fields: CoverageField[],
+  uri: string,
+  coveredPaths: Iterable<string>,
+): FieldCoverageEntry[] {
+  return buildFieldCoverage(fields, uri, "", {
+    declared: buildCoveredFieldPaths(coveredPaths),
+    nl: buildCoveredFieldPaths([]),
+  });
+}
+
+/**
  * Recursively build the FieldCoverageEntry list for a schema's fields.
  * `prefix` is the path from the schema root to the current level; record
  * fields emit an entry of their own *and* entries for every descendant, the

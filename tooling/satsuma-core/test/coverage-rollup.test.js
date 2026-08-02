@@ -24,6 +24,7 @@ import {
   extractMappings,
   aggregateCoverage,
   summarizeFieldCoverage,
+  countContainerStates,
 } from "@satsuma/core";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -139,6 +140,43 @@ describe("summarizeFieldCoverage()", () => {
       { path: "c", uri: "u", mapped: false },
     ]);
     assert.equal(totals.pct, 33);
+  });
+});
+
+describe("countContainerStates()", () => {
+  // The counts reviewers read beside the ratio. Containers are excluded from
+  // the percentage (ADR-034), so this is the only surface that reports them —
+  // and it must report the tri-state, not a boolean, or "one of twelve address
+  // fields is mapped" is indistinguishable from "all twelve are".
+  const ENTRIES = [
+    { path: "address", uri: "u", mapped: true, state: "partial" },
+    { path: "address.city", uri: "u", mapped: true, state: "covered" },
+    { path: "address.line1", uri: "u", mapped: false, state: "uncovered" },
+    { path: "billing", uri: "u", mapped: true, state: "covered" },
+    { path: "billing.city", uri: "u", mapped: true, state: "covered" },
+    { path: "shipping", uri: "u", mapped: false, state: "uncovered" },
+    { path: "shipping.city", uri: "u", mapped: false, state: "uncovered" },
+    { path: "amount", uri: "u", mapped: true, state: "covered" },
+  ];
+
+  it("tallies containers by state and counts no leaf among them", () => {
+    // `amount` and every `.city` are leaves: were any of them counted the
+    // totals would exceed the three records declared.
+    assert.deepEqual(countContainerStates(ENTRIES), {
+      covered: 1,
+      partial: 1,
+      uncovered: 1,
+    });
+  });
+
+  it("reports three zeroes for a schema declaring no records", () => {
+    // A flat schema has no container state to report, and must not borrow its
+    // leaves' states to manufacture one.
+    assert.deepEqual(countContainerStates([{ path: "id", uri: "u", mapped: true }]), {
+      covered: 0,
+      partial: 0,
+      uncovered: 0,
+    });
   });
 });
 

@@ -77,6 +77,23 @@ export interface CoverageTotals {
 }
 
 /**
+ * How many of a schema's containers sit in each coverage state (PRD 38 R2).
+ *
+ * Reported *alongside* a percentage, never inside one: a record is structure,
+ * so it is excluded from the ratio by ADR-034, but "two records are only partly
+ * mapped" is exactly what a reviewer wants next to "9/12". The three counts sum
+ * to the number of record and `list_of record` fields declared.
+ */
+export interface ContainerStateCounts {
+  /** Containers every one of whose descendant leaves is covered. */
+  covered: number;
+  /** Containers with at least one covered and at least one uncovered leaf. */
+  partial: number;
+  /** Containers no leaf of which is covered. */
+  uncovered: number;
+}
+
+/**
  * Aggregate coverage for one schema in one role, unioned across every mapping
  * that references it.
  *
@@ -165,6 +182,28 @@ export function summarizeFieldCoverage(fields: FieldCoverageEntry[]): CoverageTo
 export function leafFieldEntries(fields: FieldCoverageEntry[]): FieldCoverageEntry[] {
   const paths = new Set(fields.map((f) => f.path));
   return fields.filter((f) => !hasDescendant(f.path, paths));
+}
+
+/**
+ * The container entries of a schema's coverage list, tallied by state.
+ *
+ * The counterpart to {@link summarizeFieldCoverage}, and deliberately not part
+ * of it: containers are excluded from the percentage (ADR-034) and this is the
+ * shape that lets a consumer say so out loud. "9/12 leaves, 2 records partly
+ * mapped" is review information a percentage cannot carry — a reviewer can see
+ * that two records need attention without a number that double-counts their
+ * children.
+ *
+ * Containers and leaves partition the list, so a schema with no records reports
+ * three zeroes.
+ */
+export function countContainerStates(fields: FieldCoverageEntry[]): ContainerStateCounts {
+  const paths = new Set(fields.map((f) => f.path));
+  const counts: ContainerStateCounts = { covered: 0, partial: 0, uncovered: 0 };
+  for (const field of fields) {
+    if (hasDescendant(field.path, paths)) counts[field.state]++;
+  }
+  return counts;
 }
 
 /** True when any entry's path sits below `path`, i.e. `path` is a record. */

@@ -19,8 +19,11 @@ import { fileURLToPath } from "node:url";
 import {
   initParser,
   getParser,
+  buildCoveredFieldSet,
   computeMappingCoverage,
+  countContainerStates,
   extractSchemas,
+  fieldCoverageFromCoveredPaths,
   extractMappings,
   extractNLRefData,
   leafFieldEntries,
@@ -1580,5 +1583,101 @@ mapping load {
 }`;
     const s = forRole(coverage(BRACKETS, "load"), "source");
     assertMapped(s, "items.id", false);
+  });
+});
+
+// ── Set-based entry building (sl-hcan) ───────────────────────────────────────
+//
+// The path a consumer takes when it holds a covered-path *set* rather than a
+// mapping's CST — the viz card, which builds its set in the browser. ADR-034
+// requires one number per workspace across `satsuma coverage`, the VS Code
+// status bar and the viz card, so what matters here is that this entry point
+// answers exactly as the CST path does.
+
+describe("fieldCoverageFromCoveredPaths()", () => {
+  const NESTED = `
+schema src { city STRING }
+schema tgt {
+  amount DECIMAL
+  address record { city STRING line1 STRING postcode STRING }
+}
+mapping load {
+  source { src }
+  target { tgt }
+  city -> address.city
+}`;
+
+  /** The declared field tree of `tgt`, in core's minimal coverage shape. */
+  function targetFields(source = NESTED, schemaName = "tgt") {
+    const tree = getParser().parse(source);
+    const schema = extractSchemas(tree.rootNode).find((s) => s.name === schemaName);
+    return toCoverageFields(schema.fields);
+  }
+
+  it("reports the same entries as computeMappingCoverage for the same arrows", () => {
+    // The parity property sl-hcan exists for. If the two paths can disagree,
+    // the viz card and the CLI can print different numbers for one file, which
+    // is exactly what they did before this entry point existed.
+    const viaCst = forRole(coverage(NESTED, "load"), "target");
+    const viaSet = fieldCoverageFromCoveredPaths(
+      targetFields(),
+      TEST_URI,
+      buildCoveredFieldSet(["address.city"]),
+    );
+    assert.deepEqual(viaSet, viaCst.fields);
+  });
+
+  it("counts leaves only, so nesting depth alone cannot move the percentage", () => {
+    // The concrete figure sl-hcan cites: `amount` plus a three-leaf `address`
+    // with only `address.city` covered is 1/4 — 25%. Counting the record too
+    // (the viz card's old rule) gave 2/5 — 40%.
+    const entries = fieldCoverageFromCoveredPaths(
+      targetFields(),
+      TEST_URI,
+      buildCoveredFieldSet(["address.city"]),
+    );
+    assert.deepEqual(summarizeFieldCoverage(entries), {
+      covered: 1,
+      coveredDeclared: 1,
+      coveredNl: 0,
+      total: 4,
+      pct: 25,
+    });
+    assert.deepEqual(countContainerStates(entries), { covered: 0, partial: 1, uncovered: 0 });
+  });
+
+  it("gives a flat and a deeply nested schema with the same leaves the same percentage", () => {
+    // Depth invariance, stated as a property rather than a figure: re-nesting a
+    // schema without changing its leaves or the arrows into it must not move the
+    // number. This is what makes a coverage percentage comparable between two
+    // schemas, and what counting containers destroyed.
+    const FLAT = `schema tgt { a STRING b STRING c STRING d STRING }`;
+    const DEEP = `schema tgt { a STRING outer record { b STRING mid record { c STRING inner record { d STRING } } } }`;
+    const COVERED = new Set(["a"]);
+
+    const flat = summarizeFieldCoverage(
+      fieldCoverageFromCoveredPaths(targetFields(FLAT), TEST_URI, COVERED),
+    );
+    const deep = summarizeFieldCoverage(
+      fieldCoverageFromCoveredPaths(targetFields(DEEP), TEST_URI, COVERED),
+    );
+    assert.deepEqual(flat, deep);
+    assert.equal(flat.total, 4);
+    assert.equal(flat.pct, 25);
+  });
+
+  it("judges a container from its leaves even when the set names the container itself", () => {
+    // A set built from `each parcels -> .packed { }` contains "packed" with no
+    // leaf beneath it covered. A container reference must not manufacture leaf
+    // coverage (PRD 38 R2) — the same rule the CST path applies, reached here
+    // through a set that has forgotten which arrow put the path there.
+    const SCHEMA = `schema tgt { packed record { weight DECIMAL sku STRING } }`;
+    const entries = fieldCoverageFromCoveredPaths(
+      targetFields(SCHEMA),
+      TEST_URI,
+      buildCoveredFieldSet(["packed"]),
+    );
+    assert.equal(entries.find((f) => f.path === "packed").state, "uncovered");
+    assert.equal(summarizeFieldCoverage(entries).covered, 0);
   });
 });
