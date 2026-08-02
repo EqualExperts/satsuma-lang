@@ -186,10 +186,10 @@ describe("computeLayout", () => {
     // Pins collectBlockEdges' unified recursion: the previous per-kind loops
     // walked nestedEach only, so arrows under a flatten nested in an each (the
     // sl-vu22 shape) got no edges, and nested_arrow blocks were absent from the
-    // model entirely. Absolute authored paths are used because relative-path
-    // arrows (.sku -> .sku) do not resolve to ports yet — that is 3cdd-yavi,
-    // and when it lands this fixture's paths can switch to the canonical
-    // relative form.
+    // model entirely. Paths are authored element-relative, as spec §4.6 has
+    // them inside all three container kinds and as the model stores them — the
+    // form that resolved to no port at all, and so drew no edge, until
+    // 3cdd-yavi qualified them against their container.
     const nested = (name, children) => ({ ...field(name, "record"), children });
     const model = {
       uri: "file:///test.stm",
@@ -214,13 +214,13 @@ describe("computeLayout", () => {
                 {
                   sourceField: "orders",
                   targetField: "orders",
-                  arrows: [arrow("orders.id", "orders.id")],
+                  arrows: [arrow(".id", ".id")],
                   nestedEach: [],
                   nestedFlatten: [
                     {
-                      sourceField: "orders.parcels",
+                      sourceField: ".parcels",
                       targetField: ".packed",
-                      arrows: [arrow("orders.parcels.sku", "orders.packed.sku")],
+                      arrows: [arrow(".sku", ".sku")],
                       nestedEach: [],
                       nestedFlatten: [],
                       nestedArrows: [],
@@ -235,7 +235,7 @@ describe("computeLayout", () => {
                 {
                   sourceField: "addr",
                   targetField: "address",
-                  arrows: [arrow("addr.line1", "address.line1")],
+                  arrows: [arrow(".line1", ".line1")],
                   nestedEach: [],
                   nestedFlatten: [],
                   nestedArrows: [],
@@ -309,19 +309,19 @@ describe("computeLayout", () => {
               ...mapping("m", ["s"], "t", [arrow("plain", "plain")]),
               eachBlocks: [
                 eachBlock({
-                  arrows: [arrow("orders.id", "orders.id")],
+                  arrows: [arrow(".id", ".id")],
                   nestedFlatten: [
                     eachBlock({
-                      sourceField: "orders.parcels",
+                      sourceField: ".parcels",
                       targetField: ".packed",
-                      arrows: [arrow("orders.parcels.sku", "orders.packed.sku")],
+                      arrows: [arrow(".sku", ".sku")],
                     }),
                   ],
                   nestedArrows: [
                     eachBlock({
                       sourceField: ".ship",
                       targetField: ".shipping",
-                      arrows: [arrow("orders.ship.carrier", "orders.shipping.carrier")],
+                      arrows: [arrow(".carrier", ".carrier")],
                     }),
                   ],
                 }),
@@ -330,7 +330,7 @@ describe("computeLayout", () => {
                 eachBlock({
                   sourceField: "addr",
                   targetField: "address",
-                  arrows: [arrow("addr.line1", "address.line1")],
+                  arrows: [arrow(".line1", ".line1")],
                 }),
               ],
             },

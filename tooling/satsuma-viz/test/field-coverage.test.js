@@ -1,5 +1,5 @@
 import "./dom-shim.js";
-import { describe, it } from "node:test";
+import { before, describe, it } from "node:test";
 import * as assert from "node:assert/strict";
 
 const loc = { uri: "file:///test.stm", line: 1, character: 0 };
@@ -215,12 +215,12 @@ const arrowAtEveryLevel = () => ({
     {
       sourceField: "items",
       targetField: "lines",
-      arrows: [arrow("items.sku", "lines.sku")],
+      arrows: [arrow(".sku", ".sku")],
       nestedEach: [
         {
-          sourceField: "items.discounts",
-          targetField: "lines.discounts",
-          arrows: [arrow("items.discounts.code", "lines.discounts.code")],
+          sourceField: ".discounts",
+          targetField: ".discounts",
+          arrows: [arrow(".code", ".code")],
           nestedEach: [],
           nestedFlatten: [],
           nestedArrows: [],
@@ -236,7 +236,7 @@ const arrowAtEveryLevel = () => ({
     {
       sourceField: "tags",
       targetField: "invoice",
-      arrows: [arrow("tags.label", "tag_label")],
+      arrows: [arrow(".label", "tag_label")],
       nestedEach: [],
       nestedFlatten: [],
       nestedArrows: [],
@@ -273,13 +273,13 @@ describe("countMappingArrows (sl-fm0q)", () => {
         {
           sourceField: "orders",
           targetField: "orders",
-          arrows: [arrow("orders.id", "orders.id")],
+          arrows: [arrow(".id", ".id")],
           nestedEach: [],
           nestedFlatten: [
             {
-              sourceField: "orders.parcels.contents",
-              targetField: "orders.packed_items",
-              arrows: [arrow("orders.parcels.contents.sku", "orders.packed_items.sku")],
+              sourceField: ".parcels.contents",
+              targetField: ".packed_items",
+              arrows: [arrow(".sku", ".sku")],
               nestedEach: [],
               nestedFlatten: [],
               nestedArrows: [],
@@ -372,5 +372,103 @@ describe("sz-mapping-detail hover lookups recurse into nestedEach (sl-fm0q)", ()
       detail.mapping,
     );
     assert.deepEqual([...targets], ["lines.discounts.code"]);
+  });
+});
+
+// ── Element-relative paths inside containers (3cdd-yavi) ─────────────────────
+//
+// Arrows inside `nested_arrow`, `each` and `flatten` bodies are authored
+// relative to the container (`.line1 -> .line1`, spec §4.6) and the model keeps
+// them that way, because that is what the mapping-detail table shows. Anything
+// matching an arrow against a *declared field* has to qualify first — and until
+// this ticket nothing did, so `resolveSchemaLocalFieldPath(".line1", …)` split
+// to ["", "line1"], matched no field, and every relative-path arrow silently
+// contributed nothing to coverage, hover highlighting or overview edges.
+
+describe("relative arrow paths resolve against their container (3cdd-yavi)", () => {
+  /** @type {typeof import("../dist/satsuma-viz.js")} */
+  let mod;
+
+  const src = schema("s", [field("addr", [field("line1")]), field("orders", [field("id")])]);
+  const tgt = schema("t", [field("address", [field("line1")]), field("orders", [field("id")])]);
+
+  /** A mapping whose only arrow sits inside `blocks`, authored relatively. */
+  const mappingWith = (over) => ({
+    id: "m",
+    sourceRefs: ["s"],
+    targetRef: "t",
+    arrows: [],
+    eachBlocks: [],
+    flattenBlocks: [],
+    nestedArrows: [],
+    sourceBlock: null,
+    notes: [],
+    comments: [],
+    location: loc,
+    ...over,
+  });
+
+  const block = (sourceField, targetField, over = {}) => ({
+    sourceField,
+    targetField,
+    arrows: [],
+    nestedEach: [],
+    nestedFlatten: [],
+    nestedArrows: [],
+    location: loc,
+    ...over,
+  });
+
+  before(async () => {
+    mod = await import("../dist/satsuma-viz.js");
+  });
+
+  it("counts a nested_arrow body's relative arrow as covering the qualified leaf", () => {
+    // The ticket's headline case: `.line1 -> .line1` under `addr -> address`
+    // covers addr.line1 and address.line1 on their respective cards.
+    const mapping = mappingWith({
+      nestedArrows: [block("addr", "address", { arrows: [arrow(".line1", ".line1")] })],
+    });
+    const { sourceMapped, targetMapped } = mod.buildMappingCoveredFields(mapping, [src], tgt);
+
+    assert.equal(sourceMapped.get("s").has("addr.line1"), true);
+    assert.equal(targetMapped.has("address.line1"), true);
+    // The containers come along as ancestors of a covered leaf, which is what
+    // makes the record row render as touched rather than as a gap.
+    assert.equal(targetMapped.has("address"), true);
+  });
+
+  it("accumulates prefixes through a flatten nested inside an each", () => {
+    // The sl-vu22 shape. Each container level contributes one segment, so the
+    // rule has to compose — a single level of qualification would resolve
+    // `.sku` to `parcels.sku` and still match nothing.
+    const deepSrc = schema("s", [field("orders", [field("parcels", [field("sku")])])]);
+    const deepTgt = schema("t", [field("orders", [field("packed", [field("sku")])])]);
+    const mapping = mappingWith({
+      eachBlocks: [
+        block("orders", "orders", {
+          nestedFlatten: [block(".parcels", ".packed", { arrows: [arrow(".sku", ".sku")] })],
+        }),
+      ],
+    });
+
+    const { sourceMapped, targetMapped } = mod.buildMappingCoveredFields(
+      mapping,
+      [deepSrc],
+      deepTgt,
+    );
+    assert.equal(sourceMapped.get("s").has("orders.parcels.sku"), true);
+    assert.equal(targetMapped.has("orders.packed.sku"), true);
+  });
+
+  it("leaves a mapping-level arrow untouched, dot and all", () => {
+    // At mapping-body level there is no container to resolve against, so a
+    // stray leading dot must stay unresolvable rather than be quietly matched
+    // to a top-level field — coverage must never rise on a malformed path.
+    const mapping = mappingWith({ arrows: [arrow(".orders", ".orders")] });
+    const { sourceMapped, targetMapped } = mod.buildMappingCoveredFields(mapping, [src], tgt);
+
+    assert.equal(sourceMapped.get("s").has("orders"), false);
+    assert.equal(targetMapped.has("orders"), false);
   });
 });

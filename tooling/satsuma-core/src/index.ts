@@ -112,6 +112,7 @@ export {
   extractImports,
   extractArrowRecords,
   extractMappingArrowRecords,
+  qualifyChildArrowPath,
   canonicalPipeChainText,
 } from "./extract.js";
 export {

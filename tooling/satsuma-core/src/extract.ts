@@ -950,6 +950,34 @@ export function extractMappingArrowRecords(
 }
 
 /**
+ * Make one arrow path absolute against the container it was authored inside.
+ *
+ * Inside a `nested_arrow`, `each` or `flatten` body, paths are authored
+ * *element-relative* — `.line1 -> .line1` under `each parcels -> packed` means
+ * `parcels.line1 -> packed.line1` (spec §4.6). The leading dot is the authored
+ * marker of that relativity and is stripped as the container prefix goes on;
+ * a path written without one inside a container is treated identically, since
+ * the container is the only frame it can be read in.
+ *
+ * Exported because every consumer that resolves an arrow against a declared
+ * field must apply this rule, and the copies drift when they don't share it:
+ * coverage reported nested leaves as gaps until sc-xnxp, and the viz dropped
+ * every relative-path arrow from its coverage lookups, hover highlighting and
+ * overview edges until 3cdd-yavi.
+ *
+ * @param path        Path as authored, with or without a leading dot.
+ * @param containerPath Absolute path of the enclosing container, or null at
+ *                    mapping-body level, where a path is already absolute and
+ *                    is returned untouched — dot and all, since a stray leading
+ *                    dot there matches no declared field and must not be made
+ *                    to look as though it does.
+ */
+export function qualifyChildArrowPath(path: string, containerPath: string | null): string {
+  if (!containerPath || !path) return path;
+  return `${containerPath}.${path.replace(/^\./, "")}`;
+}
+
+/**
  * Recursively collect arrow records from a list of sibling CST nodes,
  * appending to `records` in document order.
  *
@@ -1021,16 +1049,8 @@ function extractSingleArrow(
   const derived = classifyArrow(arrow);
   const steps = decomposePipeSteps(pipeSteps);
 
-  if (parentSrc && sources.length > 0) {
-    sources = sources.map((s) => {
-      const cleanSrc = s.replace(/^\./, "");
-      return `${parentSrc}.${cleanSrc}`;
-    });
-  }
-  if (parentTgt && target) {
-    const cleanTgt = target.replace(/^\./, "");
-    target = `${parentTgt}.${cleanTgt}`;
-  }
+  sources = sources.map((s) => qualifyChildArrowPath(s, parentSrc));
+  target = target === null ? null : qualifyChildArrowPath(target, parentTgt);
 
   // Canonical (layout-independent) so two arrows that differ only in how
   // the formatter laid out the chain or a map literal compare equal — diff
