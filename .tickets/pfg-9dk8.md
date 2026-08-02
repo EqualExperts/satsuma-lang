@@ -1,6 +1,6 @@
 ---
 id: pfg-9dk8
-status: open
+status: in_progress
 deps: []
 links: []
 created: 2026-08-01T21:39:42Z

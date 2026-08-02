@@ -1,0 +1,12 @@
+# Prettier configuration for JS/TS formatting (pfg-9dk8).
+#
+# printWidth 100 was measured against the existing codebase, not taken as a
+# default: at Prettier's default 80 the largest files fight the prevailing
+# style badly (elk-layout.ts alone reformats 354 lines at 80 vs 184 at 100),
+# while 120 is too wide for this repo's prose-heavy doc-comments (CLAUDE.md
+# mandates module, function, and type comments everywhere, so lines are
+# comment-dense). 100 is the best fit for how the code is already written.
+#
+# Everything else is Prettier defaults — the prevailing style already matches
+# them (double quotes, semicolons, trailing commas).
+printWidth: 100
