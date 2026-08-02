@@ -21,7 +21,7 @@ renderer drew a filler bar on non-namespaced compact cards that the layout's
 `compactHeight()` never counted, the edge SVG layer was mounted at the canvas
 padding-box origin while cards sat inside the padding, and the result was the
 feature 34 review's headline bug — anchor dots floating in space beside and
-above the cards (`features/34-live-editor-ux/edge-attachment-markup.jpg`),
+above the cards (`archive/features/34-live-editor-ux/edge-attachment-markup.jpg`),
 with row spacing distorted by cards overflowing their ELK nodes.
 
 Two alternatives were considered. *Measuring the rendered DOM and re-running
