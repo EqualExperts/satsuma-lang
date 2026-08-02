@@ -1,0 +1,9 @@
+# Commits to skip in git blame — bulk mechanical changes with no semantic
+# content. Point blame past them with:
+#
+#   git config blame.ignoreRevsFile .git-blame-ignore-revs
+#
+# (documented as a setup step in docs/developer/AGENT-CONTRIBUTIONS.md)
+
+# Repo-wide Prettier (printWidth 100) + ruff format adoption reformat (pfg-9dk8)
+9605b252268cc35741d55205433b0840f707fdfb

@@ -83,6 +83,27 @@ List active worktrees:
 git worktree list
 ```
 
+## Formatting and git blame
+
+JS/TS is formatted with Prettier (`.prettierrc`, printWidth 100) and Python with
+`ruff format`. Both are enforced by `npm run lint` (and therefore by the
+pre-commit hook and the Lint CI job). To fix formatting locally:
+
+```bash
+npm run format
+```
+
+The one-off repo-wide adoption reformat is recorded in `.git-blame-ignore-revs`
+so it does not pollute `git blame`. Configure git to use it (once per clone):
+
+```bash
+git config blame.ignoreRevsFile .git-blame-ignore-revs
+```
+
+Agents working in Claude Code get format-on-edit automatically via the
+`PostToolUse` hook in `.claude/settings.json`, which runs `prettier --write` /
+`ruff format` on each edited file — the commit gate should rarely fire.
+
 ## Branch Naming
 
 | Scope | Pattern | Example |
@@ -145,6 +166,7 @@ Before starting work:
 - [ ] Create a worktree: `git worktree add .worktrees/<branch> -b <branch>`
 - [ ] `cd` into the worktree
 - [ ] Run `npm run install:all` to install deps, build WASM, and compile LSP server
+- [ ] Configure blame to skip bulk reformats: `git config blame.ignoreRevsFile .git-blame-ignore-revs`
 
 Before opening a PR:
 

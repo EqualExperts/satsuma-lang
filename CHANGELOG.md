@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+### Prettier and `ruff format` are now formatting gates (`pfg-9dk8`)
+
+JS/TS had no formatting gate at all (ESLint 10 ships no formatting rules) and
+Python ran `ruff check` but never `ruff format --check`. Both holes are closed:
+`npm run lint:js` now runs `prettier --check` (printWidth 100, otherwise
+defaults) and `npm run lint:python` runs `ruff format --check`, so the Lint CI
+job and the pre-commit hook both reject unformatted code. `npm run format`
+fixes everything in one shot, and a `PostToolUse` hook in
+`.claude/settings.json` gives Claude Code agents format-on-edit so the gate
+should rarely fire. The one-off repo-wide reformat (230 files) is isolated in
+its own commit and recorded in `.git-blame-ignore-revs` — run
+`git config blame.ignoreRevsFile .git-blame-ignore-revs` once per clone to
+keep `git blame` useful (see AGENT-CONTRIBUTIONS.md).
+
 ### Viz arrow counts and the detail table no longer drop `nested_arrow` blocks (`svdfe-s6we`)
 
 Mappings using the braced `src -> tgt { .a -> .b }` form were undercounted:

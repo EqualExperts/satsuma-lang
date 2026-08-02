@@ -8,10 +8,11 @@
     "ci:all": "npm ci && npm ci --prefix tooling/satsuma-core && npm ci --prefix tooling/satsuma-viz-model && npm ci --prefix tooling/satsuma-viz-backend && npm ci --prefix tooling/tree-sitter-satsuma && npm ci --ignore-scripts --prefix tooling/satsuma-cli && npm ci --prefix tooling/satsuma-viz && npm ci --prefix tooling/satsuma-viz-harness && npm ci --prefix tooling/satsuma-lsp && npm ci --prefix tooling/vscode-satsuma",
     "reinstall": "npm run clean:all && npm run install:all",
     "lint": "npm run lint:js && npm run lint:md && npm run lint:yaml && npm run lint:python",
-    "lint:js": "eslint .",
+    "lint:js": "eslint . && prettier --check \"**/*.{ts,mts,cts,js,mjs,cjs}\"",
     "lint:md": "markdownlint-cli2",
     "lint:yaml": "yamllint .github/workflows/",
-    "lint:python": "ruff check scripts/ tooling/tree-sitter-satsuma/scripts/ skills/ smoke-tests/",
+    "lint:python": "ruff check scripts/ tooling/tree-sitter-satsuma/scripts/ skills/ smoke-tests/ && ruff format --check scripts/ tooling/tree-sitter-satsuma/scripts/ skills/ smoke-tests/",
+    "format": "prettier --write \"**/*.{ts,mts,cts,js,mjs,cjs}\" && ruff format scripts/ tooling/tree-sitter-satsuma/scripts/ skills/ smoke-tests/",
     "test:coverage": "npm --prefix tooling/satsuma-core run test:coverage && npm --prefix tooling/satsuma-viz-model run test:coverage && npm --prefix tooling/satsuma-viz-backend run test:coverage && npm --prefix tooling/satsuma-viz run test:coverage && npm --prefix tooling/satsuma-lsp run test:coverage && npm --prefix tooling/satsuma-cli run test:coverage"
   },
   "overrides": {

@@ -1,0 +1,17 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "jq -r '.tool_input.file_path // .tool_response.filePath // empty' | { read -r f; [ -z \"$f\" ] && exit 0; case \"$f\" in *.ts|*.mts|*.cts|*.js|*.mjs|*.cjs) npx prettier --write --ignore-unknown \"$f\" ;; *.py) ruff format \"$f\" ;; esac; } 2>/dev/null || true",
+            "timeout": 30,
+            "statusMessage": "Formatting (prettier/ruff)"
+          }
+        ]
+      }
+    ]
+  }
+}
