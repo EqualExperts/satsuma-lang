@@ -117,7 +117,8 @@ applied at _resolution_ time, not in the model: the mapping-detail table still
 shows `.line1 -> .line1` under its scope heading, because that is what the author
 wrote and the heading already supplies the context. Coverage figures on
 workspaces using nested iteration will rise — they were understated by every
-arrow inside a container.
+arrow inside a container. See **ADR-039** for the convention this and the spread
+fix share.
 
 ### The viz schema card counts coverage in leaves, like every other surface (`sl-hcan`)
 

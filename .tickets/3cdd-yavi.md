@@ -1,6 +1,6 @@
 ---
 id: 3cdd-yavi
-status: open
+status: closed
 deps: []
 links: [svdfe-s6we, sc-xnxp]
 created: 2026-08-01T21:19:06Z
@@ -17,3 +17,12 @@ Arrows inside nested_arrow, each and flatten bodies are authored with element-re
 
 Child arrows inside nested_arrow/each/flatten reach the model with container-qualified absolute paths (or the resolution layer qualifies them equivalently), reusing core's qualification rule rather than a viz-local copy; buildMappingCoveredFields marks .line1 -> .line1 under 'addr -> address' as covering address.line1 on both sides; elk-layout produces edges for relative-path arrows, including flatten-inside-each (the sl-vu22 shape) and nested_arrow bodies; hover cross-highlighting resolves them; a layout test with populated eachBlocks/flattenBlocks/nestedArrows pins edge collection; viz + viz-backend suites pass and the Playwright harness run is green.
 
+
+## Notes
+
+**2026-08-02T21:06:38Z**
+
+**2026-08-02T21:06:38Z**
+
+Cause: the viz model stores arrow paths as authored, and nothing qualified an element-relative path (.line1) against its container before matching it against declared fields — resolveSchemaLocalFieldPath split it to ['', 'line1'] and returned null, so every arrow inside nested_arrow/each/flatten was dropped from mapping-detail coverage, hover cross-highlighting and overview edges (elk skipped the edge on the missing port silently).
+Fix: exported core's prefixing rule as qualifyChildArrowPath (extraction now calls it too, so there is one copy) and applied it at resolution time — forEachMappingArrow hands visitors the arrow plus its absolute paths, and elk-layout and the detail highlight check thread the same ContainerScope. Model keeps authored text so the detail table still renders what the author wrote (ADR-038). Layout/hover fixtures moved to the canonical relative form; Playwright harness green at 99 passed (commit 5c3e6d9).
