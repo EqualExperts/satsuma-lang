@@ -1,6 +1,6 @@
 ---
 id: sl-0pun
-status: open
+status: closed
 deps: [sl-fmx0]
 links: []
 created: 2026-07-31T14:43:38Z
@@ -26,3 +26,10 @@ FieldCoverageEntry.mapped is an existing contract, so ADD the state rather than 
 
 Tri-state on record and list_of record entries, doc-commented; leaves never report partial; mapped === (state !== 'uncovered') for containers so the VS Code gutter is unchanged; one of three leaves mapped yields partial, three of three covered, zero of three uncovered; partial propagates upward while covered does not (a record { b record { x, y } } with only a.b.x mapped leaves both a.b and a partial); a container referenced with an empty each body (each parcels -> .packed { }) is uncovered, not partial — a container reference must not manufacture leaf coverage; core, LSP and CLI suites pass.
 
+
+## Notes
+
+**2026-08-02T07:50:46Z**
+
+Cause: coverage carried two contradictory boolean definitions of a covered record — the LSP treated a record as mapped when ANY descendant was covered (ancestor-prefix registration), while the CLI review queue excluded one only when ALL children were. One boolean cannot carry both claims.
+Fix: FieldCoverageEntry gains a tri-state `state` (covered/partial/uncovered) computed for containers purely from their descendant leaves, with `mapped` redefined as `state !== "uncovered"` so the VS Code gutter and CLI queue are byte-identical. Leaves stay binary. buildFieldCoverage now recurses bottom-up (coverageForField/rollUpContainer), and aggregateCoverage recomputes container states from unioned leaves rather than OR-ing per-mapping states — two mappings each covering half a record now aggregate to covered. A container reference no longer manufactures leaf coverage: an empty each body and a computed arrow into a record both leave the container uncovered.
