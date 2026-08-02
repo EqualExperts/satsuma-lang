@@ -1,6 +1,6 @@
 ---
 id: pfg-9dk8
-status: in_progress
+status: closed
 deps: []
 links: []
 created: 2026-08-01T21:39:42Z
@@ -37,3 +37,10 @@ The repo-wide reformat lands as its own commit containing no other change; its S
 
 Every package's test suite passes after the reformat (the reformat must be behaviour-neutral), and all existing CI checks stay green.
 
+
+## Notes
+
+**2026-08-02T06:30:34Z**
+
+Cause: JS/TS had no formatting gate (ESLint 10 ships no formatting rules) and lint:python never ran ruff format --check.
+Fix: prettier pinned at root with printWidth 100 (.prettierrc documents the measurement) and .prettierignore mirroring eslint's ignores (commit eedb8e4); isolated repo-wide reformat of 230 files (commit 4041154, recorded in .git-blame-ignore-revs — three lit html-template files needed a second prettier pass to reach the fixed point); gates wired into lint:js (prettier --check) and lint:python (ruff format --check) so CI Lint and the pre-commit hook both enforce them, plus npm run format and a Claude Code PostToolUse format-on-edit hook in .claude/settings.json for a tight loop. blame.ignoreRevsFile documented in AGENT-CONTRIBUTIONS.md. Verified by deliberate misformat: npm run lint rejected it, passed after restore.
