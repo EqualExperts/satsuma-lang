@@ -6,4 +6,4 @@
 # (documented as a setup step in docs/developer/AGENT-CONTRIBUTIONS.md)
 
 # Repo-wide Prettier (printWidth 100) + ruff format adoption reformat (pfg-9dk8)
-9605b252268cc35741d55205433b0840f707fdfb
+bd12dc16fa4bd65f652d938b4d4a7459c6d01d67
