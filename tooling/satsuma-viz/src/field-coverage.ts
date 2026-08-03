@@ -22,6 +22,11 @@
  */
 
 import { schemaLocalFieldPath } from "@satsuma/core/coverage-paths";
+import {
+  createAuthoredEntityRef,
+  createCanonicalEntityRef,
+  createContainerQualifiedFieldRef,
+} from "@satsuma/core/reference-stages";
 import { unionFieldCoverage } from "@satsuma/core/coverage-rollup";
 import { uncoveredFieldCoverage } from "@satsuma/core/coverage";
 import { qualifyChildArrowPath } from "@satsuma/core/extract";
@@ -84,17 +89,30 @@ export function resolveSchemaLocalFieldPath(
   schema: FieldPathCard,
   sourceRefs: string[],
 ): string | null {
-  const otherRefs = sourceRefs.filter((ref) => ref !== schema.qualifiedId);
+  const authoredSchemaRef = createAuthoredEntityRef(schema.qualifiedId);
+  const canonicalSchemaRef = createCanonicalEntityRef(
+    schema.qualifiedId.includes("::") ? schema.qualifiedId : `::${schema.qualifiedId}`,
+  );
+  const otherRefs = sourceRefs
+    .filter((ref) => ref !== schema.qualifiedId)
+    .map(createAuthoredEntityRef);
   const declaresTopLevel = (name: string): boolean =>
     schema.fields.some((field) => field.name === name);
 
-  const local = schemaLocalFieldPath(fieldRef, [schema.qualifiedId], otherRefs, declaresTopLevel);
+  const qualifiedFieldRef = createContainerQualifiedFieldRef(fieldRef);
+  const local = schemaLocalFieldPath(
+    qualifiedFieldRef,
+    authoredSchemaRef,
+    canonicalSchemaRef,
+    otherRefs,
+    declaresTopLevel,
+  );
   if (local === null) return null;
 
   // An explicit `thisSchema.` prefix is proof enough that the ref is meant for
   // this card. Only an unprefixed ref — which could belong to any card on
   // screen — has to be confirmed against the declared fields.
-  if (local !== fieldRef) return local;
+  if (String(local) !== String(qualifiedFieldRef)) return local;
 
   return schemaHasFieldPath(schema, local) ? local : null;
 }

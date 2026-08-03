@@ -14,6 +14,9 @@ import { fileURLToPath } from "node:url";
 import fc from "fast-check";
 import {
   buildCoveredFieldPaths,
+  createAuthoredEntityRef,
+  createCanonicalEntityRef,
+  createContainerQualifiedFieldRef,
   initParser,
   leafFieldEntries,
   schemaLocalFieldPath,
@@ -64,6 +67,16 @@ function coveredLeaves(schema) {
     leafFieldEntries(schema.fields)
       .filter((field) => field.mapped)
       .map((f) => f.path),
+  );
+}
+
+/** Run a generated reference through the explicit R5 localization stages. */
+function localizeGenerated(fieldRef, ownSchema, otherSchema) {
+  return schemaLocalFieldPath(
+    createContainerQualifiedFieldRef(fieldRef),
+    createAuthoredEntityRef(ownSchema),
+    createCanonicalEntityRef(`::${ownSchema}`),
+    [createAuthoredEntityRef(otherSchema)],
   );
 }
 
@@ -197,7 +210,7 @@ describe("generated coverage invariants", () => {
         ({ ownSchema, otherSchema, localPath, scenario }) => {
           const { source } = parseGeneratedScenario(scenario);
           assert.equal(
-            schemaLocalFieldPath(localPath, [ownSchema], [otherSchema]),
+            localizeGenerated(localPath, ownSchema, otherSchema),
             localPath,
             `generated schema-local ref changed:\n${source}`,
           );
@@ -216,7 +229,7 @@ describe("generated coverage invariants", () => {
         ({ ownSchema, otherSchema, localPath, scenario }) => {
           const { source } = parseGeneratedScenario(scenario);
           assert.equal(
-            schemaLocalFieldPath(`${otherSchema}.${localPath}`, [ownSchema], [otherSchema]),
+            localizeGenerated(`${otherSchema}.${localPath}`, ownSchema, otherSchema),
             null,
             `generated other-schema ref was claimed locally:\n${source}`,
           );
@@ -235,7 +248,7 @@ describe("generated coverage invariants", () => {
         ({ ownSchema, otherSchema, localPath, scenario }) => {
           const { source } = parseGeneratedScenario(scenario);
           assert.equal(
-            schemaLocalFieldPath(`${ownSchema}.${localPath}`, [ownSchema], [otherSchema]),
+            localizeGenerated(`${ownSchema}.${localPath}`, ownSchema, otherSchema),
             localPath,
             `generated own-schema prefix did not normalize once:\n${source}`,
           );

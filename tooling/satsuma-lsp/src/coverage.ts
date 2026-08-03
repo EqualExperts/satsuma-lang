@@ -28,6 +28,7 @@ import type { DefinitionEntry, FieldInfo, WorkspaceIndex } from "./workspace-ind
 import { resolveDefinition } from "./workspace-index";
 import { makeDefinitionLookup } from "@satsuma/viz-backend/coverage";
 import {
+  canonicalizeEntityRef,
   computeMappingCoverage as computeCoverage,
   declaresRecordBody,
   expandDeclaredFields,
@@ -35,6 +36,7 @@ import {
   resolveAllNLRefs,
 } from "@satsuma/core";
 import type {
+  AuthoredEntityRef,
   CoverageField,
   CoverageSchemaDefinition,
   FieldDecl,
@@ -150,16 +152,18 @@ function resolveNLRefs(uri: string, tree: Tree, wsIndex: WorkspaceIndex): Resolv
  */
 function resolveSchema(
   wsIndex: WorkspaceIndex,
-  schemaId: string,
+  schemaId: AuthoredEntityRef,
   mappingNamespace: string | null,
 ): CoverageSchemaDefinition | null {
+  const canonicalRef = canonicalizeEntityRef(schemaId, mappingNamespace, wsIndex.definitions);
+  if (!canonicalRef) return null;
   const defs = resolveDefinition(wsIndex, schemaId, mappingNamespace);
   const def = defs.find((d) => d.kind === "schema");
   if (!def) return null;
-  const canonicalId =
-    def.namespace && !schemaId.includes("::") ? `${def.namespace}::${schemaId}` : schemaId;
+  const reportedSchemaId = canonicalRef.startsWith("::") ? canonicalRef.slice(2) : canonicalRef;
   return {
-    schemaId: canonicalId,
+    schemaId: reportedSchemaId,
+    canonicalRef,
     uri: def.uri,
     fields: expandedFields(wsIndex, def).map(toCoverageField),
   };

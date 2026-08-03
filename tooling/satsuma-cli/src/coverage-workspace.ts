@@ -17,7 +17,7 @@
  * independently maintained code.
  */
 
-import { computeMappingCoverage } from "@satsuma/core";
+import { canonicalizeEntityRef, computeMappingCoverage } from "@satsuma/core";
 import type {
   CoverageSchemaDefinition,
   CoverageSchemaResolver,
@@ -25,7 +25,6 @@ import type {
   MappingCoverageResult,
   ResolvedNLRef,
 } from "@satsuma/core";
-import { resolveScopedEntityRef } from "./index-builder.js";
 import { expandDeclaredFields } from "./spread-expand.js";
 import { toCoverageFields } from "./field-positions.js";
 import type { ExtractedWorkspace, ParsedFile, SchemaRecord } from "./types.js";
@@ -71,12 +70,15 @@ export function makeSchemaResolver(
   index: ExtractedWorkspace,
   mappingNamespace: string | null,
 ): CoverageSchemaResolver {
-  return (writtenRef: string): CoverageSchemaDefinition | null => {
-    const key = resolveScopedEntityRef(writtenRef, mappingNamespace, index.schemas);
-    const schema = key ? index.schemas.get(key) : undefined;
-    if (!key || !schema) return null;
+  return (writtenRef): CoverageSchemaDefinition | null => {
+    const canonicalRef = canonicalizeEntityRef(writtenRef, mappingNamespace, index.schemas);
+    if (!canonicalRef) return null;
+    const key = canonicalRef.startsWith("::") ? canonicalRef.slice(2) : canonicalRef;
+    const schema = index.schemas.get(key);
+    if (!schema) return null;
     return {
       schemaId: key,
+      canonicalRef,
       uri: schema.file,
       fields: toCoverageFields(expandedFields(schema, index), {
         file: schema.file,

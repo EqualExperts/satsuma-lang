@@ -28,6 +28,7 @@ import {
   resolveAllNLRefs,
   summarizeFieldCoverage,
   countContainerStates,
+  createCanonicalEntityRef,
   declaresRecordBody,
 } from "@satsuma/core";
 
@@ -79,7 +80,15 @@ function coverage(source, mappingName) {
     mappingName,
     (schemaId) => {
       const schema = byId.get(schemaId);
-      return schema ? { uri: TEST_URI, fields: toCoverageFields(schema.fields) } : null;
+      return schema
+        ? {
+            canonicalRef: createCanonicalEntityRef(
+              schemaId.includes("::") ? schemaId : `::${schemaId}`,
+            ),
+            uri: TEST_URI,
+            fields: toCoverageFields(schema.fields),
+          }
+        : null;
     },
     resolveRefsIn(tree, byId),
   );
@@ -1057,7 +1066,13 @@ mapping load {
   id -> id
 }`);
     const result = computeMappingCoverage(tree, "load", (schemaId) =>
-      schemaId === "tgt" ? { uri: TEST_URI, fields: [{ name: "id" }, { name: "memo" }] } : null,
+      schemaId === "tgt"
+        ? {
+            canonicalRef: createCanonicalEntityRef("::tgt"),
+            uri: TEST_URI,
+            fields: [{ name: "id" }, { name: "memo" }],
+          }
+        : null,
     );
     for (const entry of forRole(result, "target").fields) {
       assert.ok(!("line" in entry), `expected no line key on ${entry.path}, got ${entry.line}`);
