@@ -7,8 +7,7 @@ created: 2026-08-03T06:09:18Z
 type: task
 priority: 3
 assignee: Thorben Louw
-parent: sl-j6g9
-tags: [feature-38, lint, validate, core]
+tags: [lint, validate, core, follow-up]
 ---
 # lint: warn when a fragment spread redeclares an explicitly declared field
 
@@ -17,6 +16,10 @@ sl-qead settled the semantics: a spread contributes only the names the body has 
 The author gets no signal that it happened. A redeclaration is legal but rarely deliberate — a reader has to know the fragment's contents to see that `...meta` adds less than it appears to, and the shadowed field silently loses whatever the fragment said about its type, constraints and note.
 
 satsuma validate reports nothing here today.
+
+This warning was discovered while closing Feature 38, but it does not change
+coverage semantics or cross-consumer parity. It remains open as a standalone
+lint follow-up rather than a child of the completed coverage epic.
 
 ## Design
 
@@ -31,4 +34,3 @@ Warning, not error: the ruling on sl-qead was explicitly that redeclaration stay
 ## Acceptance Criteria
 
 A schema that declares a field and spreads a fragment declaring the same name produces one warning-severity diagnostic naming the field and the fragment. The LSP surfaces it on the redeclaring line. Nothing is reported when the names do not collide. Corpus files that warn are either cleaned up or listed in the ticket notes as accepted. Coverage counts are unchanged — sl-qead already fixed those.
-

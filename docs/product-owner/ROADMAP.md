@@ -8,17 +8,7 @@ Feature specs live in `features/` while active and move to `archive/features/` o
 
 ## Active Feature Specs
 
-The four specs currently in `features/`. Everything numbered 01–35 has shipped and is archived (see [Shipped Features](#shipped-features)).
-
-### Feature 38 — Hierarchical Field Coverage (in flight)
-
-Makes field coverage correct and single-definition for nested records, lists of records, and schemas that reuse field names across depths, so a coverage percentage can be trusted as a merge gate. Four of nine tickets are closed (epic `sl-j6g9`).
-
-**Remaining:** `sl-0pun` (container tri-state: covered / partial / uncovered) and `sl-r6b0` (whole-subtree arrow coverage) are both unblocked and ready; then `sl-hcan` (the viz card counts containers in its ratio, disagreeing with `satsuma coverage`) and `sl-5nsv` (cross-consumer parity tests, including fragment-spread expansion).
-
-**Why it matters most:** until this lands, `--fail-under` can fail a fully-mapped spec — the repo's own canonical nested example reports 75% when it is 100% mapped.
-
-**Source:** `features/38-hierarchical-coverage/PRD.md`
+The three specs currently in `features/`. Everything numbered 01–35 and Feature 38 has shipped and is archived (see [Shipped Features](#shipped-features)).
 
 ### Feature 36 — Viz Coverage Overlay and Field Chain View (not started)
 
@@ -48,11 +38,11 @@ Two warning-severity lint rules — `type-mismatch-direct-arrow` (bare arrows be
 
 Moves the invariants this toolchain documents in prose into the build: node-kind types generated from `node-types.json` so a grammar rename cannot silently change behaviour, branded path and ref types so `sl-joeq`'s name-for-path confusion is unrepresentable, generated-input properties for the ADR-034–041 coverage rules, a naive reference model to differentially test against, and type-aware linting across the four packages that currently have none.
 
-**Why it matters:** the recent defect clusters were *specification* defects — `sl-joeq`, `sl-qead` (which forced ADR-041 to amend ADR-035), ADR-038 constraining ADR-037 — where the code correctly implemented a rule that was wrong or absent, and a green suite said so. Feature 38 is deciding what those rules should be; this feature makes them machine-checked so they cannot quietly stop holding.
+**Why it matters:** the recent defect clusters were *specification* defects — `sl-joeq`, `sl-qead` (which forced ADR-041 to amend ADR-035), ADR-038 constraining ADR-037 — where the code correctly implemented a rule that was wrong or absent, and a green suite said so. Feature 38 decided those rules; this feature makes them machine-checked so they cannot quietly stop holding.
 
 **Ready now:** R1 (generated node-kind types) is small, mechanical, blocks two other requirements, and touches nothing Feature 38 is changing. R5 and the R6 lint rollout follow.
 
-**Sequenced behind Feature 38:** R2, R3 and R4 touch `coverage.ts` and `coverage-paths.ts`, which `sl-0pun` and `sl-r6b0` are still changing; the two spikes (R7 rule-consistency model, R8 denotational spec section) wait for epic `sl-j6g9` to close.
+**Newly unblocked by Feature 38:** R2, R3 and R4 can now build on the settled coverage semantics, and the R7 rule-consistency and R8 denotational-spec spikes can begin now that epic `sl-j6g9` is closed.
 
 **Source:** `features/39-correctness-by-default/PRD.md`
 
@@ -64,6 +54,7 @@ Delivered and moved to `archive/features/`. Recent work, most recent first:
 
 | Feature | Shipped | What landed |
 | --- | --- | --- |
+| 38 — Hierarchical field coverage | 2026-08-03 | Path-correct nested coverage, container tri-state, whole-subtree arrow semantics, leaf-only ratios, and parity across the CLI, LSP, VS Code, and viz consumers (ADR-035–041) |
 | 35 — Workspace coverage command | 2026-08-01 | `satsuma coverage` with per-mapping/per-schema/workspace rollups, a stable `--json` contract, and a `--fail-under` CI gate on exit code 3; `computeMappingCoverage` relocated into `@satsuma/core` |
 | 34 — Live editor UX polish | 2026-06-10 | All eight R1–R8 fixes to the public playground chrome and edit-loop behaviour (ADR-029, ADR-030) |
 | 33 — Live editor / "Try it Live!" | 2026-06-10 | The client-only browser playground (ADR-027, ADR-028) — see [below](#browser-playground--live-editor-shipped--feature-33) |

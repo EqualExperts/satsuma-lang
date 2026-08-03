@@ -1,13 +1,10 @@
 # Feature 38 — Hierarchical Field Coverage
 
-> **Status: PROPOSED** (2026-07-31) — raised after reading the coverage
-> implementation and reproducing its behaviour. Six defects were found: coverage
-> resolves field names rather than paths and so reports unmapped fields as
-> mapped, two nesting constructs were not walked at all, three different
-> percentage conventions ship, two independent walkers derive the same paths, and
-> the container semantics the CLI and LSP each rely on are mutually
-> contradictory. The two unwalked constructs are fixed (`sl-qzy3`); the rest are
-> open, and share one root cause.
+> **Status: IMPLEMENTED** (2026-08-03) — all coverage semantics, implementation,
+> reporting, and cross-consumer parity work delivered under epic `sl-j6g9`.
+> Archived 2026-08-03. The author-facing fragment-redeclaration warning found
+> during parity work is a separate lint follow-up (`sqdsp-00kv`), not unfinished
+> coverage scope.
 >
 > **State this PRD was written against:** branch `feat/35-coverage-command` at
 > `47438ac`, since merged to `main` as **PR #405** (Feature 35 complete —
@@ -22,9 +19,12 @@
 > and none by a test, which is the case for removing the duplicate walker
 > rather than patching it a fourth time.
 >
-> **Defects 1, 4, 5 and 6 remain open.** Defect 5's *symptom* is gone — the two
-> walkers agree again on the nested corpus — but the duplication that caused it
-> is still there, which is what `sl-vu22` addresses. R1–R7 are unchanged.
+> **All six defects are fixed.** The implementation separates direct and derived
+> coverage, uses one extraction-backed path model, defines container tri-state and
+> whole-subtree semantics, and gives every consumer the core leaf-only ratio.
+> Cross-consumer parity tests cover fragment-spread expansion and the NL `@ref`
+> tier. The original defect analysis and acceptance criteria remain below as the
+> historical record of the feature.
 >
 > **Relationship to ADR-034 (Accepted).** This feature is not in tension with
 > it — ADR-034 reaches the same conclusion from the same evidence and names the

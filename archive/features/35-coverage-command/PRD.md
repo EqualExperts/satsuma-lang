@@ -4,7 +4,7 @@
 > epic `sl-ce11`. Archived 2026-08-02. The coverage-correctness defects found
 > while implementing this feature (nested records, whole-subtree arrows,
 > disagreeing percentage conventions across consumers) are out of scope here
-> and are tracked as Feature 38, which is still in flight.
+> and were subsequently delivered in Feature 38.
 >
 > Original motivation, retained as context — motivated by recurring
 > engagements where mapping specs are reverse-engineered from spreadsheet

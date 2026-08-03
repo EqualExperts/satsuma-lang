@@ -419,11 +419,9 @@ ADR-041. Prose is sufficient; mechanised proof is out of scope.
    production implementation.
 4. **Brands:** stop at coverage/ref normalization stages. The first migration is
    evidence for whether more nominal types are worth their ergonomics.
-5. **Feature 38 state:** the core path model and whole-structure semantics are
-   now implemented (`sl-fmx0`, `sl-r6b0`, `3ct-cs4y`, `sl-qead` closed). R3 and
-   R4 can begin against those accepted rules. R5 should wait for the remaining
-   viz coverage parity work (`sl-46wr`, `sl-csrs`) because it changes the same
-   consumer boundaries. I1 and I2 wait for the Feature 38 epic to close.
+5. **Feature 38 state:** the core path model, whole-structure semantics, and
+   cross-consumer parity are implemented and epic `sl-j6g9` is closed. R3, R4,
+   and R5 can begin against those accepted rules; I1 and I2 are also unblocked.
 6. **Static-check rollout:** R1/R2 first, then package-by-package R7. R6 is
    independent and can land immediately. R8 is a separate public-model migration
    and must not be hidden inside lint cleanup.
