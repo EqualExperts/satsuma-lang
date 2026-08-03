@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## v0.12.0 — 2026-08-03
+
 ### The viz coverage figures now match `satsuma coverage` (`sl-46wr`, `sl-csrs`)
 
 **Schema-card percentages rise, on twelve of the shipped examples.** The

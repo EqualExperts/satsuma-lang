@@ -190,14 +190,16 @@ the `release` job.
 
 #### `release`
 
-Downloads both artifacts and creates a GitHub release:
+Downloads all three artifacts and creates a GitHub release:
 
-- **On `workflow_dispatch`:** extracts release notes for the given version tag
-  from `CHANGELOG.md` (the section starting `## vX.Y.Z —`), then creates a
-  tagged release with those notes and attaches both artifacts.
+- **On `workflow_dispatch`:** verifies that the requested tag matches `VERSION`
+  and the CLI, standalone LSP, and VS Code extension package versions. It then
+  extracts non-placeholder release notes from `CHANGELOG.md` (the section
+  starting `## vX.Y.Z —`), creates the tagged release, and attaches all three
+  artifacts.
 - **On push to `main`:** deletes any existing `latest` pre-release (including
   its tag), then recreates it as a `--prerelease` with install instructions,
-  attaching both artifacts.
+  attaching all three artifacts.
 
 ### Release artifacts
 
@@ -218,12 +220,16 @@ names.
 
 ### Creating a tagged release
 
-1. Add a `## vX.Y.Z — <date>` section to `CHANGELOG.md` with release notes.
-2. Trigger **Actions → Release → Run workflow** with the version tag (e.g.
+1. Run `./scripts/bump-version.sh X.Y.Z`. It synchronizes the releasable package
+   versions and moves the accumulated `Unreleased` notes beneath a dated
+   `## vX.Y.Z — <date>` heading, leaving a fresh `Unreleased` section.
+2. Review and merge the resulting release-preparation PR.
+3. Trigger **Actions → Release → Run workflow** with the version tag (e.g.
    `v0.5.1`).
 
-The workflow will fail if no matching changelog section is found or if it is
-empty, so the release notes are always non-trivial.
+The workflow fails before building artifacts if the tag differs from `VERSION`
+or any releasable package. It also fails if no matching changelog section exists
+or the section contains only whitespace or placeholder comments.
 
 ---
 

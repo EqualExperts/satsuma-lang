@@ -33,6 +33,12 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
+      - name: Validate tagged-release metadata
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          RELEASE_TAG: ${{ inputs.version }}
+        run: node scripts/release-metadata.mjs validate "$RELEASE_TAG"
+
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
           node-version: "22"
@@ -90,35 +96,7 @@ jobs:
         if: github.event_name == 'workflow_dispatch'
         env:
           RELEASE_TAG: ${{ inputs.version }}
-        run: |
-          node <<'NODE' > release-notes.md
-          const fs = require('fs');
-          const tag = process.env.RELEASE_TAG;
-          const lines = fs.readFileSync('CHANGELOG.md', 'utf8').split('\n');
-          const heading = `## ${tag} — `;
-          const startIndex = lines.findIndex((line) => line.startsWith(heading));
-
-          if (startIndex === -1) {
-            console.error(`No changelog section found for ${tag}`);
-            process.exit(1);
-          }
-
-          let endIndex = lines.length;
-          for (let index = startIndex + 1; index < lines.length; index += 1) {
-            if (lines[index].startsWith('## ')) {
-              endIndex = index;
-              break;
-            }
-          }
-
-          const notes = lines.slice(startIndex + 1, endIndex).join('\n').trim();
-          if (!notes) {
-            console.error(`Changelog section for ${tag} is empty`);
-            process.exit(1);
-          }
-
-          process.stdout.write(`${notes}\n`);
-          NODE
+        run: node scripts/release-metadata.mjs notes "$RELEASE_TAG" > release-notes.md
 
       - name: Rename release assets for tagged release
         if: github.event_name == 'workflow_dispatch'

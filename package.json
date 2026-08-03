@@ -13,6 +13,7 @@
     "lint:yaml": "yamllint .github/workflows/",
     "lint:python": "ruff check scripts/ tooling/tree-sitter-satsuma/scripts/ skills/ smoke-tests/ && ruff format --check scripts/ tooling/tree-sitter-satsuma/scripts/ skills/ smoke-tests/",
     "format": "prettier --write \"**/*.{ts,mts,cts,js,mjs,cjs}\" && ruff format scripts/ tooling/tree-sitter-satsuma/scripts/ skills/ smoke-tests/",
+    "test:release": "node --test scripts/release-metadata.test.mjs",
     "test:coverage": "npm --prefix tooling/satsuma-core run test:coverage && npm --prefix tooling/satsuma-viz-model run test:coverage && npm --prefix tooling/satsuma-viz-backend run test:coverage && npm --prefix tooling/satsuma-viz run test:coverage && npm --prefix tooling/satsuma-lsp run test:coverage && npm --prefix tooling/satsuma-cli run test:coverage"
   },
   "overrides": {

@@ -43,6 +43,7 @@ for tool in yamllint ruff; do
 done
 
 run_step "repo lint" npm run lint
+run_step "release tooling tests" npm run test:release
 
 run_parallel "satsuma-core + satsuma-viz-model tests" \
   "npm --prefix tooling/satsuma-core test" \
