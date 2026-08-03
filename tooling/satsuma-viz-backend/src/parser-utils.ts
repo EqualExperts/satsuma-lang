@@ -15,7 +15,7 @@ import { Position, Range } from "vscode-languageserver-types";
 import { child, children, labelText, stringText, walkDescendants } from "@satsuma/core";
 import type { SyntaxNode } from "@satsuma/core";
 
-export type { SyntaxNode, Tree } from "@satsuma/core";
+export type { SatsumaCstType, SatsumaGrammarSymbol, SyntaxNode, Tree } from "@satsuma/core";
 export { child, children, labelText, stringText, walkDescendants };
 
 /** Convert a tree-sitter node span to an LSP Range. */
