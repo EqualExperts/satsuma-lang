@@ -27,4 +27,8 @@ schemaLocalFieldPath accepts only ContainerQualifiedFieldRef and returns SchemaL
 
 **2026-08-03T16:46:34Z**
 
-Cause: Coverage builders, localization, and declared-field probes still accepted interchangeable strings after the R5 stage vocabulary existed, so consumers could skip or reverse normalization without a compile error. Fix: Tightened coverage APIs to SchemaLocalPath and explicit authored/canonical inputs, migrated core producers and CLI/LSP/viz adapters through validated constructors and transitions, and added compile-only plus runtime regression coverage while preserving protocol strings (commit immediately after c4e4f231).
+Cause: Coverage builders, localization, and declared-field probes still accepted interchangeable strings after the R5 stage vocabulary existed, so consumers could skip or reverse normalization without a compile error. Fix: Tightened coverage APIs to SchemaLocalPath and explicit authored/canonical inputs, migrated core producers and CLI/LSP/viz adapters through validated constructors and transitions, and added compile-only plus runtime regression coverage while preserving protocol strings (commit immediately after a34b0224).
+
+**2026-08-03T16:55:11Z**
+
+Decision record: ADR-044 records opaque reference stages as the durable core boundary, extends ADR-039 without superseding it, and keeps serialized protocols string-based (documentation commit immediately after cd5ba86e).
