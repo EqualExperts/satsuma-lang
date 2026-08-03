@@ -77,6 +77,10 @@
     "./coverage-rollup": {
       "types": "./dist/coverage-rollup.d.ts",
       "default": "./dist/coverage-rollup.js"
+    },
+    "./config": {
+      "types": "./dist/satsuma-config.d.ts",
+      "default": "./dist/satsuma-config.js"
     }
   },
   "types": "./dist/index.d.ts",
@@ -89,7 +93,8 @@
     "test:coverage": "c8 --reporter=text --reporter=lcov --reporter=json-summary --include='dist/**/*.js' --exclude='dist/**/*.d.ts' node --test test/**/*.test.js"
   },
   "dependencies": {
-    "web-tree-sitter": "^0.26.11"
+    "web-tree-sitter": "^0.26.11",
+    "yaml": "^2.9.0"
   },
   "devDependencies": {
     "@types/node": "^26.1.2",

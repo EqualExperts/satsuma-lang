@@ -102,7 +102,9 @@ Operations that check or compare workspace structure.
 
 `lint` checks **policy and conventions**: duplicate definitions, hidden schema dependencies in NL text, unresolved NL `@ref` references. It answers "does this workspace follow best practices?" Some lint rules support `--fix` for safe, deterministic autofix.
 
-Flags: `--json` (structured output), `--fix` (apply safe fixes), `--select <rules>` / `--ignore <rules>` (filter rules), `--quiet` (exit code only), `--rules` (list available rules).
+Flags: `--json` (structured output), `--fix` (apply safe fixes), `--select <rules>` / `--ignore <rules>` (filter rules), `--config <path>` (config file, see [Workspace configuration](#workspace-configuration)), `--quiet` (exit code only), `--rules` (list available rules).
+
+A rule id that does not exist is an error wherever it is written — `--select`, `--ignore`, or the config file — and exits `3`. A typo that silently suppressed nothing would leave the author believing a rule was off.
 
 | Rule                         | Severity | Fixable | Description                                                         |
 | ---------------------------- | -------- | ------- | ------------------------------------------------------------------- |
@@ -110,6 +112,36 @@ Flags: `--json` (structured output), `--fix` (apply safe fixes), `--select <rule
 | `unresolved-nl-ref`          | warning  | no      | `@ref` in NL does not resolve to any known identifier               |
 | `duplicate-definition`       | error    | no      | Named definition is declared more than once in a namespace          |
 | `unenumerated-record-target` | warning  | no      | Arrow targets a record without a record source or child arrows      |
+
+### Workspace configuration
+
+`lint` reads an optional `satsuma.config.yaml` from the working directory, overridable with `--config <path>`. Every setting is optional and the file itself is optional — **a workspace with no config runs every rule**, so adding the file is always opt-in.
+
+```yaml
+# satsuma.config.yaml — workspace lint configuration.
+lint:
+  # Rules to skip in every run. The persistent form of --ignore.
+  # An id that is not a real rule is an error, not a no-op.
+  suppress:
+    - unresolved-nl-ref
+
+  # Declared types to treat as equivalent, as groups. Groups stay separate:
+  # one flat list would make STRING equivalent to INT in the workspace below.
+  typeAliases:
+    - [STRING, TEXT, VARCHAR]
+    - [INT, INTEGER, BIGINT]
+
+  # Escalate warnings to a failing exit code.
+  strict: false
+```
+
+**Precedence — one rule.** Flags win over config, and the union of `--ignore` and `lint.suppress` is suppressed. The single exception: `--select` means "run exactly these", so a rule named on the command line runs even when the config suppresses it — naming a rule is an unambiguous instruction to run it.
+
+Unrecognised settings are reported as warnings and ignored, so a config written for a newer CLI still runs. Anything that makes the file unusable — invalid YAML, a wrong-shaped setting, an unknown rule id — aborts the run with exit `3` rather than falling back to defaults: linting with rules the author did not ask for, and reporting success, is worse than refusing to lint.
+
+`lint.typeAliases` and `lint.strict` are accepted and validated now, but nothing consumes them yet — the CLI prints a warning saying so, so a config cannot look like an active gate when no code enforces it. Their consumers ship with the type-mismatch rule and strict-mode exit codes respectively.
+
+Lint exit codes: `0` no error-severity findings, `2` error-severity findings present, `3` lint could not run.
 
 ### coverage
 
@@ -345,6 +377,8 @@ Cycles are handled gracefully — each field is visited at most once. NL-derived
 | 0    | Success                         |
 | 1    | Not found or no results         |
 | 2    | Parse error or filesystem error |
+
+Two commands add a code that means something specific to them, so a script can tell a failing gate from a broken run: `coverage --fail-under` exits `3` when measured coverage is below the threshold, and `lint` exits `3` when it could not run at all (see [Workspace configuration](#workspace-configuration)). They never collide in one invocation — `lint` has no threshold and `coverage` reads no rules.
 
 ## How Agents Use the CLI
 
