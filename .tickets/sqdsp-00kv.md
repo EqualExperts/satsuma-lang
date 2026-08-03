@@ -2,7 +2,7 @@
 id: sqdsp-00kv
 status: open
 deps: []
-links: []
+links: [sl-qead]
 created: 2026-08-03T06:09:18Z
 type: task
 priority: 3

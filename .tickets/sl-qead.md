@@ -1,8 +1,8 @@
 ---
 id: sl-qead
-status: open
+status: closed
 deps: []
-links: []
+links: [sqdsp-00kv]
 created: 2026-08-02T21:41:14Z
 type: bug
 priority: 2
@@ -43,3 +43,14 @@ Coverage should be fixed to dedupe regardless of how the spec question lands —
 
 The minimal fixture above reports 2/3 (67%) from the CLI, the LSP path and the viz path. coverage --json never emits two fields[] entries with the same path, pinned by a test. examples/namespaces/ns-platform.stm reports vault::sat_contact_details with 10 leaves. The spec question is resolved and recorded in docs/developer/SATSUMA-V2-SPEC.md; if the ruling is that a redeclaration is a diagnostic, it is raised as a separate lint ticket rather than folded in here.
 
+
+## Notes
+
+**2026-08-03T06:12:43Z**
+
+**2026-08-03T00:00:00Z**
+
+Cause: core's `expandEntityFields` returned every field a fragment declared, including names the entity's own body had already declared, so `expandDeclaredFields` concatenated two entries with one path — inflating both the denominator and, for a mapped field, the numerator.
+Fix: a spread now contributes only names the body has not claimed (explicit wins, first spread wins between spreads), seeded from the entity's own fields so the nested record form is covered by the same rule; the minimal fixture reports 2/3 67% and vault::sat_contact_details reports its true 10 leaves. (commit 92ce4b39)
+
+Spec question resolved as **override** and recorded in docs/developer/SATSUMA-V2-SPEC.md §5.1 ("Redeclaring a spread field") plus AI-AGENT-REFERENCE.md: redeclaration stays legal, shadowing is whole-field, no diagnostic today. The author-facing warning is raised separately as sqdsp-00kv.
