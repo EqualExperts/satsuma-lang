@@ -94,8 +94,8 @@ sentinel file:
 agent ──touch .run-tests──▶ watch-and-test.sh
                                 │
                                 ├── kills any stale server on :3333
-                                ├── runs `npx playwright test`
-                                ├── writes .playwright-results.txt
+                                ├── runs `npm test` (pretest rebuild + Playwright)
+                                ├── writes build and test output to .playwright-results.txt
                                 └── removes .run-tests on pickup
 ```
 
@@ -120,7 +120,9 @@ touch tooling/satsuma-viz-harness/.run-tests
 
 A full run takes roughly 30–90 seconds. Results from the previous run remain
 in `.playwright-results.txt` until the next run overwrites them, so always
-check the file timestamp after triggering.
+check the file timestamp after triggering. The watcher performs the complete
+build itself; its build output in the results file proves the browser received
+fresh harness and viz bundles.
 
 ### Run directly (developer, not agent)
 
