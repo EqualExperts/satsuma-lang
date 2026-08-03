@@ -1,6 +1,6 @@
 ---
 id: cbdr-o6xn
-status: open
+status: in_progress
 deps: []
 links: []
 created: 2026-08-03T15:34:41Z
