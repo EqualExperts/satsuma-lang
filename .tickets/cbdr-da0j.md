@@ -1,6 +1,6 @@
 ---
 id: cbdr-da0j
-status: in_progress
+status: closed
 deps: [cbdr-o6xn]
 links: []
 created: 2026-08-03T16:03:45Z
@@ -21,3 +21,10 @@ Add the oracle in satsuma-core test support, separate from generated-scenarios.j
 ## Acceptance Criteria
 
 A purpose-commented fast-check differential suite compares every qualified source and target field's mapped/state verdict plus covered/total/pct rollups between the semantic oracle and coverageForScenario after recovery-free parse, extraction, spread expansion, and production coverage computation; the oracle does not import or call production coverage helpers and has a concise rule-to-ADR table; failures retain fast-check seed/path and shrunk rendered Satsuma; a local mutation restoring bare-segment registration fails with a repeated-name counterexample; a local mutation restoring spread/explicit duplication fails the oracle or uniqueness property; a local mutation removing ADR-038's container-source condition fails with a shrunk scalar-to-record counterexample; existing R3 properties and hand-authored regressions remain; npm --prefix tooling/satsuma-core test and npm audit pass; the ticket receives a timestamped cause/fix note before closure.
+
+## Notes
+
+**2026-08-03T16:14:13Z**
+
+Cause: R3's individual properties stated settled invariants separately, but no independent reference model crossed the renderer, parser, extraction, spread-expansion, and production coverage boundaries, so coordinated drift or path-identity regressions lacked a holistic comparison.
+Fix: Added a test-only semantic oracle and repeated-name scenario that compare every generated field state and leaf rollup with production; verified the three mandated mutations fail, 607 core tests and the full repository hook pass, and npm audit reports zero vulnerabilities. (commit 24c98433)
