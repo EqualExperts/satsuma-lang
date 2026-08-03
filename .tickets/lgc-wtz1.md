@@ -27,3 +27,27 @@ Found while writing Feature 41 R3's 'every edge endpoint is backed by a node' pr
 
 One spelling per entity across nodes[], edges[] and schema_edges[] in every graph --json mode, --schema-only included. Whichever form is chosen is stated in the graph command's JSON documentation and SATSUMA-CLI.md. Feature 41's endpoint-has-a-node property drops its normalisation shim. Existing graph tests updated for the chosen form; no other command's output changes.
 
+
+## Notes
+
+**2026-08-03T22:18:24Z**
+
+A second instance, found while writing R3's properties (sl-hi0z): the
+inconsistency is cross-command as well as intra-payload.
+
+`graph --json` `edges[].mapping` is the index-key form; `field-lineage --json`
+`via_mapping` is the canonical form (`canonicalKey(...)`, field-lineage.ts:165).
+For the *same* mapping in the *same* workspace:
+
+  graph:         "mapping": "load_metric"
+  field-lineage: "via_mapping": "::load_metric"
+
+So a consumer correlating the two commands cannot join them for any file-scope
+mapping — the exact join that makes `graph` and `field-lineage` usable together.
+Namespaced mappings agree (`warehouse::stage_raw` both sides), which is why this
+survived.
+
+Whichever spelling the fix chooses must therefore be applied across commands, not
+just within `graph --json`. Feature 41's R3 properties normalise mapping keys with
+a documented shim that references this ticket; the R5 parity sweep (sl-kwet) will
+need the same shim until this is fixed.

@@ -19,6 +19,27 @@ plan while executing it.
 | R5 cross-consumer parity sweep | `sl-kwet` | blocked — same |
 | R6 branded lineage endpoints | `sl-jyee` | blocked on Feature 39 R5, which has no ticket |
 
+## What I did not do
+
+Ranked by what I would pick up next.
+
+1. **Fix `lgc-4bxl` and `lgc-fu7o`** (both P1, both viz, both small). They are the
+   two highest-value items here: a phantom lineage edge and a hover that points at
+   the wrong card are user-visible wrong answers, and both properties are already
+   written and waiting — removing a `todo` marker is the whole test change. They are
+   *not* in this PR because `sl-hi0z` says to record such findings against their own
+   ticket rather than fix them here, and because changing what the viz draws deserves
+   the Playwright harness and a look at the picture.
+2. **Fix `lgc-3f13`** (P1, core). Bigger blast radius: it changes what
+   `ExtractedMapping.targets` contains, so every consumer of that field needs
+   checking. It also unblocks the generator's namespaced-chain arbitrary generating
+   the shape again, which widens R3's domain for free.
+3. **R4 and R5**, once Feature 40's `sl-prlp` lands — see below. R4's oracle is
+   already shipped.
+4. **`lgc-wtz1`** (P2, cosmetic but corrosive): one spelling per entity across
+   `nodes`, `edges`, `schema_edges` and `field-lineage`. Landing it deletes the two
+   normalisation shims in R3's properties and the same shims R5 would otherwise need.
+
 ## The Feature 40 dependency (R4 and R5)
 
 R4 (`sl-jsyn`) and R5 (`sl-kwet`) both depend on Feature 40's `sl-prlp`, which
@@ -228,3 +249,86 @@ mode these gates exist for: `containerWorkspaceArbitrary` built a record chain o
 level deeper than the block nesting, so every innermost arrow named a path that did
 not exist. Reported as four `field-not-in-schema` warnings with the rendered source
 attached, and fixed in the generator — not accommodated in a property.
+
+## R3 — structural edge invariants (`sl-hi0z`)
+
+Nine properties, in two files:
+`satsuma-cli/test/generated-edge-invariants.test.ts` (the graph's edges) and
+`satsuma-viz/test/generated-edge-completeness.test.js` (the edges the layout draws).
+
+| Property | Defends against | State |
+|---|---|---|
+| Every field-edge endpoint is a declared path | invented endpoints (P1) | green |
+| A container header onto the schema root invents nothing | `r0-7w76` | **todo** |
+| The emitted edge set is exactly the declared set | dropped *and* invented (P2) | green |
+| Every arrow in a nested container block gets an edge | `3cdd-yavi`, `sl-l7u0` | green |
+| Every field-edge endpoint's schema has a node | `sl-p895`'s backfill | green |
+| Every schema-edge endpoint has a node, under `--namespace` too | same, filtered | green |
+| `--namespace` edges are a subset of the unfiltered ones | filter soundness | green |
+| The edge set survives reordering declarations | order-independence | green |
+| The edge set survives splitting across more files | file-independence | green |
+| The layout draws every declared arrow (chain, container, spread, namespaced) | silent port-resolution skips | green |
+| A multi-source arrow draws one edge per source | `lgc-fu7o` | **todo** |
+| A computed arrow is never drawn from a same-named source | `lgc-4bxl` | **todo** |
+
+### The mutation checks the ticket asks for, run and confirmed
+
+- **Removing the `nsFilter` node backfill** (`graph-builder.ts:196-249`) makes the
+  endpoint-has-a-node property fail with `schema edge endpoint has no node under
+  --namespace ns_a`. Acceptance test 8. ✅
+- **Reverting the container-relative qualification** in `elk-layout.ts` — the
+  pre-`3cdd-yavi` behaviour — makes the container property fail with `actual: []`,
+  which is precisely the original symptom: *no lines at all*. Acceptance test 7. ✅
+- **Acceptance test 6 is not runnable as written.** It says "reverting
+  `qualifyField`'s guard" makes the endpoint property fail; there is no guard to
+  revert — the function has always guessed. The `todo` property is the executable
+  form of the same claim: it fails *now*, on the shape `r0-7w76` owns.
+
+### Three permitted omissions on the viz side, enumerated rather than shrugged at
+
+The viz's edge set is deliberately a subset of the CLI's, so the property lists
+what may be missing — which is what makes a *fourth* kind of omission a failure:
+
+1. **`nl-derived` edges.** The VizModel carries no resolved `@ref`s, so the layout
+   could not draw them.
+2. **Container *header* edges.** The viz treats a block header as a scope, not an
+   arrow, consistently in both its walks (`forEachMappingArrow` does not visit
+   headers; `addMappingEdges` does not draw them). `satsuma graph` counts the header
+   as an arrow record and emits an edge. **This is a genuine consumer divergence and
+   is the first question for R5's parity sweep** (`sl-kwet`) — it is a coherent
+   convention rather than a dropped edge, so R3 permits it rather than failing on it.
+3. **Computed arrows** — `lgc-4bxl`, excluded rather than blessed.
+
+### Two more real bugs, both viz, both P1
+
+`sl-hi0z` says explicitly: if a property fails on current behaviour, record it
+against the owning bug ticket rather than weakening the assertion. So these are
+raised and marked `todo`, not fixed here. Both are small, well-understood fixes and
+are the highest-value follow-up in this area — see [What I did not do](#what-i-did-not-do).
+
+**`lgc-4bxl` — a computed arrow is drawn as a line from a same-named source
+field.** `addMappingEdges` resolves a sourceless arrow's source with
+`: targetField` — it looks the *target's* own name up in the *source* schema. When a
+field of that name exists there (the normal case, since matching names on both sides
+is the norm) the viz draws a line asserting lineage the Satsuma explicitly denies;
+when it does not, the edge is silently dropped. A phantom lineage edge is worse than
+a missing one: it is a confident claim about where data came from. `satsuma graph` is
+correct here — it emits `"from": null`.
+
+**`lgc-fu7o` — only the first source of a multi-source arrow is drawn, and hover
+points at the wrong card.** `a.sourceFields[0]` and nothing else, against spec §4.2's
+"one edge per source field". Worse than a plain omission because the hover path does
+*not* share it: `sz-edge-layer.ts:218` highlights on the whole authored
+`arrow.sourceFields`, so hovering the **second** source highlights the single drawn
+edge — which runs to the **first** source's card. The ticket also records a latent
+contract problem in the same code path: `LayoutEdge.sourceField` holds the authored
+ref, so it is schema-local for a bare ref and schema-prefixed for a qualified one,
+with no doc comment and two meanings.
+
+### `satsuma-viz` now runs in the local pre-commit hook
+
+CI has always run it through the `tooling-modules` matrix, but
+`scripts/run-repo-checks.sh` did not — so the viz properties, the ones defending
+against a mapping that renders no lines at all, would only have failed after a push.
+Added to the existing parallel step. **Revert this if commit time matters more**; the
+cost is `satsuma-viz`'s `pretest` (a `tsc --noEmit` plus an esbuild bundle).

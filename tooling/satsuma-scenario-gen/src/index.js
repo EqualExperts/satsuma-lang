@@ -84,7 +84,6 @@ export {
   nlRefWorkspaceArbitrary,
   permutationArbitrary,
   permuteWorkspaceDeclarations,
-  schemaRootContainerWorkspaceArbitrary,
   spreadWorkspaceArbitrary,
   splitWorkspaceAcrossFiles,
   workspacePermutationsArbitrary,

@@ -45,16 +45,20 @@ export interface LoadedGeneratedWorkspace {
 }
 
 /**
- * Render a scenario workspace into a fresh temporary directory and load it.
+ * Write already-rendered files to a fresh temporary directory and load them.
  *
- * The caller must call {@link disposeGeneratedWorkspace} — a property runs this
- * a hundred times, and leaving a directory behind each time would fill `tmpdir`.
+ * `files[0]` is the entry. Exposed separately from
+ * {@link loadGeneratedWorkspace} for the few cases that need Satsuma the scenario
+ * model cannot express — a container header naming a schema *root* has no field
+ * path, so it is a literal fixture rather than a scenario.
+ *
+ * The caller must call {@link disposeGeneratedWorkspace} — a property runs this a
+ * hundred times, and leaving a directory behind each time would fill `tmpdir`.
  */
-export async function loadGeneratedWorkspace(
-  workspace: ScenarioWorkspace,
+export async function loadRenderedFiles(
+  files: Array<{ path: string; source: string }>,
 ): Promise<LoadedGeneratedWorkspace> {
   const root = mkdtempSync(join(tmpdir(), "satsuma-generated-"));
-  const files = renderWorkspace(workspace);
   for (const file of files) writeFileSync(join(root, file.path), file.source);
 
   const entryPath = join(root, files[0].path);
@@ -68,6 +72,13 @@ export async function loadGeneratedWorkspace(
     fileCount: loaded.length,
     parseErrorCount: loaded.reduce((total, file) => total + file.errorCount, 0),
   };
+}
+
+/** Render a scenario workspace into a fresh temporary directory and load it. */
+export async function loadGeneratedWorkspace(
+  workspace: ScenarioWorkspace,
+): Promise<LoadedGeneratedWorkspace> {
+  return loadRenderedFiles(renderWorkspace(workspace));
 }
 
 /** Remove a workspace's temporary directory. Safe to call more than once. */
