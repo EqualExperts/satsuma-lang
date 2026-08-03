@@ -1,6 +1,6 @@
 ---
 id: sl-kap8
-status: in_progress
+status: closed
 deps: []
 links: []
 created: 2026-08-03T11:35:29Z
@@ -27,3 +27,10 @@ playwright.config.ts compounds it: webServer runs 'node dist/server.js', so a st
 - CLAUDE.md's viz-harness section states that the watcher rebuilds, so no agent assumes it must rebuild by hand.
 - Verified by touching a string in tooling/satsuma-viz/src and confirming it reaches the browser in the next sentinel-triggered run without any manual build.
 
+
+## Notes
+
+**2026-08-03T13:17:42Z**
+
+Cause: The sentinel watcher invoked npx directly, bypassing the harness package pretest lifecycle and allowing stale client and server bundles to be tested.
+Fix: Route sentinel runs through npm test, preserve pipeline failures in the results file, document the rebuild contract, and cover success and failure behavior with isolated watcher tests. (commit 28b6da6f)
