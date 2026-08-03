@@ -7,30 +7,12 @@
 
 // ── Tree-sitter primitives ──────────────────────────────────────────────────
 
-export interface SyntaxNode {
-  type: string;
-  text: string;
-  isNamed: boolean;
-  children: SyntaxNode[];
-  namedChildren: SyntaxNode[];
-  childCount: number;
-  child(index: number): SyntaxNode | null;
-  parent: SyntaxNode | null;
-  startPosition: { row: number; column: number };
-  endPosition: { row: number; column: number };
-  startIndex: number;
-  endIndex: number;
-  isMissing: boolean;
-}
-
-export interface Tree {
-  rootNode: SyntaxNode;
-}
-
-export interface Parser {
-  setLanguage(lang: unknown): void;
-  parse(source: string): Tree;
-}
+/**
+ * Parser-backed packages share core's generated-symbol-typed CST contract.
+ * Keeping a structural clone here previously allowed the CLI and core to drift.
+ */
+import type { SyntaxNode, Tree } from "@satsuma/core";
+export type { SyntaxNode, Tree };
 
 // ── Extracted record types ──────────────────────────────────────────────────
 

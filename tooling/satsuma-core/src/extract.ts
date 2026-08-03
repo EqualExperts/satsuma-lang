@@ -21,6 +21,7 @@ import {
   isPresent,
 } from "./cst-utils.js";
 import type { Classification, FieldDecl, MetaEntry, PipeStep, SyntaxNode } from "./types.js";
+import type { SatsumaCstType, SatsumaGrammarSymbol } from "./generated/cst-types.js";
 
 // ── Internal field tree ────────────────────────────────────────────────────
 
@@ -167,7 +168,11 @@ function spreadLabelText(labelNode: SyntaxNode): string {
 // Comment node types from the grammar extras list. These appear as named
 // children in tree-sitter's namedChildren when they occur inside blocks, but
 // they are not schema references and must be skipped during source/target extraction.
-const COMMENT_NODE_TYPES = new Set(["comment", "warning_comment", "question_comment"]);
+const COMMENT_NODE_TYPES: ReadonlySet<SatsumaCstType> = new Set([
+  "comment",
+  "warning_comment",
+  "question_comment",
+]);
 
 /**
  * Extract a structural source_ref name for mapping extraction and recover
@@ -200,7 +205,10 @@ interface NamespaceCollected {
 /**
  * Collect nodes of a given type from both top-level and inside namespace blocks.
  */
-function collectFromNamespaces(rootNode: SyntaxNode, nodeType: string): NamespaceCollected[] {
+function collectFromNamespaces(
+  rootNode: SyntaxNode,
+  nodeType: SatsumaGrammarSymbol,
+): NamespaceCollected[] {
   const results: NamespaceCollected[] = [];
   for (const c of rootNode.namedChildren) {
     if (c.type === nodeType) {
@@ -550,7 +558,12 @@ export function extractTransforms(rootNode: SyntaxNode): ExtractedTransform[] {
   });
 }
 
-const BLOCK_TYPES = new Set(["schema_block", "mapping_block", "fragment_block", "transform_block"]);
+const BLOCK_TYPES: ReadonlySet<SatsumaCstType> = new Set([
+  "schema_block",
+  "mapping_block",
+  "fragment_block",
+  "transform_block",
+]);
 
 function findParentBlock(node: SyntaxNode): { name: string | null; blockType: string | null } {
   let current = node.parent;
@@ -1087,7 +1100,7 @@ function extractSingleArrow(
  * choice plus the two list operators, which `_nested_block_item` adds inside
  * `each`/`flatten` bodies. Kept in step with those two grammar rules.
  */
-const ARROW_DECLARATION_TYPES = new Set([
+const ARROW_DECLARATION_TYPES: ReadonlySet<SatsumaCstType> = new Set([
   "map_arrow",
   "computed_arrow",
   "nested_arrow",
@@ -1103,7 +1116,7 @@ const ARROW_DECLARATION_TYPES = new Set([
  * falling back to it would be the dangerous default. `computed` is the
  * conservative one, and is what an unrecognised shape gets.
  */
-function arrowDeclarationKind(nodeType: string): ArrowDeclarationKind {
+function arrowDeclarationKind(nodeType: SatsumaCstType): ArrowDeclarationKind {
   switch (nodeType) {
     case "map_arrow":
       return "map";

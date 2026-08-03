@@ -5,10 +5,13 @@
  * produced by the satsuma-core extraction functions.
  */
 
+import type { SatsumaCstType } from "./generated/cst-types.js";
+
 // ── Tree-sitter primitives ──────────────────────────────────────────────────
 
 export interface SyntaxNode {
-  type: string;
+  /** Grammar symbol or the explicit ERROR recovery-node type. */
+  type: SatsumaCstType;
   text: string;
   isNamed: boolean;
   children: SyntaxNode[];

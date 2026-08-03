@@ -33,7 +33,12 @@ export type {
   ImportScopeViolation,
 } from "./validate.js";
 export { initParser, getParser, getLanguage, createQuery } from "./parser.js";
-export type { ParserInitOptions } from "./parser.js";
+export type {
+  ParserInitOptions,
+  ParsedSatsumaNode,
+  ParsedSatsumaTree,
+  SatsumaParser,
+} from "./parser.js";
 export { collectParseErrors } from "./parse-errors.js";
 export type { ParseErrorEntry } from "./parse-errors.js";
 export {

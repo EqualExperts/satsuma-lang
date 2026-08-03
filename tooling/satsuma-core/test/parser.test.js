@@ -83,6 +83,24 @@ describe("parser singleton — post-init", () => {
     assert.equal(tree.rootNode.hasError, false, "valid source must parse without errors");
   });
 
+  it("keeps concrete node navigation across the typed parser boundary", () => {
+    // The adapter narrows only the CST discriminant. Consumers must retain the
+    // concrete web-tree-sitter children and parent links used by editor tools.
+    const tree = getParser().parse("schema Customers {}");
+    const schema = tree.rootNode.namedChildren[0];
+    assert.equal(schema.type, "schema_block");
+    assert.equal(schema.parent.equals(tree.rootNode), true);
+    assert.equal(typeof schema.child, "function");
+  });
+
+  it("preserves ERROR as the explicit recovery-node discriminant", () => {
+    // Generated grammar symbols do not include recovery artifacts. This case
+    // protects the audited exception that allows ERROR and nothing broader.
+    const tree = getParser().parse("%%% bad tokens");
+    const error = tree.rootNode.namedChildren.find((node) => node.type === "ERROR");
+    assert.ok(error, "malformed input must expose an ERROR recovery node");
+  });
+
   it("rejects v1 bracket array paths ('items[].id') as a parse error", () => {
     // sl-8o1n: v2 removed [] from field paths — iteration is expressed via
     // each/flatten (grammar.js, 'iteration is expressed via each/flatten').

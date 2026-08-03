@@ -5,6 +5,7 @@
  * consume these; neither consumer should maintain its own copies.
  */
 
+import type { SatsumaGrammarSymbol } from "./generated/cst-types.js";
 import type { SyntaxNode } from "./types.js";
 
 /**
@@ -22,7 +23,7 @@ export function isPresent(node: SyntaxNode | null | undefined): node is SyntaxNo
  * First named child of the given type, or null.
  * Filters out null entries for compatibility with web-tree-sitter's nullable array.
  */
-export function child(node: SyntaxNode, type: string): SyntaxNode | null {
+export function child(node: SyntaxNode, type: SatsumaGrammarSymbol): SyntaxNode | null {
   return node.namedChildren.find((c) => c !== null && c.type === type) ?? null;
 }
 
@@ -30,7 +31,7 @@ export function child(node: SyntaxNode, type: string): SyntaxNode | null {
  * All named children of the given type.
  * Filters out null entries for compatibility with web-tree-sitter's nullable array.
  */
-export function children(node: SyntaxNode, type: string): SyntaxNode[] {
+export function children(node: SyntaxNode, type: SatsumaGrammarSymbol): SyntaxNode[] {
   return node.namedChildren.filter((c): c is SyntaxNode => c !== null && c.type === type);
 }
 
@@ -39,7 +40,7 @@ export function children(node: SyntaxNode, type: string): SyntaxNode[] {
  */
 export function allDescendants(
   node: SyntaxNode,
-  type: string,
+  type: SatsumaGrammarSymbol,
   acc: SyntaxNode[] = [],
 ): SyntaxNode[] {
   for (const c of node.namedChildren) {

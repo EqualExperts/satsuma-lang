@@ -22,11 +22,64 @@
  *   3. There is no teardown — the singleton lives for the process lifetime.
  */
 
-import type { Parser, Language, Query } from "web-tree-sitter";
+import type {
+  Parser,
+  Language,
+  Node as WebTreeSitterNode,
+  ParseCallback,
+  ParseOptions,
+  Query,
+  Tree as WebTreeSitterTree,
+} from "web-tree-sitter";
+import type { SyntaxNode, Tree } from "./types.js";
+
+// ── Audited external-type boundary ─────────────────────────────────────────
+
+/**
+ * A concrete web-tree-sitter node whose discriminant follows the generated
+ * Satsuma grammar contract.
+ *
+ * The runtime object remains the original web-tree-sitter Node. The
+ * intersection adds the smaller parser-independent core contract so consumers
+ * can retain concrete navigation APIs while CST comparisons are type-checked.
+ */
+export type ParsedSatsumaNode = WebTreeSitterNode & SyntaxNode;
+
+/** A concrete web-tree-sitter tree with a generated-symbol-typed root node. */
+export type ParsedSatsumaTree = Omit<WebTreeSitterTree, "rootNode"> &
+  Tree & {
+    readonly rootNode: ParsedSatsumaNode;
+  };
+
+/**
+ * The shared parser surface returned to Satsuma consumers.
+ *
+ * web-tree-sitter correctly exposes Node.type as string because it serves any
+ * grammar. Once this singleton has loaded the Satsuma WASM, parse results can
+ * only contain generated Satsuma symbols plus ERROR recovery nodes. The
+ * narrowed parse result records that runtime invariant at this one boundary.
+ */
+export type SatsumaParser = Omit<Parser, "parse"> & {
+  parse(
+    callback: string | ParseCallback,
+    oldTree?: WebTreeSitterTree | null,
+    options?: ParseOptions,
+  ): ParsedSatsumaTree | null;
+};
+
+/**
+ * Narrow the grammar-agnostic parser after the Satsuma language is installed.
+ *
+ * This is the only assertion needed for ordinary parser output. Extraction and
+ * formatting code consume the resulting contract without local casts.
+ */
+function asSatsumaParser(parser: Parser): SatsumaParser {
+  return parser as SatsumaParser;
+}
 
 // ── Singleton state ─────────────────────────────────────────────────────────
 
-let _parser: Parser | null = null;
+let _parser: SatsumaParser | null = null;
 let _language: Language | null = null;
 
 // Retained so that createQuery() can construct Query instances from the same
@@ -90,8 +143,9 @@ export function initParser(wasmPath: string, options?: ParserInitOptions): Promi
       options?.locateFile ? { locateFile: options.locateFile } : undefined,
     );
     _language = await TreeSitter.Language.load(wasmPath);
-    _parser = new TreeSitter.Parser();
-    _parser.setLanguage(_language);
+    const parser = new TreeSitter.Parser();
+    parser.setLanguage(_language);
+    _parser = asSatsumaParser(parser);
   })();
 
   return _initPromise;
@@ -101,7 +155,7 @@ export function initParser(wasmPath: string, options?: ParserInitOptions): Promi
  * Return the initialised Parser instance.
  * Throws if initParser() has not been awaited.
  */
-export function getParser(): Parser {
+export function getParser(): SatsumaParser {
   if (!_parser) throw new Error("Parser not initialised — call initParser() first");
   return _parser;
 }
