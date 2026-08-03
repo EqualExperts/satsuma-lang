@@ -18,11 +18,16 @@
 /**
  * A record field, which owns nested declarations and may spread a fragment.
  *
+ * `isList` renders the declaration as `list_of record`, which is what an `each`
+ * or `flatten` block iterates. It changes no path: `orders.order_no` is the same
+ * path whether `orders` is a record or a list of records.
+ *
  * @typedef {{
  *   name: string,
  *   kind: "record",
  *   fields: ScenarioField[],
  *   spreads?: string[],
+ *   isList?: boolean,
  * }} ScenarioRecordField
  */
 /** @typedef {ScenarioScalarField | ScenarioRecordField} ScenarioField */
@@ -78,6 +83,15 @@ export function scalarField(name) {
 /** Construct one record declaration in the generated semantic model. */
 export function recordField(name, fields, spreads = []) {
   return { name, kind: "record", fields, ...(spreads.length > 0 ? { spreads } : {}) };
+}
+
+/**
+ * Construct a `list_of record` declaration — the shape an `each` or `flatten`
+ * block iterates. Declaring it as a plain record instead would still parse, but
+ * would make the generated iteration semantically dubious.
+ */
+export function listRecordField(name, fields) {
+  return { name, kind: "record", fields, isList: true };
 }
 
 /** Stable leaf names derived from a generated count rather than arbitrary text. */

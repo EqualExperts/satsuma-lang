@@ -25,9 +25,10 @@ The adapters that *do* drive the production pipeline — parse, extract, compute
 coverage, build a graph — live in each consuming package's test tree, beside the
 pipeline they drive:
 
-| Consumer | Adapter |
-|---|---|
-| `satsuma-core` | `test/support/scenario-pipeline.js` |
+| Consumer | Adapter | Drives |
+|---|---|---|
+| `satsuma-core` | `test/support/scenario-pipeline.js` | parse, extract, coverage |
+| `satsuma-cli` | `test/support/generated-workspace.ts` | write to disk, load, validate, build the graph |
 
 Keeping pipeline code out of this package is what stops it becoming a second
 production implementation of Satsuma's semantics.
@@ -36,10 +37,30 @@ production implementation of Satsuma's semantics.
 
 | Module | Owns |
 |---|---|
-| `src/model.js` | scenario data shapes, constructors, path helpers |
+| `src/model.js` | single-file scenario shapes, constructors, path helpers |
 | `src/render.js` | scenario → Satsuma source text |
-| `src/arbitraries.js` | fast-check domains, each a named semantic family |
+| `src/arbitraries.js` | fast-check domains for coverage and formatting |
+| `src/workspace-model.js` | workspace shapes: files, namespaces, arrow kinds |
+| `src/workspace-render.js` | workspace → one Satsuma source per file, imports derived |
+| `src/ground-truth.js` | declared paths, declared edges, reachability over them |
+| `src/workspace-arbitraries.js` | one generated domain per lineage axis |
 | `src/index.js` | the public surface |
+
+## Two ideas worth knowing before reading the code
+
+**Endpoints name their schema; authored spellings are derived.** An arrow endpoint
+is `{ schema, path }`, never a bare string, and paths are always absolute. The
+renderer decides how each one is *written* — bare, `schema.path`, or `.suffix`
+inside a container block. Production code has to invert that choice; the ground
+truth never does. A generator that stored only the authored spelling would have to
+re-implement the same inference to state its own expectations, and would then share
+its bugs.
+
+**`import` statements are derived from usage.** A file that references an entity
+declared elsewhere gets exactly the import it needs. Satsuma scopes symbols
+explicitly, so a workspace whose imports disagreed with its usage would be
+semantically invalid — a generator bug the properties would report as a toolchain
+bug.
 
 ## Consuming it from TypeScript
 

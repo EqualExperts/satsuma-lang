@@ -1,8 +1,8 @@
 ---
 id: sl-dqyu
-status: open
+status: closed
 deps: [sl-puky]
-links: []
+links: [lgc-3f13]
 created: 2026-08-03T16:23:38Z
 type: task
 priority: 1
@@ -22,3 +22,32 @@ Add each axis as its own arbitrary so a property can pick the smallest domain th
 
 Every generated workspace parses recovery-free and produces no semantic diagnostics from validateSemanticWorkspace. A generated workspace containing a namespace, an each container, an NL @ref, a derived block and a metric renders, parses and validates. scenarioFieldEdges, scenarioSchemaEdges and scenarioDeclaredFieldPaths are computed from the scenario alone, with a purpose comment stating that independence. Existing core property suites still pass.
 
+
+## Notes
+
+**2026-08-03T22:12:05Z**
+
+Cause: The scenario model was one mapping over scalar/record fields — the right
+domain for coverage, and unable to express chains, namespaces, container blocks,
+NL @refs, computed arrows, metrics or multiple files, which is where every logged
+lineage defect lives.
+
+Fix: Added workspace-model.js, workspace-render.js, ground-truth.js and
+workspace-arbitraries.js to @satsuma/scenario-gen. Endpoints are {schema, path}
+with absolute paths, and the renderer derives the authored spelling (bare,
+schema-qualified, or .relative inside a block) plus every import statement from
+usage — so the ground truth never re-implements qualifyField's inference and a
+workspace cannot claim an import graph its declarations contradict. Ground truth
+is scenarioDeclaredFieldPaths / scenarioFieldEdges / scenarioSchemaEdges plus
+depth-bounded reachability (shipped early for R4). Gates live in
+satsuma-cli/test/generated-workspace.test.ts: every generated workspace parses
+recovery-free, validates clean, and is import-reachable from its entry. 17
+hand-written oracle tests in the package itself.
+
+The gates immediately found two real toolchain bugs, both raised and linked:
+lgc-3f13 (P1 — a namespaced mapping targeting a global schema makes graph,
+lineage and validate all report a schema that does not exist; the generator
+avoids the shape for now, referencing the ticket) and lgc-wtz1 (P2 — graph --json
+spells the same entity two ways across nodes/edges/schema_edges). They also found
+one generator bug: the container arbitrary nested records one level deeper than
+its blocks. (commit immediately after 51edf4bb)

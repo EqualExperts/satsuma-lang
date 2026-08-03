@@ -2,7 +2,7 @@
 id: sl-hi0z
 status: open
 deps: [sl-dqyu]
-links: []
+links: [lgc-3f13, lgc-wtz1]
 created: 2026-08-03T16:23:59Z
 type: task
 priority: 1

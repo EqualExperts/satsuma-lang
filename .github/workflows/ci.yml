@@ -152,6 +152,15 @@ jobs:
             tooling/satsuma-lsp/node_modules
           key: workspace-${{ github.sha }}
 
+      # @satsuma/scenario-gen has no build step and no coverage target, so it gets
+      # no shard of its own in the tooling-modules matrix. Its tests run here,
+      # where the CLI — its largest consumer — already has everything installed,
+      # and *before* the CLI's own suite: a broken generator would otherwise show
+      # up as dozens of unexplained property failures.
+      - name: Run @satsuma/scenario-gen tests
+        working-directory: tooling/satsuma-scenario-gen
+        run: npm test
+
       - name: Run CLI tests with coverage
         run: |
           mkdir -p ../../test-results

@@ -45,6 +45,11 @@ done
 run_step "repo lint" npm run lint
 run_step "release tooling tests" npm run test:release
 
+# The scenario generator runs first and alone: core's property suites depend on
+# it, so a broken generator would otherwise surface as a wall of unexplained
+# property failures rather than as its own named failure.
+run_step "scenario generator tests" npm --prefix tooling/satsuma-scenario-gen test
+
 run_parallel "satsuma-core + satsuma-viz-model tests" \
   "npm --prefix tooling/satsuma-core test" \
   "npm --prefix tooling/satsuma-viz-model test"
