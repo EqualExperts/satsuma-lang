@@ -21,8 +21,8 @@ All tooling is parser-backed. Downstream tools should be built on the tree-sitte
 - `useful-prompts/`: self-contained system prompts for web LLMs (Excel-to-Satsuma, Satsuma-to-Excel)
 - `skills/`: Agent Skills following the [agentskills.io](https://agentskills.io) standard (Excel-to-Satsuma conversion skill, Satsuma-to-Excel export skill)
 - `scripts/`: utility scripts used during development
-- `tooling/tree-sitter-satsuma/`: tree-sitter grammar (315 corpus tests), generated parser artifacts, and queries
-- `tooling/satsuma-cli/`: TypeScript CLI tool for workspace extraction, validation, and structural analysis (879 tests)
+- `tooling/tree-sitter-satsuma/`: tree-sitter grammar (318 corpus tests), generated parser artifacts, and queries
+- `tooling/satsuma-cli/`: TypeScript CLI tool for workspace extraction, validation, and structural analysis (987 tests)
 - `tooling/satsuma-lsp/`: editor-agnostic Language Server (semantic tokens, diagnostics, go-to-definition, find-references, completions, hover, rename, code lens, folding, document symbols); runnable standalone via `npx satsuma-lsp --stdio`
 - `tooling/vscode-satsuma/`: VS Code extension (LSP client, commands, webview panels) and TextMate grammar; delegates language intelligence to `satsuma-lsp`
 
@@ -218,7 +218,7 @@ XDG_CACHE_HOME="$SCRATCHPAD/ts-cache" npm --prefix tooling/tree-sitter-satsuma t
 ```
 
 Do **not** conclude from the lock error that the corpus tests cannot be run
-locally — they can, and they must be before any grammar change is pushed. All 315
+locally — they can, and they must be before any grammar change is pushed. All 318
 parses should pass.
 
 ## Code Search with ast-grep
