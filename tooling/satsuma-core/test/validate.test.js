@@ -310,6 +310,42 @@ describe("metric source reference diagnostics", () => {
 // ---------- Section 6: Arrow field references ----------
 
 describe("arrow field-not-in-schema diagnostics", () => {
+  it("accepts a namespaced target schema's bare name as a flatten root", () => {
+    // A flatten header targets the schema root, and authors inside that
+    // namespace may use its bare name. Treating only the canonical key as the
+    // root produces a false warning before any child arrow is considered.
+    const index = makeIndex({
+      schemas: [
+        { name: "source", namespace: "survey", fields: [{ name: "items", type: "list" }] },
+        { name: "fact", namespace: "mart", fields: [{ name: "value", type: "INT" }] },
+      ],
+      mappings: [
+        {
+          name: "publish",
+          namespace: "mart",
+          sources: ["survey::source"],
+          targets: ["fact"],
+        },
+      ],
+      fieldArrows: [
+        {
+          mapping: "publish",
+          namespace: "mart",
+          sources: ["items"],
+          target: "fact",
+          steps: [],
+          line: 5,
+          file: "test.stm",
+        },
+      ],
+    });
+
+    const fieldDiags = collectSemanticDiagnostics(index).filter(
+      (diagnostic) => diagnostic.rule === "field-not-in-schema",
+    );
+    assert.deepEqual(fieldDiags, []);
+  });
+
   it("warns when an arrow source field is not declared in the source schema", () => {
     // Arrow paths that don't match any declared field are almost always typos.
     // The check fires only when the source schema is known and has no unresolved spreads.

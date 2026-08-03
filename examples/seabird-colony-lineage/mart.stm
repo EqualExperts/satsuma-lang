@@ -1,0 +1,22 @@
+// Analytics mart — flatten observations into one row per species sighting.
+import { science::colony_observations } from "./observations.stm"
+
+namespace mart {
+  schema species_fact (format parquet) {
+    survey_id     UUID
+    species_code  STRING
+    total_birds   INT
+  }
+
+  mapping `publish species fact` {
+    source { science::colony_observations }
+    target { species_fact }
+
+    survey_id -> survey_id
+
+    flatten observations -> species_fact {
+      .species -> species_code
+      .birds -> total_birds
+    }
+  }
+}

@@ -55,8 +55,11 @@ describe("qualifyField()", () => {
     assert.equal(qualifyField(".address.street", ["customers"]), "customers.address.street");
   });
 
-  it("leaves fields qualified by a namespace-qualified schema name unchanged", () => {
-    assert.equal(qualifyField("customers.id", ["crm::customers"]), "customers.id");
+  it("restores the namespace on a field prefixed by a namespaced schema's bare name", () => {
+    // Container extraction prefixes flatten children with the authored target
+    // schema (`customers.id`). That is not canonical until the namespace from
+    // the mapping endpoint has been restored.
+    assert.equal(qualifyField("customers.id", ["crm::customers"]), "crm::customers.id");
   });
 
   it("leaves fully namespace-qualified field paths unchanged", () => {

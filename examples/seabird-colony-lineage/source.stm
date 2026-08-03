@@ -1,0 +1,22 @@
+// Seabird colony survey — nested source owned by the field team.
+
+namespace survey {
+  schema colony_survey (format json) {
+    survey_id  UUID
+
+    transects list_of record {
+      transect_ref  STRING
+
+      sightings list_of record {
+        species_code  STRING
+        adults        INT
+        chicks        INT
+
+        rings list_of record {
+          ring_id    STRING
+          condition  STRING
+        }
+      }
+    }
+  }
+}

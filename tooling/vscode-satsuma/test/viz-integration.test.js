@@ -155,7 +155,13 @@ describe("loadExpandedModels", () => {
 });
 
 describe("buildFieldLineagePath", () => {
-  it("builds the schema.field path emitted from a viz field-lineage action", () => {
-    assert.equal(buildFieldLineagePath("customers", "email"), "customers.email");
+  it("preserves namespace and nesting in the path emitted by a viz field-lineage action", () => {
+    // The VS Code panel passes this value directly to `satsuma field-lineage`.
+    // Dropping either part would make a valid nested field resolve to a phantom
+    // global schema or a same-named leaf elsewhere in the workspace.
+    assert.equal(
+      buildFieldLineagePath("science::colony_observations", "observations.rings.identifier"),
+      "science::colony_observations.observations.rings.identifier",
+    );
   });
 });

@@ -1240,6 +1240,13 @@ function qualifiedSourceSchema(path: string, schemaNames: string[]): string | nu
   );
 }
 
+/** Whether an authored schema reference names a resolved schema key. */
+function matchesResolvedSchema(reference: string, resolvedKey: string): boolean {
+  if (reference === resolvedKey) return true;
+  const namespaceSeparator = resolvedKey.indexOf("::");
+  return namespaceSeparator !== -1 && resolvedKey.slice(namespaceSeparator + 2) === reference;
+}
+
 /**
  * Pick the schema to blame in a field-not-in-schema message: a qualified path
  * (s2.created_at) blames the schema it is qualified with; anything else
@@ -1268,7 +1275,7 @@ function resolveFieldPath(
 ): boolean {
   if (path.startsWith(".")) return true;
   if (fieldPaths.has(path)) return true;
-  if (schemaNames.includes(path)) return true;
+  if (schemaNames.some((schemaName) => matchesResolvedSchema(path, schemaName))) return true;
 
   const matchedSchema = qualifiedSourceSchema(path, schemaNames);
   if (matchedSchema) {

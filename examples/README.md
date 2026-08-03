@@ -20,6 +20,7 @@ The CLI requires a `.stm` file entry point (not a directory). The workspace is d
 | [`nested-iteration/`](nested-iteration/) | `pipeline.stm` | Nested `each`/`flatten` sub-blocks mapping hierarchical dispatch events to a courier manifest |
 | [`protobuf-to-parquet/`](protobuf-to-parquet/) | `pipeline.stm` | Protobuf Kafka commerce events to session-level Parquet |
 | [`reports-and-models/`](reports-and-models/) | `pipeline.stm` | Reports, dashboards, and ML models as first-class pipeline consumers |
+| [`seabird-colony-lineage/`](seabird-colony-lineage/) | `platform.stm` | Deeply nested field lineage and coverage across files and namespaces |
 | [`sap-po-to-mfcs/`](sap-po-to-mfcs/) | `pipeline.stm` | SAP ERP purchase order to Oracle MFCS ingestion contract |
 | [`sfdc-to-snowflake/`](sfdc-to-snowflake/) | `pipeline.stm` | Salesforce Opportunity/Account objects to Snowflake analytics |
 | [`xml-to-parquet/`](xml-to-parquet/) | `pipeline.stm` | Commerce order XML to Lakehouse Parquet |
