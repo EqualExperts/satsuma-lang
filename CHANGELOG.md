@@ -2,6 +2,65 @@
 
 ## Unreleased
 
+### The viz coverage figures now match `satsuma coverage` (`sl-46wr`, `sl-csrs`)
+
+**Schema-card percentages rise, on twelve of the shipped examples.** The
+visualization worked out for itself which fields a mapping covers, by walking the
+arrows in its own model. That could not see two of the rules coverage is defined
+by, because neither is visible in an arrow's endpoints: a leaf named by a resolved
+NL `@ref` is covered (ADR-036, needs the ref resolver), and an arrow onto a record
+covers that record's subtree when it enumerates no children (ADR-037, needs the
+arrow's declaration kind). So the card reported gaps the CLI did not.
+
+On `examples/contracts/buy-to-om-order.stm` the source schema read `7/8` against
+the CLI's `8/8`, the single difference being `tax_amount` — reached only through
+`@tax_amount` in a transform. Across `examples/` there were 45 such
+disagreements, per mapping, schema and role. There are now none, asserted by a
+sweep over the whole corpus.
+
+Coverage is computed once, by `@satsuma/core`, when the model is assembled, and
+travels to the client in the payload; the card renders and counts those verdicts
+rather than deriving any. It also now shows the tier — a field reached only
+through prose is marked as such — and distinguishes a partly covered record from
+a fully covered one. Nothing in the CLI's own figures changes. See ADR-042.
+
+Two related fixes to what the card _shows_:
+
+- A schema spreading a fragment from an **imported** file rendered without those
+  fields. `examples/multi-source/multi-source-join.stm`'s `customer_360` showed 26
+  leaves where `satsuma coverage` counts 30.
+- A card whose coverage could not be computed at all — a model built without a
+  workspace index, or a payload cached by an older host — showed `0/N` and marked
+  every field unmapped. It now shows a plain field count, because "not measured"
+  is not "nothing is mapped". A schema that genuinely no mapping references still
+  reports `0/N`.
+
+### `coverage` no longer confuses two mappings that share a label (`sl-46wr`)
+
+**Figures change for any workspace with the same mapping name in two
+namespaces.** Coverage looked a mapping up by its label, and a label is not
+unique: `namespace a { mapping load … }` and `namespace b { mapping load … }` both
+resolved to whichever was declared first. Where the two namespaces also declare
+schemas of the same name the resolution _succeeded_, so the second mapping was
+reported using the first one's arrows — a plausible figure that belonged to
+another mapping.
+
+```satsuma
+namespace b { mapping load { source { s } target { t } x -> x  y -> y } }
+```
+
+`b::load` maps both leaves and reported `1/2`; it now reports `2/2`. Re-baseline
+any `--fail-under` threshold set against such a workspace — in this direction the
+old figure _understated_ the spec, so a threshold that was passing still passes.
+
+Anonymous `mapping { … }` blocks are affected too: having no label, they could not
+be looked up at all. `satsuma coverage` still skips them by design (it reports
+them as skipped, since it keys by label), but the visualization renders them and
+now reports on them.
+
+A mapping is identified to core by namespace and position rather than by label, so
+the CLI, the VS Code gutter and the viz card resolve the same mapping.
+
 ### A spread no longer redeclares a field the schema body declared (`sl-qead`)
 
 **Percentages drop for any schema that redeclares a spread field.** A schema that
