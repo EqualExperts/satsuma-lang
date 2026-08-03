@@ -23,11 +23,11 @@ Satsuma is a concise notation for describing data schemas, mappings, and transfo
 
 ### 2.1 Delimiters
 
-| Delimiter | Role | Contains |
-|-----------|------|----------|
-| `( )` | Metadata / annotations | Key-value pairs, flags, notes about the preceding element |
-| `{ }` | Structural content | Fields, arrows, map entries, pipe chains, child blocks |
-| `" "` | Natural language | Human-readable descriptions, transform logic, documentation |
+| Delimiter | Role                   | Contains                                                    |
+| --------- | ---------------------- | ----------------------------------------------------------- |
+| `( )`     | Metadata / annotations | Key-value pairs, flags, notes about the preceding element   |
+| `{ }`     | Structural content     | Fields, arrows, map entries, pipe chains, child blocks      |
+| `" "`     | Natural language       | Human-readable descriptions, transform logic, documentation |
 
 These roles are **mutually exclusive**. Metadata never appears in `{ }`. Structural children never appear in `( )`. Natural language always uses `" "`.
 
@@ -40,12 +40,13 @@ All comma-separated list constructs follow one rule: **a trailing comma after th
 ### 2.2 Strings and Quoting
 
 - **Double quotes** `" "` — natural language strings. Always double quotes. Escape inner double quotes with `\"`.
-- **Triple double quotes** `""" """` — multiline natural language with Markdown support. No escaping needed for inner `"`, including at the end of the content (`"""He said "hi""""` is valid). The one limitation: content cannot *end* with three or more consecutive quotes, since that run is indistinguishable from the closing delimiter. Use for notes with headings, bold, lists, or multi-paragraph content. Leading indentation from the content is preserved as-is.
+- **Triple double quotes** `""" """` — multiline natural language with Markdown support. No escaping needed for inner `"`, including at the end of the content (`"""He said "hi""""` is valid). The one limitation: content cannot _end_ with three or more consecutive quotes, since that run is indistinguishable from the closing delimiter. Use for notes with headings, bold, lists, or multi-paragraph content. Leading indentation from the content is preserved as-is.
 - **Backticks** `` ` ` `` — identifiers and names that aren't bare-safe. Used for block labels containing special characters (spaces, dots, hyphens) and for field identifiers with special characters.
 - **`@` prefix** — structural cross-references in NL text. `@customers.email` references a schema field. Required inside NL strings for tooling to detect refs; optional but allowed everywhere else.
 
 **Two quoting rules:**
-- Backticks for names: bare names work when matching `[a-zA-Z_][a-zA-Z0-9_-]*`, except that a bare name may not *end* with a hyphen (so `a->b` always reads as an arrow, never as the name `a-` followed by `>`). Everything else gets backticks.
+
+- Backticks for names: bare names work when matching `[a-zA-Z_][a-zA-Z0-9_-]*`, except that a bare name may not _end_ with a hyphen (so `a->b` always reads as an arrow, never as the name `a-` followed by `>`). Everything else gets backticks.
 - Double quotes for prose: NL content uses `"..."` or `"""..."""`.
 
 ```
@@ -73,11 +74,11 @@ fragment `US Address` { ... }
 
 ### 2.4 Comments
 
-| Syntax | Meaning | Behaviour |
-|--------|---------|-----------|
-| `//` | Comment | Author-side. Stripped by tooling. Not exported. |
-| `//!` | Warning | Flags a known issue or risk. May be surfaced by tooling. |
-| `//?` | Question/TODO | Open question. May be surfaced by tooling. |
+| Syntax | Meaning       | Behaviour                                                |
+| ------ | ------------- | -------------------------------------------------------- |
+| `//`   | Comment       | Author-side. Stripped by tooling. Not exported.          |
+| `//!`  | Warning       | Flags a known issue or risk. May be surfaced by tooling. |
+| `//?`  | Question/TODO | Open question. May be surfaced by tooling.               |
 
 Comments run to end of line. There are no block comments.
 
@@ -85,13 +86,13 @@ Comments run to end of line. There are no block comments.
 
 Whitespace around `->` is optional: `a->b`, `a-> b`, `a ->b`, and `a -> b` are all the same arrow.
 
-| Operator | Meaning |
-|----------|---------|
-| `->` | Maps source to target |
-| `->` (no left side) | Computed/derived target field |
-| `\|` | Pipeline step separator |
-| `...` | Spread/expand a fragment or named transform |
-| `:` | Separator in map entries |
+| Operator            | Meaning                                     |
+| ------------------- | ------------------------------------------- |
+| `->`                | Maps source to target                       |
+| `->` (no left side) | Computed/derived target field               |
+| `\|`                | Pipeline step separator                     |
+| `...`               | Spread/expand a fragment or named transform |
+| `:`                 | Separator in map entries                    |
 
 ### 2.6 Reserved Keywords
 
@@ -162,9 +163,9 @@ A field is declared as:
 - **Type** — a vocabulary token (interpreted by the LLM, not formally validated). Common types: `STRING`, `VARCHAR(n)`, `INT`, `DECIMAL(p,s)`, `BOOLEAN`, `DATE`, `TIMESTAMPTZ`, `UUID`, `JSON`, `TEXT`.
 - **Metadata** — optional `( )` block with flags and key-value pairs.
 
-**Type arguments vs metadata.** Parentheses attached *directly* to the type name (no whitespace) are type arguments and belong to the type: `DECIMAL(12,2)`, `VARCHAR(MAX)`. Parentheses separated from the type by whitespace are the field's metadata block: `UUID (pk)`. The two are easy to mix up:
+**Type arguments vs metadata.** Parentheses attached _directly_ to the type name (no whitespace) are type arguments and belong to the type: `DECIMAL(12,2)`, `VARCHAR(MAX)`. Parentheses separated from the type by whitespace are the field's metadata block: `UUID (pk)`. The two are easy to mix up:
 
-- `customer_id UUID(pk)` parses cleanly but means "a type called `UUID(pk)`" — the `pk` constraint is *not* metadata. Tooling flags known constraint tokens inside type arguments (`constraint-in-type-args` warning).
+- `customer_id UUID(pk)` parses cleanly but means "a type called `UUID(pk)`" — the `pk` constraint is _not_ metadata. Tooling flags known constraint tokens inside type arguments (`constraint-in-type-args` warning).
 - `amount DECIMAL (12,2)` is a parse error — numeric type arguments must attach to the type with no space.
 
 ### 3.3 Nested Structures: `record` and `list_of`
@@ -176,6 +177,7 @@ NAME [TYPE] [(metadata)] [{body}]
 ```
 
 Where TYPE can be:
+
 - A scalar type: `STRING`, `DECIMAL(12,2)`, etc.
 - `record` — single nested structure
 - `list_of record` — list of structured elements
@@ -254,7 +256,7 @@ note {
 }
 ```
 
-This distinction follows the three-delimiter rule: `( )` for metadata *about* an element, `{ }` for standalone structural content.
+This distinction follows the three-delimiter rule: `( )` for metadata _about_ an element, `{ }` for standalone structural content.
 
 ### 3.5 Format-Specific Metadata
 
@@ -393,7 +395,7 @@ CUST_ID -> customer_id (note "Deterministic UUID from legacy ID") {
 
 ### 4.3 Value Maps
 
-Use `map { }` for discrete value mappings. The `:` separates input from output. Output values are usually quoted; a bare (unquoted) value extends to the end of its line, so entries can be newline-separated without commas. Two entries on the *same* line must be comma-separated — `R: retail B: biz` without a comma is an error.
+Use `map { }` for discrete value mappings. The `:` separates input from output. Output values are usually quoted; a bare (unquoted) value extends to the end of its line, so entries can be newline-separated without commas. Two entries on the _same_ line must be comma-separated — `R: retail B: biz` without a comma is an error.
 
 ```
 CUST_TYPE -> customer_type {
@@ -438,27 +440,65 @@ StageName -> pipeline_stage {
 
 ### 4.4 Nested Mappings
 
-When source and target have nested/repeated structures, use `each` blocks to iterate lists and nest the arrows:
+When source and target have nested/repeated structures, use `each` blocks to iterate lists and nest the arrows. Blocks nest where the _source_ nests — here `lines` is declared inside `orders`:
 
 ```
-each POReferences -> ShipmentHeader.asnDetails (
-  note "Each PO reference generates one asnDetails entry.
-        Line items and quantities correlated by position."
-) {
-  .REFNUM -> .orderNo { split("/") | first | to_number }
+schema dispatch {
+  orders list_of record {
+    order_no  STRING
+    lines list_of record {
+      sku  STRING
+      qty  INT
+    }
+  }
+}
 
-  each LineItems -> .items {
-    .ITEMNO -> .item { trim | "Resolve via MFCS supplier item cross-reference" }
-    Quantities.QUANTITY -> .unitQuantity {
-      "Divide by 10000 (4 implied decimals), multiply by PO pack size from MFCS"
+mapping `dispatch manifest` {
+  source { dispatch }
+  target { manifest }
+
+  each orders -> shipments (note "One shipment per dispatched order.") {
+    .order_no -> .reference { trim | uppercase }
+
+    each lines -> .items {
+      .sku -> .code { trim | uppercase }
+      .qty -> .quantity
     }
   }
 }
 ```
 
-The `.` prefix indicates a field relative to the current nesting context. The `each` keyword introduces an iteration over a source list, producing elements in the target list.
+The `each` keyword introduces an iteration over a source list, producing elements in the target list.
 
-**Where nested arrows are valid.** Arrows nest inside `each`/`flatten` blocks and inside the braced body of a plain `src -> tgt` arrow. The bodies of *computed* arrows (`-> tgt { ... }`) and *multi-source* arrows (`a, b -> tgt { ... }`) are transform pipelines, not nesting scopes — an arrow written there is a parse error, never silently treated as pipeline prose (it would otherwise vanish from lineage).
+**Every path inside a block is relative to that block.** A leading `.` documents the relativity, but it does not decide it: `sku` and `.sku` inside `each lines` both mean `orders.lines.sku`. The block's own path is prefixed to whatever is written, accumulating through every level of nesting.
+
+| Written inside                                     | Resolves to                                           |
+| -------------------------------------------------- | ----------------------------------------------------- |
+| `.order_no` in `each orders`                       | `orders.order_no`                                     |
+| `.sku` in `each lines` in `each orders`            | `orders.lines.sku`                                    |
+| `orders.order_no` in `each lines` in `each orders` | `orders.lines.orders.order_no` — not a declared field |
+
+**There is no notation for reaching an ancestor**, as that last row shows. A field from an enclosing level cannot be referenced from inside a block; write the arrow _outside_ the block, where its path is already absolute. In a `flatten` block that reads naturally, since fields outside the block repeat on every output row (section 4.6).
+
+**Correlating two lists declared side by side.** A list is only nested if it is _declared_ nested. Two lists at the schema root are iterated by two sibling `each` blocks, which may write into the same target list; state the correspondence in a `note`, using an `@ref` so it is traceable:
+
+```
+each LineItems -> ShipmentHeader.asnDetails.items (
+  note "Correlate to @POReferences by position within the EDI message group."
+) {
+  .ITEMNO -> .item { trim }
+}
+
+each Quantities -> ShipmentHeader.asnDetails.items (
+  note "Match to @LineItems by position — each quantity corresponds to one line item."
+) {
+  .QUANTITY -> .unitQuantity { "Divide by 10000 (4 implied decimals)" }
+}
+```
+
+Nesting `each Quantities` inside `each LineItems` would instead resolve to `LineItems.Quantities`, which such a schema does not declare. Section 8.2 shows this pattern in full.
+
+**Where nested arrows are valid.** Arrows nest inside `each`/`flatten` blocks and inside the braced body of a plain `src -> tgt` arrow. The bodies of _computed_ arrows (`-> tgt { ... }`) and _multi-source_ arrows (`a, b -> tgt { ... }`) are transform pipelines, not nesting scopes — an arrow written there is a parse error, never silently treated as pipeline prose (it would otherwise vanish from lineage).
 
 ### 4.5 Fallback Sources
 
@@ -589,6 +629,7 @@ Import syntax follows the pattern `import { <names> } from "<path>"`. Paths are 
 Satsuma uses **explicit import scoping**: a symbol is only in scope within a file if it appears in that file's import graph (directly imported or transitively reachable via imported symbols' own dependencies). Symbols that exist in the same workspace directory but are not reachable via imports are **not** in scope. Importing one symbol from a file does **not** bring every other definition from that file into scope.
 
 Tooling must respect this boundary:
+
 - Navigation features (go-to-definition, find-references, completions, rename) resolve symbols only within the import-reachable file set of the active file.
 - Editor diagnostics and semantic analysis use the same import-reachable file set; they do not treat the surrounding directory or workspace folder as an implicit merged scope.
 - A reference to a symbol that exists in the workspace but is not reachable via imports is a semantic error. Tooling should suggest the exact `import` statement needed to bring the symbol into scope.
@@ -602,7 +643,7 @@ The entry file for platform-wide lineage analysis is the file that imports from 
 
 A metric schema declares a business metric: what it measures, where the data comes from, and how it can be sliced. Metrics are consumers of schemas — they appear at the end of a lineage graph, not in the middle.
 
-Metrics are `schema` blocks decorated with the `metric` vocabulary token in the metadata block. This is consistent with how `report` and `ml_model` schemas are declared — there is no separate `metric` keyword. Data flow *into* a metric is expressed via `mapping` blocks, not embedded in the schema declaration.
+Metrics are `schema` blocks decorated with the `metric` vocabulary token in the metadata block. This is consistent with how `report` and `ml_model` schemas are declared — there is no separate `metric` keyword. Data flow _into_ a metric is expressed via `mapping` blocks, not embedded in the schema declaration.
 
 ### 6.1 Basic Structure
 
@@ -629,23 +670,23 @@ The data pipeline that populates the metric is expressed as a separate `mapping`
 
 These vocabulary tokens go in the `( )` metadata block alongside `metric`:
 
-| Token | Meaning | Example |
-|-------|---------|---------|
-| `metric` | Marks this schema as a business metric | `metric` |
-| `metric_name` | Short business display label | `metric_name "MRR"` |
-| `source` | Schema(s) the metric is derived from | `source fact_orders` or `source {fact_orders, dim_customer}` |
-| `grain` | The time or dimensional grain | `grain monthly`, `grain daily` |
-| `slice` | Dimensions the metric can be cut by | `slice {region, product_line, segment}` |
-| `filter` | Row-level filter applied before aggregation | `filter "status = 'active'"` |
+| Token         | Meaning                                     | Example                                                      |
+| ------------- | ------------------------------------------- | ------------------------------------------------------------ |
+| `metric`      | Marks this schema as a business metric      | `metric`                                                     |
+| `metric_name` | Short business display label                | `metric_name "MRR"`                                          |
+| `source`      | Schema(s) the metric is derived from        | `source fact_orders` or `source {fact_orders, dim_customer}` |
+| `grain`       | The time or dimensional grain               | `grain monthly`, `grain daily`                               |
+| `slice`       | Dimensions the metric can be cut by         | `slice {region, product_line, segment}`                      |
+| `filter`      | Row-level filter applied before aggregation | `filter "status = 'active'"`                                 |
 
 ### 6.3 Measure Fields
 
 Fields inside a metric body declare the numeric values the metric produces. The `measure` vocabulary token describes aggregation behaviour:
 
-| Token | Meaning |
-|-------|---------|
-| `measure additive` | Can be summed across all dimensions |
-| `measure non_additive` | Cannot be summed (e.g. ratios, averages) |
+| Token                   | Meaning                                                                               |
+| ----------------------- | ------------------------------------------------------------------------------------- |
+| `measure additive`      | Can be summed across all dimensions                                                   |
+| `measure non_additive`  | Cannot be summed (e.g. ratios, averages)                                              |
 | `measure semi_additive` | Can be summed across some dimensions but not others (e.g. balance at a point in time) |
 
 ### 6.4 Examples
@@ -716,7 +757,7 @@ schema churn_rate (
 ### 6.5 Metric Schemas vs Regular Schemas
 
 - Metric schemas **are schemas** — they share the definition namespace with all other schemas and can appear as `target` in mapping blocks.
-- Metric schemas are **not valid sources** — mapping blocks should not use a metric schema as a `source`. By convention, data flows *into* metrics; nothing flows *out*.
+- Metric schemas are **not valid sources** — mapping blocks should not use a metric schema as a `source`. By convention, data flows _into_ metrics; nothing flows _out_.
 - The `source`, `grain`, `slice`, and `filter` tokens are vocabulary tokens interpreted by the LLM or downstream tooling — the parser captures them structurally but does not enforce them.
 - The `satsuma metric <name>` command identifies schemas decorated with the `metric` metadata token. It is not a distinct block type.
 
@@ -728,56 +769,56 @@ Vocabulary tokens are **not keywords** — they are interpreted by the LLM based
 
 ### 7.1 Field Metadata Tokens (used in `( )`)
 
-| Token | Meaning | Example |
-|-------|---------|---------|
-| `pk` | Primary key | `(pk)` |
-| `required` | Must not be null | `(required)` |
-| `unique` | Values must be unique | `(unique)` |
-| `indexed` | Should have an index | `(indexed)` |
-| `pii` | Personally identifiable information | `(pii)` |
-| `encrypt` | Must be encrypted | `(encrypt AES-256-GCM)` |
-| `enum` | Restricted value set | `(enum {a, b, c})` |
-| `default` | Default value | `(default 0)` |
-| `format` | Data format constraint | `(format email)` |
-| `ref` | Foreign key reference | `(ref addresses.id)` |
-| `xpath` | XML path expression | `(xpath "ord:OrderId")` |
-| `namespace` | XML namespace declaration | `(namespace ord "http://...")` |
-| `filter` | Row-level filter condition | `(filter QUAL == "ON")` |
-| `note` | Persistent documentation | `(note "Converted at daily spot rate")` |
+| Token       | Meaning                             | Example                                 |
+| ----------- | ----------------------------------- | --------------------------------------- |
+| `pk`        | Primary key                         | `(pk)`                                  |
+| `required`  | Must not be null                    | `(required)`                            |
+| `unique`    | Values must be unique               | `(unique)`                              |
+| `indexed`   | Should have an index                | `(indexed)`                             |
+| `pii`       | Personally identifiable information | `(pii)`                                 |
+| `encrypt`   | Must be encrypted                   | `(encrypt AES-256-GCM)`                 |
+| `enum`      | Restricted value set                | `(enum {a, b, c})`                      |
+| `default`   | Default value                       | `(default 0)`                           |
+| `format`    | Data format constraint              | `(format email)`                        |
+| `ref`       | Foreign key reference               | `(ref addresses.id)`                    |
+| `xpath`     | XML path expression                 | `(xpath "ord:OrderId")`                 |
+| `namespace` | XML namespace declaration           | `(namespace ord "http://...")`          |
+| `filter`    | Row-level filter condition          | `(filter QUAL == "ON")`                 |
+| `note`      | Persistent documentation            | `(note "Converted at daily spot rate")` |
 
-**Tag value boundaries.** A bare (unquoted) tag value extends along the tag's line only, and never includes the structural entry keywords (`note`, `enum`, `slice`) or the constraint flag tokens (`pk`, `required`, `unique`, `indexed`, `pii`, `encrypt`). This makes a forgotten comma a parse error rather than a silent misread: `(pk note "x")`, `(required pii)`, and a flag starting the next line all fail loudly instead of folding the flag into the previous value. To use a constraint flag word *as* a value, quote it: `(classification "pii")`.
+**Tag value boundaries.** A bare (unquoted) tag value extends along the tag's line only, and never includes the structural entry keywords (`note`, `enum`, `slice`) or the constraint flag tokens (`pk`, `required`, `unique`, `indexed`, `pii`, `encrypt`). This makes a forgotten comma a parse error rather than a silent misread: `(pk note "x")`, `(required pii)`, and a flag starting the next line all fail loudly instead of folding the flag into the previous value. To use a constraint flag word _as_ a value, quote it: `(classification "pii")`.
 
 ### 7.2 Vocabulary Conventions (pipe step shorthand)
 
 All pipe step content — bare tokens, quoted strings, and map literals — is natural language interpreted by a human or LLM. The following table lists **vocabulary conventions**: commonly used bare tokens that teams adopt as shorthand for well-understood operations. They are not keywords or reserved words; the parser treats them identically to any other bare token. Their meaning is defined by convention and by the implementing system, not by the Satsuma grammar.
 
-| Token | Conventional meaning |
-|-------|---------------------|
-| `trim` | Strip whitespace |
-| `lowercase` / `uppercase` | Case conversion |
-| `coalesce(val)` | Replace null with val |
-| `round(n)` | Round to n decimal places |
-| `split(sep)` | Split string on separator |
-| `first` / `last` | Take first/last element |
-| `to_utc` | Convert to UTC |
-| `to_iso8601` | Format as ISO 8601 |
-| `parse(fmt)` | Parse string with format |
-| `null_if_empty` | Convert empty string to null |
-| `null_if_invalid` | Convert invalid value to null |
-| `drop_if_invalid` | Drop the record if value is invalid |
-| `drop_if_null` | Drop the record if value is null |
-| `warn_if_invalid` | Log a warning if value is invalid |
-| `warn_if_null` | Log a warning if value is null |
-| `error_if_invalid` | Fail the pipeline if value is invalid |
-| `error_if_null` | Fail the pipeline if value is null |
-| `validate_email` | Validate email format |
-| `now_utc()` | Current UTC timestamp |
-| `title_case` | Convert to title case |
-| `escape_html` | Escape HTML entities |
-| `truncate(n)` | Truncate to n characters |
-| `to_number` | Convert to numeric type |
-| `prepend(str)` | Prefix a string |
-| `max_length(n)` | Enforce maximum length |
+| Token                     | Conventional meaning                  |
+| ------------------------- | ------------------------------------- |
+| `trim`                    | Strip whitespace                      |
+| `lowercase` / `uppercase` | Case conversion                       |
+| `coalesce(val)`           | Replace null with val                 |
+| `round(n)`                | Round to n decimal places             |
+| `split(sep)`              | Split string on separator             |
+| `first` / `last`          | Take first/last element               |
+| `to_utc`                  | Convert to UTC                        |
+| `to_iso8601`              | Format as ISO 8601                    |
+| `parse(fmt)`              | Parse string with format              |
+| `null_if_empty`           | Convert empty string to null          |
+| `null_if_invalid`         | Convert invalid value to null         |
+| `drop_if_invalid`         | Drop the record if value is invalid   |
+| `drop_if_null`            | Drop the record if value is null      |
+| `warn_if_invalid`         | Log a warning if value is invalid     |
+| `warn_if_null`            | Log a warning if value is null        |
+| `error_if_invalid`        | Fail the pipeline if value is invalid |
+| `error_if_null`           | Fail the pipeline if value is null    |
+| `validate_email`          | Validate email format                 |
+| `now_utc()`               | Current UTC timestamp                 |
+| `title_case`              | Convert to title case                 |
+| `escape_html`             | Escape HTML entities                  |
+| `truncate(n)`             | Truncate to n characters              |
+| `to_number`               | Convert to numeric type               |
+| `prepend(str)`            | Prefix a string                       |
+| `max_length(n)`           | Enforce maximum length                |
 
 #### Error-handling convention
 
@@ -1140,24 +1181,33 @@ mapping `edi to mfcs` {
   ShipmentRefs.SHIPREF -> ShipmentHeader.comments { prepend("Shipment reference number: ") }
 
   // --- Detail lines grouped by PO ---
+  // POReferences, LineItems and Quantities are all declared at the schema root,
+  // so each is iterated by its own block. Nesting `each LineItems` inside
+  // `each POReferences` would resolve to POReferences.LineItems, which the EDI
+  // schema does not declare — see the path rule in section 4.4.
   each POReferences -> ShipmentHeader.asnDetails (
-    note "Each PO reference generates one asnDetails entry.
-          Line items and quantities are correlated by position."
+    note "Each PO reference generates one asnDetails entry."
   ) {
     .REFNUM -> .orderNo { split("/") | first | to_number }
+  }
 
-    each LineItems -> .items {
-      .ITEMNO -> .item {
-        trim
-        | "Retrieve MFCS item number using the supplier's traded code
-           from the MFCS supplier item cross-reference."
-      }
+  each LineItems -> ShipmentHeader.asnDetails.items (
+    note "Correlate to @POReferences by position within the EDI message group."
+  ) {
+    .ITEMNO -> .item {
+      trim
+      | "Retrieve MFCS item number using the supplier's traded code
+         from the MFCS supplier item cross-reference."
+    }
+  }
 
-      Quantities.QUANTITY -> .unitQuantity {
-        "Divide by 10000 to account for 4 implied decimal places.
-         Then multiply by PO pack size from MFCS (Action A-504).
-         Pack size retrieved from MFCS PO line matching this item."
-      }
+  each Quantities -> ShipmentHeader.asnDetails.items (
+    note "Match to @LineItems by position — each quantity corresponds to one line item."
+  ) {
+    .QUANTITY -> .unitQuantity {
+      "Divide by 10000 to account for 4 implied decimal places.
+       Then multiply by PO pack size from MFCS (Action A-504).
+       Pack size retrieved from MFCS PO line matching this item."
     }
   }
 
@@ -1473,17 +1523,17 @@ mapping `opportunity ingestion` {
 
 ## 8. Summary of Changes from v1
 
-| v1 | v2 | Rationale |
-|----|-----|-----------|
-| `[pk, required]` bracket tags | `(pk, required)` parentheses | `()` = metadata, `[]` freed |
-| `@xpath(...)`, `@format(...)` annotations | `(xpath ..., format ...)` in metadata | Unified in `()` |
-| `table`, `message`, `source`, `target` keywords | Single `schema` keyword | Simpler — role is contextual |
-| `STRUCT { }` / `ARRAY { }` | `Name record { }` / `Name list_of record { }` | Unified field syntax: `NAME TYPE (meta) {body}` |
-| `nl("...")` function | Bare `"..."` in `{ }` | NL is first-class |
-| `: transform` after arrow | `{ transform }` after arrow | Consistent — `{}` holds content |
-| `when/else` clauses | `map { }` with conditions or NL | Simpler, more flexible |
-| `fallback` keyword | NL fallback description | Let the LLM interpret |
-| `[enum: {a, b}]` | `(enum {a, b})` | Braces for value sets, parens for metadata |
-| `note '''...`''` triple-quoted | `(note "...")` or `(note """...""")` | Notes are metadata; `"""` for Markdown |
-| `integration { }` block | `note { """...""" }` block | Structured, consistent with delimiter rules |
-| `=> target` computed fields | `-> target` (no left side) | Consistent arrow syntax |
+| v1                                              | v2                                            | Rationale                                       |
+| ----------------------------------------------- | --------------------------------------------- | ----------------------------------------------- |
+| `[pk, required]` bracket tags                   | `(pk, required)` parentheses                  | `()` = metadata, `[]` freed                     |
+| `@xpath(...)`, `@format(...)` annotations       | `(xpath ..., format ...)` in metadata         | Unified in `()`                                 |
+| `table`, `message`, `source`, `target` keywords | Single `schema` keyword                       | Simpler — role is contextual                    |
+| `STRUCT { }` / `ARRAY { }`                      | `Name record { }` / `Name list_of record { }` | Unified field syntax: `NAME TYPE (meta) {body}` |
+| `nl("...")` function                            | Bare `"..."` in `{ }`                         | NL is first-class                               |
+| `: transform` after arrow                       | `{ transform }` after arrow                   | Consistent — `{}` holds content                 |
+| `when/else` clauses                             | `map { }` with conditions or NL               | Simpler, more flexible                          |
+| `fallback` keyword                              | NL fallback description                       | Let the LLM interpret                           |
+| `[enum: {a, b}]`                                | `(enum {a, b})`                               | Braces for value sets, parens for metadata      |
+| `note '''...`''` triple-quoted                  | `(note "...")` or `(note """...""")`          | Notes are metadata; `"""` for Markdown          |
+| `integration { }` block                         | `note { """...""" }` block                    | Structured, consistent with delimiter rules     |
+| `=> target` computed fields                     | `-> target` (no left side)                    | Consistent arrow syntax                         |
