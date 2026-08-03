@@ -2,7 +2,7 @@
 id: sl-3de8
 status: open
 deps: [sl-ce11]
-links: [sl-9p2t]
+links: [sl-9p2t, sl-46wr, sl-csrs]
 created: 2026-07-31T13:13:41Z
 type: epic
 priority: 1

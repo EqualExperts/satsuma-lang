@@ -2,7 +2,7 @@
 id: sl-5nsv
 status: closed
 deps: [sl-0pun, sl-hcan, sl-vu22]
-links: []
+links: [sl-46wr]
 created: 2026-07-31T14:44:00Z
 type: task
 priority: 2
