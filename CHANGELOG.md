@@ -4,6 +4,37 @@
 
 ## v0.12.0 — 2026-08-03
 
+### Nested lineage keeps its target namespace (`nfl-8o6u`)
+
+**`graph` and `field-lineage` edges change for any `flatten` or `each` block that
+names its target schema.** A container's child arrows are made absolute against
+the enclosing target, so `.species -> species_code` under `flatten observations ->
+species_fact` becomes `species_fact.species_code` — the authored bare name, as an
+author writing inside `namespace mart` would spell it. Qualification read that
+prefix as already complete and left it untouched, so the canonical form was
+supplied the empty namespace rather than the mapping's:
+
+```text
+science::colony_observations.observations.species -> ::species_fact.species_code
+```
+
+`::species_fact` is no schema in the workspace. The edge was still drawn, under a
+name nothing else uses, so `satsuma field-lineage mart::species_fact.species_code
+--upstream` reported no connections for a field two mappings feed, and a
+downstream trace through it named an endpoint no further hop could extend. That
+edge now reads `mart::species_fact.species_code` and the same query returns both
+hops. Coverage is derived separately (ADR-042) and never used this path, so no
+figure moves and no `--fail-under` threshold needs re-baselining.
+
+`satsuma validate` warned on the same line — `Arrow target 'species_fact' not
+declared in schema 'mart::species_fact'`. A container header may name the target
+schema root, but only the resolved key was recognized as one; the bare name a
+namespaced author writes is now accepted too, and the false warning is gone.
+
+`examples/seabird-colony-lineage/` is the case in the corpus: four files, three
+namespaces, and a two-hop chain through a nested `flatten` with an `each` inside
+it.
+
 ### The viz coverage figures now match `satsuma coverage` (`sl-46wr`, `sl-csrs`)
 
 **Schema-card percentages rise, on twelve of the shipped examples.** The
