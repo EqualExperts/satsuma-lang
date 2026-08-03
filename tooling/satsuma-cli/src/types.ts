@@ -242,10 +242,25 @@ export interface LintDiagnostic {
   fix?: LintFix;
 }
 
+/**
+ * Workspace settings a rule may need beyond the index itself.
+ *
+ * Passed to every rule rather than captured when the registry is built, so `RULES`
+ * stays a plain constant that `--rules` and the help text can list without a
+ * config in hand. Rules that need nothing from it ignore the parameter.
+ */
+export interface LintRuleContext {
+  /**
+   * Declared-type equivalence groups from `lint.typeAliases`, consumed by
+   * `type-mismatch-direct-arrow`. Empty when the workspace has no config.
+   */
+  typeAliases: readonly (readonly string[])[];
+}
+
 export interface LintRule {
   id: string;
   description: string;
-  check: (index: ExtractedWorkspace) => LintDiagnostic[];
+  check: (index: ExtractedWorkspace, context: LintRuleContext) => LintDiagnostic[];
 }
 
 export type RegisterFn = (rule: LintRule) => void;

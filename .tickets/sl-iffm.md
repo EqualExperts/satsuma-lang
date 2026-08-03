@@ -1,6 +1,6 @@
 ---
 id: sl-iffm
-status: open
+status: closed
 deps: []
 links: []
 created: 2026-07-31T13:14:15Z
@@ -15,3 +15,12 @@ Implement features/37-lint-structural-rules/PRD.md: two new warning-severity lin
 
 Doc review 2026-07-31 settled four further points. (1) Config file is satsuma.config.yaml, not .satsumacfg — .satsuma is a first-class source extension. (2) Config suppression is the persistent form of the existing --ignore flag, not a parallel mechanism; flags win over config. (3) lineage-cycle reports one finding per strongly-connected component rather than per elementary cycle, which removes the need for a truncation cap. (4) Strict mode forced lint's exit codes to be pinned down: lint currently returns 2 for error findings where 2 is documented as "parse error", so lint gets its own documented table (0/1/2/3) — a breaking change for CI consumers.
 
+
+## Notes
+
+**2026-08-03T17:53:06Z**
+
+**2026-08-03T17:53:06Z**
+
+Cause: Epic complete — all five children closed (sl-npi6 config loader, sl-j30s type-mismatch rule, sl-hysg lineage-cycle rule, sl-1u6r exit-code table and strict mode, sl-ay8a docs).
+Fix: Both detectors live in @satsuma/core (lint-type-mismatch.ts, lint-lineage-cycle.ts) with thin CLI wrappers, so the deferred LSP mirroring needs no re-implementation. PRD marked COMPLETE and the ROADMAP entry updated with what shipped and what stays deferred. (commit immediately after acbb3b96)

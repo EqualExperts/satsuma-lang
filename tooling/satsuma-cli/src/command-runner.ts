@@ -73,9 +73,22 @@ export const EXIT_PARSE_ERROR = 2;
 export const EXIT_THRESHOLD_NOT_MET = 3;
 
 /**
+ * `lint --strict` (or `lint.strict: true`): the workspace has warning-severity
+ * findings and the caller asked for warnings to fail the build.
+ *
+ * Numerically the same as {@link EXIT_NOT_FOUND} but command-scoped, and the two
+ * never collide: `lint` takes no lookup argument that can fail to resolve, so `1`
+ * from `lint` has exactly one meaning. This is the escalation half of lint's own
+ * exit-code table (PRD 37 R5); the advisory default still exits `0`, so adding a
+ * config file cannot break an existing CI job.
+ */
+export const EXIT_LINT_STRICT_WARNINGS = 1;
+
+/**
  * `lint`: the command could not run as instructed — an unusable
- * `satsuma.config.yaml`, or a rule id that does not exist named by
- * `--select`/`--ignore`/`lint.suppress`.
+ * `satsuma.config.yaml`, a rule id that does not exist named by
+ * `--select`/`--ignore`/`lint.suppress`, or a workspace that could not be
+ * resolved or read at all.
  *
  * Numerically the same as {@link EXIT_THRESHOLD_NOT_MET} but a different
  * meaning, which is intentional and command-scoped: `lint` publishes its own

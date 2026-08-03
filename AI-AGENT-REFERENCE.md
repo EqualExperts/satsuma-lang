@@ -402,6 +402,22 @@ Every arrow the CLI returns carries one of three classifications:
 | `[nl]` | Has a transform body; all pipe-step content is NL | Read it and interpret intent |
 | `[nl-derived]` | Implicit arrow from NL `@ref` | Synthetic — verify the referenced field exists |
 
+**When you author a mapping, the classification is a claim you are making.** A bare
+`src -> tgt` asserts the value passes through *unchanged* — including its type — and
+`satsuma lint` checks that assertion against both declared types
+(`type-mismatch-direct-arrow`). Adding a transform body, even one NL string like
+`{ "parse as ISO-8601" }`, suppresses the check: you have said something happens
+here, and the CLI leaves judging it to a reader. So write the transform body
+whenever a conversion is intended, rather than leaving a bare arrow between two
+different types — an honest bare arrow is one you would be happy for a linter to
+verify.
+
+Two more authoring rules `lint` enforces: an arrow onto a record needs either a
+record source or child arrows saying which fields it fills
+(`unenumerated-record-target`), and mappings must not form a cycle across distinct
+schemas (`lineage-cycle`). Mapping a schema to *itself* is fine and expected — that
+is how an increment is expressed.
+
 ### Composing workflows
 
 **Whole-workspace reasoning:** Call `satsuma graph <entry-file>.stm --json` to load the entire workspace topology for that file's import-reachable graph in one call — nodes (schemas, mappings, metrics, fragments, transforms), field-level edges with transform classification, and schema-level topology. Use `--schema-only` for topology-only queries, `--namespace <ns>` to scope, `--no-nl` to reduce payload size. The `unresolved_nl` section lists all NL arrows requiring interpretation.

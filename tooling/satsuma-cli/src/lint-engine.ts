@@ -8,15 +8,26 @@
  */
 
 import {
+  canonicalizeEntityRef,
   capitalize,
   createAuthoredEntityRef,
   createCanonicalEntityRef,
   createContainerQualifiedFieldRef,
   declaredFieldKind,
+  detectLineageCycles,
+  detectTypeMismatches,
   schemaLocalFieldPath,
   stripNLRefScopePrefix,
+  LINEAGE_CYCLE_RULE_ID,
+  TYPE_MISMATCH_RULE_ID,
 } from "@satsuma/core";
-import type { ArrowDeclarationKind } from "@satsuma/core";
+import type {
+  ArrowDeclarationKind,
+  DeclaredTypeSchemaResolver,
+  LineageSchemaIdResolver,
+  LintFinding,
+} from "@satsuma/core";
+import { expandDeclaredFields } from "./spread-expand.js";
 import {
   extractAtRefs,
   computeNLRefPosition,
@@ -25,7 +36,13 @@ import {
   isSchemaInMappingSources,
 } from "./nl-ref-extract.js";
 import { resolveCanonicalKey } from "./index-builder.js";
-import type { LintDiagnostic, LintFix, LintRule, ExtractedWorkspace } from "./types.js";
+import type {
+  LintDiagnostic,
+  LintFix,
+  LintRule,
+  LintRuleContext,
+  ExtractedWorkspace,
+} from "./types.js";
 
 // ── Rule registry ──────────────────────────────────────────────────────────
 
@@ -49,6 +66,16 @@ export const RULES: LintRule[] = [
     id: "unenumerated-record-target",
     description: "Arrow targets a record without a record source or child arrows",
     check: checkUnenumeratedRecordTarget,
+  },
+  {
+    id: TYPE_MISMATCH_RULE_ID,
+    description: "Bare arrow connects fields whose declared types differ",
+    check: checkTypeMismatchDirectArrow,
+  },
+  {
+    id: LINEAGE_CYCLE_RULE_ID,
+    description: "Schema-level mapping graph contains a cycle",
+    check: checkLineageCycle,
   },
 ];
 
@@ -606,11 +633,109 @@ function endpointKind(
   return null;
 }
 
+// ── Structural rules detected in core ──────────────────────────────────────
+//
+// Both rules below are thin adapters, by design (PRD 37 R3): the detection lives
+// in `@satsuma/core` because the LSP will mirror these as editor diagnostics, and
+// a second implementation would let the editor and CI disagree about the same
+// workspace. Everything these functions do is resolve `ExtractedWorkspace` into
+// the shapes core asks for.
+
+/**
+ * Report bare arrows whose two ends declare different types.
+ *
+ * Alias groups arrive from `satsuma.config.yaml` through {@link LintRuleContext}:
+ * nothing is presumed equivalent without them.
+ */
+function checkTypeMismatchDirectArrow(
+  index: ExtractedWorkspace,
+  context: LintRuleContext,
+): LintDiagnostic[] {
+  return detectTypeMismatches({
+    arrows: index.arrows,
+    mappings: index.mappings,
+    resolveSchema: makeDeclaredTypeResolver(index),
+    typeAliases: context.typeAliases,
+  }).map(toLintDiagnostic);
+}
+
+/** Report each cyclic tangle in the schema-level mapping graph. */
+function checkLineageCycle(index: ExtractedWorkspace): LintDiagnostic[] {
+  return detectLineageCycles({
+    mappings: index.mappings,
+    resolveSchemaId: makeLineageSchemaIdResolver(index),
+  }).map(toLintDiagnostic);
+}
+
+/**
+ * Adapt a core finding to a CLI diagnostic.
+ *
+ * `fixable: false` is not a placeholder: neither rule can be fixed
+ * mechanically. Correcting a type mismatch means choosing between the field, the
+ * type and a missing transform, and breaking a cycle means reversing an arrow —
+ * both are author judgements, so there is nothing safe for `--fix` to apply.
+ */
+function toLintDiagnostic(finding: LintFinding): LintDiagnostic {
+  return {
+    file: finding.file,
+    line: finding.line,
+    column: finding.column,
+    severity: finding.severity,
+    rule: finding.rule,
+    message: finding.message,
+    fixable: false,
+  };
+}
+
+/**
+ * Resolve a schema reference written in a mapping to its declared field tree,
+ * with fragment spreads inlined.
+ *
+ * Spreads are expanded because a spread field is a declared field of the
+ * consuming schema, and an arrow may perfectly well name one — leaving them out
+ * would make the rule silently skip every arrow that touched one.
+ */
+function makeDeclaredTypeResolver(index: ExtractedWorkspace): DeclaredTypeSchemaResolver {
+  return (writtenRef, mappingNamespace) => {
+    const canonicalRef = canonicalizeEntityRef(writtenRef, mappingNamespace, index.schemas);
+    if (!canonicalRef) return null;
+    const key = resolveCanonicalKey(canonicalRef);
+    const schema = index.schemas.get(key);
+    if (!schema) return null;
+    return {
+      schemaId: key,
+      canonicalRef,
+      fields: expandDeclaredFields(schema, schema.namespace ?? null, index),
+    };
+  };
+}
+
+/**
+ * Resolve a schema reference written in a mapping to the workspace key that
+ * identifies it — the graph's node id.
+ *
+ * Uses the same canonicalization as every other consumer so `orders` written
+ * inside `namespace crm` and `crm::orders` written outside it become one node.
+ */
+function makeLineageSchemaIdResolver(index: ExtractedWorkspace): LineageSchemaIdResolver {
+  return (writtenRef, mappingNamespace) => {
+    const canonicalRef = canonicalizeEntityRef(writtenRef, mappingNamespace, index.schemas);
+    if (!canonicalRef) return null;
+    const key = resolveCanonicalKey(canonicalRef);
+    return index.schemas.has(key) ? key : null;
+  };
+}
+
 // ── Engine ─────────────────────────────────────────────────────────────────
 
 interface LintOptions {
   select?: string[];
   ignore?: string[];
+  /**
+   * Declared-type equivalence groups from `lint.typeAliases`. Defaults to none,
+   * which is what a workspace with no config file gets.
+   */
+  typeAliases?: readonly (readonly string[])[];
 }
 
 /**
@@ -627,9 +752,11 @@ export function runLint(index: ExtractedWorkspace, opts: LintOptions = {}): Lint
     rules = rules.filter((r) => !set.has(r.id));
   }
 
+  const context: LintRuleContext = { typeAliases: opts.typeAliases ?? [] };
+
   const diagnostics: LintDiagnostic[] = [];
   for (const rule of rules) {
-    diagnostics.push(...rule.check(index));
+    diagnostics.push(...rule.check(index, context));
   }
 
   diagnostics.sort(

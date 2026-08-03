@@ -406,7 +406,7 @@ describe("sl-tslm: collectSemanticWarnings emits 'unresolved-nl-ref' to match li
 
 // ── sl-j8uk: Filesystem errors exit code 2 ────────────────────────────────
 
-describe("sl-j8uk: filesystem errors exit code 2", () => {
+describe("sl-j8uk: filesystem errors exit with a 'could not run' code, never 0", () => {
   it("summary exits 2 for nonexistent path", async () => {
     const { code } = await run("summary", "/nonexistent/path");
     assert.equal(code, 2);
@@ -422,9 +422,13 @@ describe("sl-j8uk: filesystem errors exit code 2", () => {
     assert.equal(code, 2);
   });
 
-  it("lint exits 2 for nonexistent path", async () => {
+  it("lint exits 3 for nonexistent path, because 2 now means 'the workspace has lint errors'", async () => {
+    // lint publishes its own exit-code table (PRD 37 R5, sl-1u6r), which is a
+    // deliberate break from the CLI-wide `2` the sibling cases above assert. A
+    // CI job must be able to tell a failing lint gate from an unreadable
+    // workspace, so "could not run" moved to 3.
     const { code } = await run("lint", "/nonexistent/path");
-    assert.equal(code, 2);
+    assert.equal(code, 3);
   });
 
   it("not-found schema still exits 1", async () => {

@@ -141,6 +141,22 @@ export {
   walkDescendants,
 } from "./cst-utils.js";
 export { classifyTransform, classifyArrow } from "./classify.js";
+export type { LintFinding } from "./lint-findings.js";
+export { TYPE_MISMATCH_RULE_ID, detectTypeMismatches } from "./lint-type-mismatch.js";
+export type {
+  DeclaredTypeField,
+  DeclaredTypeSchema,
+  DeclaredTypeSchemaResolver,
+  TypeMismatchArrow,
+  TypeMismatchInput,
+  TypeMismatchMapping,
+} from "./lint-type-mismatch.js";
+export { LINEAGE_CYCLE_RULE_ID, detectLineageCycles } from "./lint-lineage-cycle.js";
+export type {
+  LineageCycleInput,
+  LineageCycleMapping,
+  LineageSchemaIdResolver,
+} from "./lint-lineage-cycle.js";
 export {
   canonicalRef,
   canonicalEntityName,

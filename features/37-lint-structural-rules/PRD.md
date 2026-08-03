@@ -1,6 +1,6 @@
 # Feature 37 — Structural Lint Rules: Type Mismatch & Lineage Cycles
 
-> **Status: PROPOSED** (2026-07-31) — independent of Features 35/36; shares
+> **Status: COMPLETE** (2026-08-03) — independent of Features 35/36; shares
 > their motivation. Large multi-layer mapping specs — especially ones
 > reverse-engineered from spreadsheet workbooks — accumulate two classes of
 > silent structural defect that the current toolchain accepts without
