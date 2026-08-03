@@ -49,11 +49,6 @@ export function endpoint(schema, path) {
   return { schema, path };
 }
 
-/** The authored reference for an entity: `ns::name`, or plain `name` at file scope. */
-export function entityRef(namespace, name) {
-  return namespace ? `${namespace}::${name}` : name;
-}
-
 /**
  * The canonical `[ns]::name` form the toolchain emits, from an authored ref.
  *
