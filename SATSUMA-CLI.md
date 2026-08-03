@@ -142,6 +142,14 @@ Counting a resolved `@ref` is **resolution, not interpretation**: the author wro
 
 **Percentages count leaf fields only.** A `record` is structure, not data; counting it alongside its children would count the same data twice and let a schema's nesting depth move the number on its own. A record's own coverage is _derived_ from its leaves and has three states — covered (every leaf), partial (some), uncovered (none) — which is what the editor gutter and the viz overlay render; the percentage still counts the leaves it was derived from.
 
+**Records are reported beside the percentage, never inside it.** "Two records are only half mapped" is exactly what a reviewer wants next to `9/12`, and it must not enter the number. A schema row names its partly mapped records when it has any and stays silent when it has none — a fully covered record needs no attention, and an uncovered one is already in the list of gaps below the row:
+
+```text
+  target  mart_customer_360   1/4   25%  — 1 record partly mapped
+```
+
+`--json` carries the full `covered`/`partial`/`uncovered` split for every schema, whatever the states are.
+
 **A whole-record arrow covers the whole record.** `addr -> address` onto a record-typed field asserts the structure maps across, so every leaf beneath `address` counts as covered. Two conditions gate it. The arrow must state a correspondence: an `each`/`flatten` header opens an iteration and a computed arrow (`-> containers { "..." }`) has no source, so neither one counts. And its body must enumerate nothing — once a header lists child arrows it is claiming those and no others, so `addr -> address { .street -> .line }` covers `street` and leaves `zip` a gap. A record that is merely the _ancestor_ of a covered leaf confers nothing downward either: with `address` copied wholesale and `billing` covered only by an arrow to `billing.city`, `billing.line1` is still a gap.
 
 **On the target side the arrow must also carry a record** (ADR-038). `addr -> address` covers `address` wholesale because a record arrives; `full_name -> address` does not, because one scalar cannot fill twelve leaves and the arrow does not say which one it would fill — so those leaves stay gaps, and `lint`'s `unenumerated-record-target` tells you which arrow left them that way. Any one container source is enough for a multi-source arrow, and a source path that resolves to nothing confers nothing.
@@ -189,6 +197,12 @@ appears unchanged in both.
           "covered_nl": 2, // of those, covered only by a resolved @ref
           "total": 11, // leaf fields declared
           "pct": 73, // covered/total, whole-number percent
+          "records": {
+            // container states — reported beside the counts, excluded from them
+            "covered": 1, // every leaf beneath the record is covered
+            "partial": 1, // some are, some are not
+            "uncovered": 0, // none is
+          },
           "fields": [
             {
               "path": "email",
@@ -213,6 +227,7 @@ appears unchanged in both.
         "covered_nl": 2,
         "total": 11,
         "pct": 100,
+        "records": { "covered": 2, "partial": 0, "uncovered": 0 },
         "fields": [/* same entry shape; `mapped` is the union across `mappings` */],
       },
     ],
@@ -238,6 +253,8 @@ appears unchanged in both.
 `fields` lists leaf fields only, matching the counts, so the paths shown and the number beside them are always the same population. `tier` is present exactly when `mapped` is true, and says which tier covered the field — consumers differentiate declared from NL-derived coverage from this key rather than reconstructing it. `line` is 1-indexed and **omitted** when the declaration position is unknown — never 0, which would send an editor-jump link to line 1 of the wrong file. Fields arriving via a fragment spread report the _consuming_ schema's position, not the fragment's.
 
 `covered_declared` and `covered_nl` are the two tiers of `covered` and always sum to it: a field covered both ways is reported as declared, so they are disjoint. They appear on every counts object — per-mapping schema, aggregate schema, namespace subtotal and workspace total.
+
+`records` is the container tally that the leaf-only counts deliberately exclude, so a consumer can render "9/12, 2 records partly mapped" without reconstructing it from `fields` — which lists leaves only. Its three counts sum to the number of `record` and `list_of record` fields the schema declares, and a schema with no records reports three zeroes. Unlike the tier counts it appears on **schema entries only**, in both sections: a container belongs to one schema, and a namespace or workspace figure saying "5 records partly mapped" could not say which schema to go and look at.
 
 With `--uncovered`, `fields` is filtered to unmapped entries while `covered`/`total` stay unchanged, so the denominator survives.
 

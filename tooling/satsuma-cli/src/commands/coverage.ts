@@ -36,10 +36,16 @@ import { canonicalKey, displayKey, resolveIndexKey } from "../index-builder.js";
 import { coverageForWorkspace } from "../coverage-workspace.js";
 import { resolveAllNLRefs } from "../nl-ref-extract.js";
 import type { MappingCoverage } from "../coverage-workspace.js";
-import { aggregateCoverage, summarizeFieldCoverage, leafFieldEntries } from "@satsuma/core";
+import {
+  aggregateCoverage,
+  summarizeFieldCoverage,
+  countContainerStates,
+  leafFieldEntries,
+} from "@satsuma/core";
 import type {
   AggregateCoverage,
   AggregateSchemaCoverage,
+  ContainerStateCounts,
   CoverageTotals,
   FieldCoverageEntry,
   RoleTotals,
@@ -97,6 +103,12 @@ for nothing: use 'nl-refs' to find the former and 'lint' for the latter.
 Percentages count leaf fields only: a record is structure, not data, so counting
 it alongside its children would count the same data twice.
 
+Records are reported BESIDE the percentage instead, never inside it. A schema row
+names its partly-mapped records when it has any ("3/8  37%  — 2 records partly
+mapped") and says nothing when it has none, because a fully covered record needs
+no attention and an uncovered one is already in the list below. --json always
+carries the full covered/partial/uncovered split, per schema.
+
 Names can be namespace-qualified (e.g. crm::orders).
 
 JSON shape (--json):
@@ -112,6 +124,11 @@ JSON shape (--json):
         "covered_nl":       int,   # of those, covered only by a resolved @ref
         "total":            int,   # leaf fields declared
         "pct":              int,   # covered/total, whole-number percent
+        "records": {               # container states, EXCLUDED from the counts
+          "covered":   int,        #   every leaf beneath the record is covered
+          "partial":   int,        #   some are, some are not
+          "uncovered": int         #   none is
+        },
         "fields":  [{"path": str, "mapped": bool, "tier": "declared" | "nl",
                      "file": str, "line": int}, ...]
       }, ...]
@@ -121,11 +138,15 @@ JSON shape (--json):
   ... plus an "aggregate" section, unioned across the mappings in scope:
     "aggregate": {
       "schemas":    [{"schema": str, "role": str, "mappings": [str, ...],
-                      <counts as above>, "fields": [...]}, ...],
+                      <counts as above>, "records": {...}, "fields": [...]}, ...],
       "namespaces": [{"namespace": str | null,
                       "source": <counts as above>, "target": <counts as above>}, ...],
       "workspace":  {"source": {...}, "target": {...}}
     }
+
+'records' appears on schema entries in both sections and nowhere else: a
+container belongs to one schema, and a namespace or workspace figure saying "5
+records partly mapped" could not say which schema to go and look at.
 
 The two sections answer different questions and are not interchangeable. Under
 "mappings", uncovered means "this mapping does not touch the field" — another
@@ -326,6 +347,7 @@ function toJson(mapping: MappingCoverage, opts: CoverageOptions): Record<string,
       schema: canonicalKey(schema.schemaId),
       role: schema.role,
       ...totalsToJson(summarizeFieldCoverage(schema.fields)),
+      records: recordsToJson(schema.fields),
       fields: reportedFields(schema, opts).map(fieldToJson),
     })),
   };
@@ -348,6 +370,24 @@ function totalsToJson(totals: CoverageTotals): Record<string, number> {
     total: totals.total,
     pct: totals.pct,
   };
+}
+
+/**
+ * A schema's container states as JSON, under the contract's `records` key.
+ *
+ * Sourced from core's {@link countContainerStates}, never recounted here
+ * (ADR-034): "what is a container" and "when is one partial" are coverage
+ * semantics, and a second definition in the CLI is exactly how the viz card and
+ * the status bar came to disagree with this command.
+ *
+ * The counts sit *beside* the percentage and are excluded from it, so a consumer
+ * can report that two records are half-mapped without a number that
+ * double-counts their leaves. They appear on schema entries only — a container
+ * belongs to one schema, and a namespace or workspace subtotal that said "5
+ * records partly mapped" could not say which schema to go and look at.
+ */
+function recordsToJson(fields: FieldCoverageEntry[]): ContainerStateCounts {
+  return countContainerStates(fields);
 }
 
 /**
@@ -402,7 +442,8 @@ function printPerMappingReport(mappings: MappingCoverage[], opts: CoverageOption
     for (const schema of mapping.result.schemas) {
       console.log(
         `  ${schema.role.padEnd(ROLE_COLUMN_WIDTH)}  ${displayKey(schema.schemaId).padEnd(schemaWidth)}  ` +
-          `${formatTotals(summarizeFieldCoverage(schema.fields))}`,
+          `${formatTotals(summarizeFieldCoverage(schema.fields))}` +
+          `${formatPartialRecords(countContainerStates(schema.fields))}`,
       );
     }
 
@@ -547,6 +588,7 @@ function aggregateToJson(
       role: schema.role,
       mappings: schema.mappings.map(canonicalKey),
       ...totalsToJson(schema.totals),
+      records: recordsToJson(schema.fields),
       fields: aggregateFields(schema, opts).map(fieldToJson),
     })),
     namespaces: aggregate.namespaces.map((ns) => ({
@@ -589,7 +631,8 @@ function printAggregateReport(aggregate: AggregateCoverage, opts: CoverageOption
   for (const schema of aggregate.schemas) {
     console.log(
       `  ${schema.role.padEnd(ROLE_COLUMN_WIDTH)}  ${displayKey(schema.schemaId).padEnd(schemaWidth)}  ` +
-        `${formatTotals(schema.totals)}`,
+        `${formatTotals(schema.totals)}` +
+        `${formatPartialRecords(countContainerStates(schema.fields))}`,
     );
   }
 
@@ -659,6 +702,27 @@ function formatTotals(totals: CoverageTotals): string {
 function formatTierSplit(totals: CoverageTotals): string {
   if (totals.coveredNl === 0) return "";
   return `  (${totals.coveredDeclared} declared, ${totals.coveredNl} nl)`;
+}
+
+/**
+ * "  — 2 records partly mapped" — the container annotation on a schema row, or
+ * "" when no record is in that state.
+ *
+ * Rule (PRD 38 R3): container states are reported *beside* the percentage and
+ * never inside it, since a record is structure rather than data. Of the three
+ * states only `partial` earns a phrase, the same restraint the viz card's
+ * tooltip shows: a record every leaf of which is covered needs no attention, and
+ * one with no covered leaf is already named in the uncovered list below the row.
+ * `--json` carries all three counts regardless.
+ *
+ * Appended after {@link formatTierSplit} rather than inside {@link formatTotals}
+ * because the namespace and workspace subtotal rows share that formatter and
+ * carry no container counts of their own.
+ */
+function formatPartialRecords(containers: ContainerStateCounts): string {
+  if (containers.partial === 0) return "";
+  const noun = containers.partial === 1 ? "record" : "records";
+  return `  — ${containers.partial} ${noun} partly mapped`;
 }
 
 /**
