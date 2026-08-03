@@ -19,6 +19,10 @@
     "./viz-model": {
       "types": "./dist/viz-model.d.ts",
       "default": "./dist/viz-model.js"
+    },
+    "./coverage": {
+      "types": "./dist/coverage.d.ts",
+      "default": "./dist/coverage.js"
     }
   },
   "scripts": {

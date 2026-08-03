@@ -39,11 +39,23 @@ The primary success criteria are:
   ELK-laid-out overview (schema/metric cards, mapping edges) and a
   per-mapping detail view. It is embedded in the VS Code webview panels and
   in the site's client-only "Try it Live!" playground (Features 33/34).
-- `tooling/satsuma-viz/src/field-coverage.ts` already consumes
-  `@satsuma/core/coverage-paths` (`buildCoveredFieldSet`) so the detail view
-  shares the LSP's nested-field coverage semantics. The component is one step
-  short of *showing* coverage as a first-class signal — the semantics are
-  wired in, the presentation is not.
+- Coverage arrives in the model, already computed. `@satsuma/viz-backend`
+  calls core's `computeMappingCoverage` when it assembles a VizModel and
+  attaches the result to each `MappingBlock.coverage`; the component selects
+  and counts those entries (`mappingSchemaCoverage`, `buildCoverageIndex` in
+  `tooling/satsuma-viz/src/field-coverage.ts`) and never decides what is
+  covered. The overlay must read the same entries.
+
+  This replaces an earlier plan for the detail view to build its own
+  covered-path set via `buildCoveredFieldSet`. That set could not express the
+  NL `@ref` tier (ADR-036) or whole-structure conferral (ADR-037), because both
+  are properties of the *arrow* rather than of the path it names, so the card
+  disagreed with `satsuma coverage` on twelve shipped examples (sl-46wr,
+  sl-csrs). The API is gone; R2's "numbers equal `coverage --json`" is now
+  structural rather than something the overlay has to re-achieve.
+
+  The component is therefore one step short of *showing* coverage as a
+  first-class signal — the semantics are wired in, the presentation is not.
 - Feature 35 relocates `computeMappingCoverage` into `@satsuma/core`. Because
   the playground is client-only, this relocation is what makes a coverage
   overlay *possible* there at all: viz can call the core function directly on

@@ -1,0 +1,58 @@
+// Fixture for sl-46wr: the resolved NL `@ref` coverage tier (ADR-036).
+//
+// A leaf named by a *resolved* `@ref` in a mapping is covered, in the `nl` tier —
+// the same lineage weight `arrows`, `graph`, `lineage` and `lint` have always
+// given it (ADR-013). The tier is invisible in an arrow's endpoints, so a
+// consumer deriving covered paths from arrows alone reports these leaves as gaps
+// while `satsuma coverage` reports them covered. That is the divergence sl-46wr
+// records across twelve shipped examples, reduced here to one file.
+//
+// Covered, declared:  id, net_amount, status
+// Covered, nl:        tax_amount   — named only by @tax_amount in a transform
+//                     discount     — named only by @discount in a transform
+// Uncovered:          internal_ref — described in prose but never @ref'd, so it
+//                                    stays a gap: coverage follows explicit
+//                                    references, it does not read prose.
+//                     unresolved   — @no_such_field resolves to nothing, and a
+//                                    ref that resolves to nothing must never
+//                                    raise coverage (that is lint's
+//                                    unresolved-nl-ref).
+schema buy_order {
+  id STRING
+  net_amount DECIMAL(12, 2)
+  tax_amount DECIMAL(12, 2)
+  discount DECIMAL(12, 2)
+  internal_ref STRING
+  unresolved STRING
+  status STRING
+}
+
+schema om_order {
+  order_id STRING
+  goods_total DECIMAL(12, 2)
+  gross_total DECIMAL(12, 2)
+  rebate DECIMAL(12, 2)
+  state STRING
+}
+
+mapping `nl tier` {
+  source { buy_order }
+  target { om_order }
+
+  id -> order_id
+  net_amount -> goods_total
+  status -> state
+
+  // `tax_amount` reaches the target only through this @ref: no arrow names it.
+  -> gross_total { "Sum of @net_amount and @tax_amount" }
+
+  // `discount` likewise: prose is its only route to the target.
+  -> rebate { "Carried over from @discount on the buying document" }
+
+  // Prose alone confers nothing, and neither does a ref that resolves to
+  // nothing — both `internal_ref` and `unresolved` must stay uncovered.
+  note {
+    "The internal reference field is deliberately not carried across. See
+     @no_such_field for the decision record."
+  }
+}

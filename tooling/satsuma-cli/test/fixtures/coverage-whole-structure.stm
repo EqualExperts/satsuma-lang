@@ -1,0 +1,111 @@
+// Fixture for sl-csrs: whole-structure arrow conferral (ADR-037), in all the
+// forms the rule distinguishes, on one file.
+//
+// ADR-037 rules that an arrow whose path resolves to a record or `list_of
+// record` covers that node's whole declared subtree when it states a
+// correspondence and enumerates no child arrows. Three shapes confer and two do
+// not, and telling them apart needs the arrow's *declaration kind* — which is
+// exactly what a flat set of covered paths has thrown away. The viz derived such
+// a set from the model's arrows until sl-csrs and so reported every leaf under a
+// conferring arrow as a gap.
+//
+// Conferring (record arrives, body enumerates nothing):
+//   addr -> address        bare record-to-record
+//   rows -> lines          list_of record to list_of record
+//   plain -> plain_out     empty braced body
+//   trimmed -> trimmed_out pipe-chain body: a pipeline, not a nesting scope
+// Not conferring:
+//   enum_src -> enum_out { .kept -> .kept }   enumerates, so covers only `kept`
+//   full_name -> scalar_into_record           a scalar cannot fill a record (ADR-038)
+schema src {
+  addr record {
+    street STRING
+    city STRING
+    zip STRING
+  }
+  rows list_of record {
+    sku STRING
+    qty INT
+  }
+  bill record {
+    city STRING
+    country STRING
+  }
+  plain record {
+    a STRING
+    b STRING
+  }
+  trimmed record {
+    c STRING
+    d STRING
+  }
+  enum_src record {
+    kept STRING
+    dropped STRING
+  }
+  full_name STRING
+}
+
+schema tgt {
+  address record {
+    line1 STRING
+    city STRING
+    postcode STRING
+  }
+  lines list_of record {
+    code STRING
+    quantity INT
+  }
+  billing record {
+    city STRING
+    country STRING
+  }
+  plain_out record {
+    a STRING
+    b STRING
+  }
+  trimmed_out record {
+    c STRING
+    d STRING
+  }
+  enum_out record {
+    kept STRING
+    dropped STRING
+  }
+  scalar_into_record record {
+    first STRING
+    last STRING
+  }
+}
+
+mapping whole_structure {
+  source { src }
+  target { tgt }
+
+  // Confers: a record maps across as a whole.
+  addr -> address
+
+  // Confers: a list of records is still a container.
+  rows -> lines
+
+  // Confers: an empty body enumerates nothing.
+  plain -> plain_out { }
+
+  // Confers: a pipe-chain body is a transform pipeline, not a nesting scope
+  // (spec §4.4), so the header's claim over the whole structure stands.
+  trimmed -> trimmed_out { trim }
+
+  // Does not confer: the body narrows the claim to what it lists, so
+  // `enum_out.dropped` stays a genuine gap.
+  enum_src -> enum_out {
+    .kept -> .kept
+  }
+
+  // Does not confer on the target side: one scalar cannot fill two leaves, and
+  // the arrow says nothing about which (ADR-038).
+  full_name -> scalar_into_record
+
+  // A plain leaf arrow, so `billing.country` stays uncovered and `billing`
+  // reads as partial — the state that proves conferral is not blanket.
+  bill.city -> billing.city
+}

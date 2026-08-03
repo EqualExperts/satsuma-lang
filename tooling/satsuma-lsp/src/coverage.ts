@@ -9,9 +9,12 @@
  * `(uri, tree, mappingName, wsIndex)` signature that server.ts's
  * `satsuma/mappingCoverage` request handler already calls.
  *
- * It owns nothing else: no path rules, no field walking, no counting. If coverage
- * output looks wrong, the bug is in core unless the schema being reported is the
- * wrong one — that resolution step is what lives here.
+ * It owns nothing else: no path rules, no field walking, no counting, and no
+ * longer the `DefinitionLookup` either — that is `@satsuma/viz-backend`'s, shared
+ * with the viz's own coverage adapter so the gutter and the schema card cannot
+ * resolve the same prose differently. If coverage output looks wrong, the bug is
+ * in core unless the schema being reported is the wrong one — that resolution
+ * step is what lives here.
  *
  * The gutter must agree with `satsuma coverage` field for field, so it feeds core
  * the same two inputs the CLI does. Resolved `@refs` are one of them (ADR-036):
@@ -23,17 +26,16 @@
 import type { Tree } from "./parser-utils";
 import type { DefinitionEntry, FieldInfo, WorkspaceIndex } from "./workspace-index";
 import { resolveDefinition } from "./workspace-index";
+import { makeDefinitionLookup } from "@satsuma/viz-backend/coverage";
 import {
   computeMappingCoverage as computeCoverage,
   expandDeclaredFields,
-  extractMappings,
   extractNLRefData,
   resolveAllNLRefs,
 } from "@satsuma/core";
 import type {
   CoverageField,
   CoverageSchemaDefinition,
-  DefinitionLookup,
   FieldDecl,
   ResolvedNLRef,
   SpreadEntity,
@@ -85,57 +87,6 @@ function resolveNLRefs(uri: string, tree: Tree, wsIndex: WorkspaceIndex): Resolv
   if (items.length === 0) return [];
   return resolveAllNLRefs(items, makeDefinitionLookup(tree, wsIndex));
 }
-
-/**
- * Adapt the LSP index to core's `DefinitionLookup` (ADR-006's callback pattern).
- *
- * Schemas and fragments come from the workspace index, so an `@ref` to an
- * imported schema resolves. Mapping source/target lists are read from this tree
- * instead: the index does not record them in that shape, and the only mapping
- * whose context matters is the one declared here.
- */
-function makeDefinitionLookup(tree: Tree, wsIndex: WorkspaceIndex): DefinitionLookup {
-  const mappings = new Map<string, { sources: string[]; targets: string[] }>();
-  for (const m of extractMappings(tree.rootNode)) {
-    // Anonymous mappings have no label, so no ref can be filed under them.
-    if (!m.name) continue;
-    const key = m.namespace ? `${m.namespace}::${m.name}` : m.name;
-    mappings.set(key, { sources: m.sources, targets: m.targets });
-  }
-
-  const entryOfKind = (key: string, kind: DefinitionEntryKind) =>
-    resolveDefinition(wsIndex, key, null).find((d) => d.kind === kind) ?? null;
-
-  // `hasSpreads: false` because the LSP index stores each schema's fields
-  // already flattened; there is no unresolved spread left for core to expand.
-  const schemaLike = (key: string) => {
-    const def = entryOfKind(key, "schema");
-    return def ? { fields: def.fields, hasSpreads: false, namespace: def.namespace } : null;
-  };
-
-  return {
-    hasSchema: (key) => schemaLike(key) !== null,
-    getSchema: (key) => schemaLike(key),
-    hasFragment: (key) => entryOfKind(key, "fragment") !== null,
-    getFragment: (key) => {
-      const def = entryOfKind(key, "fragment");
-      return def ? { fields: def.fields, hasSpreads: false } : null;
-    },
-    hasTransform: (key) => entryOfKind(key, "transform") !== null,
-    getMapping: (key) => mappings.get(key) ?? null,
-    iterateSchemas: () => {
-      const out: Array<[string, { fields: FieldInfo[]; hasSpreads: boolean }]> = [];
-      for (const [key, entries] of wsIndex.definitions) {
-        const def = entries.find((d) => d.kind === "schema");
-        if (def) out.push([key, { fields: def.fields, hasSpreads: false }]);
-      }
-      return out;
-    },
-  } as DefinitionLookup;
-}
-
-/** The `kind` values a `DefinitionEntry` can carry that this module looks up. */
-type DefinitionEntryKind = "schema" | "fragment" | "transform";
 
 /**
  * Resolve a schema reference to core's coverage input shape.

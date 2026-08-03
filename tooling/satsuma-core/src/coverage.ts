@@ -472,8 +472,8 @@ function expandWholeStructureRefs(
  * root — empty when the path names a leaf or is not declared here.
  *
  * Both records and their leaves are returned. The leaves are what coverage
- * counts; the intermediate records keep the flat set view (`buildCoveredFieldSet`)
- * consistent with the model for consumers that only hold the set.
+ * counts; the intermediate records are returned so a conferred record reads as
+ * `covered` in its own right rather than only through its descendants.
  */
 function descendantPathsOf(path: string, fields: CoverageField[]): string[] {
   const found = findDeclaredField(path, fields);
@@ -657,40 +657,27 @@ interface TieredCoveredPaths {
 }
 
 /**
- * Coverage entries for a declared field tree, judged against the flat
- * covered-path set view (`buildCoveredFieldSet`).
+ * Coverage entries for a declared field tree that no mapping touches: every
+ * field `uncovered`, with the leaf and container rules applied as usual.
  *
- * The entry point for a consumer that holds a *set* of covered paths rather
- * than a mapping's CST — the viz card, which builds its set in the browser from
- * the viz model. Without it that consumer has to re-derive the tri-state and
- * leaf rules itself, and ADR-034 requires the opposite: `satsuma coverage`, the
- * VS Code status bar and the viz card must report one number for one workspace,
- * so every one of them counts through the shapes this module emits.
+ * Exists so "nothing covers this schema" is still an answer *this* module
+ * produces. A consumer showing a schema no mapping references — the viz overview
+ * renders one card per declared schema — still needs a denominator, and deriving
+ * "0 of N" from its own count of the field tree is how a card ends up counting
+ * containers into the ratio that ADR-034 excludes (sl-hcan).
  *
- * Re-deriving the model from the flat set changes no answer. The set is defined
- * as the union of the model's `direct` and `ancestors` sets, and
- * {@link isCoveredPath} asks for membership of either, so a path is covered here
- * exactly when it was covered in the model the set came from. Containers are
- * judged from their leaves regardless of how their own path was registered.
- *
- * **Tier:** a flat set records no tier, so every covered leaf is reported as
- * `declared`. That is accurate for the only caller today — the viz builds its
- * set from declared arrows alone — but a consumer that starts folding resolved
- * NL `@ref` coverage into its set must move to {@link computeMappingCoverage}
- * rather than have it mislabelled here (ADR-036).
- *
- * **Whole-structure arrows are not expanded** (ADR-037): the expansion needs the
- * arrow's declaration kind, which a set of paths has thrown away. A caller whose
- * set may contain a whole-record arrow's target must expand it into that
- * record's leaves before building the set, or the record will read as uncovered.
+ * There is deliberately **no** entry point taking an arbitrary set of covered
+ * paths. One existed, and it was the shape that let the viz keep deriving its
+ * own covered set: a flat set of paths has thrown away the two things coverage
+ * now needs — which tier covered a field (ADR-036) and whether an arrow's
+ * declaration confers its whole subtree (ADR-037) — so anything built that way
+ * silently under-reports both, as the viz card did on twelve shipped examples
+ * (sl-46wr, sl-csrs). A consumer with real coverage to report must go through
+ * {@link computeMappingCoverage}, which has the arrows and the resolved refs.
  */
-export function fieldCoverageFromCoveredPaths(
-  fields: CoverageField[],
-  uri: string,
-  coveredPaths: Iterable<string>,
-): FieldCoverageEntry[] {
+export function uncoveredFieldCoverage(fields: CoverageField[], uri: string): FieldCoverageEntry[] {
   return buildFieldCoverage(fields, uri, "", {
-    declared: buildCoveredFieldPaths(coveredPaths),
+    declared: buildCoveredFieldPaths([]),
     nl: buildCoveredFieldPaths([]),
   });
 }

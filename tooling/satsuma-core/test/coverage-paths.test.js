@@ -9,33 +9,34 @@
 
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import {
-  buildCoveredFieldPaths,
-  buildCoveredFieldSet,
-  isCoveredFieldPath,
-  isCoveredPath,
-  schemaLocalFieldPath,
-} from "@satsuma/core";
+import { buildCoveredFieldPaths, isCoveredPath, schemaLocalFieldPath } from "@satsuma/core";
 
-describe("buildCoveredFieldSet()", () => {
+// ── Path identity (sl-joeq, ADR-035) ────────────────────────────────────────
+//
+// Coverage identity is the qualified path and nothing else. These cases were
+// written against the flat-set view; that view was deleted with its last
+// consumer (sl-46wr), and they now assert the same rules on the model, which is
+// where the rules always lived — the set was only ever its union.
+
+describe("covered-path registration is by qualified path alone", () => {
   it("marks nested field paths and their parents as covered", () => {
     // Coverage of "address" must fire when an arrow targets a path inside it —
     // without ancestor registration the parent record always reads as unmapped.
-    const covered = buildCoveredFieldSet(["customer.email"]);
-    assert.equal(isCoveredFieldPath("customer", covered), true);
-    assert.equal(isCoveredFieldPath("customer.email", covered), true);
+    const covered = buildCoveredFieldPaths(["customer.email"]);
+    assert.equal(isCoveredPath("customer", covered), true);
+    assert.equal(isCoveredPath("customer.email", covered), true);
   });
 
   it("registers every ancestor of a deep path, not just one level", () => {
     // Three-level paths appear in real workbooks; a one-level implementation
     // would leave "a.b" unregistered and report the middle record uncovered.
-    const covered = buildCoveredFieldSet(["a.b.c"]);
-    assert.deepEqual([...covered].sort(), ["a", "a.b", "a.b.c"]);
+    const covered = buildCoveredFieldPaths(["a.b.c"]);
+    assert.deepEqual([...covered.direct, ...covered.ancestors].sort(), ["a", "a.b", "a.b.c"]);
   });
 
   it("returns false for unrelated paths", () => {
-    const covered = buildCoveredFieldSet(["customer.email"]);
-    assert.equal(isCoveredFieldPath("customer.tier", covered), false);
+    const covered = buildCoveredFieldPaths(["customer.email"]);
+    assert.equal(isCoveredPath("customer.tier", covered), false);
   });
 
   it("leaves a top-level field uncovered when only a nested field shares its name", () => {
@@ -43,34 +44,34 @@ describe("buildCoveredFieldSet()", () => {
     // bare name, so bare-segment registration made it collide with any nested
     // leaf of the same name. Reported 100% for a schema half of whose fields
     // no arrow touches.
-    const covered = buildCoveredFieldSet(["home_address.city"]);
-    assert.equal(isCoveredFieldPath("city", covered), false);
+    const covered = buildCoveredFieldPaths(["home_address.city"]);
+    assert.equal(isCoveredPath("city", covered), false);
   });
 
   it("leaves every intermediate segment of a deep path uncovered as a top-level name", () => {
     // Middle segments leaked as well as leaves: with only a.b.c.d covered,
     // top-level fields named b, c or d all read as mapped.
-    const covered = buildCoveredFieldSet(["a.b.c.d"]);
+    const covered = buildCoveredFieldPaths(["a.b.c.d"]);
     for (const segment of ["b", "c", "d"]) {
-      assert.equal(isCoveredFieldPath(segment, covered), false, `'${segment}' must be uncovered`);
+      assert.equal(isCoveredPath(segment, covered), false, `'${segment}' must be uncovered`);
     }
-    assert.equal(isCoveredFieldPath("a", covered), true, "'a' is a genuine ancestor prefix");
+    assert.equal(isCoveredPath("a", covered), true, "'a' is a genuine ancestor prefix");
   });
 
   it("leaves a sibling record's same-named leaf uncovered", () => {
     // Sibling records sharing a leaf name (the fragment-spread shape of
     // examples/lib/sfdc_fragments.stm, where one fragment lands in both
     // BillingAddress and ShippingAddress) must be judged independently.
-    const covered = buildCoveredFieldSet(["home_address.city"]);
-    assert.equal(isCoveredFieldPath("work_address.city", covered), false);
+    const covered = buildCoveredFieldPaths(["home_address.city"]);
+    assert.equal(isCoveredPath("work_address.city", covered), false);
   });
 
   it("leaves a sibling list container's same-named leaf uncovered", () => {
     // Sibling lists whose element records share field names are the norm in
     // nested schemas; only the container an arrow actually writes is covered.
-    const covered = buildCoveredFieldSet(["orders.lines.sku"]);
-    assert.equal(isCoveredFieldPath("orders.lines.sku", covered), true);
-    assert.equal(isCoveredFieldPath("orders.packed.sku", covered), false);
+    const covered = buildCoveredFieldPaths(["orders.lines.sku"]);
+    assert.equal(isCoveredPath("orders.lines.sku", covered), true);
+    assert.equal(isCoveredPath("orders.packed.sku", covered), false);
   });
 });
 
@@ -138,15 +139,13 @@ describe("buildCoveredFieldPaths() — the direct/derived model", () => {
     assert.ok(covered.ancestors.has("items[]"), "the ancestor split is on dots alone");
   });
 
-  it("keeps the flat-set view equal to the union of direct and ancestors", () => {
-    // buildCoveredFieldSet is defined as the model's union, so consumers on the
-    // boolean view can never drift from consumers on the model.
-    const paths = ["a.b.c", "x", "a.other"];
-    const flat = buildCoveredFieldSet(paths);
-    const model = buildCoveredFieldPaths(paths);
-    assert.deepEqual(flat, new Set([...model.direct, ...model.ancestors]));
-    for (const p of flat) {
-      assert.equal(isCoveredPath(p, model), true, `'${p}' must probe as covered on the model too`);
+  it("probes every registered path as covered, whichever set it landed in", () => {
+    // The property the deleted flat-set view existed to guarantee: `isCoveredPath`
+    // must accept membership of either set, so which set a path lands in is an
+    // internal detail and never changes the "mapped" answer a consumer renders.
+    const model = buildCoveredFieldPaths(["a.b.c", "x", "a.other"]);
+    for (const p of [...model.direct, ...model.ancestors]) {
+      assert.equal(isCoveredPath(p, model), true, `'${p}' must probe as covered`);
     }
   });
 });

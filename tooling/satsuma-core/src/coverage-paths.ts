@@ -101,12 +101,8 @@ export function buildCoveredFieldPaths(paths: Iterable<string>): CoveredFieldPat
 
 /**
  * True when the path is covered at all — directly or as the ancestor of a
- * direct path. This is the boolean every current consumer renders as "mapped",
- * and it is exactly what the flat-set probe has always answered.
- *
- * Same-named sibling: {@link isCoveredFieldPath} answers the identical question
- * over the flat `Set<string>` view for consumers that never build the model.
- * This one takes the model; that one takes the set.
+ * direct path. This is the boolean every consumer renders as "mapped", reached
+ * through the `FieldCoverageEntry` list coverage.ts builds from it.
  */
 export function isCoveredPath(path: string, covered: CoveredFieldPaths): boolean {
   return covered.direct.has(path) || covered.ancestors.has(path);
@@ -123,43 +119,22 @@ function properPrefixesOf(path: string): string[] {
   return prefixes;
 }
 
-// ── Flat-set compatibility view ──────────────────────────────────────────────
+// ── No flat-set view ─────────────────────────────────────────────────────────
 //
-// Consumers that only need the "covered at all?" boolean (the viz card, the
-// LSP gutter) work over a flat Set<string>. That view is now *defined* as the
-// union of the model's two sets, so the splitting rules exist once.
-
-/**
- * Expand a collection of field paths into a flat coverage set — the union of
- * the model's direct and ancestor sets, for consumers that only need the
- * "covered at all?" boolean and none of the why. The registration rules
- * (qualified paths only, never bare segments; no bracket normalisation) are
- * the model's — see {@link buildCoveredFieldPaths} for the rules and their
- * history (sl-joeq, sl-8o1n).
- */
-export function buildCoveredFieldSet(paths: Iterable<string>): Set<string> {
-  const { direct, ancestors } = buildCoveredFieldPaths(paths);
-  return new Set([...direct, ...ancestors]);
-}
-
-/**
- * Return true when a schema-local field path is covered by the expanded set.
- *
- * The caller must pass the schema-local *qualified* path (`customer.email`, not
- * `orders.customer.email` and not the bare leaf `email`). Matching is exact:
- * buildCoveredFieldSet() registers ancestor prefixes, so a record whose
- * descendant is covered matches on its own path, but a field is never matched
- * by local name alone (sl-joeq).
- *
- * Same-named sibling: {@link isCoveredPath} answers the identical question over
- * the {@link CoveredFieldPaths} model. This one takes the flat `Set<string>`
- * view (the viz card's shape); that one takes the model. Consumers moving onto
- * the model should prefer it — this set-based probe exists for call sites that
- * only ever see the flat view.
- */
-export function isCoveredFieldPath(path: string, coveredPaths: Set<string>): boolean {
-  return coveredPaths.has(path);
-}
+// There was one — `buildCoveredFieldSet(paths)` returning the union of the two
+// sets above, plus `isCoveredFieldPath(path, set)` to probe it — for consumers
+// that only wanted the "covered at all?" boolean. It is gone, with its last
+// consumer (sl-46wr, sl-csrs).
+//
+// It has to stay gone. A flat set of paths cannot express either of the two
+// rules coverage has gained since: which tier covered a field (ADR-036) and
+// whether an arrow's declaration confers its whole subtree (ADR-037). Both are
+// properties of the *arrow*, not of the path it names, so a consumer holding
+// only paths cannot apply them — and, worse, cannot tell that it is failing to.
+// The viz card held such a set and under-reported twelve of the shipped examples
+// while looking entirely plausible. A consumer with real coverage to report goes
+// through `computeMappingCoverage`, which has the arrows and the resolved refs;
+// one that merely needs a denominator uses `uncoveredFieldCoverage`.
 
 // ── Schema-qualified arrow references ───────────────────────────────────────
 

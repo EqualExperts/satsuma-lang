@@ -19,11 +19,9 @@ import { fileURLToPath } from "node:url";
 import {
   initParser,
   getParser,
-  buildCoveredFieldSet,
   computeMappingCoverage,
-  countContainerStates,
   extractSchemas,
-  fieldCoverageFromCoveredPaths,
+  uncoveredFieldCoverage,
   extractMappings,
   extractNLRefData,
   leafFieldEntries,
@@ -1586,25 +1584,19 @@ mapping load {
   });
 });
 
-// ── Set-based entry building (sl-hcan) ───────────────────────────────────────
+// ── Schemas no mapping touches (sl-hcan) ─────────────────────────────────────
 //
-// The path a consumer takes when it holds a covered-path *set* rather than a
-// mapping's CST — the viz card, which builds its set in the browser. ADR-034
+// A consumer showing a schema that no mapping references still needs a
+// denominator — the viz overview renders one card per declared schema. ADR-034
 // requires one number per workspace across `satsuma coverage`, the VS Code
-// status bar and the viz card, so what matters here is that this entry point
-// answers exactly as the CST path does.
+// status bar and the viz card, so that denominator has to be counted by the
+// same rules as every other, not by the consumer counting its own field tree.
 
-describe("fieldCoverageFromCoveredPaths()", () => {
+describe("uncoveredFieldCoverage()", () => {
   const NESTED = `
-schema src { city STRING }
 schema tgt {
   amount DECIMAL
   address record { city STRING line1 STRING postcode STRING }
-}
-mapping load {
-  source { src }
-  target { tgt }
-  city -> address.city
 }`;
 
   /** The declared field tree of `tgt`, in core's minimal coverage shape. */
@@ -1614,70 +1606,69 @@ mapping load {
     return toCoverageFields(schema.fields);
   }
 
-  it("reports the same entries as computeMappingCoverage for the same arrows", () => {
-    // The parity property sl-hcan exists for. If the two paths can disagree,
-    // the viz card and the CLI can print different numbers for one file, which
-    // is exactly what they did before this entry point existed.
-    const viaCst = forRole(coverage(NESTED, "load"), "target");
-    const viaSet = fieldCoverageFromCoveredPaths(
-      targetFields(),
-      TEST_URI,
-      buildCoveredFieldSet(["address.city"]),
+  it("reports every field uncovered, records included", () => {
+    // The container must read `uncovered` rather than be omitted or left
+    // undefined: a card renders the tri-state per row, and an absent state is
+    // not the same claim as "nothing under here is mapped".
+    const entries = uncoveredFieldCoverage(targetFields(), TEST_URI);
+    assert.deepEqual(
+      entries.map((f) => [f.path, f.state, f.mapped]),
+      [
+        ["amount", "uncovered", false],
+        ["address", "uncovered", false],
+        ["address.city", "uncovered", false],
+        ["address.line1", "uncovered", false],
+        ["address.postcode", "uncovered", false],
+      ],
     );
-    assert.deepEqual(viaSet, viaCst.fields);
+    assert.equal(
+      entries.every((f) => f.tier === undefined),
+      true,
+    );
   });
 
-  it("counts leaves only, so nesting depth alone cannot move the percentage", () => {
-    // The concrete figure sl-hcan cites: `amount` plus a three-leaf `address`
-    // with only `address.city` covered is 1/4 — 25%. Counting the record too
-    // (the viz card's old rule) gave 2/5 — 40%.
-    const entries = fieldCoverageFromCoveredPaths(
-      targetFields(),
-      TEST_URI,
-      buildCoveredFieldSet(["address.city"]),
-    );
-    assert.deepEqual(summarizeFieldCoverage(entries), {
-      covered: 1,
-      coveredDeclared: 1,
+  it("counts leaves only, so nesting depth alone cannot move the denominator", () => {
+    // The figure sl-hcan cites, in its zero-covered form: `amount` plus a
+    // three-leaf `address` is 0/4, not 0/5. Counting the record too — the viz
+    // card's old rule — inflated every denominator by its nesting.
+    assert.deepEqual(summarizeFieldCoverage(uncoveredFieldCoverage(targetFields(), TEST_URI)), {
+      covered: 0,
+      coveredDeclared: 0,
       coveredNl: 0,
       total: 4,
-      pct: 25,
+      pct: 0,
     });
-    assert.deepEqual(countContainerStates(entries), { covered: 0, partial: 1, uncovered: 0 });
   });
 
-  it("gives a flat and a deeply nested schema with the same leaves the same percentage", () => {
+  it("gives a flat and a deeply nested schema with the same leaves the same denominator", () => {
     // Depth invariance, stated as a property rather than a figure: re-nesting a
-    // schema without changing its leaves or the arrows into it must not move the
-    // number. This is what makes a coverage percentage comparable between two
-    // schemas, and what counting containers destroyed.
+    // schema without changing its leaves must not move the number. This is what
+    // makes a coverage percentage comparable between two schemas, and what
+    // counting containers destroyed.
     const FLAT = `schema tgt { a STRING b STRING c STRING d STRING }`;
     const DEEP = `schema tgt { a STRING outer record { b STRING mid record { c STRING inner record { d STRING } } } }`;
-    const COVERED = new Set(["a"]);
 
-    const flat = summarizeFieldCoverage(
-      fieldCoverageFromCoveredPaths(targetFields(FLAT), TEST_URI, COVERED),
-    );
-    const deep = summarizeFieldCoverage(
-      fieldCoverageFromCoveredPaths(targetFields(DEEP), TEST_URI, COVERED),
-    );
+    const flat = summarizeFieldCoverage(uncoveredFieldCoverage(targetFields(FLAT), TEST_URI));
+    const deep = summarizeFieldCoverage(uncoveredFieldCoverage(targetFields(DEEP), TEST_URI));
     assert.deepEqual(flat, deep);
     assert.equal(flat.total, 4);
-    assert.equal(flat.pct, 25);
   });
 
-  it("judges a container from its leaves even when the set names the container itself", () => {
-    // A set built from `each parcels -> .packed { }` contains "packed" with no
-    // leaf beneath it covered. A container reference must not manufacture leaf
-    // coverage (PRD 38 R2) — the same rule the CST path applies, reached here
-    // through a set that has forgotten which arrow put the path there.
-    const SCHEMA = `schema tgt { packed record { weight DECIMAL sku STRING } }`;
-    const entries = fieldCoverageFromCoveredPaths(
-      targetFields(SCHEMA),
-      TEST_URI,
-      buildCoveredFieldSet(["packed"]),
-    );
-    assert.equal(entries.find((f) => f.path === "packed").state, "uncovered");
-    assert.equal(summarizeFieldCoverage(entries).covered, 0);
+  it("agrees with computeMappingCoverage on a mapping that covers nothing", () => {
+    // The two entry points must produce the same shape for the same schema, or
+    // a card seeded with this list and later unioned with a real result would
+    // disagree with itself.
+    const EMPTY = `
+schema src { unused STRING }
+schema tgt {
+  amount DECIMAL
+  address record { city STRING line1 STRING postcode STRING }
+}
+mapping load {
+  source { src }
+  target { tgt }
+}`;
+    const viaCst = forRole(coverage(EMPTY, "load"), "target");
+    assert.deepEqual(uncoveredFieldCoverage(targetFields(EMPTY), TEST_URI), viaCst.fields);
   });
 });
