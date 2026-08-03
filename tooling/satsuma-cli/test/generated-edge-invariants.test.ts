@@ -147,64 +147,67 @@ describe("nothing invented: every emitted endpoint is a declared field (sl-hi0z)
     );
   });
 
-  it(
-    "names only declared paths when a container header targets the target schema root",
-    { todo: "fails on current behaviour — owned by r0-7w76, not by this feature" },
-    async () => {
-      // The one shape excluded from the generated domain, kept as an executable
-      // demonstration rather than a prose description. It is a literal fixture
-      // because a scenario endpoint is `{ schema, path }` and a schema *root* has
-      // no path.
-      //
-      // `qualifyField` cannot tell `flatten group_0 -> mart` — a header naming the
-      // target schema — from a bare field name, so it emits `::mart.mart`, a field
-      // nothing declares, while `satsuma validate` reads the same token correctly.
-      // Core therefore holds two readings of one authored form. This test turns
-      // green when r0-7w76 is decided; do not "fix" it here.
-      const loaded = await loadRenderedFiles([
-        {
-          path: "entry.stm",
-          source: [
-            "schema observations {",
-            "  rows list_of record {",
-            "    species STRING",
-            "  }",
-            "}",
-            "",
-            "schema mart {",
-            "  species STRING",
-            "}",
-            "",
-            "mapping load {",
-            "  source { observations }",
-            "  target { mart }",
-            "  flatten rows -> mart {",
-            "    .species -> species",
-            "  }",
-            "}",
-            "",
-          ].join("\n"),
-        },
+  it("invents ::mart.mart when a container header targets the target schema root (r0-7w76)", async () => {
+    // ⚠️ THIS TEST PINS A KNOWN DEFECT. It asserts what the graph does *today*, not
+    // what it should do, so it will go **red the moment r0-7w76 is decided** — at
+    // which point invert it to the invariant stated in the sibling property above
+    // and delete this comment. It is not an endorsement of the behaviour.
+    //
+    // `qualifyField` cannot tell `flatten rows -> mart` — a header naming the target
+    // *schema* — from a bare field name, so it emits `::mart.mart`, a field nothing
+    // declares, while `satsuma validate` reads the same token correctly. Core holds
+    // two readings of one authored form.
+    //
+    // Pinned rather than skipped for two reasons. A skipped test proves nothing, and
+    // `{ todo: … }` is not usable here: node's JUnit reporter puts a `failure=`
+    // attribute on a failing todo case, which fails CI's test-report check.
+    //
+    // It is a literal fixture rather than a scenario because a scenario endpoint is
+    // `{ schema, path }` and a schema root has no path.
+    const loaded = await loadRenderedFiles([
+      {
+        path: "entry.stm",
+        source: [
+          "schema observations {",
+          "  rows list_of record {",
+          "    species STRING",
+          "  }",
+          "}",
+          "",
+          "schema mart {",
+          "  species STRING",
+          "}",
+          "",
+          "mapping load {",
+          "  source { observations }",
+          "  target { mart }",
+          "  flatten rows -> mart {",
+          "    .species -> species",
+          "  }",
+          "}",
+          "",
+        ].join("\n"),
+      },
+    ]);
+    try {
+      const declared = new Set([
+        "::observations.rows",
+        "::observations.rows.species",
+        "::mart.species",
       ]);
-      try {
-        const declared = new Set([
-          "::observations.rows",
-          "::observations.rows.species",
-          "::mart.species",
-        ]);
-        const emitted = graphFor(loaded)
-          .edges.flatMap((edge) => [edge.from, edge.to])
-          .filter((endpoint): endpoint is string => endpoint !== null);
-        assert.deepEqual(
-          emitted.filter((endpoint) => !declared.has(endpoint)),
-          [],
-          `a container header onto the schema root invented an endpoint:\n${loaded.sources}`,
-        );
-      } finally {
-        disposeGeneratedWorkspace(loaded);
-      }
-    },
-  );
+      const emitted = graphFor(loaded)
+        .edges.flatMap((edge) => [edge.from, edge.to])
+        .filter((endpoint): endpoint is string => endpoint !== null);
+      assert.deepEqual(
+        [...new Set(emitted.filter((endpoint) => !declared.has(endpoint)))],
+        ["::mart.mart"],
+        `r0-7w76's invented endpoint changed — read this test's comment before ` +
+          `updating the expectation:\n${loaded.sources}`,
+      );
+    } finally {
+      disposeGeneratedWorkspace(loaded);
+    }
+  });
 });
 
 describe("nothing dropped: the emitted edge set is exactly the declared one (sl-hi0z)", () => {

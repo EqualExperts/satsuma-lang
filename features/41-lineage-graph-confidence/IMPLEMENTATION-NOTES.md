@@ -42,7 +42,8 @@ Ranked by what I would pick up next.
 1. **Fix `lgc-4bxl` and `lgc-fu7o`** (both P1, both viz, both small). They are the
    two highest-value items here: a phantom lineage edge and a hover that points at
    the wrong card are user-visible wrong answers, and both properties are already
-   written and waiting — removing a `todo` marker is the whole test change. They are
+   written and waiting — the pinned test goes red on the fix and tells you what to
+   replace it with. They are
    *not* in this PR because `sl-hi0z` says to record such findings against their own
    ticket rather than fix them here, and because changing what the viz draws deserves
    the Playwright harness and a look at the picture.
@@ -275,7 +276,7 @@ Nine properties, in two files:
 | Property | Defends against | State |
 |---|---|---|
 | Every field-edge endpoint is a declared path | invented endpoints (P1) | green |
-| A container header onto the schema root invents nothing | `r0-7w76` | **todo** |
+| A container header onto the schema root invents `::mart.mart` | `r0-7w76` | **pinned** |
 | The emitted edge set is exactly the declared set | dropped *and* invented (P2) | green |
 | Every arrow in a nested container block gets an edge | `3cdd-yavi`, `sl-l7u0` | green |
 | Every field-edge endpoint's schema has a node | `sl-p895`'s backfill | green |
@@ -284,8 +285,26 @@ Nine properties, in two files:
 | The edge set survives reordering declarations | order-independence | green |
 | The edge set survives splitting across more files | file-independence | green |
 | The layout draws every declared arrow (chain, container, spread, namespaced) | silent port-resolution skips | green |
-| A multi-source arrow draws one edge per source | `lgc-fu7o` | **todo** |
-| A computed arrow is never drawn from a same-named source | `lgc-4bxl` | **todo** |
+| Only the first source of a multi-source arrow is drawn | `lgc-fu7o` | **pinned** |
+| A computed arrow is drawn as a phantom line | `lgc-4bxl` | **pinned** |
+
+### Three known defects are *pinned*, not skipped — and `{ todo: … }` is unusable here
+
+The three properties that fail on current behaviour started as `{ todo: … }`. That
+broke CI's **Test report** check, and the reason is worth writing down: node's JUnit
+reporter puts a **`failure=` attribute on a failing `todo` testcase**, alongside
+`<skipped type="todo">`. `dorny/test-reporter` reads the attribute and fails the
+check. So a `todo` test that actually runs and throws is not viable in this
+repository — only one that is never executed.
+
+Each was therefore rewritten to **pin the current, wrong behaviour**: it asserts the
+invented endpoint, the phantom edge, the single drawn edge. That is strictly better
+than a skip in three ways — the defect has an executable description, the test goes
+**red the moment the bug is fixed** so nobody can fix it and leave a stale
+expectation behind, and it catches the defect *changing shape*. Each opens with a
+`⚠️ THIS TEST PINS A KNOWN DEFECT` banner naming the ticket and saying what to
+replace it with, and each failure message tells the reader to read the comment
+before touching the expectation.
 
 ### The mutation checks the ticket asks for, run and confirmed
 
@@ -319,7 +338,7 @@ what may be missing — which is what makes a *fourth* kind of omission a failur
 
 `sl-hi0z` says explicitly: if a property fails on current behaviour, record it
 against the owning bug ticket rather than weakening the assertion. So these are
-raised and marked `todo`, not fixed here. Both are small, well-understood fixes and
+raised and pinned, not fixed here. Both are small, well-understood fixes and
 are the highest-value follow-up in this area — see [What I did not do](#what-i-did-not-do).
 
 **`lgc-4bxl` — a computed arrow is drawn as a line from a same-named source

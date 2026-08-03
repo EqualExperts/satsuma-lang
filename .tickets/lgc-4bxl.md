@@ -45,3 +45,9 @@ Related but distinct: sl-k7i4 is the DETAIL view's empty Source cell for the sam
 
 A computed arrow never produces an edge whose source is a field the arrow does not name. Whatever is drawn for a computed target is distinguishable from a mapped one and from an unmapped one. The fallback 'sourceField = targetField' is gone; a sourceless arrow is handled explicitly rather than by a lookup that happens to miss. Feature 41's viz edge-completeness property covers computed arrows and its todo marker is removed. Harness Playwright coverage for the rendered result.
 
+
+## Notes
+
+**2026-08-03T22:45:49Z**
+
+Feature 41 R3 pinned this defect in an executable test rather than skipping it. The test asserts the CURRENT (wrong) behaviour and will go RED when this ticket is fixed, with a comment naming the invariant to replace it with. `{ todo: ... }` is not usable in this repo: node's JUnit reporter puts a `failure=` attribute on a failing todo testcase, and dorny/test-reporter then fails CI's Test report check.

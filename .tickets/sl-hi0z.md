@@ -56,3 +56,7 @@ arrow as a line from a same-named source field, or drops it entirely) and lgc-fu
 path highlights on all of them, so hovering the second source lights up a line to
 the first source's card). Both have their property written and marked todo, so
 fixing them is a one-line test change. (commit immediately after d86a2413)
+
+**2026-08-03T22:45:49Z**
+
+Correction to this ticket's closing note: the three properties that fail on current behaviour are PINNED, not marked todo. `{ todo: ... }` broke CI's Test report check — node's JUnit reporter emits a `failure=` attribute on a failing todo testcase alongside <skipped type="todo">, and dorny/test-reporter reads the attribute. Each now asserts the current wrong behaviour behind a '⚠️ THIS TEST PINS A KNOWN DEFECT' banner, so it goes red when its ticket is fixed instead of silently staying skipped.

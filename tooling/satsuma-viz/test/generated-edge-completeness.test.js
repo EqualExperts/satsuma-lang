@@ -170,27 +170,38 @@ describe("the layout draws every declared arrow (sl-hi0z)", () => {
     );
   });
 
-  it(
-    "attaches a multi-source arrow's edges to the card that declares each source",
-    { todo: "fails on current behaviour — owned by lgc-fu7o" },
-    async () => {
-      // Spec §4.2: `a, b -> t` is one edge *per source*, all to the same target.
-      // `addMappingEdges` reads `a.sourceFields[0]` and nothing else, so the viz
-      // draws one line and omits the rest of the arrow's provenance.
-      //
-      // The hover path does not share the omission — `sz-edge-layer.ts:218`
-      // highlights on the whole authored `arrow.sourceFields` — so hovering the
-      // *second* source highlights the single drawn edge, which runs to the *first*
-      // source's card. The UI points at the wrong schema, which is why this is
-      // worse than a missing line. That is lgc-fu7o.
-      await fc.assert(
-        fc.asyncProperty(multiSourceWorkspaceArbitrary, async ({ workspace }) => {
-          await assertEdgesMatch(workspace, "a multi-source arrow drew the wrong edges");
-        }),
-        GENERATED_PROPERTY_PARAMETERS,
-      );
-    },
-  );
+  it("draws only the first source of a multi-source arrow (lgc-fu7o)", async () => {
+    // ⚠️ THIS TEST PINS A KNOWN DEFECT — see the note at the head of the r0-7w76
+    // test in satsuma-cli/test/generated-edge-invariants.test.ts for why a pinned
+    // divergence is used here rather than `{ todo: … }`. It asserts what the layout
+    // does *today* and goes **red when lgc-fu7o is fixed**, at which point replace
+    // it with `assertEdgesMatch`, which already states the correct invariant.
+    //
+    // Spec §4.2: `a, b -> t` is one edge *per source*, all to the same target.
+    // `addMappingEdges` reads `a.sourceFields[0]` and nothing else, so the viz draws
+    // one line and omits the rest of the arrow's provenance. The hover path does not
+    // share the omission — `sz-edge-layer.ts:218` highlights on the whole authored
+    // `arrow.sourceFields` — so hovering the *second* source highlights the single
+    // drawn edge, which runs to the *first* source's card. Pointing at the wrong
+    // schema is worse than drawing nothing.
+    await fc.assert(
+      fc.asyncProperty(multiSourceWorkspaceArbitrary, async ({ workspace, expectedSources }) => {
+        const { model, sources } = modelFor(workspace);
+        const layout = await viz.computeLayout(model);
+        assert.equal(
+          layout.edges.length,
+          1,
+          `expected lgc-fu7o's single edge for ${expectedSources.length} sources:\n${sources}`,
+        );
+        // The drawn edge belongs to the *first* declared source, and its recorded
+        // `sourceField` keeps the authored schema prefix — the second half of
+        // lgc-fu7o, latent today because nothing matches on that field.
+        assert.equal(layout.edges[0].sourceNode, "s0", `edge left the first source's card`);
+        assert.equal(layout.edges[0].sourceField, "s0.field_0", `sourceField form changed`);
+      }),
+      GENERATED_PROPERTY_PARAMETERS,
+    );
+  });
 
   it("draws an arrow whose endpoint is declared only by a spread fragment", async () => {
     // Ports exist for spread-expanded fields, so an arrow naming one must resolve.
@@ -217,21 +228,19 @@ describe("the layout draws every declared arrow (sl-hi0z)", () => {
     );
   });
 
-  it(
-    "never draws a computed arrow as a line from a same-named source field",
-    { todo: "fails on current behaviour — owned by lgc-4bxl" },
-    async () => {
-      // A computed arrow declares a target with no source. `addMappingEdges` falls
-      // back to `sourceField = targetField`, so it looks the target's own name up in
-      // the *source* schema: when a field of that name exists — the normal case,
-      // since matching names on both sides is the norm — the viz draws a line
-      // asserting lineage the Satsuma explicitly denies, and when it does not, the
-      // edge is silently dropped.
-      //
-      // A phantom lineage edge is worse than a missing one: it is a confident claim
-      // about where data came from. This is lgc-4bxl; do not "fix" it by relaxing
-      // the assertion.
-      const source = `
+  it("draws a computed arrow as a phantom line from a same-named source field (lgc-4bxl)", async () => {
+    // ⚠️ THIS TEST PINS A KNOWN DEFECT, for the reasons given on the multi-source
+    // test above. It goes **red when lgc-4bxl is fixed**; at that point assert that
+    // no edge has an empty `arrow.sourceFields`, which is the invariant that matters.
+    //
+    // A computed arrow declares a target with no source. `addMappingEdges` falls back
+    // to `sourceField = targetField`, so it looks the target's own name up in the
+    // *source* schema: where a field of that name exists — the normal case, since
+    // matching names on both sides is the norm — the viz draws a line asserting
+    // lineage the Satsuma explicitly denies. Where it does not, the edge is silently
+    // dropped instead. A phantom lineage edge is worse than a missing one: it is a
+    // confident claim about where data came from.
+    const source = `
 schema s0 {
   a STRING
   stamp STRING
@@ -247,19 +256,19 @@ mapping m0 {
   -> stamp { "Set at load time; no source field." }
 }
 `;
-      const parser = getParser();
-      const index = createWorkspaceIndex();
-      const uri = "file:///entry.stm";
-      const tree = parser.parse(source);
-      indexFile(index, uri, tree);
-      const layout = await viz.computeLayout(buildVizModel(uri, tree, index));
+    const parser = getParser();
+    const index = createWorkspaceIndex();
+    const uri = "file:///entry.stm";
+    const tree = parser.parse(source);
+    indexFile(index, uri, tree);
+    const layout = await viz.computeLayout(buildVizModel(uri, tree, index));
 
-      const phantom = layout.edges.filter((edge) => edge.arrow.sourceFields.length === 0);
-      assert.deepEqual(
-        phantom.map(drawnKey),
-        [],
-        `a sourceless arrow was drawn as if it had a source:\n${source}`,
-      );
-    },
-  );
+    const phantom = layout.edges.filter((edge) => edge.arrow.sourceFields.length === 0);
+    assert.deepEqual(
+      phantom.map(drawnKey),
+      ["s0.stamp -> s1.stamp"],
+      `lgc-4bxl's phantom edge changed — read this test's comment before updating ` +
+        `the expectation:\n${source}`,
+    );
+  });
 });
