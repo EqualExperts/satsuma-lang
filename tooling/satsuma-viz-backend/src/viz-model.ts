@@ -8,7 +8,8 @@
 
 import type { SyntaxNode, Tree } from "./parser-utils";
 import { child, children, labelText, stringText } from "./parser-utils";
-import type { FieldInfo, WorkspaceIndex } from "./workspace-index";
+import { attachMappingCoverage } from "./coverage";
+import type { DefinitionEntry, FieldInfo, WorkspaceIndex } from "./workspace-index";
 import { findReferences, resolveDefinition } from "./workspace-index";
 import type { DefinitionLookup } from "@satsuma/core";
 import {
@@ -132,7 +133,11 @@ export function buildVizModel(uri: string, tree: Tree, wsIndex: WorkspaceIndex):
 
   // Pre-resolve all fragment spreads into schema fields so the viz never sees
   // spread placeholders or fragment nodes — spreads are an authoring shorthand only.
-  resolveAndStripSpreads(namespaces);
+  resolveAndStripSpreads(namespaces, wsIndex);
+
+  // Coverage last: it is judged against the cards' field trees, which are only
+  // final once spreads have been materialised into them (sl-5nsv).
+  attachMappingCoverage(uri, tree, namespaces, wsIndex);
 
   return { uri, fileNotes, namespaces };
 }
@@ -254,16 +259,28 @@ function fieldInfoToEntry(fi: FieldInfo, defUri: string): FieldEntry {
  * nodes from every namespace group.
  *
  * Resolution is cross-namespace (a schema in `src` can spread `common::frag`),
- * namespace-relative (a bare `...frag` resolves within the schema's own
- * namespace first), and transitive (a fragment may itself spread another
- * fragment). Core's expandEntityFields() handles cycle detection and
- * diamond-shaped graphs. Spreads that resolve are replaced by their fields and
- * removed; spreads that don't resolve are left in place so the schema card can
- * surface the dangling reference instead of silently dropping it.
+ * cross-*file* (a fragment reached through an `import`), namespace-relative (a
+ * bare `...frag` resolves within the schema's own namespace first), and
+ * transitive (a fragment may itself spread another fragment). Core's
+ * expandEntityFields() handles cycle detection and diamond-shaped graphs.
+ * Spreads that resolve are replaced by their fields and removed; spreads that
+ * don't resolve are left in place so the schema card can surface the dangling
+ * reference instead of silently dropping it.
  */
-function resolveAndStripSpreads(namespaces: NamespaceGroup[]): void {
+function resolveAndStripSpreads(namespaces: NamespaceGroup[], wsIndex: WorkspaceIndex): void {
   // Build a flat entity lookup for spread resolution across all namespaces.
+  //
+  // Imported fragments come from the index, because a single-file model holds
+  // only the fragments this file declares. `examples/multi-source/multi-source-join.stm`
+  // spreads `audit columns` from `../lib/common.stm`, and resolving against the
+  // model alone left the card four leaves short of what `satsuma coverage`
+  // counts — the cross-file half of the defect sl-5nsv fixed within a file.
+  // Model entries are written last so a locally declared entity wins.
   const entityMap = new Map<string, SpreadEntity>();
+  for (const [key, entries] of wsIndex.definitions) {
+    const fragment = entries.find((d) => d.kind === "fragment");
+    if (fragment) entityMap.set(key, definitionToSpreadEntity(fragment));
+  }
   for (const ns of namespaces) {
     for (const f of ns.fragments) {
       entityMap.set(f.id, fragmentToSpreadEntity(f));
@@ -310,6 +327,33 @@ function fragmentToSpreadEntity(f: FragmentCard): SpreadEntity {
     fields: f.fields.map(fieldEntryToDecl),
     hasSpreads: f.spreads.length > 0,
     spreads: f.spreads,
+  };
+}
+
+/**
+ * Convert an indexed definition to core's SpreadEntity, for a fragment declared
+ * in a file this model does not itself contain.
+ *
+ * The index stores fields unexpanded, so the fragment's own spreads are carried
+ * through and core resolves them transitively.
+ */
+function definitionToSpreadEntity(def: DefinitionEntry): SpreadEntity {
+  return {
+    fields: def.fields.map(fieldInfoToDecl),
+    hasSpreads: (def.spreads?.length ?? 0) > 0,
+    spreads: def.spreads ?? [],
+  };
+}
+
+/** Convert an indexed FieldInfo to core's FieldDecl for spread expansion input. */
+function fieldInfoToDecl(fi: FieldInfo): FieldDecl {
+  return {
+    name: fi.name,
+    type: fi.type ?? "",
+    startRow: fi.range.start.line,
+    children: fi.children.map(fieldInfoToDecl),
+    hasSpreads: (fi.spreads?.length ?? 0) > 0,
+    spreads: fi.spreads ?? [],
   };
 }
 
