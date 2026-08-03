@@ -38,3 +38,7 @@ This undercuts the point of Feature 38 (epic sl-j6g9): the partial state is comp
 
 Cause: sz-schema-card chose the port-dot class from entry.mapped, which core defines as state !== "uncovered" — true for 'covered' and 'partial' alike — so a partly covered record painted the same solid dot as a fully covered one, and the tri-state reached a reader only through hover text.
 Fix: the dot class now derives from the coverage state via a total Record<FieldCoverageState, string> map (a fourth state fails to compile rather than collapsing into an existing style), and a new .port.partial rule draws a half-filled dot inside an accent ring. Verified in Firefox in both themes on examples/filter-flatten-governance (order-line-facts): order_totals and line_items render half-moons between currency's solid dot and subtotal's hollow ring.
+
+**2026-08-03T13:30:02Z**
+
+Commit: 9c4c253c (PR #440).
