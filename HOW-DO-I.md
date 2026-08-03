@@ -48,6 +48,28 @@ Both example sets model the same RetailCo company. See the [comparison overview]
 
 ---
 
+## Nested and Repeated Data
+
+**How do I declare a nested structure or a repeated one?**
+Use `record { }` for a single nested structure, `list_of record { }` for a repeated one, and `list_of TYPE` for a list of primitives. Full guide: [Nested and Repeated Data](docs/nested-data/README.md#1-three-shapes-one-declaration-syntax)
+
+**How do I map a list of records without losing the hierarchy?**
+Use `each src -> tgt { }` and address element fields with a leading `.`. Nest `each` blocks for deeper hierarchies. Guide: [`each`](docs/nested-data/README.md#3-each--iterate-a-list-keep-the-hierarchy)
+
+**How do I turn a nested list into one row per element?**
+Use `flatten src -> tgt { }`. Arrows outside the block repeat on every output row. Guide: [`flatten`](docs/nested-data/README.md#4-flatten--one-output-row-per-element)
+
+**How do I reference a parent field from inside an `each` or `flatten` block?**
+You can't — every path inside a block is prefixed with the block's path. Put the arrow outside the block. Guide: [The resolution rule](docs/nested-data/README.md#the-resolution-rule)
+
+**How do I map two parallel lists that are correlated by position (a "zip")?**
+There is no `zip` operator. Use sibling `each` blocks over one target list, or map each scalar list onto its target leaf — and state the correlation in a `note`. Guide: [Two parallel lists](docs/nested-data/README.md#5-two-parallel-lists--the-zip-question)
+
+**How does nesting affect my coverage percentage?**
+Only leaf fields are counted; a record's state is derived from its leaves; and a whole-structure arrow (`addr -> address`) covers its entire subtree. Guide: [What coverage counts](docs/nested-data/README.md#7-what-coverage-counts)
+
+---
+
 ## Load Strategy
 
 **How do I declare an upsert/merge strategy on a mapping?**
@@ -194,4 +216,4 @@ Run `satsuma where-used <metric-name>` or `satsuma metric <name>` for extraction
 
 ---
 
-*All convention guides are complete. See [features/21-convention-docs/PRD.md](features/21-convention-docs/PRD.md) for the documentation plan.*
+_All convention guides are complete. See [features/21-convention-docs/PRD.md](features/21-convention-docs/PRD.md) for the documentation plan._
