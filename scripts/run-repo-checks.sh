@@ -50,9 +50,14 @@ run_step "release tooling tests" npm run test:release
 # property failures rather than as its own named failure.
 run_step "scenario generator tests" npm --prefix tooling/satsuma-scenario-gen test
 
-run_parallel "satsuma-core + satsuma-viz-model tests" \
+# satsuma-viz joins these (sl-hi0z): CI has always run it via the tooling-modules
+# matrix, but the local hook did not, so the viz's edge-completeness properties —
+# the ones defending against a mapping that silently renders no lines at all —
+# would only have failed after a push.
+run_parallel "satsuma-core + satsuma-viz-model + satsuma-viz tests" \
   "npm --prefix tooling/satsuma-core test" \
-  "npm --prefix tooling/satsuma-viz-model test"
+  "npm --prefix tooling/satsuma-viz-model test" \
+  "npm --prefix tooling/satsuma-viz test"
 
 # `npm --prefix tooling/satsuma-cli test` below already runs test:typecheck via
 # npm's implicit pretest hook, but make it an explicit, separately labelled

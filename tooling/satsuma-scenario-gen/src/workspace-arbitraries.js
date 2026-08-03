@@ -26,9 +26,13 @@
  * target_schema`). That is `r0-7w76`: core holds two readings of the same token,
  * and `qualifyField` invents `::target_schema.target_schema` for it. Generating it
  * in the default domain would make every endpoint-existence property red for a
- * defect this feature explicitly does not decide. It has its own arbitrary,
- * {@link schemaRootContainerWorkspaceArbitrary}, used by one property that is
- * marked `todo` against that ticket.
+ * defect this feature explicitly does not decide.
+ *
+ * It is also not *expressible* here: an endpoint is `{ schema, path }`, and a
+ * schema root has no path. Rather than give every endpoint an empty-path special
+ * case for one known-failing demonstration, the shape lives as a literal fixture
+ * in `satsuma-cli/test/generated-edge-invariants.test.ts`, in the property marked
+ * `todo` against that ticket.
  *
  * **NL `@ref`s that coincide with a declared source, or with the arrow's own
  * target.** Both hit production suppression branches that the ground truth would
@@ -355,42 +359,6 @@ export const containerWorkspaceArbitrary = fc
       depth,
     };
   });
-
-/**
- * A `flatten` block whose target is the target *schema*, not a field of it.
- *
- * This is `r0-7w76`'s shape and it is not in the default domain. `qualifyField`
- * cannot distinguish this token from a bare field name and emits
- * `::s1.s1` — an endpoint no schema declares — while `satsuma validate` reads the
- * same token correctly. Kept here so the divergence has an executable
- * demonstration rather than only a prose description.
- */
-export const schemaRootContainerWorkspaceArbitrary = fc.constant(null).map(() => {
-  const source = schemaName(0);
-  const target = schemaName(1);
-  const [leaf] = leaves();
-  return {
-    workspace: singleFile({
-      schemas: [
-        schemaDecl({ name: source, fields: [listRecordField("group_0", flatFields())] }),
-        schemaDecl({ name: target, fields: flatFields() }),
-      ],
-      mappings: [
-        mappingDecl({
-          name: mappingName(0),
-          sources: [source],
-          targets: [target],
-          arrows: [
-            flattenBlock(endpoint(source, "group_0"), endpoint(target, leaf), [
-              mapArrow([endpoint(source, `group_0.${leaf}`)], endpoint(target, leaf)),
-            ]),
-          ],
-        }),
-      ],
-    }),
-    invented: `::${target}.${target}`,
-  };
-});
 
 // ── NL `@ref` transform text ───────────────────────────────────────────────
 

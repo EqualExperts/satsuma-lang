@@ -2,7 +2,7 @@
 id: sl-k7i4
 status: open
 deps: []
-links: []
+links: [lgc-4bxl]
 created: 2026-08-03T12:30:52Z
 type: bug
 priority: 3
