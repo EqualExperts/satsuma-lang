@@ -1,6 +1,6 @@
 ---
 id: tcc-chls
-status: in_progress
+status: closed
 deps: [tcc-e35f]
 links: []
 created: 2026-08-03T14:38:22Z
@@ -21,3 +21,10 @@ Consume the core SyntaxNode/Tree contract through parser-utils. Route model-from
 ## Acceptance Criteria
 
 model-from-sources uses the audited typed parser boundary in both Node and browser hosts; parser-utils re-exports the typed core node/tree and symbol-aware helpers; workspace-index and viz-model direct CST comparisons, switch labels, lookup maps, and symbol selector parameters compile against SatsumaGrammarSymbol or SatsumaCstType as appropriate; unrelated VizModel and FieldDecl type strings remain semantically unchanged; no arbitrary CST casts are introduced; a removed referenced grammar symbol fails the package typecheck; all viz-backend tests and existing source-to-model parity coverage pass.
+
+## Notes
+
+**2026-08-03T15:22:28Z**
+
+Cause: Viz-backend indexed CST block kinds and mapping-body selectors through broad string types, so the Node/browser assembly path could drift from generated grammar symbols.
+Fix: Re-exported the shared CST symbol contract, narrowed backend kind maps and selectors, enforced package typechecking, and added a stale-symbol regression while preserving source-to-model parity (commit 6eb03976).
