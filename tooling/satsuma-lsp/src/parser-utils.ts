@@ -14,6 +14,7 @@
  */
 
 import { Range, Position } from "vscode-languageserver";
+import type { SatsumaGrammarSymbol } from "@satsuma/core";
 import type { Parser, Language, Tree, Node } from "web-tree-sitter";
 
 // Re-export web-tree-sitter types under the names the rest of the server uses.
@@ -39,12 +40,12 @@ import {
 } from "@satsuma/core";
 
 /** First named child of the given type. */
-export function child(node: Node, type: string): Node | null {
+export function child(node: Node, type: SatsumaGrammarSymbol): Node | null {
   return _child(node, type) as Node | null;
 }
 
 /** All named children of the given type. */
-export function children(node: Node, type: string): Node[] {
+export function children(node: Node, type: SatsumaGrammarSymbol): Node[] {
   return _children(node, type) as Node[];
 }
 

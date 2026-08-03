@@ -11,6 +11,7 @@
  * configuration — one style for all Satsuma files everywhere.
  */
 
+import type { SatsumaCstType, SatsumaGrammarSymbol } from "./generated/cst-types.js";
 import type { SyntaxNode, Tree } from "./types.js";
 
 const INDENT = "  ";
@@ -65,7 +66,7 @@ function sameLine(a: SyntaxNode, b: SyntaxNode): boolean {
 }
 
 /** Find a named child by type. */
-function findChild(node: SyntaxNode, type: string): SyntaxNode | null {
+function findChild(node: SyntaxNode, type: SatsumaGrammarSymbol): SyntaxNode | null {
   for (const c of node.children) {
     if (c.type === type) return c;
   }
@@ -73,7 +74,7 @@ function findChild(node: SyntaxNode, type: string): SyntaxNode | null {
 }
 
 /** Find all children of a given type. */
-function findChildren(node: SyntaxNode, type: string): SyntaxNode[] {
+function findChildren(node: SyntaxNode, type: SatsumaGrammarSymbol): SyntaxNode[] {
   return node.children.filter((c) => c.type === type);
 }
 
@@ -82,7 +83,11 @@ function findChildren(node: SyntaxNode, type: string): SyntaxNode[] {
 // node and `}`).  Tree-sitter places extras (comments) at the nearest
 // enclosing named node, so a comment before the first body child lands as
 // a sibling of the body inside the block — not inside the body itself.
-const BODY_TYPES = new Set(["schema_body", "mapping_body", "pipe_chain"]);
+const BODY_TYPES: ReadonlySet<SatsumaCstType> = new Set([
+  "schema_body",
+  "mapping_body",
+  "pipe_chain",
+]);
 
 /**
  * Collect comments that appear between the opening `{` and the body node.
@@ -912,7 +917,7 @@ function formatEachFlattenBlock(
   node: SyntaxNode,
   source: string,
   indent: number,
-  keyword: string,
+  keyword: "each" | "flatten",
 ): string {
   const srcPath = findChild(node, "src_path");
   const tgtPath = findChild(node, "tgt_path");
