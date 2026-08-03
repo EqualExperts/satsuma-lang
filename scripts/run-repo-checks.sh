@@ -49,6 +49,13 @@ run_parallel "satsuma-core + satsuma-viz-model tests" \
   "npm --prefix tooling/satsuma-core test" \
   "npm --prefix tooling/satsuma-viz-model test"
 
+# `npm --prefix tooling/satsuma-cli test` below already runs test:typecheck via
+# npm's implicit pretest hook, but make it an explicit, separately labelled
+# step (matching R2/sl-851u) rather than relying on that hook alone (fixes P4).
+# `pretest`, not a bare `test:typecheck`, because test:typecheck's tsconfig
+# resolves several test files' imports against `dist/` (the built output),
+# which only `pretest`'s build steps guarantee are present and current.
+run_step "satsuma-cli test:typecheck" npm --prefix tooling/satsuma-cli run pretest
 run_step "satsuma-cli tests" npm --prefix tooling/satsuma-cli test
 
 # ADR-022: CLI accepts files, not directories. Check each example entry file.
