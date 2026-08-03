@@ -264,6 +264,37 @@ function sumTotals(parts: Iterable<CoverageTotals>): CoverageTotals {
   return { covered, coveredDeclared, coveredNl, total, pct: coveragePercentage(covered, total) };
 }
 
+// ── Union ───────────────────────────────────────────────────────────────────
+
+/**
+ * Union several field-coverage lists for the *same schema* into one.
+ *
+ * **Union rule:** a leaf is covered when any input covers it, under the
+ * strongest tier any input claims; every container is then re-derived from the
+ * unioned leaves. Entries are returned in the order the first input declared
+ * them, with fields only later inputs know about appended.
+ *
+ * Exported because three questions reduce to this one operation and must not
+ * answer it differently: "does any mapping in the workspace cover this field?"
+ * ({@link aggregateCoverage}), "does this mapping cover it on either side?" (a
+ * schema can appear in both `source{}` and `target{}`), and "does anything in
+ * this file touch it?" — the viz overview card's index. Each of those was, or
+ * would have become, its own re-implementation of the same three rules.
+ *
+ * The inputs are not mutated; the result is a fresh list of fresh entries.
+ *
+ * Why containers cannot simply be OR-ed: two mappings that each cover half of
+ * `address` both report it `partial`, but between them every leaf is written,
+ * so the union is `covered`. Taking the strongest per-input state would say
+ * `partial` and understate the union — see {@link recomputeContainerStates}.
+ */
+export function unionFieldCoverage(lists: Iterable<FieldCoverageEntry[]>): FieldCoverageEntry[] {
+  const accumulated: FieldCoverageEntry[] = [];
+  for (const list of lists) unionInto(accumulated, list);
+  recomputeContainerStates(accumulated);
+  return accumulated;
+}
+
 // ── Aggregation ─────────────────────────────────────────────────────────────
 
 /**
@@ -287,7 +318,15 @@ export function aggregateCoverage(inputs: MappingCoverageInput[]): AggregateCove
   // Keyed by role + schemaId. Role is a two-value enum containing no spaces,
   // so the first space always separates the two parts — the key stays
   // unambiguous even for backtick-quoted schema names that contain spaces.
-  const byRoleAndSchema = new Map<string, AggregateSchemaCoverage>();
+  const byRoleAndSchema = new Map<
+    string,
+    {
+      schemaId: string;
+      role: "source" | "target";
+      mappings: string[];
+      lists: FieldCoverageEntry[][];
+    }
+  >();
 
   for (const { mappingId, result } of inputs) {
     for (const schema of result.schemas) {
@@ -298,22 +337,19 @@ export function aggregateCoverage(inputs: MappingCoverageInput[]): AggregateCove
           schemaId: schema.schemaId,
           role: schema.role,
           mappings: [mappingId],
-          fields: schema.fields.map((f) => ({ ...f })),
-          // Placeholder; every entry's totals are computed once all mappings
-          // have been unioned in, below.
-          totals: { covered: 0, coveredDeclared: 0, coveredNl: 0, total: 0, pct: 0 },
+          lists: [schema.fields],
         });
         continue;
       }
       if (!existing.mappings.includes(mappingId)) existing.mappings.push(mappingId);
-      unionInto(existing.fields, schema.fields);
+      existing.lists.push(schema.fields);
     }
   }
 
-  const schemas = [...byRoleAndSchema.values()];
-  for (const schema of schemas) {
-    recomputeContainerStates(schema.fields);
-    schema.totals = summarizeFieldCoverage(schema.fields);
+  const schemas: AggregateSchemaCoverage[] = [];
+  for (const { schemaId, role, mappings, lists } of byRoleAndSchema.values()) {
+    const fields = unionFieldCoverage(lists);
+    schemas.push({ schemaId, role, mappings, fields, totals: summarizeFieldCoverage(fields) });
   }
 
   return {
@@ -327,16 +363,23 @@ export function aggregateCoverage(inputs: MappingCoverageInput[]): AggregateCove
 }
 
 /**
- * Merge one mapping's field entries into the accumulated aggregate list.
+ * Merge one input's field entries into the accumulated list, copying rather
+ * than aliasing so the caller's entries are never mutated.
  *
  * `mapped` is OR-ed — that is the union rule. A field the accumulator has not
- * seen is appended, which only happens if two mappings resolved the same schema
+ * seen is appended, which only happens when two inputs resolved the same schema
  * id to different definitions; keeping it is safer than dropping a declared
  * field from the report.
  *
- * Containers are OR-ed here too, but that answer is provisional: their real
- * aggregate state can only be read off the unioned *leaves*, which is why
- * {@link recomputeContainerStates} runs once afterwards.
+ * `state` is re-derived from the OR-ed `mapped` rather than merged, because a
+ * merged state would be the *first* input's answer to a question the union has
+ * since changed: a leaf mapping A ignores and mapping B writes is covered, and
+ * leaving `state: "uncovered"` on it beside `mapped: true` contradicts the
+ * documented invariant that the two always agree. The binary form applied here
+ * is right for a leaf and provisional for a container, whose real unioned state
+ * can only be read off the unioned *leaves* — which is why
+ * {@link recomputeContainerStates} runs once afterwards, overwriting it. Both
+ * happen inside {@link unionFieldCoverage}, the only caller.
  */
 function unionInto(accumulated: FieldCoverageEntry[], incoming: FieldCoverageEntry[]): void {
   const byPath = new Map(accumulated.map((f) => [f.path, f]));
@@ -349,6 +392,7 @@ function unionInto(accumulated: FieldCoverageEntry[], incoming: FieldCoverageEnt
       continue;
     }
     existing.mapped = existing.mapped || field.mapped;
+    existing.state = existing.mapped ? "covered" : "uncovered";
     // Tier unions toward the stronger claim: a field one mapping declares and
     // another only mentions in prose is declared-covered in the aggregate
     // (ADR-036). Without this the aggregate could report a declared field as
@@ -362,14 +406,14 @@ function unionInto(accumulated: FieldCoverageEntry[], incoming: FieldCoverageEnt
 /**
  * Recompute every container's tri-state from the unioned leaves beneath it.
  *
- * A container's state cannot be unioned the way a leaf's can. Two mappings that
- * each cover half of `address` both report it `partial`; the aggregate must
+ * A container's state cannot be unioned the way a leaf's can. Two inputs that
+ * each cover half of `address` both report it `partial`; the union must
  * report `covered`, because between them every leaf is written. Taking the
- * strongest per-mapping state would say `partial`, understating the aggregate;
+ * strongest per-input state would say `partial`, understating the union;
  * OR-ing `mapped` alone would lose the distinction entirely. So the union
  * happens on leaves, where it is well defined, and containers are derived from
  * the result — the same rule `coverageForField` applies per mapping, restated
- * over a flat list because that is the shape the aggregate holds.
+ * over a flat list because that is the shape the union holds.
  *
  * Mutates `fields` in place. Leaf entries are left exactly as unioned.
  */

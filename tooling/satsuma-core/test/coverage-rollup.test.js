@@ -23,6 +23,7 @@ import {
   extractSchemas,
   extractMappings,
   aggregateCoverage,
+  unionFieldCoverage,
   summarizeFieldCoverage,
   countContainerStates,
   coveragePercentage,
@@ -467,5 +468,109 @@ describe("aggregateCoverage() — degenerate inputs", () => {
     // find or resolve; that must not create a phantom zero-coverage entry.
     const result = aggregateCoverage([{ mappingId: "ghost", result: { schemas: [] } }]);
     assert.deepEqual(result.schemas, []);
+  });
+});
+
+// ── The union operation on its own ──────────────────────────────────────────
+
+describe("unionFieldCoverage()", () => {
+  // aggregateCoverage unions by (schema, role); the viz overview card unions a
+  // schema's roles together; `fields --unmapped-by` unions the two sides of one
+  // mapping. Same three rules each time, so they are pinned here once against
+  // the exported operation rather than three times through its callers.
+
+  /** One schema's entries: a leaf plus a two-leaf record. */
+  const half = (city, line1, amount, tier = "declared") => [
+    {
+      path: "amount",
+      uri: "u",
+      mapped: amount,
+      state: amount ? "covered" : "uncovered",
+      ...(amount ? { tier } : {}),
+    },
+    {
+      path: "address",
+      uri: "u",
+      mapped: city || line1,
+      state: city && line1 ? "covered" : city || line1 ? "partial" : "uncovered",
+      ...(city || line1 ? { tier } : {}),
+    },
+    {
+      path: "address.city",
+      uri: "u",
+      mapped: city,
+      state: city ? "covered" : "uncovered",
+      ...(city ? { tier } : {}),
+    },
+    {
+      path: "address.line1",
+      uri: "u",
+      mapped: line1,
+      state: line1 ? "covered" : "uncovered",
+      ...(line1 ? { tier } : {}),
+    },
+  ];
+
+  it("promotes a record to covered when two inputs each cover half of it", () => {
+    // The rule a plain OR of container states cannot express: both inputs call
+    // `address` partial, but between them every leaf is written, so the union
+    // is covered. Getting this wrong understates the union.
+    const union = unionFieldCoverage([half(true, false, false), half(false, true, false)]);
+    const byPath = new Map(union.map((f) => [f.path, f]));
+    assert.equal(byPath.get("address").state, "covered");
+    assert.equal(byPath.get("address.city").state, "covered");
+    assert.equal(byPath.get("address.line1").state, "covered");
+  });
+
+  it("leaves a record partial when no input covers one of its leaves", () => {
+    // The mirror case: union must not round a genuine gap up to covered.
+    const union = unionFieldCoverage([half(true, false, false), half(true, false, true)]);
+    const byPath = new Map(union.map((f) => [f.path, f]));
+    assert.equal(byPath.get("address").state, "partial");
+    assert.equal(byPath.get("address.line1").state, "uncovered");
+    assert.equal(byPath.get("address.line1").tier, undefined);
+  });
+
+  it("reports a leaf covered by prose in one input and by an arrow in another as declared", () => {
+    // Tier unions toward the stronger claim (ADR-036). Without it, whether a
+    // declared field reads as merely inferred would depend on input order.
+    const union = unionFieldCoverage([half(true, false, false, "nl"), half(true, false, false)]);
+    const byPath = new Map(union.map((f) => [f.path, f]));
+    assert.equal(byPath.get("address.city").tier, "declared");
+    assert.equal(byPath.get("address").tier, "declared");
+  });
+
+  it("re-derives a leaf's state from the unioned flag, not from the first input", () => {
+    // `mapped` and `state` are documented to always agree. Merging `mapped` but
+    // keeping the first input's `state` left `mapped: true, state: "uncovered"`
+    // on any leaf the first input missed — invisible while only the counts were
+    // read, wrong the moment a consumer renders the tri-state.
+    const union = unionFieldCoverage([half(false, false, false), half(false, false, true)]);
+    const amount = union.find((f) => f.path === "amount");
+    assert.equal(amount.mapped, true);
+    assert.equal(amount.state, "covered");
+  });
+
+  it("keeps the NL tier when no input declares the field", () => {
+    // The tier must survive the union, not be flattened to `declared` — a
+    // reviewer has to see that nothing but prose names this field.
+    const union = unionFieldCoverage([half(true, false, false, "nl"), half(false, false, false)]);
+    assert.equal(union.find((f) => f.path === "address.city").tier, "nl");
+  });
+
+  it("does not mutate the inputs", () => {
+    // Callers hold the per-mapping results and render them separately; a union
+    // that wrote through would silently turn every per-mapping figure into the
+    // aggregate one.
+    const first = half(true, false, false);
+    const second = half(false, true, false);
+    unionFieldCoverage([first, second]);
+    assert.equal(first.find((f) => f.path === "address.line1").mapped, false);
+    assert.equal(second.find((f) => f.path === "address").state, "partial");
+  });
+
+  it("returns an empty list for no inputs", () => {
+    // A schema no mapping references unions to nothing, not to a phantom entry.
+    assert.deepEqual(unionFieldCoverage([]), []);
   });
 });
