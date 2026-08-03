@@ -25,6 +25,21 @@ const serverConfig = {
   format: "cjs",
   sourcemap: true,
   nodePaths: [path.resolve(__dirname, "../satsuma-lsp/node_modules")],
+  // The server is bundled from @satsuma/viz-backend's TypeScript *sources*, not
+  // its dist, so the extension builds without that package having been compiled
+  // first. esbuild's `alias` takes no wildcard, so every subpath the LSP imports
+  // needs its own entry here.
+  //
+  // **This list must mirror the `exports` map in satsuma-viz-backend's
+  // package.json.** A subpath that is missing falls back to the bare-package
+  // alias and has its remainder appended to it, so the error names a path that
+  // was never written anywhere:
+  //
+  //     Cannot read directory "../satsuma-viz-backend/src/index.ts": not a directory
+  //     Could not resolve ".../src/index.ts/coverage" (originally "@satsuma/viz-backend/coverage")
+  //
+  // Nothing but `npm run build` in this package catches it — the unit, fixture
+  // and golden suites never invoke esbuild.
   alias: {
     "@satsuma/viz-backend": path.resolve(__dirname, "../satsuma-viz-backend/src/index.ts"),
     "@satsuma/viz-backend/workspace-index": path.resolve(
@@ -34,6 +49,10 @@ const serverConfig = {
     "@satsuma/viz-backend/viz-model": path.resolve(
       __dirname,
       "../satsuma-viz-backend/src/viz-model.ts",
+    ),
+    "@satsuma/viz-backend/coverage": path.resolve(
+      __dirname,
+      "../satsuma-viz-backend/src/coverage.ts",
     ),
   },
   // web-tree-sitter uses import.meta.url internally (for createRequire and
