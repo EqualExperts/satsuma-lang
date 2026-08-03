@@ -15,8 +15,8 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 
 // ── Test setup: load real parser for CST-level tests ────────────────────────
 
-let findBlockNode: (root: any, nodeType: string, name: string) => any;
-let parseFile: (filePath: string) => any;
+let findBlockNode: typeof import("#src/cst-query.js").findBlockNode;
+let parseFile: typeof import("#src/parser.js").parseFile;
 
 before(async () => {
   const parser = await import("#src/parser.js");

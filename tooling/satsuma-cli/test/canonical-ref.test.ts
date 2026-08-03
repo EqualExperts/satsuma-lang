@@ -201,8 +201,26 @@ describe("distinctArrowRecords", () => {
     filePath: "test.stm",
     errorCount: 0,
     schemas: [
-      { name: "s", namespace: null, fields: [], row: 0 },
-      { name: "t", namespace: null, fields: [], row: 1 },
+      {
+        name: "s",
+        namespace: null,
+        note: null,
+        fields: [],
+        hasSpreads: false,
+        spreads: [],
+        row: 0,
+        startColumn: 0,
+      },
+      {
+        name: "t",
+        namespace: null,
+        note: null,
+        fields: [],
+        hasSpreads: false,
+        spreads: [],
+        row: 1,
+        startColumn: 0,
+      },
     ],
     metrics: [],
     mappings: [
@@ -213,6 +231,7 @@ describe("distinctArrowRecords", () => {
         targets: ["t"],
         arrowCount: arrowRecords.length,
         row: 2,
+        startColumn: 0,
       },
     ],
     fragments: [],
@@ -221,6 +240,9 @@ describe("distinctArrowRecords", () => {
     questions: [],
     arrowRecords,
     namespaces: [],
+    imports: [],
+    nlRefData: [],
+    notes: [],
   });
 
   it("yields each record exactly once despite multi-key registration", () => {

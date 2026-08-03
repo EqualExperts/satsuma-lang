@@ -14,7 +14,7 @@ import { loadWorkspace } from "../load-workspace.js";
 import { runCommand, CommandError, EXIT_NOT_FOUND } from "../command-runner.js";
 import { resolveIndexKey } from "../index-builder.js";
 import { extractMetadata } from "@satsuma/core";
-import type { MetaEntry } from "@satsuma/core";
+import type { MetaEntry, SatsumaGrammarSymbol } from "@satsuma/core";
 import { findBlockNode } from "../cst-query.js";
 import type { SyntaxNode, ExtractedWorkspace, ParsedFile, FieldDecl } from "../types.js";
 import { expandEntityFields } from "../spread-expand.js";
@@ -100,7 +100,7 @@ function extractBlockMeta(
   index: ExtractedWorkspace,
 ): MetaResult {
   // Determine block type, resolving namespace-qualified keys
-  const blockTypes: string[] = [];
+  const blockTypes: SatsumaGrammarSymbol[] = [];
   let resolvedName = blockName;
   const schemaResolved = resolveIndexKey(blockName, index.schemas);
   const mappingResolved = resolveIndexKey(blockName, index.mappings);
@@ -192,8 +192,8 @@ function extractFieldMeta(
     entry: { fields: FieldDecl[]; file: string; namespace?: string };
   };
   let resolved: ResolvedEntity | null = resolveIndexKey(entityName, index.schemas);
-  let blockType = "schema_block";
-  let bodyType = "schema_body";
+  let blockType: SatsumaGrammarSymbol = "schema_block";
+  let bodyType: SatsumaGrammarSymbol = "schema_body";
   if (!resolved) {
     resolved = resolveIndexKey(entityName, index.fragments);
     blockType = "fragment_block";
