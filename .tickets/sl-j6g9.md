@@ -11,7 +11,7 @@ tags: [feature-38, coverage, core]
 ---
 # Feature 38 epic: hierarchical field coverage
 
-Implement features/38-hierarchical-coverage/PRD.md. Make field coverage correct and single-definition for nested records, lists of records, and schemas that reuse field names across depths, so a coverage percentage can be trusted as a merge gate.
+Implement archive/features/38-hierarchical-coverage/PRD.md. Make field coverage correct and single-definition for nested records, lists of records, and schemas that reuse field names across depths, so a coverage percentage can be trusted as a merge gate.
 
 Six defects verified against branch feat/35-coverage-command (HEAD fc3d5a5), not main — feature 35 is substantially implemented there:
 1. Bare-segment registration makes coverage name-based, reporting unmapped fields as mapped (raised separately as sl-joeq, this epic depends on it).
