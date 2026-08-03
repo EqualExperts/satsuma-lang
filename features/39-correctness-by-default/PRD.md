@@ -144,6 +144,14 @@ This feature deliberately does not duplicate work already in place:
 - **`FieldDecl`** (`types.ts:98`) is a bag of eight optional fields in which
   `type: "record"` implies `children`, `isList` implies an element type, and
   `hasSpreads` implies `spreads` — none of it expressible to the compiler.
+- **A configured check that nothing runs.** `satsuma-cli` defines
+  `test:typecheck` (`tsc --project tsconfig.test.json`), and it is wired into
+  neither `.github/workflows/` nor `scripts/run-repo-checks.sh`. It currently
+  fails: `test/canonical-ref.test.ts` builds `FileData` literals missing
+  `imports`, `nlRefData` and `notes`. Test files are excluded from the linted
+  and typechecked surface by design (`eslint.config.mjs` notes the
+  `import.meta.dirname` module-target conflict), so ~31k lines of test code
+  sit outside both.
 
 ## Problems
 
@@ -268,6 +276,11 @@ on R1.
   one-time cleanup; land it per package.
 - Add `noUncheckedIndexedAccess` to `satsuma-viz/tsconfig.json`, the only
   package missing it.
+- Fix the `FileData` literals in `satsuma-cli/test/canonical-ref.test.ts` and
+  wire `test:typecheck` into `scripts/run-repo-checks.sh` so the check the
+  package already defines actually gates commits. Then decide the general
+  question it exposes — whether the test surface stays outside type-aware
+  checking (Open Question 7).
 - Convert `FieldDecl` to a discriminated union on the leaf/record/list axis,
   modelled on `MetaEntry` in the same file, and add an `assertNever` helper to
   core. `FieldDecl` is on core's public surface, so this is a breaking change to
@@ -392,6 +405,13 @@ Cases 1–12 must **fail** against `4d17c505`.
 6. **Should the R3 reference model be exported?** Test-only keeps it honest.
    Exporting it from core would let the LSP and viz test suites use it as an
    oracle too, at the risk of it drifting into a second walker.
+7. **Does type-aware checking extend to the test surface?** Roughly 31k lines of
+   test code are outside it today, and `eslint.config.mjs` records a concrete
+   blocker: tests use `import.meta.dirname`, which needs a higher module target
+   than the `node16` the packages compile against. Proposed: fix the one broken
+   typecheck and gate it in CI (R6), and treat raising the test-file module
+   target as separate work rather than smuggling a toolchain bump into this
+   feature.
 
 ## Ticket Map
 
