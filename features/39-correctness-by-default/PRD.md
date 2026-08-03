@@ -1,7 +1,8 @@
 # Feature 39 — Correctness by Default
 
-> **Status: PROPOSED** (revised 2026-08-03) — raised after reviewing the
-> mechanism behind recent defect clusters. The recurring problem is broader
+> **Status: IN PROGRESS** (started 2026-08-03 with R1, `gcsc-ejb2`) — raised
+> after reviewing the mechanism behind recent defect clusters. The recurring
+> problem is broader
 > than either “bad specification” or “bad implementation”: important rules have
 > lived in prose, string conventions, or examples, so the build could confirm
 > that code matched its tests without confirming that the rule was complete,
@@ -168,7 +169,7 @@ the type system.
 
 ## Delivery Requirements
 
-### R1 — Generate the CST symbol contract (fixes P1)
+### R1 — Generate the CST symbol contract (fixes P1; `gcsc-ejb2`)
 
 - A deterministic generator reads
   `tooling/tree-sitter-satsuma/src/node-types.json` and emits:
@@ -430,12 +431,13 @@ ADR-041. Prose is sufficient; mechanised proof is out of scope.
 
 ## Ticket Map
 
-No implementation tickets have been raised yet. Proposed shape:
+Feature epic: `gcsc-qka8`. R1 is the first implementation stage; later rows
+remain the agreed ticket shape and will receive concrete IDs when scheduled.
 
 | Work | Ticket shape | Depends on |
 |---|---|---|
-| Feature 39 epic | 1 epic | — |
-| R1 generated CST artifact and stale check | 1 task | — |
+| Feature 39 epic (`gcsc-qka8`) | 1 epic | — |
+| R1 generated CST artifact and stale check (`gcsc-ejb2`) | 1 task | — |
 | R2 typed core node/helpers and parser adapters | 1 task | R1 |
 | R2 consumer CST-use migration | 1 task per consumer package or tightly coupled group | typed core task |
 | R3 semantic generators and coverage properties | 1 task | — |

@@ -6,6 +6,8 @@ __pycache__/
 **/node_modules
 **/dist
 **/generated
+!tooling/satsuma-core/src/generated/
+!tooling/satsuma-core/src/generated/cst-types.ts
 **/coverage
 
 # TypeScript build artifacts that may leak into src/ directories

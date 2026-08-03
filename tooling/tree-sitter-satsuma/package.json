@@ -6,9 +6,12 @@
   "license": "MIT",
   "scripts": {
     "install": "echo 'Skipping native build — WASM only'",
-    "generate": "tree-sitter generate",
-    "build": "tree-sitter generate && tree-sitter build --wasm . -o tree-sitter-satsuma.wasm",
-    "test": "tree-sitter generate && tree-sitter test --wasm",
+    "generate": "tree-sitter generate && node scripts/generate-cst-symbols.mjs",
+    "generate:cst-symbols": "node scripts/generate-cst-symbols.mjs",
+    "check:cst-symbols": "node scripts/generate-cst-symbols.mjs --check",
+    "build": "npm run generate && tree-sitter build --wasm . -o tree-sitter-satsuma.wasm",
+    "test": "npm run generate && npm run test:generator && tree-sitter test --wasm",
+    "test:generator": "node --test scripts/generate-cst-symbols.test.mjs",
     "smoke": "node scripts/smoke-check.js"
   },
   "devDependencies": {

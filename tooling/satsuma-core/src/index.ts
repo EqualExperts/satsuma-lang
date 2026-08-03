@@ -1,4 +1,17 @@
 export { capitalize, normalizeName } from "./string-utils.js";
+export {
+  SATSUMA_NAMED_KINDS,
+  SATSUMA_ANONYMOUS_TOKENS,
+  SATSUMA_GRAMMAR_SYMBOLS,
+  SATSUMA_RECOVERY_TYPE,
+  SATSUMA_CST_TYPES,
+} from "./generated/cst-types.js";
+export type {
+  SatsumaNamedKind,
+  SatsumaAnonymousToken,
+  SatsumaGrammarSymbol,
+  SatsumaCstType,
+} from "./generated/cst-types.js";
 export { SATSUMA_FILE_EXTENSIONS, SATSUMA_FILE_GLOB, isSatsumaFilePath } from "./source-files.js";
 export { findFieldByPath, collectFieldNames } from "./field-utils.js";
 export type { FieldTreeNode } from "./field-utils.js";

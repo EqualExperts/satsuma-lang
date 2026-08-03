@@ -1,6 +1,6 @@
 # Satsuma Tooling Architecture
 
-> Last updated: 2026-04-07 — canonicalised this document as the single tooling architecture reference.
+> Last updated: 2026-08-03 — documented the generated CST symbol contract boundary (ADR-043).
 
 This document is the canonical architecture reference for the Satsuma language tooling — the packages under `tooling/` that parse, analyse, format, validate, visualize, and provide IDE support for `.stm` files. The design is influenced by [rust-analyzer's architecture](https://rust-analyzer.github.io/book/contributing/architecture.html), adapted for a tree-sitter-backed DSL rather than a full programming language compiler.
 
@@ -14,8 +14,8 @@ The `tooling/` directory contains nine npm packages:
 
 | Package | Role |
 |---------|------|
-| `tree-sitter-satsuma` | Grammar definition and compiled parser artifacts (WASM) |
-| `satsuma-core` | Shared extraction, formatting, validation, and analysis library — the foundation |
+| `tree-sitter-satsuma` | Grammar definition, compiled parser artifacts (WASM), and CST symbol contract generation |
+| `satsuma-core` | Shared extraction, formatting, validation, analysis, and generated CST symbol types — the foundation |
 | `satsuma-viz-model` | Shared VizModel protocol contract — types for the server→viz JSON payload |
 | `satsuma-viz-backend` | Shared VizModel assembly — `buildVizModel`, `mergeVizModels`, workspace index; used by LSP server and viz harness |
 | `satsuma-cli` | CLI command suite; consumer of satsuma-core |
@@ -55,6 +55,8 @@ graph TD
 ```
 
 `satsuma-core` and `satsuma-viz-model` have no upward dependencies on consumer packages such as the CLI, LSP, VS Code extension, or viz harness. `satsuma-viz-backend` is the shared boundary between the LSP server and the viz harness — it owns all VizModel assembly logic so neither consumer duplicates it.
+
+The dependency arrows above describe runtime and compile-time package dependencies. At generation time, `tree-sitter-satsuma` also derives the tracked `satsuma-core/src/generated/cst-types.ts` contract from tree-sitter's `node-types.json`. The grammar package owns generation and freshness checks; core owns the public artifact consumed through `@satsuma/core`. See ADR-043.
 
 ---
 
@@ -130,6 +132,7 @@ flowchart TD
 graph LR
   IDX["index.ts\n(re-exports all)"]
   TYPES["types.ts\nSyntaxNode · Tree · FieldDecl\nExtracted* · NLRefData · AtRef\nMappingContext · Resolution · …"]
+  GENCST["generated/cst-types.ts\nSatsumaNamedKind · SatsumaAnonymousToken\nSatsumaGrammarSymbol · SatsumaCstType"]
   CST["cst-utils.ts\nchild · children\nallDescendants\nlabelText · stringText"]
   CLS["classify.ts\nclassifyTransform\nclassifyArrow"]
   CAN["canonical-ref.ts\ncanonicalRef()\nresolveScopedEntityRef()"]
@@ -144,7 +147,7 @@ graph LR
   COV["coverage.ts · coverage-paths.ts\nFieldCoverageEntry\nSchemaCoverageResult\nbuildCoveredFieldPaths()\nschemaLocalFieldPath()"]
   VAL["validate.ts\nSemanticIndex · SemanticDiagnostic\ncollectSemanticDiagnostics()"]
 
-  IDX --> TYPES & CST & CLS & CAN & META & EXT & SPR & NL & FMT & STR & PAR & PE & COV & VAL
+  IDX --> TYPES & GENCST & CST & CLS & CAN & META & EXT & SPR & NL & FMT & STR & PAR & PE & COV & VAL
   EXT --> CST & CLS & CAN & META & TYPES
   SPR --> EXT & TYPES
   NL --> SPR & TYPES
@@ -157,6 +160,7 @@ graph LR
 |---|---|---|
 | `SyntaxNode` | `types.ts` | Abstract CST node interface (structurally matches web-tree-sitter `Node`) |
 | `Tree` | `types.ts` | Parsed tree with `rootNode: SyntaxNode` |
+| `SatsumaCstType` | `generated/cst-types.ts` | Generated union of named CST kinds, anonymous grammar tokens, and tree-sitter's synthetic `ERROR` recovery type |
 | `FieldDecl` | `types.ts` | Recursive field: `{ name, type, isList?, children?, spreads?, metadata? }` |
 | `ExtractedSchema` | `types.ts` | Schema block: name, namespace, fields, spreads, metadata |
 | `ExtractedMapping` | `types.ts` | Mapping block: sourceRefs, targetRef, arrows |
@@ -347,7 +351,7 @@ No CLI or LSP code needs to be imported.
 
 | Package | Test location | Approach |
 |---|---|---|
-| `tree-sitter-satsuma` | `test/corpus/` | tree-sitter corpus tests (parse → CST shape assertions) |
+| `tree-sitter-satsuma` | `test/corpus/`, `scripts/*.test.mjs` | Corpus tests for CST shapes plus deterministic contract-generation and stale-output tests |
 | `satsuma-core` | `test/*.test.js` | Unit tests against pure functions; no I/O, no WASM required |
 | `satsuma-cli` | `test/*.test.ts` | Integration tests via CLI commands and focused command helpers |
 | `satsuma-lsp` | `test/*.test.js` | Unit tests for LSP handlers, diagnostics, custom requests, and extraction adapters |
