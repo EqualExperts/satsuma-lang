@@ -8,7 +8,7 @@ Feature specs live in `features/` while active and move to `archive/features/` o
 
 ## Active Feature Specs
 
-The three specs currently in `features/`. Everything numbered 01–35 has shipped and is archived (see [Shipped Features](#shipped-features)).
+The four specs currently in `features/`. Everything numbered 01–35 has shipped and is archived (see [Shipped Features](#shipped-features)).
 
 ### Feature 38 — Hierarchical Field Coverage (in flight)
 
@@ -43,6 +43,18 @@ Two warning-severity lint rules — `type-mismatch-direct-arrow` (bare arrows be
 **Recorded decision this rule must honour:** self-mappings (same source and target schema) are legitimate — they represent increments — and do not count as cycles. See the note at the foot of this page.
 
 **Source:** `features/37-lint-structural-rules/PRD.md`
+
+### Feature 39 — Correctness by Default (proposed, no tickets yet)
+
+Moves the invariants this toolchain documents in prose into the build: node-kind types generated from `node-types.json` so a grammar rename cannot silently change behaviour, branded path and ref types so `sl-joeq`'s name-for-path confusion is unrepresentable, generated-input properties for the ADR-034–041 coverage rules, a naive reference model to differentially test against, and type-aware linting across the four packages that currently have none.
+
+**Why it matters:** the recent defect clusters were *specification* defects — `sl-joeq`, `sl-qead` (which forced ADR-041 to amend ADR-035), ADR-038 constraining ADR-037 — where the code correctly implemented a rule that was wrong or absent, and a green suite said so. Feature 38 is deciding what those rules should be; this feature makes them machine-checked so they cannot quietly stop holding.
+
+**Ready now:** R1 (generated node-kind types) is small, mechanical, blocks two other requirements, and touches nothing Feature 38 is changing. R5 and the R6 lint rollout follow.
+
+**Sequenced behind Feature 38:** R2, R3 and R4 touch `coverage.ts` and `coverage-paths.ts`, which `sl-0pun` and `sl-r6b0` are still changing; the two spikes (R7 rule-consistency model, R8 denotational spec section) wait for epic `sl-j6g9` to close.
+
+**Source:** `features/39-correctness-by-default/PRD.md`
 
 ---
 
