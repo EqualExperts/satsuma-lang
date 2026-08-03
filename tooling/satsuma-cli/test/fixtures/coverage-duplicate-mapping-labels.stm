@@ -1,0 +1,38 @@
+// Fixture for the sl-46wr review: a mapping label is not an identity.
+//
+// The same label in two namespaces is valid, and `viz-model.test.js` pins that
+// the model keeps them apart (sl-aeae). Coverage did not: it looked the mapping
+// up by label alone, so both `a::load` and `b::load` resolved to whichever block
+// was declared first. Every consumer was affected — `satsuma coverage` reported
+// `b::load` as 1/2 using `a::load`'s single arrow, and the viz reported the same
+// wrong figure or none at all depending on whether the namespaces happened to
+// share schema names.
+//
+// The schemas are deliberately named identically in both namespaces, which is
+// the case that produces a *plausible* wrong answer rather than an empty one:
+// `b`'s resolver finds `b::s`, so the figure looks reasonable and is simply not
+// `b::load`'s.
+//
+// Correct: a::load covers 1 of 2 on each side; b::load covers 2 of 2.
+namespace a {
+  schema s { x STRING y STRING }
+  schema t { x STRING y STRING }
+
+  mapping load {
+    source { s }
+    target { t }
+    x -> x
+  }
+}
+
+namespace b {
+  schema s { x STRING y STRING }
+  schema t { x STRING y STRING }
+
+  mapping load {
+    source { s }
+    target { t }
+    x -> x
+    y -> y
+  }
+}

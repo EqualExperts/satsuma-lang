@@ -93,8 +93,13 @@ function renderText(card) {
   return serialize(card.render());
 }
 
-/** A card bound to `fields`, reporting `coverage`. */
-async function makeCard(fields, coverage = [], { compact = false } = {}) {
+/**
+ * A card bound to `fields`, reporting `coverage`.
+ *
+ * `null` — "not computed" — is the default, so a case that forgets to supply
+ * verdicts cannot accidentally assert against zeroes.
+ */
+async function makeCard(fields, coverage = null, { compact = false } = {}) {
   const mod = await import("../dist/satsuma-viz.js");
   const card = new mod.SzSchemaCard();
   card.schema = schemaCard(fields);
@@ -238,13 +243,45 @@ describe("sz-schema-card renders the verdict it was given", () => {
     assert.match(text, /partly mapped/);
   });
 
-  it("renders every row unmarked when given no coverage at all", async () => {
-    // A model assembled without a workspace index carries no coverage. That is
-    // "not computed", not "nothing is mapped", so the card must not claim a
-    // verdict it was never given — and must not crash looking one up.
-    const card = await makeCard(AMOUNT_AND_ADDRESS, []);
+  it("shows a field count instead of a ratio when coverage was not computed", async () => {
+    // `null` is "not computed", not "nothing is mapped" — a model assembled
+    // without a workspace index, or a cached payload from an older host. The
+    // header must not print `0/4`, which asserts a completeness figure nobody
+    // measured and is indistinguishable from a genuinely unmapped schema. The
+    // count itself still comes from core, in leaves (ADR-034), so it agrees with
+    // the denominator a ratio would have used.
+    const card = await makeCard(AMOUNT_AND_ADDRESS, null);
+    const text = renderText(card);
+    assert.match(text, /header-count[^>]*>4 fields</);
+    assert.doesNotMatch(text, /header-count[^>]*>0\/4</);
+    assert.match(text, /data-coverage-available="?false/);
+    assert.match(text, /Coverage not computed/);
+  });
+
+  it("renders every row unmarked when coverage was not computed", async () => {
+    // The rows must claim no verdict either, and looking one up must not crash.
+    const card = await makeCard(AMOUNT_AND_ADDRESS, null);
     const text = renderText(card);
     assert.match(text, /data-coverage="?unmapped/);
     assert.doesNotMatch(text, /data-coverage-tier="?(nl|declared)/);
+  });
+
+  it("still shows 0/N when coverage says nothing is covered", async () => {
+    // The distinction the case above exists for: a schema no mapping references
+    // has a real answer, and the card must give the number rather than fall back
+    // to the count.
+    const card = await makeCard(
+      AMOUNT_AND_ADDRESS,
+      entries(
+        ["amount", "uncovered"],
+        ["address", "uncovered"],
+        ["address.city", "uncovered"],
+        ["address.line1", "uncovered"],
+        ["address.postcode", "uncovered"],
+      ),
+    );
+    const text = renderText(card);
+    assert.match(text, /header-count[^>]*>0\/4</);
+    assert.match(text, /data-coverage-available="?true/);
   });
 });

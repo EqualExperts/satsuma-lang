@@ -33,6 +33,8 @@ export type {
   CoverageField,
   CoverageSchemaDefinition,
   CoverageSchemaResolver,
+  MappingSelector,
+  MappingTarget,
 } from "./coverage.js";
 export {
   buildCoveredFieldPaths,

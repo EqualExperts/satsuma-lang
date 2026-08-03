@@ -249,31 +249,41 @@ export function countMappingArrows(mapping: MappingBlock): number {
 // ── Reading core's coverage out of the model ────────────────────────────────
 
 /**
- * The coverage entries for one schema card in one mapping and role, as core
- * computed them.
+ * Coverage for a schema card, or `null` when it could not be computed.
  *
- * Falls back to "every field uncovered" when the mapping carries no coverage —
- * a model assembled without a workspace index, or a payload cached by a host
- * predating `MappingBlock.coverage`. The fallback is core's
- * {@link uncoveredFieldCoverage} rather than an empty list because the card
- * still needs a denominator, and a card that counts its own fields is how the
- * ratio started including containers (sl-hcan).
+ * **`null` is not `0/N`.** A model assembled without a workspace index, and a
+ * payload cached by a host predating `MappingBlock.coverage`, both carry no
+ * coverage at all — and rendering that as "nothing is mapped" states a fact
+ * nobody established. `MappingBlock.coverage`'s contract and ADR-042 both say
+ * absent means "not computed", so the unavailable case has to survive all the
+ * way to the renderer rather than being flattened into an all-uncovered list
+ * here. A schema that no mapping references is the genuine `0/N`, and stays
+ * distinguishable from this.
+ */
+export type SchemaCoverage = FieldCoverageEntry[] | null;
+
+/**
+ * The coverage entries for one schema card in one mapping and role, as core
+ * computed them, or `null` when this mapping carries none.
  *
  * `role` matters: a schema may sit on both sides of one mapping, and the detail
  * view renders it as two cards asking two different questions — what this
  * mapping *reads* from it, and what this mapping *writes* into it.
+ *
+ * A mapping whose coverage *is* present but which lists no entry for this schema
+ * also reports `null`: core could not resolve the reference, which is again "no
+ * answer" rather than "no coverage".
  */
 export function mappingSchemaCoverage(
   mapping: MappingBlock,
   schema: SchemaCard,
   role: "source" | "target",
-): FieldCoverageEntry[] {
-  const found = mapping.coverage?.schemas.find(
+): SchemaCoverage {
+  if (!mapping.coverage) return null;
+  const found = mapping.coverage.schemas.find(
     (s) => s.role === role && s.schemaId === schema.qualifiedId,
   );
-  return found
-    ? found.fields
-    : uncoveredFieldCoverage(toCoverageFields(schema.fields), schema.location.uri);
+  return found ? found.fields : null;
 }
 
 /**
@@ -288,40 +298,59 @@ export function mappingSchemaCoverage(
  * not the same as OR-ing the containers, since two mappings that each cover half
  * of a record cover all of it between them.
  *
- * Every declared schema gets an entry, seeded with its own all-uncovered field
- * list, so a schema no mapping references reports `0/N` rather than dropping out
- * of the index and leaving its card with nothing to count.
+ * Three outcomes, kept apart:
+ *
+ * - **A mapping references the schema but carries no coverage** → `null`. The
+ *   answer is unknown, and the card must not imply one.
+ * - **No mapping references the schema** → its own all-uncovered list. `0/N` is
+ *   the true answer, and it comes from core's {@link uncoveredFieldCoverage} so
+ *   the denominator counts leaves by the same rule as every other (ADR-034).
+ * - **Otherwise** → the union of every referencing mapping's entries, seeded with
+ *   that same all-uncovered list so the card's own field tree fixes the
+ *   denominator and the row order.
  */
-export function buildCoverageIndex(model: VizModel): Map<string, FieldCoverageEntry[]> {
-  const contributions = new Map<string, FieldCoverageEntry[][]>();
+export function buildCoverageIndex(model: VizModel): Map<string, SchemaCoverage> {
+  const mappings = model.namespaces.flatMap((ns) => ns.mappings);
+  const index = new Map<string, SchemaCoverage>();
 
-  // Seed first: the card's own field tree defines the denominator and the row
-  // order, and every mapping's entries merge into it.
   for (const ns of model.namespaces) {
     for (const schema of ns.schemas) {
-      contributions.set(schema.qualifiedId, [
-        uncoveredFieldCoverage(toCoverageFields(schema.fields), schema.location.uri),
-      ]);
-    }
-  }
+      const referencing = mappings.filter((m) => referencesSchema(m, schema.qualifiedId));
 
-  for (const ns of model.namespaces) {
-    for (const mapping of ns.mappings) {
-      for (const covered of mapping.coverage?.schemas ?? []) {
-        contributions.get(covered.schemaId)?.push(covered.fields);
+      // Unknown beats partial: if anything that touches this schema could not be
+      // reported on, the union below would silently omit its contribution and
+      // understate the result.
+      if (referencing.some((m) => !m.coverage)) {
+        index.set(schema.qualifiedId, null);
+        continue;
       }
+
+      const lists = [uncoveredFieldCoverage(toCoverageFields(schema.fields), schema.location.uri)];
+      for (const mapping of referencing) {
+        for (const covered of mapping.coverage?.schemas ?? []) {
+          if (covered.schemaId === schema.qualifiedId) lists.push(covered.fields);
+        }
+      }
+      index.set(schema.qualifiedId, unionFieldCoverage(lists));
     }
   }
 
-  const index = new Map<string, FieldCoverageEntry[]>();
-  for (const [schemaId, lists] of contributions) {
-    index.set(schemaId, unionFieldCoverage(lists));
-  }
   return index;
 }
 
-/** Project the model's field entries onto core's minimal coverage field shape. */
-function toCoverageFields(fields: FieldEntry[]): CoverageField[] {
+/** True when the mapping names this schema on either side. */
+function referencesSchema(mapping: MappingBlock, qualifiedId: string): boolean {
+  return mapping.sourceRefs.includes(qualifiedId) || mapping.targetRef === qualifiedId;
+}
+
+/**
+ * Project the model's field entries onto core's minimal coverage field shape.
+ *
+ * Exported because the schema card needs it for the one figure it may show
+ * without coverage — a leaf count, when coverage was not computed — and that
+ * count must be core's, counted in leaves, not the card's own tally (ADR-034).
+ */
+export function toCoverageFields(fields: FieldEntry[]): CoverageField[] {
   return fields.map((f) => ({
     name: f.name,
     line: f.location.line,

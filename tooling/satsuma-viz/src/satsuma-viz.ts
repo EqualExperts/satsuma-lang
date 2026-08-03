@@ -19,7 +19,7 @@ import { SzOpenMappingEvent } from "./edges/sz-overview-edge-layer.js";
 import tokens from "./tokens.css";
 import { renderMarkdown } from "./markdown.js";
 import { buildCoverageIndex, mappingSchemaCoverage } from "./field-coverage.js";
-import type { FieldCoverageEntry } from "@satsuma/core/coverage";
+import type { SchemaCoverage } from "./field-coverage.js";
 import { metricAsSchemaCard } from "./metric-adapter.js";
 
 export { VizModel } from "./model.js";
@@ -978,7 +978,7 @@ export class SatsumaViz extends LitElement {
    * model, so a schema pulled in by a cross-file expansion is counted too.
    */
   @state()
-  private _coverageBySchema = new Map<string, FieldCoverageEntry[]>();
+  private _coverageBySchema = new Map<string, SchemaCoverage>();
 
   @state()
   private _renderedNamespaceBoxes: Array<{
@@ -1980,7 +1980,7 @@ export class SatsumaViz extends LitElement {
     );
     const targetCoverage = expandedTarget
       ? mappingSchemaCoverage(mapping, expandedTarget, "target")
-      : [];
+      : null;
 
     const namespaceLabel = this._namespaceForMapping(mapping);
 
@@ -2373,7 +2373,7 @@ export class SatsumaViz extends LitElement {
             ...ns.schemas.flatMap((s) => {
               const node = layout.nodes.get(s.qualifiedId);
               if (!node) return [html``];
-              const coverage = this._coverageBySchema.get(s.qualifiedId) ?? [];
+              const coverage = this._coverageBySchema.get(s.qualifiedId) ?? null;
               const isExpanded = expandedIds.has(s.qualifiedId);
               const results = [
                 html`
@@ -2463,7 +2463,7 @@ export class SatsumaViz extends LitElement {
   private _renderFlexCards(ns: NamespaceGroup) {
     return html`
       ${ns.schemas.map((s) => {
-        const coverage = this._coverageBySchema.get(s.qualifiedId) ?? [];
+        const coverage = this._coverageBySchema.get(s.qualifiedId) ?? null;
         return html`<sz-schema-card
           data-testid=${`fallback-schema-card-${sanitizeTestIdSegment(s.qualifiedId)}`}
           .testIdPrefix=${`fallback-schema-card-${sanitizeTestIdSegment(s.qualifiedId)}`}

@@ -56,6 +56,22 @@ function corpusFiles(dir: string, out: string[] = []): string[] {
   return out;
 }
 
+/** What the viz side reports for one file: figures, plus what it could not report. */
+interface VizFigures {
+  /** Per {@link figureKey}, the figures the card would show. */
+  figures: Map<string, Figures>;
+  /**
+   * Mapping ids whose `MappingBlock.coverage` is absent.
+   *
+   * Reported rather than skipped: absent coverage is a legitimate state for a
+   * mapping the CLI also cannot report on (an anonymous block, which `coverage`
+   * skips by design), and a defect for any mapping it can. The assertion below
+   * draws that line — the sweep is otherwise blind to a whole class of
+   * regression, since a mapping with no coverage produces no keys to compare.
+   */
+  uncomputed: string[];
+}
+
 /** Covered/total/pct, the three figures a reviewer reads off either surface. */
 interface Figures {
   covered: number;
@@ -101,7 +117,7 @@ async function cliFigures(entryPath: string): Promise<Map<string, Figures>> {
  * resolve, scope the model to the entry's own import graph, then read
  * `MappingBlock.coverage` — the payload the card is handed.
  */
-function vizFigures(entryPath: string, corpus: string[]): Map<string, Figures> {
+function vizFigures(entryPath: string, corpus: string[]): VizFigures {
   const parser = getParser();
   const index = createWorkspaceIndex();
   const trees = new Map<string, ReturnType<typeof parser.parse>>();
@@ -114,21 +130,30 @@ function vizFigures(entryPath: string, corpus: string[]): Map<string, Figures> {
 
   const entryUri = `file://${entryPath}`;
   const entryTree = trees.get(entryUri);
-  if (!entryTree) return new Map();
+  if (!entryTree) return { figures: new Map(), uncomputed: [] };
   const scoped = createScopedIndex(index, getImportReachableUris(entryUri, index));
   const model = buildVizModel(entryUri, entryTree, scoped);
 
   const figures = new Map<string, Figures>();
+  const uncomputed: string[] = [];
   for (const ns of model.namespaces) {
     for (const mapping of ns.mappings) {
       const mappingId = ns.name ? `${ns.name}::${mapping.id}` : mapping.id;
-      for (const schema of mapping.coverage?.schemas ?? []) {
+      // Tracked separately, because a mapping with no coverage contributes no
+      // keys and would be *invisible* to a comparison that only walks entries.
+      // That blind spot is why an anonymous mapping silently losing its coverage
+      // survived a corpus-wide sweep.
+      if (!mapping.coverage) {
+        uncomputed.push(mappingId);
+        continue;
+      }
+      for (const schema of mapping.coverage.schemas) {
         const { covered, total, pct } = summarizeFieldCoverage(schema.fields);
         figures.set(figureKey(mappingId, schema.schemaId, schema.role), { covered, total, pct });
       }
     }
   }
-  return figures;
+  return { figures, uncomputed };
 }
 
 describe("viz coverage equals satsuma coverage across the example corpus (sl-46wr, sl-csrs)", () => {
@@ -151,8 +176,20 @@ describe("viz coverage equals satsuma coverage across the example corpus (sl-46w
 
     for (const file of corpus) {
       const cli = await cliFigures(file);
-      const viz = vizFigures(file, corpus);
+      const { figures: viz, uncomputed } = vizFigures(file, corpus);
       const relative = file.slice(EXAMPLES.length + 1);
+
+      // A mapping the CLI reports on must have coverage on the viz side. The
+      // converse is fine: `coverage` skips anonymous mappings by design, so one
+      // the CLI never mentions may legitimately be absent here.
+      const cliMappings = new Set([...cli.keys()].map((k) => k.split("|")[0]));
+      for (const mappingId of uncomputed) {
+        if (cliMappings.has(mappingId)) {
+          disagreements.push(
+            `${relative} ${mappingId}: no coverage attached, but the CLI reports on it`,
+          );
+        }
+      }
 
       for (const [key, vizFigure] of viz) {
         const cliFigure = cli.get(key);
