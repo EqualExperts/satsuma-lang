@@ -1,6 +1,6 @@
 ---
 id: r0-xp2v
-status: open
+status: closed
 deps: []
 links: []
 created: 2026-08-03T10:20:34Z
@@ -15,3 +15,10 @@ Prepare the v0.12.0 release and make future release preparation safe. The curren
 ## Acceptance Criteria
 
 scripts/bump-version.sh updates VERSION plus the CLI, standalone LSP, and VS Code extension package manifests and lockfiles; promoting a version moves the existing Unreleased body beneath a dated v0.12.0 heading while retaining a fresh empty Unreleased section; the release workflow rejects a requested tag that disagrees with VERSION or releasable package versions and rejects placeholder-only notes; automated tests cover LSP synchronization, changelog promotion, and mismatch failures; the repository is bumped to 0.12.0; relevant tests and artifact smoke tests pass.
+
+## Notes
+
+**2026-08-03T10:30:57Z**
+
+Cause: release preparation duplicated its contract between an incomplete shell package list and an inline workflow extractor. The shell omitted the standalone LSP, referenced a removed VS Code server package, and created a placeholder section without promoting Unreleased notes.
+Fix: centralized releasable-package synchronization, atomic changelog promotion, metadata validation, and note extraction in a tested release helper; wired it into the bump script, CI, and release workflow; prepared v0.12.0 across all public artifacts (commit 0da4f263).
