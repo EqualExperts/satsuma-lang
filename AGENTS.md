@@ -116,8 +116,10 @@ results without shell access to the browser process:
    ```
    ./tooling/satsuma-viz-harness/watch-and-test.sh &
    ```
-   The watcher polls for `.run-tests`, runs `npx playwright test` when it appears,
-   writes output to `.playwright-results.txt`, then removes the sentinel.
+   The watcher polls for `.run-tests`, runs `npm test` when it appears, and therefore
+   rebuilds the core, backend, viz, and harness bundles through npm's `pretest` hook
+   before Playwright starts. Build and test output is written to
+   `.playwright-results.txt`, then the sentinel is removed.
 
 2. The agent triggers a run by creating the sentinel:
    ```bash
@@ -154,6 +156,8 @@ Then touch the sentinel, wait for it to disappear (the watcher picks it up withi
 - **Never** try to run `npx playwright test` directly — it will be blocked or
   will produce no usable output in the sandbox.
 - **Never** try to start a browser process directly.
+- The watcher rebuilds everything needed by the harness. Do not rebuild by hand
+  before triggering it; confirm the fresh build output in `.playwright-results.txt`.
 - The watcher kills any stale server on port 3333 before each run, so there is
   no need to manage the server separately.
 - If `.playwright-results.txt` is stale (timestamp older than your sentinel
