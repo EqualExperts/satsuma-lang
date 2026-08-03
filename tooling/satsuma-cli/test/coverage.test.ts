@@ -29,6 +29,10 @@ const NESTED = resolve(__dirname, "fixtures/unmapped-nested.stm");
 // `flatten` inside them. Fully mapped apart from one deliberately unread field,
 // which makes it the reference case for nested container coverage (sl-qzy3).
 const NESTED_ITERATION = resolve(__dirname, "../../../examples/nested-iteration/pipeline.stm");
+const SEABIRD_PLATFORM = resolve(
+  __dirname,
+  "../../../examples/seabird-colony-lineage/platform.stm",
+);
 const NESTED_ARROW = resolve(__dirname, "fixtures/nested-arrow-lookup.stm");
 // Two source schemas declaring the same field names, arrows qualified by schema
 // and written inside a namespace — the pairing that exercises prefix resolution
@@ -100,6 +104,34 @@ function schemaEntry(data: any, mapping: string, role: string, schema: string): 
 // ── Default report ──────────────────────────────────────────────────────────
 
 describe("satsuma coverage — default report", () => {
+  it("reports the expected nested leaf coverage across the seabird platform imports", async () => {
+    // This is the end-to-end contract shared with lineage: deeply nested paths
+    // retain their full identity while mappings cross file and namespace
+    // boundaries. The deliberately unread transect_ref is the only source gap.
+    const { stdout, stderr, code } = await run("coverage", SEABIRD_PLATFORM, "--json");
+    assert.equal(code, 0, stderr);
+    const report = parseJson(stdout);
+    const extracted = schemaEntry(
+      report,
+      "science::extract observations",
+      "source",
+      "survey::colony_survey",
+    );
+    assert.deepEqual([extracted.covered, extracted.total, extracted.pct], [6, 7, 85]);
+    assert.deepEqual(
+      extracted.fields.filter((field: any) => !field.mapped).map((field: any) => field.path),
+      ["transects.transect_ref"],
+    );
+
+    const published = schemaEntry(
+      report,
+      "mart::publish species fact",
+      "target",
+      "mart::species_fact",
+    );
+    assert.deepEqual([published.covered, published.total, published.pct], [3, 3, 100]);
+  });
+
   it("reports every named mapping in the workspace, not just the entry file's first", async () => {
     // The command's reason to exist is a workspace-wide answer; reporting one
     // mapping would leave the caller composing the rest by hand.

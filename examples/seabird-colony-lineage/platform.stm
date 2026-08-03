@@ -1,0 +1,4 @@
+// Platform entry point — imports the schemas whose mappings form the lineage graph.
+import { survey::colony_survey } from "./source.stm"
+import { science::colony_observations } from "./observations.stm"
+import { mart::species_fact } from "./mart.stm"

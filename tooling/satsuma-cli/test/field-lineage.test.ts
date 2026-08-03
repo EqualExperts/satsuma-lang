@@ -15,6 +15,10 @@ import { run as _run } from "./helpers.js";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const CLI = resolve(__dirname, "../dist/index.js");
 const FIXTURES = resolve(__dirname, "fixtures");
+const SEABIRD_PLATFORM = resolve(
+  __dirname,
+  "../../../examples/seabird-colony-lineage/platform.stm",
+);
 
 const run = (...args: string[]) => _run(CLI, ...args);
 
@@ -284,6 +288,50 @@ describe("field-lineage — NL @refs inside containers (sl-hrql, sl-ez36)", () =
       targets,
       ["::mfcs_purchase_order.items.orderedQty"],
       "nl and nl-derived edges for one arrow must name one target field",
+    );
+  });
+});
+
+describe("field-lineage — nested fields across files and namespaces (nfl-8o6u)", () => {
+  it("validates the documented namespaced flatten target without a field warning", async () => {
+    // A top-level flatten may name its target schema. Inside a namespace the
+    // authored bare name and resolved qualified key are the same endpoint, so
+    // the canonical example must validate cleanly before its lineage is trusted.
+    const { stdout, stderr, code } = await run("validate", SEABIRD_PLATFORM, "--json");
+    assert.equal(code, 0, stderr);
+    assert.deepEqual(JSON.parse(stdout).findings, []);
+  });
+
+  it("traces a nested source leaf through two imported namespaced mappings", async () => {
+    // The first mapping preserves a nested path while the second flatten uses
+    // the bare target schema name. Losing `mart::` on that child target breaks
+    // the chain even though coverage correctly counts the same arrow.
+    const { stdout, stderr, code } = await run(
+      "field-lineage",
+      "survey::colony_survey.transects.sightings.species_code",
+      SEABIRD_PLATFORM,
+      "--json",
+      "--downstream",
+    );
+    assert.equal(code, 0, stderr);
+    assert.deepEqual(
+      JSON.parse(stdout).downstream.map((edge: any) => edge.field),
+      ["science::colony_observations.observations.species", "mart::species_fact.species_code"],
+    );
+  });
+
+  it("exports the same namespaced child target from the graph command", async () => {
+    // `graph` has its own edge builder. Locking this consumer separately keeps
+    // exported graph data from reintroducing the phantom global schema that
+    // field-lineage no longer follows.
+    const { stdout, stderr, code } = await run("graph", SEABIRD_PLATFORM, "--json");
+    assert.equal(code, 0, stderr);
+    const speciesEdges = JSON.parse(stdout).edges.filter((edge: any) =>
+      edge.from.endsWith("observations.species"),
+    );
+    assert.deepEqual(
+      speciesEdges.map((edge: any) => edge.to),
+      ["mart::species_fact.species_code"],
     );
   });
 });

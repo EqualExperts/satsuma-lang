@@ -1,0 +1,35 @@
+// Science observations — preserve sightings and their nested bird rings.
+import { survey::colony_survey } from "./source.stm"
+
+namespace science {
+  schema colony_observations (format json) {
+    survey_id  UUID
+
+    observations list_of record {
+      species  STRING
+      birds    INT
+
+      rings list_of record {
+        identifier  STRING
+        condition   STRING
+      }
+    }
+  }
+
+  mapping `extract observations` {
+    source { survey::colony_survey }
+    target { colony_observations }
+
+    survey_id -> survey_id
+
+    flatten transects.sightings -> observations {
+      .species_code -> .species
+      .adults, .chicks -> .birds { "Sum the adult and chick counts" }
+
+      each rings -> .rings {
+        .ring_id -> .identifier
+        .condition -> .condition
+      }
+    }
+  }
+}

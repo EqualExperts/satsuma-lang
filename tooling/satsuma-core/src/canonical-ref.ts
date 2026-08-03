@@ -49,7 +49,8 @@ export function canonicalEntityName(entity: {
  *
  * Handles the field forms emitted by arrow and NL-ref extraction:
  * - `.field` paths inherit the first schema and drop the leading dot.
- * - `schema.field` and `ns::schema.field` paths are already qualified.
+ * - `schema.field` paths inherit a namespace from the matching mapping schema.
+ * - `ns::schema.field` paths are already fully qualified.
  * - Bare fields are attached to the first schema in the mapping side.
  */
 export function qualifyField(field: string, schemas: string[]): string {
@@ -67,7 +68,7 @@ export function qualifyField(field: string, schemas: string[]): string {
     for (const schema of schemas) {
       const nsIdx = schema.indexOf("::");
       const bare = nsIdx !== -1 ? schema.slice(nsIdx + 2) : schema;
-      if (bare === prefix) return field;
+      if (bare === prefix) return `${schema}${field.slice(dotIdx)}`;
     }
   }
 
