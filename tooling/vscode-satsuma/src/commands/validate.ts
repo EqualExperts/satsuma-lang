@@ -2,6 +2,16 @@ import * as vscode from "vscode";
 import { runCli } from "./cli-runner";
 import { resolveEntryFile } from "./entry-file";
 
+/** Shape of a single entry from `satsuma validate --json`. */
+interface ValidateEntry {
+  file: string;
+  line: number;
+  column: number;
+  severity: string;
+  rule: string;
+  message: string;
+}
+
 export function registerValidateCommand(context: vscode.ExtensionContext, cliPath: string): void {
   const diagnostics = vscode.languages.createDiagnosticCollection("satsuma-validate-cmd");
   context.subscriptions.push(diagnostics);
@@ -16,18 +26,14 @@ export function registerValidateCommand(context: vscode.ExtensionContext, cliPat
       const result = await runCli(cliPath, ["validate", entryFilePath, "--json"]);
       diagnostics.clear();
 
-      let entries: Array<{
-        file: string;
-        line: number;
-        column: number;
-        severity: string;
-        rule: string;
-        message: string;
-      }>;
+      let entries: ValidateEntry[];
 
       try {
-        entries = JSON.parse(result.stdout);
-        if (!Array.isArray(entries)) return;
+        // Parse as unknown first: the CLI subprocess output is an external
+        // boundary, so its shape is verified (array-ness) rather than assumed.
+        const parsed: unknown = JSON.parse(result.stdout);
+        if (!Array.isArray(parsed)) return;
+        entries = parsed as ValidateEntry[];
       } catch {
         if (result.stderr) {
           vscode.window.showWarningMessage(`Satsuma validate: ${result.stderr.trim()}`);
@@ -52,8 +58,12 @@ export function registerValidateCommand(context: vscode.ExtensionContext, cliPat
         );
         diag.source = "satsuma-validate";
         diag.code = e.rule;
-        if (!grouped.has(uri)) grouped.set(uri, []);
-        grouped.get(uri)!.push(diag);
+        let diagsForUri = grouped.get(uri);
+        if (!diagsForUri) {
+          diagsForUri = [];
+          grouped.set(uri, diagsForUri);
+        }
+        diagsForUri.push(diag);
       }
 
       for (const [uriStr, diags] of grouped) {

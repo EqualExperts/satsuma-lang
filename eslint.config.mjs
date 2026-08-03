@@ -299,4 +299,39 @@ export default [
       "@typescript-eslint/unbound-method": "off",
     },
   },
+  // vscode-satsuma source files (PRD 39 R7): the last package in the R7
+  // rollout. It has no CST dependency (delegates language intelligence to
+  // satsuma-lsp), so it needs only the base type-aware preset. Its tsconfig
+  // lives at src/tsconfig.json, not the package root.
+  //
+  // The four webview entry-point scripts under src/webview/**/ carry a
+  // pre-existing `@ts-nocheck` (predating this rollout): they run in the
+  // webview's browser context with no VS Code or Node types, calling
+  // acquireVsCodeApi() and DOM APIs the extension host's tsconfig doesn't
+  // model. Giving them real types is a separate, larger piece of work than
+  // this rollout, so they stay excluded here rather than accumulate
+  // dozens of no-unsafe-* suppressions for a typing gap this ticket didn't
+  // create.
+  ...tseslint.configs.recommendedTypeChecked.map((config) => ({
+    ...config,
+    files: ["tooling/vscode-satsuma/src/**/*.ts"],
+    ignores: ["tooling/vscode-satsuma/src/webview/**/*.ts"],
+  })),
+  {
+    files: ["tooling/vscode-satsuma/src/**/*.ts"],
+    ignores: ["tooling/vscode-satsuma/src/webview/**/*.ts"],
+    languageOptions: {
+      parserOptions: {
+        projectService: true,
+        tsconfigRootDir: import.meta.dirname,
+      },
+    },
+    rules: {
+      "@typescript-eslint/no-unused-vars": [
+        "error",
+        { argsIgnorePattern: "^_", varsIgnorePattern: "^_" },
+      ],
+      "@typescript-eslint/no-non-null-assertion": "error",
+    },
+  },
 ];
