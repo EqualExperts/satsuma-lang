@@ -201,3 +201,81 @@ mapping load {
     );
   });
 });
+
+// ── The request path the editor actually takes (review of #430) ──────────────
+//
+// `showCoverage` does not pass core a mapping selector directly: it asks
+// `satsuma/actionContext` what the cursor is inside, then sends that to
+// `satsuma/mappingCoverage`. Fixing the CLI and the viz to name a mapping
+// exactly left this path still resolving by label, so the gutter and the status
+// bar stayed wrong while the other two consumers were right — the parity the
+// whole feature exists for, broken at the surface a user actually looks at.
+//
+// These exercise the two hops together, which is the only way to catch a fix
+// that stops short of the request contract.
+
+describe("the editor's coverage request resolves the mapping the cursor is in", () => {
+  const { computeActionContext } = require("../dist/action-context");
+
+  // Two namespaces declaring the same mapping label *and* the same schema names.
+  // The shared schema names matter: they make the wrong answer look right, since
+  // `b`'s resolver finds `b::s` and reports a plausible figure that belongs to
+  // `a::load`.
+  const SRC = `namespace a {
+  schema s { x STRING y STRING }
+  schema t { x STRING y STRING }
+  mapping load { source { s } target { t } x -> x }
+}
+namespace b {
+  schema s { x STRING y STRING }
+  schema t { x STRING y STRING }
+  mapping load { source { s } target { t } x -> x  y -> y }
+}`;
+
+  const URI = "file:///ns-dup.stm";
+
+  /** Coverage as the command computes it: cursor position → context → request. */
+  function coverageAtCursor(line) {
+    const tree = parse(SRC);
+    const index = createWorkspaceIndex();
+    indexFile(index, URI, tree);
+    const ctx = computeActionContext(tree, line, 30, URI, index);
+    const result = computeMappingCoverage(URI, tree, ctx.mappingName, index, ctx.mappingRow);
+    return {
+      mappingRow: ctx.mappingRow,
+      figures: result.schemas.map((s) => {
+        const leaves = s.fields.filter((f) => !f.path.includes("."));
+        return `${s.role} ${s.schemaId} ${leaves.filter((f) => f.mapped).length}/${leaves.length}`;
+      }),
+    };
+  }
+
+  it("reports the second of two same-labelled namespace mappings, not the first", () => {
+    // `b::load` maps both leaves. Resolving by label gave it `a::load`'s single
+    // arrow — 1/2 — and `satsuma coverage` printed 2/2 for the same mapping.
+    const b = coverageAtCursor(8);
+    assert.equal(b.mappingRow, 8, "the action context must carry the block's row");
+    assert.deepEqual(b.figures, ["source b::s 2/2", "target b::t 2/2"]);
+  });
+
+  it("still reports the first one correctly when the cursor is inside it", () => {
+    // The control: the fix must not simply invert which one wins.
+    const a = coverageAtCursor(3);
+    assert.equal(a.mappingRow, 3);
+    assert.deepEqual(a.figures, ["source a::s 1/2", "target a::t 1/2"]);
+  });
+
+  it("resolves an unqualified reference against the mapping's own namespace", () => {
+    // Both mappings above write `source { s }`, not `source { a::s }` — the normal
+    // way to write a mapping inside a namespace. The adapter passed `null` as the
+    // resolution scope, so nothing resolved and core skipped every schema: the
+    // editor reported no coverage at all for namespaced mappings while the CLI
+    // reported them fine. Non-empty figures above are the assertion; this pins the
+    // canonical id, which is what makes them roll up with the CLI's.
+    const b = coverageAtCursor(8);
+    assert.ok(
+      b.figures.every((f) => f.includes("b::")),
+      `expected namespace-qualified schema ids, got ${JSON.stringify(b.figures)}`,
+    );
+  });
+});

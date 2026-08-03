@@ -113,8 +113,24 @@ export interface CoverageSchemaDefinition {
  * (bare name or `ns::name`) to its definition, or null when it cannot be
  * resolved. Unresolvable schemas are skipped rather than reported: coverage
  * is not a validation pass, and `validate` already flags missing refs.
+ *
+ * `mappingNamespace` is the namespace of the mapping being reported on, or null
+ * at file scope — supplied because a reference is only resolvable relative to
+ * where it was written: a bare `orders` inside `namespace crm` means
+ * `crm::orders`. A resolver that ignores it resolves nothing for any namespaced
+ * mapping whose references are unqualified, which is the normal way to write one;
+ * the LSP's did, so the editor reported no coverage at all for those mappings
+ * while the CLI reported them fine. Core passes it rather than leaving each
+ * consumer to re-derive the mapping's namespace, which is work core has already
+ * done by the time it calls this.
+ *
+ * A resolver that closes over the namespace itself may ignore the argument — the
+ * CLI and viz adapters do, having taken it from their own indexes.
  */
-export type CoverageSchemaResolver = (schemaId: string) => CoverageSchemaDefinition | null;
+export type CoverageSchemaResolver = (
+  schemaId: string,
+  mappingNamespace: string | null,
+) => CoverageSchemaDefinition | null;
 
 // ── Public result types ─────────────────────────────────────────────────────
 
@@ -301,8 +317,8 @@ export function computeMappingCoverage(
   // below. The target side's whole-structure test has to ask what the *source*
   // path names (ADR-038), so the source field trees must be in hand before
   // `declaredTgt` is built.
-  const sources = resolveParticipants(sourceIds, resolveSchema);
-  const targets = resolveParticipants(targetIds, resolveSchema);
+  const sources = resolveParticipants(sourceIds, resolveSchema, found.namespace);
+  const targets = resolveParticipants(targetIds, resolveSchema, found.namespace);
 
   const arrows = extractMappingArrowRecords(found.node);
   const declaredSrc = arrows.flatMap((a) =>
@@ -360,10 +376,11 @@ interface ParticipatingSchema {
 function resolveParticipants(
   schemaIds: readonly string[],
   resolveSchema: CoverageSchemaResolver,
+  mappingNamespace: string | null,
 ): ParticipatingSchema[] {
   const resolved: ParticipatingSchema[] = [];
   for (const writtenRef of schemaIds) {
-    const def = resolveSchema(writtenRef);
+    const def = resolveSchema(writtenRef, mappingNamespace);
     if (def) resolved.push({ writtenRef, def });
   }
   return resolved;
@@ -850,6 +867,8 @@ interface LocatedMapping {
    * over-count of exactly the kind ADR-036's "only resolved refs" rule guards.
    */
   mappingKey: string;
+  /** Namespace the mapping is declared in, or null at file scope. */
+  namespace: string | null;
 }
 
 /** One `mapping` block in the tree, paired with the namespace it is declared in. */
@@ -919,7 +938,7 @@ function findMappingBlock(tree: Tree, target: MappingTarget): LocatedMapping | n
 
   if (typeof target === "string") {
     const match = candidates.find((c) => c.label === target);
-    return match ? { node: match.node, mappingKey: nlRefKeyFor(match) } : null;
+    return match ? located(match) : null;
   }
 
   const match = candidates.find((c) => {
@@ -927,7 +946,16 @@ function findMappingBlock(tree: Tree, target: MappingTarget): LocatedMapping | n
     if (target.row !== undefined) return c.node.startPosition.row === target.row;
     return c.label === (target.name ?? null);
   });
-  return match ? { node: match.node, mappingKey: nlRefKeyFor(match) } : null;
+  return match ? located(match) : null;
+}
+
+/** Project a matched candidate onto the shape the walk needs. */
+function located(candidate: MappingCandidate): LocatedMapping {
+  return {
+    node: candidate.node,
+    mappingKey: nlRefKeyFor(candidate),
+    namespace: candidate.namespace,
+  };
 }
 
 /** Schema references declared in the mapping's `source {}` or `target {}` block. */

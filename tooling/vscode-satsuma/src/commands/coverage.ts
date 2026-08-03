@@ -114,7 +114,7 @@ export function registerCoverageCommand(
       if (!editor || editor.document.languageId !== "satsuma") return;
 
       const actionContext = await getEditorActionContext(client);
-      const { mappingName } = actionContext;
+      const { mappingName, mappingRow } = actionContext;
 
       if (!mappingName) {
         vscode.window.showWarningMessage(
@@ -125,9 +125,14 @@ export function registerCoverageCommand(
 
       let coverageResult: { schemas: CoverageSchema[] };
       try {
+        // The row is what identifies the mapping; the name is for the messages
+        // below. Sending the name alone reported the first block carrying that
+        // label, so a cursor inside the second of two same-labelled namespace
+        // mappings painted the wrong schema's gutter.
         coverageResult = await client.sendRequest("satsuma/mappingCoverage", {
           uri: editor.document.uri.toString(),
           mappingName,
+          ...(mappingRow !== null ? { mappingRow } : {}),
         });
       } catch {
         vscode.window.showWarningMessage("Could not compute mapping coverage.");
