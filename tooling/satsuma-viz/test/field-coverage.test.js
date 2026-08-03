@@ -377,3 +377,79 @@ describe("relative arrow paths resolve against their container (3cdd-yavi)", () 
     assert.equal(mod.resolveSchemaLocalFieldPath(".orders", src, ["s"]), null);
   });
 });
+
+// ── "Not computed" is not "nothing is covered" (sl-46wr review) ──────────────
+//
+// `MappingBlock.coverage` is optional, and its contract — with ADR-042 — says
+// absent means the figure was not produced: a model assembled without a
+// workspace index, or a payload cached by a host predating the field. Rendering
+// that as `0/N` asserts a completeness figure nobody measured, and it is
+// indistinguishable from the genuine zero of a schema no mapping references.
+//
+// These go through the two public selectors the UI actually calls. Passing an
+// empty array straight to the card tests the card and skips the conversion,
+// which is how the fallback survived review of the card's own tests.
+
+describe("absent coverage stays unavailable, distinct from 0/N", () => {
+  /** @type {typeof import("../dist/satsuma-viz.js")} */
+  let mod;
+
+  const src = schema("s", [field("a"), field("b")]);
+  const orphan = schema("orphan", [field("z")]);
+
+  /** A mapping referencing `s`, with no coverage attached. */
+  const uncomputed = () => ({
+    id: "m",
+    sourceRefs: ["s"],
+    targetRef: "t",
+    arrows: [],
+    eachBlocks: [],
+    flattenBlocks: [],
+    nestedArrows: [],
+    sourceBlock: null,
+    metadata: [],
+    notes: [],
+    comments: [],
+    location: loc,
+  });
+
+  const modelWith = (mappings, schemas) => ({
+    uri: loc.uri,
+    fileNotes: [],
+    namespaces: [{ name: null, schemas, mappings, metrics: [], fragments: [] }],
+  });
+
+  before(async () => {
+    mod = await import("../dist/satsuma-viz.js");
+  });
+
+  it("reports null from the detail selector when the mapping carries no coverage", () => {
+    // The detail view's own accessor. Returning an all-uncovered list here is
+    // what made the card claim 0/N for a payload that simply never had coverage.
+    assert.equal(mod.mappingSchemaCoverage(uncomputed(), src, "source"), null);
+  });
+
+  it("reports null from the detail selector when coverage omits this schema", () => {
+    // Coverage present but naming no entry for this schema means core could not
+    // resolve the reference — again no answer, not an answer of zero.
+    const mapping = { ...uncomputed(), coverage: { schemas: [] } };
+    assert.equal(mod.mappingSchemaCoverage(mapping, src, "source"), null);
+  });
+
+  it("reports null from the overview index for a schema a coverage-less mapping references", () => {
+    // Unknown has to beat partial: the union would otherwise silently omit that
+    // mapping's contribution and understate the schema.
+    const index = mod.buildCoverageIndex(modelWith([uncomputed()], [src]));
+    assert.equal(index.get("s"), null);
+  });
+
+  it("still reports a genuine 0/N for a schema no mapping references", () => {
+    // The case that must NOT be swept up with it: nothing touches `orphan`, so
+    // every leaf really is uncovered and the card should say so.
+    const index = mod.buildCoverageIndex(modelWith([uncomputed()], [src, orphan]));
+    assert.deepEqual(
+      index.get("orphan").map((e) => [e.path, e.state]),
+      [["z", "uncovered"]],
+    );
+  });
+});

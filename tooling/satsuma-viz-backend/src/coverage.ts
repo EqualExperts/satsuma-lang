@@ -78,7 +78,18 @@ export function attachMappingCoverage(
     // inside `namespace staging` means `staging::stg_gl_entries`.
     const resolveSchema = makeCardResolver(cards, ns.name, wsIndex);
     for (const mapping of ns.mappings) {
-      const result = computeMappingCoverage(tree, mapping.id, resolveSchema, nlRefs);
+      // Identified by its start row, which names the block outright. A label is
+      // not an identity: two namespaces may declare `mapping load`, and matching
+      // on the label alone judged the second one's schemas against the first
+      // one's arrows — a plausible figure that was simply wrong. An anonymous
+      // mapping has no label at all (the model calls it "unknown"), so a
+      // label-based lookup found nothing and dropped its coverage entirely.
+      const result = computeMappingCoverage(
+        tree,
+        { namespace: ns.name, row: mapping.location.line },
+        resolveSchema,
+        nlRefs,
+      );
       if (result.schemas.length > 0) mapping.coverage = result;
     }
   }

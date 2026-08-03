@@ -126,9 +126,13 @@ export function coverageForMapping(
   if (!parsed) return null;
 
   const namespace = mapping.namespace ?? null;
+  // Named by (namespace, label), not by label alone: two mappings may carry the
+  // same label in different namespaces, and matching on the label gave the
+  // first-declared block's arrows to both — `b::load` reported its sibling's
+  // figures rather than its own, with no sign anything was wrong.
   const result: MappingCoverageResult = computeMappingCoverage(
     parsed.tree,
-    mapping.name,
+    { name: mapping.name, namespace },
     makeSchemaResolver(index, namespace),
     nlRefs,
   );

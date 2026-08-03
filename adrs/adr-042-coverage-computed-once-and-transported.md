@@ -67,6 +67,23 @@ entries; it never derives them.** The mechanism:
   as core's `MappingCoverageResult`. That package now depends on `@satsuma/core`
   and re-exports the coverage types, so the payload carries core's types verbatim
   rather than a structural copy that could drift.
+- **A mapping is named by identity, not by label.** `computeMappingCoverage`
+  takes a `MappingTarget`: a `MappingSelector` — `{namespace, name, row}`, any
+  part of which narrows the match — or a bare label for the one caller that has
+  nothing else (the LSP's `satsuma/mappingCoverage` request). A label is not
+  unique: two namespaces may declare `mapping load`, and matching on the label
+  alone gave the first-declared block's arrows to both, so a card and
+  `satsuma coverage` agreed on a figure that belonged to the other mapping. An
+  anonymous `mapping { … }` block has no label at all, so a label lookup found
+  nothing and dropped its coverage. The CLI passes `{name, namespace}`; the viz
+  passes `{namespace, row}`, which identifies the block outright.
+- **Absent coverage is "not computed", and stays distinguishable from `0/N`.**
+  The viz's selectors (`mappingSchemaCoverage`, `buildCoverageIndex`) return
+  `null` for it, and the card then shows a plain leaf count in place of a ratio.
+  A schema no mapping references is the genuine zero and does report `0/N`, from
+  `uncoveredFieldCoverage`. Collapsing the two would let a model assembled
+  without a workspace index — or a payload cached by an older host — assert a
+  completeness figure nobody measured.
 - Combining entries is core's too. `unionFieldCoverage(lists)` in
   `coverage-rollup.ts` is the single implementation of the union rule — a leaf is
   covered when any input covers it, under the strongest tier any input claims, and
@@ -116,6 +133,12 @@ of covered paths, you are reintroducing this defect.
   imported stub card to its full definition. The stub carries the index's fields,
   so the tree is stable in practice, but a future change to what a stub contains
   would need coverage recomputed after the merge.
+- The corpus sweep can only catch what the corpus contains. It found neither the
+  duplicate-label nor the anonymous-mapping defect above, because no file under
+  `examples/` has either shape — both are pinned by fixtures instead
+  (`coverage-duplicate-mapping-labels.stm`, `coverage-anonymous-mapping.stm`). A
+  sweep over real files is a good net for rules that apply everywhere and no
+  substitute for a case built to exercise one.
 - The card is now inert without a host that supplies coverage: a model assembled
   with no workspace index renders rows with no verdicts. That is the honest
   reading, and it is why absent must not be displayed as zero, but it is a

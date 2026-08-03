@@ -211,6 +211,44 @@ export interface MappingCoverageResult {
   schemas: SchemaCoverageResult[];
 }
 
+// ── Naming the mapping to report on ─────────────────────────────────────────
+
+/**
+ * Which mapping in a tree to report on, when a label alone will not do.
+ *
+ * A label is not an identity: two mappings may carry the same one in different
+ * namespaces, and an anonymous `mapping { … }` block has none at all. Supplying
+ * the parts a caller knows makes the match exact.
+ *
+ * Every field is optional, and each one supplied narrows the match:
+ */
+export interface MappingSelector {
+  /**
+   * Label as authored, backticks already stripped. `null` names an anonymous
+   * mapping — but a label is not unique on its own, so pair it with
+   * {@link namespace}, and use {@link row} for an anonymous block.
+   */
+  name?: string | null;
+  /**
+   * Namespace the mapping is declared in, or `null` for file scope. Matched
+   * exactly when supplied: omitting it matches a mapping in any namespace, which
+   * is what makes a bare label ambiguous.
+   */
+  namespace?: string | null;
+  /**
+   * 0-indexed CST start row of the `mapping` block. **Decisive when supplied** —
+   * it identifies the block outright, so it is the form to use for an anonymous
+   * mapping and the safest form for any consumer that already holds a position.
+   */
+  row?: number;
+}
+
+/**
+ * How a caller names the mapping to report on: a label, or a
+ * {@link MappingSelector} when the label is not enough to identify it.
+ */
+export type MappingTarget = string | MappingSelector;
+
 // ── Entry point ─────────────────────────────────────────────────────────────
 
 /**
@@ -222,8 +260,10 @@ export interface MappingCoverageResult {
  * resolve is omitted from the result entirely.
  *
  * @param tree         Parse tree of the file declaring the mapping.
- * @param mappingName  Mapping label to report on; matched against top-level
- *                     and namespaced `mapping` blocks in this tree.
+ * @param target       Which mapping to report on. A bare label matches the first
+ *                     block carrying it, in any namespace — pass a
+ *                     {@link MappingSelector} to name one exactly, which any
+ *                     caller holding a namespace or a position should do.
  * @param resolveSchema Adapter from the caller's index to field trees.
  * @param nlRefs       Resolved NL `@refs` for the workspace, from
  *                     `resolveAllNLRefs()`. Those belonging to this mapping
@@ -234,11 +274,11 @@ export interface MappingCoverageResult {
  */
 export function computeMappingCoverage(
   tree: Tree,
-  mappingName: string,
+  target: MappingTarget,
   resolveSchema: CoverageSchemaResolver,
   nlRefs: readonly ResolvedNLRef[] = [],
 ): MappingCoverageResult {
-  const found = findMappingBlock(tree, mappingName);
+  const found = findMappingBlock(tree, target);
   if (!found) return { schemas: [] };
 
   const body = child(found.node, "mapping_body");
@@ -812,25 +852,82 @@ interface LocatedMapping {
   mappingKey: string;
 }
 
-/** Find a `mapping` block by label, at file scope or inside a namespace block. */
-function findMappingBlock(tree: Tree, name: string): LocatedMapping | null {
+/** One `mapping` block in the tree, paired with the namespace it is declared in. */
+interface MappingCandidate {
+  node: SyntaxNode;
+  /** Enclosing namespace name, or null at file scope. */
+  namespace: string | null;
+  /** Label as authored, or null for an anonymous `mapping { … }` block. */
+  label: string | null;
+}
+
+/**
+ * Every `mapping` block in the tree, at file scope and inside namespaces, in
+ * declaration order.
+ *
+ * A namespace's name is its first `identifier` child, not a label — the same
+ * read extract.ts's `collectFromNamespaces()` does, so the keys built from it
+ * match the ones `resolveAllNLRefs()` files refs under.
+ */
+function mappingCandidates(tree: Tree): MappingCandidate[] {
+  const found: MappingCandidate[] = [];
   for (const node of tree.rootNode.namedChildren) {
-    if (node.type === "mapping_block" && labelText(node) === name) {
-      return { node, mappingKey: name };
+    if (node.type === "mapping_block") {
+      found.push({ node, namespace: null, label: labelText(node) });
+      continue;
     }
     if (node.type === "namespace_block") {
-      // A namespace's name is its first `identifier` child, not a label — the
-      // same read extract.ts's collectFromNamespaces() does, so the key built
-      // here matches the one resolveAllNLRefs() files refs under.
       const namespace = node.namedChildren.find((c) => c.type === "identifier")?.text ?? null;
       for (const ch of node.namedChildren) {
-        if (ch.type === "mapping_block" && labelText(ch) === name) {
-          return { node: ch, mappingKey: namespace ? `${namespace}::${name}` : name };
+        if (ch.type === "mapping_block") {
+          found.push({ node: ch, namespace, label: labelText(ch) });
         }
       }
     }
   }
-  return null;
+  return found;
+}
+
+/**
+ * The NL-ref key for one mapping — what `resolveAllNLRefs` files its refs under.
+ *
+ * An anonymous mapping is keyed by its start row, matching
+ * `extractMappingNLRefs`'s `<anon>@:<row>` synthesis, so a mapping with no label
+ * can still be credited with the refs in its own body.
+ */
+function nlRefKeyFor(candidate: MappingCandidate): string {
+  const name = candidate.label ?? `<anon>@:${candidate.node.startPosition.row}`;
+  return candidate.namespace ? `${candidate.namespace}::${name}` : name;
+}
+
+/**
+ * Locate the mapping a {@link MappingTarget} names.
+ *
+ * **A bare string matches by label alone, and that is ambiguous.** Two mappings
+ * may share a label in different namespaces (viz-model's sl-aeae case), and the
+ * first one declared wins the match — so the caller gets another mapping's
+ * arrows judged against its own schemas, which reads as a plausible but wrong
+ * figure rather than as an error. Callers that know which mapping they mean must
+ * pass a {@link MappingSelector}; the string form is retained only for the LSP's
+ * `satsuma/mappingCoverage` request, whose params carry a name and nothing else.
+ *
+ * A selector matches on the parts it supplies. `row` is decisive when given and
+ * is the only way to name an anonymous mapping, which has no label to match.
+ */
+function findMappingBlock(tree: Tree, target: MappingTarget): LocatedMapping | null {
+  const candidates = mappingCandidates(tree);
+
+  if (typeof target === "string") {
+    const match = candidates.find((c) => c.label === target);
+    return match ? { node: match.node, mappingKey: nlRefKeyFor(match) } : null;
+  }
+
+  const match = candidates.find((c) => {
+    if (target.namespace !== undefined && c.namespace !== target.namespace) return false;
+    if (target.row !== undefined) return c.node.startPosition.row === target.row;
+    return c.label === (target.name ?? null);
+  });
+  return match ? { node: match.node, mappingKey: nlRefKeyFor(match) } : null;
 }
 
 /** Schema references declared in the mapping's `source {}` or `target {}` block. */

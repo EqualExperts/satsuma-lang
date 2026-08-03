@@ -37,6 +37,7 @@ import type {
   CoverageField,
   CoverageSchemaDefinition,
   FieldDecl,
+  MappingTarget,
   ResolvedNLRef,
   SpreadEntity,
 } from "@satsuma/core";
@@ -57,6 +58,13 @@ import type { MappingCoverageResult } from "@satsuma/core";
  * `uri` is not used to locate the mapping (the caller already supplies its
  * parse tree) — it is retained because the request handler passes it and
  * because a future scoped resolver may need the requesting document.
+ *
+ * `mappingName` may be namespace-qualified (`crm::load`), and should be whenever
+ * the caller knows the namespace. A bare label is ambiguous: two mappings may
+ * carry the same one in different namespaces, and core then matches the
+ * first-declared block, reporting its arrows under the other's name. The
+ * `satsuma/mappingCoverage` request accepts either form so a client holding only
+ * a label still works, at that cost.
  */
 export function computeMappingCoverage(
   uri: string,
@@ -66,10 +74,26 @@ export function computeMappingCoverage(
 ): MappingCoverageResult {
   return computeCoverage(
     tree,
-    mappingName,
+    mappingTargetOf(mappingName),
     (schemaId) => resolveSchema(wsIndex, schemaId),
     resolveNLRefs(uri, tree, wsIndex),
   );
+}
+
+/**
+ * Split a possibly-qualified mapping name into an exact selector.
+ *
+ * `crm::load` names one mapping; a bare `load` cannot, so it is passed through as
+ * a label and matched as before. Split on the *last* `::` so a namespace
+ * containing one still resolves.
+ */
+function mappingTargetOf(mappingName: string): MappingTarget {
+  const separator = mappingName.lastIndexOf("::");
+  if (separator < 0) return mappingName;
+  return {
+    namespace: mappingName.slice(0, separator),
+    name: mappingName.slice(separator + 2),
+  };
 }
 
 /**

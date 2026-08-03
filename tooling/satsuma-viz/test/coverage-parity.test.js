@@ -43,6 +43,27 @@ before(async () => {
 });
 
 /**
+ * Coverage of the Nth mapping's schema, in one role, as the card receives it.
+ *
+ * `mappingIndex` matters for the duplicate-label fixture, where two mappings
+ * share a label and only their position tells them apart.
+ */
+function coverageOfMapping(fixtureName, mappingIndex, schemaId, role) {
+  const uri = `file://${resolve(FIXTURES, fixtureName)}`;
+  const tree = getParser().parse(readFileSync(resolve(FIXTURES, fixtureName), "utf8"));
+  const index = createWorkspaceIndex();
+  indexFile(index, uri, tree);
+  const model = buildVizModel(uri, tree, index);
+
+  const schema = model.namespaces
+    .flatMap((ns) => ns.schemas)
+    .find((s) => s.qualifiedId === schemaId);
+  const mapping = model.namespaces.flatMap((ns) => ns.mappings)[mappingIndex];
+  const entries = viz.mappingSchemaCoverage(mapping, schema, role);
+  return entries === null ? null : summarizeFieldCoverage(entries);
+}
+
+/**
  * Coverage of one schema in one role as the card receives it: model from the
  * backend, entries from the model, counting from core.
  *
@@ -206,5 +227,36 @@ describe("viz coverage applies whole-structure conferral (sl-csrs)", () => {
     assert.equal(tgt.totals.covered, 11);
     assert.equal(tgt.totals.total, 15);
     assert.equal(tgt.totals.pct, 73);
+  });
+});
+
+// ── A mapping label is not an identity (sl-46wr review) ─────────────────────
+
+describe("viz coverage identifies the right mapping block", () => {
+  it("keeps two same-named mappings in different namespaces apart", () => {
+    // Coverage looked the mapping up by label, so both `a::load` and `b::load`
+    // resolved to whichever was declared first. With the two namespaces
+    // declaring identically-named schemas — the fixture's shape — `b::load`'s
+    // card showed `a::load`'s single arrow as 1/2 where the truth is 2/2: a
+    // plausible figure that was simply another mapping's. `satsuma coverage`
+    // printed the same wrong number, so the two agreed while both were wrong.
+    const a = coverageOfMapping("coverage-duplicate-mapping-labels.stm", 0, "a::t", "target");
+    assert.equal(a.covered, 1);
+    assert.equal(a.total, 2);
+
+    const b = coverageOfMapping("coverage-duplicate-mapping-labels.stm", 1, "b::t", "target");
+    assert.equal(b.covered, 2, "b::load has two arrows and must not inherit a::load's one");
+    assert.equal(b.total, 2);
+  });
+
+  it("attaches coverage to an anonymous mapping, which has no label to look up", () => {
+    // The model names an anonymous `mapping { … }` block "unknown", and no CST
+    // block carries that label — so a label-based lookup found nothing and
+    // dropped the coverage entirely, which the card then rendered as 0/N.
+    // Resolving by position finds it.
+    const anon = coverageOfMapping("coverage-anonymous-mapping.stm", 0, "tgt", "target");
+    assert.notEqual(anon, null, "an anonymous mapping must still get coverage");
+    assert.equal(anon.covered, 1);
+    assert.equal(anon.total, 2);
   });
 });

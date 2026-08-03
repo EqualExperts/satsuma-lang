@@ -1,0 +1,20 @@
+// Fixture for the sl-46wr review: an anonymous mapping has no label.
+//
+// `mapping { … }` with no label is valid. The viz model calls it "unknown", and
+// no CST block carries that label — so looking the mapping up by label found
+// nothing, coverage was never attached, and the card rendered every field as
+// unmapped. Resolving by the block's position finds it.
+//
+// `satsuma coverage` skips anonymous mappings by design (it reports them as
+// `skippedAnonymous`, since coverage is keyed by mapping label), so this file
+// exists for the viz side: the card renders the mapping, so it must report on it.
+//
+// Correct on the viz side: 1 of 2 covered on each side.
+schema src { x STRING y STRING }
+schema tgt { x STRING y STRING }
+
+mapping {
+  source { src }
+  target { tgt }
+  x -> x
+}

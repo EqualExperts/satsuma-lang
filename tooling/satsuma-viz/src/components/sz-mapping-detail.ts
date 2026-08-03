@@ -19,7 +19,7 @@ import {
 import type { ContainerScope } from "../field-coverage.js";
 import { highlightAtRefs } from "../markdown.js";
 import { qualifyChildArrowPath } from "@satsuma/core/extract";
-import type { FieldCoverageEntry } from "@satsuma/core/coverage";
+import type { SchemaCoverage } from "../field-coverage.js";
 
 function sanitizeTestIdSegment(value: string): string {
   const lowered = value.toLowerCase();
@@ -338,11 +338,11 @@ export class SzMappingDetail extends LitElement {
    * one schema can legitimately appear on both sides of one mapping.
    */
   @property({ type: Object })
-  sourceCoverage: Map<string, FieldCoverageEntry[]> = new Map();
+  sourceCoverage: Map<string, SchemaCoverage> = new Map();
 
-  /** Core's coverage entries for the target schema. */
+  /** Core's coverage entries for the target schema, or null when not computed. */
   @property({ type: Array })
-  targetCoverage: FieldCoverageEntry[] = [];
+  targetCoverage: SchemaCoverage = null;
 
   @property({ type: String, attribute: "namespace-label" })
   namespaceLabel: string | null = null;
@@ -564,7 +564,7 @@ export class SzMappingDetail extends LitElement {
             (s) => html`
               <sz-schema-card
                 .schema=${s}
-                .coverage=${this.sourceCoverage.get(s.qualifiedId) ?? []}
+                .coverage=${this.sourceCoverage.get(s.qualifiedId) ?? null}
                 .highlightFields=${sourceHL.get(s.qualifiedId) ?? new Set()}
                 highlightColor="source"
                 test-id-prefix=${`${sourcePrefix}-${sanitizeTestIdSegment(s.qualifiedId)}`}

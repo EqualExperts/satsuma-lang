@@ -5,6 +5,8 @@ import type { SchemaCard, FieldEntry } from "../model.js";
 import { SzNavigateEvent, SzFieldHoverEvent, SzFieldLineageEvent } from "../satsuma-viz.js";
 import { renderMarkdown } from "../markdown.js";
 import type { FieldCoverageEntry } from "@satsuma/core/coverage";
+import { uncoveredFieldCoverage } from "@satsuma/core/coverage";
+import { toCoverageFields } from "../field-coverage.js";
 import { summarizeFieldCoverage, countContainerStates } from "@satsuma/core/coverage-rollup";
 import type { CoverageTotals, ContainerStateCounts } from "@satsuma/core/coverage-rollup";
 import {
@@ -506,11 +508,14 @@ export class SzSchemaCard extends LitElement {
    * disagreed with `satsuma coverage` on twelve shipped examples until it began
    * consuming core's verdicts instead (sl-46wr, sl-csrs).
    *
-   * Empty means the parent supplied nothing — the card then renders its fields
-   * with no coverage marking rather than claiming they are all unmapped.
+   * **`null` means "not computed", which is not "nothing is mapped".** The card
+   * then shows a plain field count in place of a ratio and leaves every row
+   * unmarked, because `0/N` would assert a completeness figure nobody produced.
+   * A schema that genuinely no mapping references arrives as an all-uncovered
+   * list instead, and does show `0/N`.
    */
   @property({ type: Array })
-  coverage: FieldCoverageEntry[] = [];
+  coverage: FieldCoverageEntry[] | null = null;
 
   /** Compact mode: hides fields, port dots, constraints, spread indicators, lineage buttons.
    *  Shows namespace::name in header when schema has a namespace (qualifiedId contains ::). */
@@ -612,7 +617,7 @@ export class SzSchemaCard extends LitElement {
 
     if (this.compact) return this._renderCompact(s);
 
-    const { totals, containers } = this._coverage();
+    const coverage = this._coverage();
     const hasNotes = s.notes.length > 0;
     const metaPills = s.metadata.filter((m) => m.key !== "note");
     const isReport = this._isReport(s);
@@ -627,11 +632,23 @@ export class SzSchemaCard extends LitElement {
         >
           ${this._headerIcon(isReport)}
           <span class="header-name">${s.id}</span>
+          <!-- No ratio when coverage was not computed: a plain field count states
+               what is known, where "0/N" would assert completeness nobody
+               measured (ADR-042). -->
           <span
             class="header-count"
             data-testid=${`${this.testIdPrefix}-header-count`}
-            title=${this._coverageTitle(totals, containers)}
-            >${totals.covered}/${totals.total}</span
+            data-coverage-available=${coverage !== null}
+            title=${
+              coverage
+                ? this._coverageTitle(coverage.totals, coverage.containers)
+                : "Coverage not computed for this schema"
+            }
+            >${
+              coverage
+                ? `${coverage.totals.covered}/${coverage.totals.total}`
+                : `${this._leafCount(s)} fields`
+            }</span
           >
           <span
             class="header-toggle"
@@ -839,11 +856,11 @@ export class SzSchemaCard extends LitElement {
    * field count, which a wide schema card notices.
    */
   private _coverageIndex: Map<string, FieldCoverageEntry> | null = null;
-  private _coverageIndexFor: FieldCoverageEntry[] | null = null;
+  private _coverageIndexFor: FieldCoverageEntry[] | null | undefined = undefined;
 
   private _coverageByPath(): Map<string, FieldCoverageEntry> {
     if (this._coverageIndexFor !== this.coverage || this._coverageIndex === null) {
-      this._coverageIndex = new Map(this.coverage.map((entry) => [entry.path, entry]));
+      this._coverageIndex = new Map((this.coverage ?? []).map((entry) => [entry.path, entry]));
       this._coverageIndexFor = this.coverage;
     }
     return this._coverageIndex;
@@ -865,15 +882,33 @@ export class SzSchemaCard extends LitElement {
    * Container states come back beside the ratio rather than inside it — a
    * reviewer wants to know two records are partly mapped, but that fact must not
    * enter the number.
+   *
+   * `null` when coverage was not computed — see {@link coverage}. Callers must
+   * render the absence rather than substitute zeroes.
    */
   private _coverage(): {
     totals: CoverageTotals;
     containers: ContainerStateCounts;
-  } {
+  } | null {
+    if (this.coverage === null) return null;
     return {
       totals: summarizeFieldCoverage(this.coverage),
       containers: countContainerStates(this.coverage),
     };
+  }
+
+  /**
+   * The schema's leaf count, for the header when there is no ratio to show.
+   *
+   * Counted by core from an all-uncovered projection of the declared fields, not
+   * by the card: "how many fields?" must be answered in leaves, the same unit the
+   * ratio is denominated in (ADR-034), or a compact card and an expanded one
+   * disagree about the same schema (sl-hcan).
+   */
+  private _leafCount(s: SchemaCard): number {
+    return summarizeFieldCoverage(
+      uncoveredFieldCoverage(toCoverageFields(s.fields), s.location.uri),
+    ).total;
   }
 
   /**
@@ -913,8 +948,9 @@ export class SzSchemaCard extends LitElement {
     const displayName = s.id;
     // Leaf count, the same unit the expanded card's ratio is denominated in
     // (ADR-034). One card must not answer "how many fields?" two ways depending
-    // on whether it happens to be compact.
-    const totalFields = this._coverage().totals.total;
+    // on whether it happens to be compact — and the compact header shows a count
+    // rather than a ratio, so it needs no coverage at all.
+    const totalFields = this._leafCount(s);
     const metaPills = s.metadata.filter((m) => m.key !== "note");
     const isReport = this._isReport(s);
 
