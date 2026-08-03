@@ -17,6 +17,7 @@ import { readFileSync, readdirSync } from "node:fs";
 import { join, dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { format, initParser, getParser } from "../dist/index.js";
+import { cstStructure } from "./support/cst-structure.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -49,19 +50,6 @@ function fmt(src) {
   return format(tree, src);
 }
 
-function structureOf(node) {
-  if (node.childCount === 0) {
-    if (node.isNamed) return node.type + "=" + JSON.stringify(node.text);
-    return null;
-  }
-  const kids = [];
-  for (const c of node.children) {
-    const s = structureOf(c);
-    if (s !== null) kids.push(s);
-  }
-  return node.type + "(" + kids.join(",") + ")";
-}
-
 // ── Corpus Round-Trip (Idempotency + Structural Equivalence) ─────────────────
 
 describe("corpus round-trip", () => {
@@ -82,8 +70,8 @@ describe("corpus round-trip", () => {
         const out = fmt(src);
         const { tree: tree2 } = parseSource(out);
         assert.equal(
-          structureOf(tree1.rootNode),
-          structureOf(tree2.rootNode),
+          cstStructure(tree1.rootNode),
+          cstStructure(tree2.rootNode),
           "parse trees should be structurally identical",
         );
       });

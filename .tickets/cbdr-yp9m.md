@@ -1,6 +1,6 @@
 ---
 id: cbdr-yp9m
-status: open
+status: in_progress
 deps: [cbdr-o6xn]
 links: []
 created: 2026-08-03T15:34:49Z
