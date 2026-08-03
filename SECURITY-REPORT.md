@@ -63,9 +63,7 @@ standard risks for any npm-based toolchain.
 
 Consumers should also weigh the items in
 [Known Gaps and Honest Caveats](#known-gaps-and-honest-caveats) — most
-notably that **CI secret scanning (Gitleaks) is temporarily disabled**
-pending an organization licence, that CI dependency auditing does not yet
-cover all package directories, and that release artifacts are not signed.
+notably that release artifacts are not signed.
 
 **Overall risk level: LOW** — comparable to installing a linter or formatter.
 The product attack surface is genuinely small; the caveats above are gaps in
@@ -85,7 +83,7 @@ changes a security reviewer should know about:
 | New packages: `satsuma-core`, `satsuma-viz`, `satsuma-viz-model`, `satsuma-viz-backend`, `satsuma-viz-harness` | New rendering code paths (webviews, browser); audited in [section 6](#6-webview-rendering-and-cross-site-scripting-xss) |
 | Public **website + browser playground** deployed to GitHub Pages | New published surface; fully static, in-browser parsing, no data leaves the browser ([section 7](#7-browser-playground-and-project-website)) |
 | LSP is now also distributed as a **standalone tarball** (`npx satsuma-lsp --stdio`) for non-VS-Code editors | Same code as the extension's server; stdio transport only |
-| **Gitleaks secret scanning disabled in CI** (2026-06-04) pending an org licence | Assurance gap — see [Known Gaps](#known-gaps-and-honest-caveats) |
+| **Gitleaks secret scanning re-enabled in CI** (2026-08-03) once the org licence was provisioned; was disabled 2026-06-04–2026-08-03 | Assurance gap closed — see [Known Gaps](#known-gaps-and-honest-caveats) |
 | Previous report inaccuracies identified | The 2026-03-24 report claimed CodeQL scanning and allowlist-expiry enforcement that do not exist in CI; corrected in this revision |
 
 ---
@@ -389,13 +387,10 @@ Satsuma does not handle secrets. There are no API keys, database connections,
 authentication tokens, or credential stores anywhere in the toolchain, and no
 environment variables are read by the CLI.
 
-**Honest caveat:** the previous report stated that Gitleaks secret scanning
-runs on every push and PR. As of 2026-06-04 the Gitleaks step **skips itself**
-because gitleaks-action v3 requires an organization licence that has not yet
-been provisioned (the step re-enables automatically once the
-`GITLEAKS_LICENSE` secret is set). Until then, there is **no automated secret
-scanning in CI** — prevention relies on review discipline. This is tracked
-and called out in [Known Gaps](#known-gaps-and-honest-caveats).
+**Update (2026-08-03):** Gitleaks secret scanning is active again. The step
+skipped itself from 2026-06-04 until the org licence was provisioned and the
+`GITLEAKS_LICENSE` secret was set on the repo; it re-enabled automatically on
+the next CI run, no workflow change required (tk 3eb-4vjj).
 
 ---
 
@@ -408,7 +403,7 @@ reading the workflows, not the previous report):
 |---|---|---|
 | **Dependency vulnerabilities** | `npm audit --omit=dev --audit-level=high` | ✅ Active — every directory with a tracked `package-lock.json` (10 as of 2026-06-11); the CI loop discovers lockfiles automatically, so new packages are covered without workflow edits |
 | **Static analysis (SAST)** | Semgrep (`--config auto`, ERROR+WARNING) | ✅ Active on every push/PR to main; results uploaded as SARIF |
-| **Secret scanning** | Gitleaks | ⚠️ **Disabled since 2026-06-04** pending org licence; re-enables automatically when `GITLEAKS_LICENSE` is provisioned |
+| **Secret scanning** | Gitleaks | ✅ Active — re-enabled 2026-08-03 once `GITLEAKS_LICENSE` was provisioned (was disabled 2026-06-04–2026-08-03; tk 3eb-4vjj) |
 | **Semantic analysis (CodeQL)** | — | ❌ Not running. The previous report listed CodeQL as a control; only the SARIF *upload action* (which is published under `github/codeql-action`) is used. No CodeQL analysis job exists |
 | **Parser integrity** | `tree-sitter generate` + diff | ✅ Active — CI fails if committed parser sources differ from regenerated output |
 | **Grammar conflict budget** | `CONFLICTS.expected` check | ✅ Active — grammar conflict count must match the documented expectation |
@@ -434,9 +429,10 @@ currently advisory.
 These are the things a security reviewer would want surfaced rather than
 discovered. None is a known vulnerability; all reduce *assurance*.
 
-1. **Secret scanning is currently off.** Gitleaks has been skipped in CI
-   since 2026-06-04 pending an organization licence. It re-enables
-   automatically once the licence secret is provisioned.
+1. **~~Secret scanning was off.~~ Re-enabled 2026-08-03 (tk 3eb-4vjj).**
+   Gitleaks skipped itself in CI from 2026-06-04 until the org licence was
+   provisioned and the `GITLEAKS_LICENSE` secret was set; the step resumed
+   automatically with no workflow change.
 2. **~~CI dependency auditing covers 5 of 10 package directories.~~
    Closed 2026-06-11 (sl-qpbx).** The `npm audit` CI loop now discovers
    every tracked `package-lock.json` automatically, and Dependabot has an
@@ -581,10 +577,10 @@ tracing, workflow YAML review) plus direct local `npm audit` runs.
 
 ### Issues and recommendations
 
-1. **Re-enable secret scanning or replace it.** Gitleaks has been skipped
-   since 2026-06-04 awaiting an org licence. If procurement stalls, switch to
-   a licence-free alternative (e.g. `gitleaks` CLI pinned in CI, or
-   `trufflehog`) rather than running without scanning.
+1. **~~Re-enable secret scanning or replace it.~~ Done 2026-08-03
+   (tk 3eb-4vjj).** Gitleaks was skipped from 2026-06-04 awaiting an org
+   licence; the licence was provisioned and the step now runs on every push
+   and PR.
 2. **~~Extend `npm audit` and Dependabot to all package directories.~~
    Done 2026-06-11 (sl-qpbx).** The CI audit loop now discovers every
    tracked lockfile, and `dependabot.yml` covers every package directory.
@@ -662,7 +658,7 @@ run your own audit — which is the recommended path below.
 | OWASP A06 (Vulnerable Components) | npm audit + Dependabot on core packages; coverage gaps documented; 0 known vulnerabilities at review time |
 | OWASP A07 (XSS) | Strict CSP with nonces; escape-before-render verified at every `unsafeHTML` site |
 | OWASP A08 (Software Integrity) | CI verifies generated parser matches source; release artifacts not yet signed |
-| OWASP A09 (Logging/Monitoring) | Gitleaks secret scanning currently disabled (licence pending) — compensate with your own scanning until re-enabled |
+| OWASP A09 (Logging/Monitoring) | Gitleaks secret scanning active (re-enabled 2026-08-03 once the org licence was provisioned) |
 | SOC 2 / supply chain | Open source, auditable, no third-party services; SBOM and provenance not yet provided |
 
 ---
