@@ -22,3 +22,25 @@ Replicate satsuma-cli/test/coverage-viz-parity.test.ts for edges. Over every .st
 
 The sweep runs over every .stm in examples/ and reports any disagreement with the file, mapping and edge that differ. A deliberate divergence introduced into any one of the three consumers is reported by the sweep. Where a real disagreement exists on current behaviour, it is recorded against the owning bug ticket rather than accommodated by weakening the assertion.
 
+
+## Notes
+
+**2026-08-03T16:43:02Z**
+
+Protocol decision this sweep gates (PRD decision 7, recorded 2026-08-03).
+
+Labelling an arrow's declaration kind on the VizModel's `ArrowEntry` was assessed
+and deferred pending this sweep's findings. The viz encodes the kind structurally
+(`eachBlocks`/`flattenBlocks`/`NestedArrowBlock`, and `sourceFields: []` for a
+computed arrow) while core states it as data (`ExtractedArrow.kind`), so the two
+agree today only by careful reading.
+
+The field was rejected for now mainly because supplying it would re-arm the
+client-side coverage derivation ADR-042 removed: `MappingBlock.coverage`'s
+doc-comment records that the client cannot derive coverage partly because it lacks
+the arrow's declaration kind.
+
+**What this means for whoever runs this sweep:** if it surfaces a genuine kind
+disagreement between the consumers, say so explicitly in the ticket notes rather
+than only fixing the symptom — that finding is the trigger to revisit the protocol
+decision, and it identifies which side was wrong.
