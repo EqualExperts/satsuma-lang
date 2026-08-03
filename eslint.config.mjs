@@ -170,4 +170,42 @@ export default [
       "@typescript-eslint/no-non-null-assertion": "error",
     },
   },
+  // satsuma-core source files (PRD 39 R7): the package R2 migrated to the
+  // generated CST type (tcc-e35f), so on top of the base type-aware preset it
+  // also gets no-unnecessary-condition and switch-exhaustiveness-check. The
+  // switch rule is scoped to domain discriminated unions (e.g. MetaEntry) —
+  // requiring every switch over the ~100-value SatsumaGrammarSymbol/CstType
+  // union to be exhaustive would fight the many intentionally partial CST
+  // walkers, so those switches keep a default/fallthrough branch rather than
+  // enumerating every symbol.
+  ...tseslint.configs.recommendedTypeChecked.map((config) => ({
+    ...config,
+    files: ["tooling/satsuma-core/src/**/*.ts"],
+  })),
+  {
+    files: ["tooling/satsuma-core/src/**/*.ts"],
+    languageOptions: {
+      parserOptions: {
+        projectService: true,
+        tsconfigRootDir: import.meta.dirname,
+      },
+    },
+    rules: {
+      "@typescript-eslint/no-unused-vars": [
+        "error",
+        { argsIgnorePattern: "^_", varsIgnorePattern: "^_" },
+      ],
+      "@typescript-eslint/no-non-null-assertion": "error",
+      "@typescript-eslint/no-unnecessary-condition": "error",
+      "@typescript-eslint/switch-exhaustiveness-check": [
+        "error",
+        {
+          // A switch over the CST symbol union is allowed to stay partial —
+          // completeness there is a semantic, construct-specific property
+          // (PRD 39, "Out of Scope"), not something the linter should force.
+          considerDefaultExhaustiveForUnions: true,
+        },
+      ],
+    },
+  },
 ];

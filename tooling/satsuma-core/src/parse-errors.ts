@@ -96,6 +96,7 @@ function walkErrors(node: SyntaxNode, out: ParseErrorEntry[]): void {
   }
 
   for (let i = 0; i < node.childCount; i++) {
-    walkErrors(node.child(i)!, out);
+    const c = node.child(i);
+    if (c) walkErrors(c, out);
   }
 }

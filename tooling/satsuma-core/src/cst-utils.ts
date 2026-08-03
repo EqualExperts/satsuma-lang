@@ -3,6 +3,14 @@
  *
  * Pure utility functions with no side effects. Both the CLI and LSP server
  * consume these; neither consumer should maintain its own copies.
+ *
+ * `SyntaxNode.namedChildren` (types.ts) is typed as non-nullable, but the
+ * child/children/allDescendants/walkDescendants walkers below still filter
+ * out `null` entries defensively. That is not dead code: test/cst-utils.test.js
+ * constructs mock nodes with real `null` holes in `namedChildren` and asserts
+ * these walkers skip them rather than throw, so a caller building a CST from a
+ * source other than the audited web-tree-sitter adapter (parser.ts) can still
+ * rely on this module's own null-safety instead of the type's promise.
  */
 
 import type { SatsumaGrammarSymbol } from "./generated/cst-types.js";
@@ -21,22 +29,28 @@ export function isPresent(node: SyntaxNode | null | undefined): node is SyntaxNo
 
 /**
  * First named child of the given type, or null.
- * Filters out null entries for compatibility with web-tree-sitter's nullable array.
+ * Filters out null entries — see the module header for why this matters
+ * despite `namedChildren`'s non-nullable type.
  */
 export function child(node: SyntaxNode, type: SatsumaGrammarSymbol): SyntaxNode | null {
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- see module header
   return node.namedChildren.find((c) => c !== null && c.type === type) ?? null;
 }
 
 /**
  * All named children of the given type.
- * Filters out null entries for compatibility with web-tree-sitter's nullable array.
+ * Filters out null entries — see the module header for why this matters
+ * despite `namedChildren`'s non-nullable type.
  */
 export function children(node: SyntaxNode, type: SatsumaGrammarSymbol): SyntaxNode[] {
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- see module header
   return node.namedChildren.filter((c): c is SyntaxNode => c !== null && c.type === type);
 }
 
 /**
  * Collect all descendants of a given type (depth-first).
+ * Filters out null entries — see the module header for why this matters
+ * despite `namedChildren`'s non-nullable type.
  */
 export function allDescendants(
   node: SyntaxNode,
@@ -44,6 +58,7 @@ export function allDescendants(
   acc: SyntaxNode[] = [],
 ): SyntaxNode[] {
   for (const c of node.namedChildren) {
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- see module header
     if (c !== null) {
       if (c.type === type) acc.push(c);
       allDescendants(c, type, acc);
@@ -163,6 +178,7 @@ export function fieldNameText(node: SyntaxNode | null | undefined): string | nul
  */
 export function walkDescendants(node: SyntaxNode, fn: (n: SyntaxNode) => void): void {
   for (const ch of node.namedChildren) {
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- see module header
     if (ch !== null) {
       fn(ch);
       walkDescendants(ch, fn);

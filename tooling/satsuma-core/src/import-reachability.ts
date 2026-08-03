@@ -117,8 +117,12 @@ export function computeSymbolDependencies(index: SemanticIndex): Map<string, Set
 
   /** Ensure a deps entry exists and add a dependency edge. */
   function addDep(from: string, to: string): void {
-    if (!deps.has(from)) deps.set(from, new Set());
-    deps.get(from)!.add(to);
+    let edges = deps.get(from);
+    if (!edges) {
+      edges = new Set();
+      deps.set(from, edges);
+    }
+    edges.add(to);
   }
 
   /** Ensure every known symbol has a deps entry, even if empty. */
@@ -129,17 +133,14 @@ export function computeSymbolDependencies(index: SemanticIndex): Map<string, Set
   // All definition maps that carry a qualified key in the index. Walk each
   // one and record its outgoing dependency edges.
 
-  const allDefinitions = new Map<string, unknown>([
-    ...(index.schemas as Map<string, unknown>),
-    ...(index.fragments as Map<string, unknown>),
-  ]);
+  const allDefinitions = new Map<string, unknown>([...index.schemas, ...index.fragments]);
 
   // --- Schemas: depend on spread fragments ---
   for (const [key, schema] of index.schemas) {
     ensureEntry(key);
     const ns = schema.namespace ?? null;
     for (const spread of schema.spreads ?? []) {
-      const resolved = resolveScopedEntityRef(spread, ns, index.fragments as Map<string, unknown>);
+      const resolved = resolveScopedEntityRef(spread, ns, index.fragments);
       if (resolved) addDep(key, resolved);
     }
   }
@@ -149,7 +150,7 @@ export function computeSymbolDependencies(index: SemanticIndex): Map<string, Set
     ensureEntry(key);
     const ns = fragment.namespace ?? null;
     for (const spread of fragment.spreads ?? []) {
-      const resolved = resolveScopedEntityRef(spread, ns, index.fragments as Map<string, unknown>);
+      const resolved = resolveScopedEntityRef(spread, ns, index.fragments);
       if (resolved) addDep(key, resolved);
     }
   }
@@ -173,7 +174,7 @@ export function computeSymbolDependencies(index: SemanticIndex): Map<string, Set
     ensureEntry(key);
     const ns = metric.namespace ?? null;
     for (const src of metric.sources ?? []) {
-      const resolved = resolveScopedEntityRef(src, ns, index.schemas as Map<string, unknown>);
+      const resolved = resolveScopedEntityRef(src, ns, index.schemas);
       if (resolved) addDep(key, resolved);
     }
   }
@@ -199,8 +200,12 @@ function buildFileToSymbols(index: SemanticIndex): Map<string, Set<string>> {
   const result = new Map<string, Set<string>>();
 
   function add(file: string, key: string): void {
-    if (!result.has(file)) result.set(file, new Set());
-    result.get(file)!.add(key);
+    let keys = result.get(file);
+    if (!keys) {
+      keys = new Set();
+      result.set(file, keys);
+    }
+    keys.add(key);
   }
 
   // --- Primary definitions (the "winning" entry in each map) ---
@@ -213,7 +218,7 @@ function buildFileToSymbols(index: SemanticIndex): Map<string, Set<string>> {
     // guard. The CLI's TransformRecord has a `file` field; the LSP adapter
     // stores `true`. Only record file associations when the value has a file.
     const val = transform as { file?: string };
-    if (val?.file) add(val.file, key);
+    if (val.file) add(val.file, key);
   }
 
   // --- Duplicate definitions (the "losing" entries not in the primary maps) ---

@@ -327,7 +327,7 @@ function checkFragmentSpreads(index: SemanticIndex, diagnostics: SemanticDiagnos
   for (const [name, schema] of index.schemas) {
     const currentNs = schema.namespace ?? null;
     for (const spread of schema.spreads ?? []) {
-      if (!resolveScopedEntityRef(spread, currentNs, index.fragments as Map<string, unknown>)) {
+      if (!resolveScopedEntityRef(spread, currentNs, index.fragments)) {
         diagnostics.push({
           file: schema.file,
           line: schema.row + 1,
@@ -400,7 +400,7 @@ function checkMetricRefs(index: SemanticIndex, diagnostics: SemanticDiagnostic[]
   for (const [name, metric] of index.metrics) {
     const currentNs = metric.namespace ?? null;
     for (const src of metric.sources ?? []) {
-      if (!resolveScopedEntityRef(src, currentNs, index.schemas as Map<string, unknown>)) {
+      if (!resolveScopedEntityRef(src, currentNs, index.schemas)) {
         diagnostics.push({
           file: metric.file,
           line: metric.row + 1,
@@ -546,8 +546,6 @@ function extractReferencedSchema(
  * unresolved spreads (can't know their full field set).
  */
 function checkArrowFieldRefs(index: SemanticIndex, diagnostics: SemanticDiagnostic[]): void {
-  if (!index.fieldArrows) return;
-
   // De-duplicate arrows (the same arrow may appear under multiple index keys).
   const seenArrows = new Set<SemanticArrow>();
   const uniqueArrows: SemanticArrow[] = [];
@@ -573,7 +571,7 @@ function checkArrowFieldRefs(index: SemanticIndex, diagnostics: SemanticDiagnost
       .map((s) => resolveScopedEntityRef(s, currentNs, index.schemas as Map<string, unknown>))
       .filter((k): k is string => k != null);
     const resolvedTgtKey = mapping.targets[0]
-      ? resolveScopedEntityRef(mapping.targets[0], currentNs, index.schemas as Map<string, unknown>)
+      ? resolveScopedEntityRef(mapping.targets[0], currentNs, index.schemas)
       : null;
 
     const srcSchema = resolvedSrcKeys[0];
@@ -593,7 +591,7 @@ function checkArrowFieldRefs(index: SemanticIndex, diagnostics: SemanticDiagnost
       resolveRef,
       lookupFragment,
       srcFieldPaths,
-      diagnostics as never[],
+      diagnostics,
       lookupSchema,
     );
 
@@ -604,12 +602,8 @@ function checkArrowFieldRefs(index: SemanticIndex, diagnostics: SemanticDiagnost
     // diagnostics were already emitted by the combined expansion above, so
     // this pass discards them to avoid duplicates.
     if (resolvedSrcKeys.length > 1) {
-      for (let i = 0; i < mapping.sources.length; i++) {
-        const key = resolveScopedEntityRef(
-          mapping.sources[i]!,
-          currentNs,
-          index.schemas as Map<string, unknown>,
-        );
+      for (const src of mapping.sources) {
+        const key = resolveScopedEntityRef(src, currentNs, index.schemas);
         if (!key) continue;
         const perSourcePaths = new Set<string>();
         collectFieldPaths(index.schemas.get(key)?.fields ?? [], "", perSourcePaths);
@@ -622,7 +616,7 @@ function checkArrowFieldRefs(index: SemanticIndex, diagnostics: SemanticDiagnost
           [],
           lookupSchema,
         );
-        for (const p of perSourcePaths) srcFieldPaths.add(`${mapping.sources[i]}.${p}`);
+        for (const p of perSourcePaths) srcFieldPaths.add(`${src}.${p}`);
       }
     }
 
@@ -639,7 +633,7 @@ function checkArrowFieldRefs(index: SemanticIndex, diagnostics: SemanticDiagnost
           resolveRef,
           lookupFragment,
           tgtFieldPaths,
-          diagnostics as never[],
+          diagnostics,
           lookupSchema,
         )
       : false;
@@ -649,16 +643,11 @@ function checkArrowFieldRefs(index: SemanticIndex, diagnostics: SemanticDiagnost
       const sch = index.schemas.get(key);
       if (sch) for (const f of getConventionFields(sch)) srcFieldPaths.add(f);
     }
-    for (let i = 0; i < mapping.sources.length; i++) {
-      const key = resolveScopedEntityRef(
-        mapping.sources[i]!,
-        currentNs,
-        index.schemas as Map<string, unknown>,
-      );
+    for (const src of mapping.sources) {
+      const key = resolveScopedEntityRef(src, currentNs, index.schemas);
       if (!key) continue;
       const sch = index.schemas.get(key);
-      if (sch)
-        for (const f of getConventionFields(sch)) srcFieldPaths.add(`${mapping.sources[i]}.${f}`);
+      if (sch) for (const f of getConventionFields(sch)) srcFieldPaths.add(`${src}.${f}`);
     }
     if (resolvedTgtKey) {
       const sch = index.schemas.get(resolvedTgtKey);
@@ -717,7 +706,6 @@ function checkArrowFieldRefs(index: SemanticIndex, diagnostics: SemanticDiagnost
  * a known transform (not a schema fragment — these are transform fragments).
  */
 function checkTransformSpreads(index: SemanticIndex, diagnostics: SemanticDiagnostic[]): void {
-  if (!index.fieldArrows) return;
   const seen = new Set<SemanticArrow>();
   for (const [, arrows] of index.fieldArrows) {
     for (const arrow of arrows) {
@@ -787,10 +775,11 @@ function checkFieldRefMetadata(
     if (field.metadata) {
       for (const m of field.metadata) {
         if (m.kind === "kv" && m.key === "ref") {
-          const refTarget = m.value.replace(/^@/, "").split(".")[0]!;
-          if (
-            !resolveScopedEntityRef(refTarget, currentNs, index.schemas as Map<string, unknown>)
-          ) {
+          // split() on a non-empty pattern always yields at least one element,
+          // so the default here is unreachable in practice — it exists only
+          // to satisfy noUncheckedIndexedAccess.
+          const [refTarget = ""] = m.value.replace(/^@/, "").split(".");
+          if (!resolveScopedEntityRef(refTarget, currentNs, index.schemas)) {
             diagnostics.push({
               file,
               line: row + 1,
@@ -882,7 +871,7 @@ function checkImportScope(
       checkRef(
         spread,
         schema.namespace ?? null,
-        index.fragments as Map<string, unknown>,
+        index.fragments,
         schema.file,
         "schema",
         name,
@@ -898,7 +887,7 @@ function checkImportScope(
       checkRef(
         spread,
         fragment.namespace ?? null,
-        index.fragments as Map<string, unknown>,
+        index.fragments,
         fragment.file,
         "fragment",
         name,
@@ -912,28 +901,10 @@ function checkImportScope(
   for (const [name, mapping] of index.mappings) {
     const ns = mapping.namespace ?? null;
     for (const src of mapping.sources) {
-      checkRef(
-        src,
-        ns,
-        allDefinitions,
-        mapping.file,
-        "mapping",
-        name ?? "<anonymous>",
-        mapping.row,
-        "source",
-      );
+      checkRef(src, ns, allDefinitions, mapping.file, "mapping", name, mapping.row, "source");
     }
     for (const tgt of mapping.targets) {
-      checkRef(
-        tgt,
-        ns,
-        allDefinitions,
-        mapping.file,
-        "mapping",
-        name ?? "<anonymous>",
-        mapping.row,
-        "target",
-      );
+      checkRef(tgt, ns, allDefinitions, mapping.file, "mapping", name, mapping.row, "target");
     }
   }
 
@@ -941,54 +912,43 @@ function checkImportScope(
   for (const [name, metric] of index.metrics) {
     const ns = metric.namespace ?? null;
     for (const src of metric.sources ?? []) {
-      checkRef(
-        src,
-        ns,
-        index.schemas as Map<string, unknown>,
-        metric.file,
-        "metric",
-        name,
-        metric.row,
-        "source",
-      );
+      checkRef(src, ns, index.schemas, metric.file, "metric", name, metric.row, "source");
     }
   }
 
   // --- Transform spread refs in arrows ---
-  if (index.fieldArrows) {
-    const seen = new Set<object>();
-    for (const [, arrows] of index.fieldArrows) {
-      for (const arrow of arrows) {
-        if (seen.has(arrow)) continue;
-        seen.add(arrow);
-        for (const step of arrow.steps ?? []) {
-          if (step.type === "fragment_spread") {
-            const spreadName = step.text.replace(/^\.\.\./, "");
-            const ns = arrow.namespace ?? null;
-            const resolved = resolveScopedEntityRef(spreadName, ns, index.transforms);
-            if (!resolved) continue;
-            const reachable = reachability.reachableSymbols.get(arrow.file);
-            if (!reachable || reachable.has(resolved)) continue;
-            diagnostics.push({
-              file: arrow.file,
-              line: arrow.line + 1,
-              column: 1,
-              severity: "error",
-              rule: policy.rule ?? "import-scope",
-              message:
-                policy.message?.({
-                  file: arrow.file,
-                  row: arrow.line,
-                  entityKind: "arrow",
-                  entityName: arrow.mapping ?? "<anonymous>",
-                  refKind: "transform",
-                  ref: spreadName,
-                  resolved,
-                  definitionFile: definitionFileFor(index.transforms.get(resolved)),
-                }) ??
-                `Arrow in mapping '${arrow.mapping}' references transform '${resolved}' which is not reachable from this file's imports`,
-            });
-          }
+  const seen = new Set<object>();
+  for (const [, arrows] of index.fieldArrows) {
+    for (const arrow of arrows) {
+      if (seen.has(arrow)) continue;
+      seen.add(arrow);
+      for (const step of arrow.steps ?? []) {
+        if (step.type === "fragment_spread") {
+          const spreadName = step.text.replace(/^\.\.\./, "");
+          const ns = arrow.namespace ?? null;
+          const resolved = resolveScopedEntityRef(spreadName, ns, index.transforms);
+          if (!resolved) continue;
+          const reachable = reachability.reachableSymbols.get(arrow.file);
+          if (!reachable || reachable.has(resolved)) continue;
+          diagnostics.push({
+            file: arrow.file,
+            line: arrow.line + 1,
+            column: 1,
+            severity: "error",
+            rule: policy.rule ?? "import-scope",
+            message:
+              policy.message?.({
+                file: arrow.file,
+                row: arrow.line,
+                entityKind: "arrow",
+                entityName: arrow.mapping ?? "<anonymous>",
+                refKind: "transform",
+                ref: spreadName,
+                resolved,
+                definitionFile: definitionFileFor(index.transforms.get(resolved)),
+              }) ??
+              `Arrow in mapping '${arrow.mapping}' references transform '${resolved}' which is not reachable from this file's imports`,
+          });
         }
       }
     }
@@ -1042,10 +1002,18 @@ function checkFieldTypeParens(
   diagnostics: SemanticDiagnostic[],
 ): void {
   for (const field of fields) {
+    // FieldDecl.type is typed as required, but callers that hand-construct a
+    // partial FieldDecl-shaped object (bypassing the type via `as any`, as
+    // satsuma-cli's validate-bugs tests deliberately do) can still reach this
+    // with type undefined — hence the optional chain despite the type.
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
     const match = field.type?.match(TYPE_WITH_ARGS);
     if (match) {
-      const [, typeName, rawArgs] = match;
-      const flagged = rawArgs!.split(/[,\s]+/).filter((arg) => CONSTRAINT_FLAG_TOKENS.has(arg));
+      // Neither capture group in TYPE_WITH_ARGS is optional, so both are
+      // always defined on a successful match; the defaults exist only to
+      // satisfy noUncheckedIndexedAccess.
+      const [, typeName, rawArgs = ""] = match;
+      const flagged = rawArgs.split(/[,\s]+/).filter((arg) => CONSTRAINT_FLAG_TOKENS.has(arg));
       if (flagged.length > 0) {
         const constraints = flagged.map((f) => `'${f}'`).join(", ");
         diagnostics.push({
@@ -1192,8 +1160,7 @@ function makeSpreadLookups(
   lookupSchema: SpreadEntityLookup;
 } {
   return {
-    resolveRef: (ref, _ns) =>
-      resolveScopedEntityRef(ref, currentNs, index.fragments as Map<string, unknown>),
+    resolveRef: (ref, _ns) => resolveScopedEntityRef(ref, currentNs, index.fragments),
     lookupFragment: (key): SpreadEntity | undefined => {
       const f = index.fragments.get(key);
       return f
