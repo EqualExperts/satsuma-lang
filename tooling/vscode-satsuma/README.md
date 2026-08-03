@@ -167,7 +167,7 @@ npm run check
 # TextMate grammar tests only
 npm test
 
-# LSP server tests only (142 tests)
+# LSP server tests only (296 tests)
 npm run test:lsp
 
 # Build .vsix locally
