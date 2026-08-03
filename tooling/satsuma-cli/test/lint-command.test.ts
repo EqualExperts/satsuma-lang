@@ -225,6 +225,22 @@ describe("structural rules registration", () => {
     assert.match(stdout, /lineage-cycle/);
   });
 
+  it("aligns every --rules description at the same column, including the longest id", async () => {
+    // The id column width is derived from the registry, so registering a rule
+    // with a longer id than any existing one must not push its description out
+    // of line (sl-n4rb: a hard-coded padEnd(24) broke the two 26-char ids).
+    const { stdout } = await run(CLI, "lint", "--rules");
+    const descriptionColumns = new Set(
+      stdout
+        .split("\n")
+        .filter((line) => line.trim().length > 0)
+        // The description starts after the id and the run of padding spaces.
+        .map((line) => line.length - line.replace(/^\s+\S+\s+/, "").length),
+    );
+
+    assert.equal(descriptionColumns.size, 1, `descriptions not aligned:\n${stdout}`);
+  });
+
   it("reports a type mismatch as an unfixable warning in --json", async () => {
     // Pins the JSON contract machine consumers read: id, severity, position, and
     // fixable: false — the fix is an author judgement, so --fix must not offer one.

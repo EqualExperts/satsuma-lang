@@ -55,6 +55,13 @@ import type { LintDiagnostic, LintFix } from "../types.js";
 /** Every rule id the engine knows, used to reject typos wherever ids are named. */
 const KNOWN_RULE_IDS: readonly string[] = RULES.map((r) => r.id);
 
+/**
+ * Width of the id column in `--rules`, computed from the registry rather than
+ * hard-coded so that registering a rule with a longer id cannot knock the
+ * description column out of alignment (sl-n4rb).
+ */
+const RULE_ID_COLUMN_WIDTH = Math.max(...KNOWN_RULE_IDS.map((id) => id.length));
+
 /** Split a comma-separated rule-id flag value, dropping incidental whitespace. */
 function parseRuleList(value: string): string[] {
   return value
@@ -208,7 +215,7 @@ Examples:
           // --rules: list available rules and exit
           if (opts.rules) {
             for (const r of RULES) {
-              console.log(`  ${r.id.padEnd(24)} ${r.description}`);
+              console.log(`  ${r.id.padEnd(RULE_ID_COLUMN_WIDTH)} ${r.description}`);
             }
             return;
           }
