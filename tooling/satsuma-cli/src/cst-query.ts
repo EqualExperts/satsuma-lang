@@ -3,6 +3,7 @@
  */
 
 import { labelText } from "@satsuma/core";
+import type { SatsumaGrammarSymbol } from "@satsuma/core";
 import type { SyntaxNode } from "./types.js";
 
 interface QualifiedName {
@@ -21,7 +22,7 @@ function splitQualifiedName(name: string): QualifiedName {
 
 export function findBlockNode(
   rootNode: SyntaxNode,
-  nodeType: string,
+  nodeType: SatsumaGrammarSymbol,
   qualifiedName: string,
 ): SyntaxNode | null {
   // Handle anonymous blocks keyed by <anon>@file:row
@@ -53,7 +54,7 @@ export function findBlockNode(
 
 function findBlockByRow(
   rootNode: SyntaxNode,
-  nodeType: string,
+  nodeType: SatsumaGrammarSymbol,
   targetRow: number,
 ): SyntaxNode | null {
   for (const c of rootNode.namedChildren) {
@@ -69,7 +70,7 @@ function findBlockByRow(
 
 function findBlockNodeInContainer(
   containerNode: SyntaxNode,
-  nodeType: string,
+  nodeType: SatsumaGrammarSymbol,
   localName: string,
 ): SyntaxNode | null {
   for (const c of containerNode.namedChildren) {

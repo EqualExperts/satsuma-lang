@@ -20,6 +20,7 @@ import { loadWorkspace } from "../load-workspace.js";
 import { runCommand, CommandError, EXIT_NOT_FOUND } from "../command-runner.js";
 import { findBlockNode } from "../cst-query.js";
 import { resolveScopedEntityRef } from "../index-builder.js";
+import type { SatsumaGrammarSymbol } from "@satsuma/core";
 import type { ExtractedWorkspace, ParsedFile, SyntaxNode } from "../types.js";
 
 interface Match {
@@ -111,11 +112,13 @@ Examples:
  * `metric` tag (see the aggregation notes in index-builder.ts), so the metric
  * scope must look up schema_block nodes.
  */
-const CST_NODE_TYPE: Record<string, string> = {
+type SearchBlockType = "schema" | "metric" | "fragment";
+
+const CST_NODE_TYPE = {
   schema: "schema_block",
   metric: "schema_block",
   fragment: "fragment_block",
-};
+} as const satisfies Record<SearchBlockType, SatsumaGrammarSymbol>;
 
 /**
  * A v2 metric registers the same schema_block node in both `index.schemas`
@@ -140,17 +143,16 @@ function searchTag(
   const fileMap = new Map<string, ParsedFile>(parsedFiles.map((p) => [p.filePath, p]));
 
   const search = (
-    blockType: string,
+    blockType: SearchBlockType,
     blockName: string,
     blockEntry: { file: string; row: number; line?: number },
-    bodyType: string,
+    bodyType: SatsumaGrammarSymbol,
   ) => {
     if (scope !== "all" && scope !== blockType) return;
     const parsed = fileMap.get(blockEntry.file);
     if (!parsed) return;
 
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- Safe: blockType is always a CST_NODE_TYPE key
-    const blockNode = findBlockNode(parsed.tree.rootNode, CST_NODE_TYPE[blockType]!, blockName);
+    const blockNode = findBlockNode(parsed.tree.rootNode, CST_NODE_TYPE[blockType], blockName);
     if (!blockNode) {
       // Fallback: use index fields (no tag info)
       return;

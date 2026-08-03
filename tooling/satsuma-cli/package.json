@@ -18,7 +18,7 @@
     "postbuild": "node scripts/postbuild.js",
     "build": "tsc",
     "dev": "tsc --watch",
-    "pretest": "npm run prebuild && tsc",
+    "pretest": "npm run prebuild && tsc && npm run test:typecheck",
     "prepare": "npm run build",
     "pack": "node scripts/pack.js",
     "test": "node --import tsx/esm --import ./test/setup.ts --test 'test/**/*.test.ts'",

@@ -16,6 +16,7 @@ import { resolveIndexKey } from "../index-builder.js";
 import { extractNLContent } from "../nl-extract.js";
 import type { NLItem } from "../nl-extract.js";
 import { labelText } from "@satsuma/core";
+import type { SatsumaGrammarSymbol } from "@satsuma/core";
 import { findBlockNode } from "../cst-query.js";
 import type { SyntaxNode, ExtractedWorkspace, ParsedFile, FieldDecl } from "../types.js";
 
@@ -129,7 +130,11 @@ function extractFromBlock(
   // Collect NL content from ALL matching blocks (schema, mapping, metric, transform)
   // to handle ambiguous names where a schema and mapping share a name
   const items: NLItemWithFile[] = [];
-  const matches: Array<{ key: string; entry: { file: string }; blockType: string }> = [];
+  const matches: Array<{
+    key: string;
+    entry: { file: string };
+    blockType: SatsumaGrammarSymbol;
+  }> = [];
   if (schemaResolved)
     matches.push({
       key: schemaResolved.key,
