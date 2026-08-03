@@ -1,6 +1,7 @@
 import * as vscode from "vscode";
 import { runCli } from "./cli-runner";
 import { resolveEntryFile } from "./entry-file";
+import { parseSummaryResponse, buildSummarySections } from "./summary-logic";
 
 export function registerSummaryCommand(
   context: vscode.ExtensionContext,
@@ -22,94 +23,30 @@ export function registerSummaryCommand(
         return;
       }
 
-      try {
-        const data = JSON.parse(result.stdout);
-        outputChannel.clear();
-        outputChannel.appendLine("Satsuma Workspace Summary");
-        outputChannel.appendLine("=".repeat(40));
-        outputChannel.appendLine("");
-
-        if (data.files !== undefined) {
-          outputChannel.appendLine(`Files: ${data.files}`);
-          outputChannel.appendLine("");
-        }
-
-        const sections: {
-          key: string;
-          label: string;
-          format: (item: Record<string, unknown>) => string;
-        }[] = [
-          {
-            key: "schemas",
-            label: "Schemas",
-            format: (s) => {
-              const fields =
-                s.fieldCount === 1 ? `[${s.fieldCount} field]` : `[${s.fieldCount} fields]`;
-              const note = s.note ? ` — ${s.note}` : "";
-              return `  ${s.name}  ${fields}${note}`;
-            },
-          },
-          {
-            key: "mappings",
-            label: "Mappings",
-            format: (m) => {
-              const note = m.note ? ` — ${m.note}` : "";
-              return `  ${m.name}${note}`;
-            },
-          },
-          {
-            key: "fragments",
-            label: "Fragments",
-            format: (f) => {
-              const note = f.note ? ` — ${f.note}` : "";
-              return `  ${f.name}${note}`;
-            },
-          },
-          {
-            key: "transforms",
-            label: "Transforms",
-            format: (t) => {
-              const note = t.note ? ` — ${t.note}` : "";
-              return `  ${t.name}${note}`;
-            },
-          },
-          {
-            key: "metrics",
-            label: "Metrics",
-            format: (m) => {
-              const note = m.note ? ` — ${m.note}` : "";
-              return `  ${m.name}${note}`;
-            },
-          },
-          {
-            key: "notes",
-            label: "Notes",
-            format: (n) => `  ${n.name || n.text || JSON.stringify(n)}`,
-          },
-          {
-            key: "arrows",
-            label: "Arrows",
-            format: (a) => `  ${a.name || JSON.stringify(a)}`,
-          },
-        ];
-
-        for (const section of sections) {
-          const items = data[section.key];
-          if (Array.isArray(items) && items.length > 0) {
-            outputChannel.appendLine(`${section.label} (${items.length}):`);
-            for (const item of items) {
-              outputChannel.appendLine(section.format(item));
-            }
-            outputChannel.appendLine("");
-          }
-        }
-
-        outputChannel.show();
-      } catch {
+      const data = parseSummaryResponse(result.stdout);
+      if (!data) {
         outputChannel.clear();
         outputChannel.appendLine(result.stdout);
         outputChannel.show();
+        return;
       }
+
+      outputChannel.clear();
+      outputChannel.appendLine("Satsuma Workspace Summary");
+      outputChannel.appendLine("=".repeat(40));
+      outputChannel.appendLine("");
+      outputChannel.appendLine(`Files: ${data.fileCount}`);
+      outputChannel.appendLine("");
+
+      for (const section of buildSummarySections(data)) {
+        outputChannel.appendLine(`${section.label} (${section.items.length}):`);
+        for (const line of section.items) {
+          outputChannel.appendLine(line);
+        }
+        outputChannel.appendLine("");
+      }
+
+      outputChannel.show();
     }),
   );
 }

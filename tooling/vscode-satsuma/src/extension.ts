@@ -54,7 +54,7 @@ export function activate(context: ExtensionContext): void {
     clientOptions,
   );
 
-  client.start();
+  void client.start();
   context.subscriptions.push({ dispose: () => client?.stop() });
 
   // Output channel for command results
