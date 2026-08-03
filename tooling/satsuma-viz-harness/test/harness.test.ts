@@ -750,6 +750,34 @@ test.describe("Mapping detail — order line facts (flatten)", () => {
 // the .hl class.  Both non-nested and nested fixtures are exercised.
 // ---------------------------------------------------------------------------
 
+/**
+ * How the coverage port dot on one field row is actually painted, as a single
+ * comparable string.
+ *
+ * Every property that can carry the distinction between coverage states is
+ * folded in — fill, gradient, ring colour and style, and the fade the "not
+ * computed" dot uses — so two states comparing equal here look the same on
+ * screen, whichever property a future style change reaches for. `rowTestId` is
+ * the field row's test id; the dot is its `.port` child inside the card's shadow
+ * root, which Playwright's CSS selectors pierce.
+ */
+async function portAppearance(
+  detail: ReturnType<Page["locator"]>,
+  rowTestId: string,
+): Promise<string> {
+  return detail.locator(`[data-testid='${rowTestId}'] .port`).evaluate((el) => {
+    const style = getComputedStyle(el);
+    return [
+      style.backgroundColor,
+      style.backgroundImage,
+      style.borderColor,
+      style.borderStyle,
+      style.borderWidth,
+      style.opacity,
+    ].join(" | ");
+  });
+}
+
 test.describe("Field coverage indicators", () => {
   test("target fields with arrows are mapped, target fields without arrows are unmapped", async ({
     page,
@@ -811,6 +839,53 @@ test.describe("Field coverage indicators", () => {
       detail.locator(`[data-testid='${targetCardPrefix}-field-line-number']`),
     ).toHaveAttribute("data-coverage", "mapped");
   });
+
+  // sl-f0x6: the port dot was chosen from the `mapped` boolean, which is true for
+  // a fully covered record and a partly covered one alike, so a record with one
+  // covered leaf out of three painted the same solid dot as a record with three.
+  // Only a real browser can prove the three states are actually *drawn*
+  // differently — the component test can only see the class names — and it has to
+  // hold in both palettes, since a distinction carried by colour alone may
+  // survive one theme and vanish in the other.
+  for (const theme of ["light", "dark"] as const) {
+    test(`a partly covered record's port dot is drawn unlike covered and uncovered ones (${theme})`, async ({
+      page,
+    }) => {
+      await page.goto(`/?theme=${theme}`);
+      await page.waitForFunction(() => {
+        const harness = window.__satsumaHarness;
+        if (!harness?.setViewMode) return false; // app.js not evaluated yet
+        harness.setViewMode("single");
+        return true;
+      });
+      await loadFixture(page, ffgUri);
+      const detail = await openMappingByName(page, "order-line-facts");
+
+      // order_events.customer is the case from the ticket: the mapping writes
+      // `customer.customer_id` and leaves `email` and `tier` alone, so the record
+      // is partial with one covered and two uncovered children beneath it.
+      const sourceCardPrefix = "mapping-detail-order-line-facts-source-schema-card-order-events";
+      const row = (path: string) =>
+        detail.locator(`[data-testid='${sourceCardPrefix}-field-${path}']`);
+
+      await expect(row("customer")).toHaveAttribute("data-coverage-state", "partial");
+      await expect(row("customer-customer-id")).toHaveAttribute("data-coverage-state", "covered");
+      await expect(row("customer-email")).toHaveAttribute("data-coverage-state", "uncovered");
+
+      const appearances = {
+        partial: await portAppearance(detail, `${sourceCardPrefix}-field-customer`),
+        covered: await portAppearance(detail, `${sourceCardPrefix}-field-customer-customer-id`),
+        uncovered: await portAppearance(detail, `${sourceCardPrefix}-field-customer-email`),
+      };
+
+      // Pairwise distinct is the whole requirement: `partial` reading like either
+      // neighbour is the defect, in either direction.
+      expect(new Set(Object.values(appearances)).size, JSON.stringify(appearances)).toBe(3);
+      // And the difference is one of shape, not shade: the half-fill is a
+      // gradient, so it survives at the 8px port size and in monochrome.
+      expect(appearances.partial).toMatch(/gradient/);
+    });
+  }
 });
 
 test.describe("Hover highlighting between arrows and field rows", () => {
