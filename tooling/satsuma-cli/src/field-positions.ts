@@ -12,6 +12,7 @@
  * (spread-expand.ts) — it only interprets their output.
  */
 
+import { declaresRecordBody } from "@satsuma/core";
 import type { CoverageField, ExpandedField } from "@satsuma/core";
 
 /** Where the entity that declares (or spreads in) a field lives. */
@@ -70,6 +71,9 @@ export function toCoverageFields(
     const row = fieldDeclarationRow(field, entity, withinSpread);
     const projected: CoverageField = { name: field.name };
     if (row !== undefined) projected.line = row;
+    // Declared from the type, not inferred from the child list: `record {}` has
+    // no children and would otherwise reach core as a scalar (`ccc-3vaw`).
+    if (declaresRecordBody(field.type)) projected.container = true;
     if (field.children && field.children.length > 0) {
       projected.children = toCoverageFields(field.children, entity, spread);
     }

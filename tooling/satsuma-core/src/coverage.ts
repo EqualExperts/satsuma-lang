@@ -80,12 +80,50 @@ export interface CoverageField {
   /** Nested declarations for record / list_of record fields. */
   children?: CoverageField[];
   /**
+   * True when this field declares a record body — `record { … }` or `list_of
+   * record { … }` — **including an empty one**.
+   *
+   * `children` cannot carry that on its own. `record {}` is legal Satsuma (spec
+   * §5.1, and the grammar corpus covers it) and declares no children, so a
+   * projection that forwards only the child list makes it indistinguishable from
+   * a scalar — and it was then counted as one, putting a field that carries no
+   * data at all into the denominator and leaving it out of
+   * {@link countContainerStates} (`ccc-3vaw`).
+   *
+   * Set it from the declared type, which every consumer already has:
+   * {@link declaresRecordBody} takes that type string. Omitting it is safe for a
+   * record with children — those are still recognised structurally — so an older
+   * or partial adapter loses only the empty case.
+   */
+  container?: boolean;
+  /**
    * 0-indexed declaration row within the file identified by
    * {@link CoverageSchemaDefinition.uri}. Omit it when the consumer has no
    * trustworthy position — never substitute 0, which reads as "line 1" and
    * sends editor-jump links to the wrong place.
    */
   line?: number;
+}
+
+/**
+ * Type strings that name a record body, and so a container.
+ *
+ * Two spellings because two shapes reach coverage: core's `FieldDecl` reports
+ * `record` and carries `list_of` separately in `isList`, while the viz model
+ * flattens the pair into one string. Both are container declarations, so both
+ * must answer yes.
+ */
+const RECORD_BODY_TYPES = ["record", "list_of record"] as const;
+
+/**
+ * True when a declared type names a record body, empty or not.
+ *
+ * The one place the spelling of a container's type is known, so that the three
+ * adapters (CLI, LSP, viz) set {@link CoverageField.container} the same way
+ * rather than each testing for `"record"` in its own words.
+ */
+export function declaresRecordBody(type: string | undefined): boolean {
+  return type !== undefined && (RECORD_BODY_TYPES as readonly string[]).includes(type);
 }
 
 /** One schema resolved for coverage: where it is declared and what it declares. */
@@ -198,6 +236,19 @@ export interface FieldCoverageEntry {
    * only — never `partial`.
    */
   state: FieldCoverageState;
+  /**
+   * True when this field declares a record body, empty or not — the entry is
+   * structure, not data.
+   *
+   * **Classify on this, never by looking for entries whose path sits below this
+   * one.** That inference is right for a record with children and blind to
+   * `record {}`, which has none: an empty record then counted as a leaf, entering
+   * the denominator and missing from {@link countContainerStates} (`ccc-3vaw`).
+   * `leafFieldEntries` and `countContainerStates` read it for exactly that
+   * reason, and keep the structural fallback for entries produced before it
+   * existed.
+   */
+  container?: boolean;
   /**
    * Which tier covered it. Absent exactly when `mapped` is false — the two
    * always agree, so a consumer may branch on either. A container reports the
@@ -578,10 +629,15 @@ function findDeclaredField(path: string, fields: CoverageField[]): CoverageField
  * arrows that gate turns away. A second implementation would let the number and
  * the explanation for it drift apart.
  *
- * A container with no declared children reads as a `leaf`, matching the rule
- * `coverageForField` and `leafFieldEntries` apply when counting: as far as
- * coverage is concerned a record nothing is declared inside carries data of its
- * own.
+ * **A record with no declared children reads as a `leaf` here, deliberately, and
+ * that is not the rule counting applies.** This function answers "does this
+ * endpoint have a subtree to confer or to enumerate?", and `record {}` has none:
+ * treating it as a container would make ADR-038's whole-structure test pass on a
+ * field with nothing to fill, and make `unenumerated-record-target` demand child
+ * arrows that cannot be written. Counting asks the different question "is this
+ * field structure or data?", where an empty record is structure and so is not a
+ * leaf — see {@link FieldCoverageEntry.container}. The two answers differ because
+ * the questions do.
  */
 export function declaredFieldKind(
   path: string,
@@ -801,15 +857,18 @@ function coverageForField(
   const path = prefix ? `${prefix}.${f.name}` : f.name;
   const children = f.children ?? [];
 
-  // A record with no declared children carries data of its own as far as
-  // coverage is concerned, so it is judged as a leaf — the same rule
-  // `leafFieldEntries` applies when counting.
+  // An empty `record {}` has no descendants to roll up, so its own path decides
+  // its state exactly as a leaf's does — `hollow -> hollow` covers it, nothing
+  // else does, and it can never read `partial`. It is still a container for
+  // counting: it is structure that carries no data, so it belongs in the
+  // container tally and out of the denominator (`ccc-3vaw`).
   const subtrees =
     children.length > 0 ? children.map((c) => coverageForField(c, uri, path, covered)) : null;
 
   const { state, tier } = subtrees ? rollUpContainer(subtrees) : leafState(path, covered);
 
   const entry: FieldCoverageEntry = { path, uri, mapped: state !== "uncovered", state };
+  if (subtrees !== null || f.container === true) entry.container = true;
   if (tier !== undefined) entry.tier = tier;
   // Omit `line` entirely when unknown rather than defaulting to 0 — see the
   // CoverageField.line contract.

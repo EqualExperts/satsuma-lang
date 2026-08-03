@@ -92,7 +92,10 @@ describe("toCoverageFields()", () => {
     const projected = toCoverageFields(schema.fields, { file: SCHEMA_FILE, row: schema.row });
     assert.deepEqual(projected, [
       { name: "id", line: 1 },
-      { name: "address", line: 2, children: [{ name: "line1", line: 3 }] },
+      // `container` is set from the declared type on every record, not only the
+      // empty ones core cannot recognise structurally (ccc-3vaw) — one rule, so
+      // the flag cannot be right for `record {}` and missing for `record {…}`.
+      { name: "address", line: 2, container: true, children: [{ name: "line1", line: 3 }] },
     ]);
   });
 
@@ -150,7 +153,12 @@ schema place {
       { name: "label", line: 7 },
       // Spread in from the fragment: the record and its child both report the
       // consuming schema's row rather than rows 1-2 of the fragment.
-      { name: "point", line: schema.row, children: [{ name: "lat", line: schema.row }] },
+      {
+        name: "point",
+        line: schema.row,
+        container: true,
+        children: [{ name: "lat", line: schema.row }],
+      },
     ]);
   });
 });

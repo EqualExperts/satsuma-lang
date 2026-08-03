@@ -40,6 +40,9 @@ const PARTIAL_RECORD = resolve(__dirname, "fixtures/coverage-partial-record.stm"
 // Whole-structure conferral, and the fixture with more than one container in a
 // state: `tgt` ends with two partly-mapped records and one uncovered.
 const WHOLE_STRUCTURE = resolve(__dirname, "fixtures/coverage-whole-structure.stm");
+// `record {}` and `list_of record {}` beside a populated record — the containers
+// that declare no children and so cannot be recognised structurally (ccc-3vaw).
+const EMPTY_RECORD = resolve(__dirname, "fixtures/coverage-empty-record.stm");
 
 const run = (...args: string[]) => _run(CLI, ...args);
 
@@ -942,6 +945,34 @@ describe("satsuma coverage — nested containers", () => {
     // Every record in this fixture is fully covered on both sides.
     const covered = await run("coverage", NESTED_ARROW);
     assert.doesNotMatch(covered.stdout, /partly mapped/);
+  });
+
+  it("counts an empty record as a container, not as a leaf (ccc-3vaw)", async () => {
+    // The three counts must sum to the records declared, and `tgt` declares
+    // three: `hollow`, `hollow_list` and `filled`. Only `filled` has children, so
+    // the other two were invisible to a structural test and tallied as leaves —
+    // reported `{0, 1, 0}` against three declarations.
+    const { stdout, code } = await run("coverage", EMPTY_RECORD, "--json");
+    assert.equal(code, 0);
+    const target = schemaEntry(parseJson(stdout), "::load", "target", "::tgt");
+    assert.deepEqual(target.records, { covered: 0, partial: 1, uncovered: 2 });
+  });
+
+  it("keeps an empty record out of the denominator and out of fields[]", async () => {
+    // The same defect seen from the percentage's side: a field that cannot hold
+    // data was inflating the denominator, so adding `hollow record {}` to a
+    // schema moved its coverage figure — 2/5 40% here, where the data is 2/3 66%.
+    // `fields[]` listed it too, contradicting the contract's "leaf fields only".
+    const { stdout } = await run("coverage", EMPTY_RECORD, "--json");
+    const target = schemaEntry(parseJson(stdout), "::load", "target", "::tgt");
+    assert.deepEqual(
+      { covered: target.covered, total: target.total, pct: target.pct },
+      { covered: 2, total: 3, pct: 66 },
+    );
+    assert.deepEqual(
+      target.fields.map((f: any) => f.path),
+      ["a", "filled.x", "filled.y"],
+    );
   });
 
   it("pluralises the count and leaves the percentage untouched", async () => {
