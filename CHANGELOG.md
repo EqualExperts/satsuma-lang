@@ -61,6 +61,32 @@ now reports on them.
 A mapping is identified to core by namespace and position rather than by label, so
 the CLI, the VS Code gutter and the viz card resolve the same mapping.
 
+### An empty `record {}` no longer counts as a mappable field (`ccc-3vaw`)
+
+**Percentages rise for any schema declaring an empty record.** `record {}` and
+`list_of record {}` are legal and declare no children — so nothing beneath them
+marked them as structure, and coverage counted them as data. A field that cannot
+hold anything sat in the denominator, which meant adding one moved a schema's
+coverage figure downward on its own:
+
+```satsuma
+schema tgt { a STRING  hollow record {}  filled record { x STRING  y STRING } }
+```
+
+With `a` and `filled.x` mapped this reported `2/5 40%`; it now reports `2/3 66%`,
+because the two records are structure and only the three leaves are data. Any
+`--fail-under` threshold set against such a schema still passes — the old figure
+_understated_ the spec. The same fields also disappeared from `--json`'s
+`fields[]`, which is documented as leaf fields only, and appear instead in the new
+`records` tally: it now sums to every record the schema declares, where an empty
+one had been silently missing from it.
+
+An arrow onto an empty record still covers it (`blob -> hollow`). With no leaves
+beneath it, its own state is the whole of what there is to report, and it can never
+read as partly mapped.
+
+Found by external review of the change below.
+
 ### `coverage` reports partly-mapped records (`sl-lctd`)
 
 Percentages count leaf fields only, so "two of these records are half mapped" is

@@ -29,6 +29,7 @@ import { resolveDefinition } from "./workspace-index";
 import { makeDefinitionLookup } from "@satsuma/viz-backend/coverage";
 import {
   computeMappingCoverage as computeCoverage,
+  declaresRecordBody,
   expandDeclaredFields,
   extractNLRefData,
   resolveAllNLRefs,
@@ -211,11 +212,19 @@ function toFieldDecl(field: FieldInfo): FieldDecl {
   };
 }
 
-/** Project a core `FieldDecl` onto core's minimal coverage field shape. */
+/**
+ * Project a core `FieldDecl` onto core's minimal coverage field shape.
+ *
+ * `container` comes from the declared type rather than from the child list, which
+ * cannot distinguish `record {}` from a scalar — both arrive with no children
+ * (`ccc-3vaw`). The type here is the LSP's rendered spelling, so it may read
+ * `list_of record`; `declaresRecordBody` accepts both forms.
+ */
 function toCoverageField(field: FieldDecl): CoverageField {
   return {
     name: field.name,
     ...(field.startRow !== undefined ? { line: field.startRow } : {}),
+    ...(declaresRecordBody(field.type) ? { container: true } : {}),
     children: (field.children ?? []).map(toCoverageField),
   };
 }

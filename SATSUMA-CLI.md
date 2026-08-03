@@ -142,6 +142,8 @@ Counting a resolved `@ref` is **resolution, not interpretation**: the author wro
 
 **Percentages count leaf fields only.** A `record` is structure, not data; counting it alongside its children would count the same data twice and let a schema's nesting depth move the number on its own. A record's own coverage is _derived_ from its leaves and has three states — covered (every leaf), partial (some), uncovered (none) — which is what the editor gutter and the viz overlay render; the percentage still counts the leaves it was derived from.
 
+An **empty** `record {}` or `list_of record {}` is structure too, so it is excluded as well: adding a field with nothing inside it never moves a percentage. It is still reported in `records`, and an arrow onto it (`blob -> hollow`) still covers it — with no leaves beneath it, its own state is all there is to report, and it can never read as partly mapped.
+
 **Records are reported beside the percentage, never inside it.** "Two records are only half mapped" is exactly what a reviewer wants next to `9/12`, and it must not enter the number. A schema row names its partly mapped records when it has any and stays silent when it has none — a fully covered record needs no attention, and an uncovered one is already in the list of gaps below the row:
 
 ```text
@@ -254,7 +256,7 @@ appears unchanged in both.
 
 `covered_declared` and `covered_nl` are the two tiers of `covered` and always sum to it: a field covered both ways is reported as declared, so they are disjoint. They appear on every counts object — per-mapping schema, aggregate schema, namespace subtotal and workspace total.
 
-`records` is the container tally that the leaf-only counts deliberately exclude, so a consumer can render "9/12, 2 records partly mapped" without reconstructing it from `fields` — which lists leaves only. Its three counts sum to the number of `record` and `list_of record` fields the schema declares, and a schema with no records reports three zeroes. Unlike the tier counts it appears on **schema entries only**, in both sections: a container belongs to one schema, and a namespace or workspace figure saying "5 records partly mapped" could not say which schema to go and look at.
+`records` is the container tally that the leaf-only counts deliberately exclude, so a consumer can render "9/12, 2 records partly mapped" without reconstructing it from `fields` — which lists leaves only. Its three counts sum to the number of `record` and `list_of record` fields the schema declares — **every one of them, an empty `record {}` included** — and a schema with no records reports three zeroes. Unlike the tier counts it appears on **schema entries only**, in both sections: a container belongs to one schema, and a namespace or workspace figure saying "5 records partly mapped" could not say which schema to go and look at.
 
 With `--uncovered`, `fields` is filtered to unmapped entries while `covered`/`total` stay unchanged, so the denominator survives.
 

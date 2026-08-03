@@ -27,6 +27,8 @@ import {
   summarizeFieldCoverage,
   countContainerStates,
   coveragePercentage,
+  leafFieldEntries,
+  declaresRecordBody,
 } from "@satsuma/core";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -38,11 +40,19 @@ before(async () => {
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
-/** Project extractSchemas() FieldDecls onto core's minimal coverage shape. */
+/**
+ * Project extractSchemas() FieldDecls onto core's minimal coverage shape.
+ *
+ * Mirrors the three real adapters, `container` included: it is taken from the
+ * declared type because an empty `record {}` has no children to give it away
+ * (ccc-3vaw). A test adapter that omitted it would model an adapter that does not
+ * exist and hide that case from every test here.
+ */
 function toCoverageFields(fields) {
   return fields.map((f) => ({
     name: f.name,
     line: f.startRow,
+    ...(declaresRecordBody(f.type) ? { container: true } : {}),
     children: f.children ? toCoverageFields(f.children) : undefined,
   }));
 }
@@ -215,6 +225,72 @@ describe("countContainerStates()", () => {
       partial: 0,
       uncovered: 0,
     });
+  });
+
+  it("counts an empty record, which has no descendant path to give it away", () => {
+    // ccc-3vaw. `record {}` is legal and declares no children, so the structural
+    // test that finds every other container cannot see it: it was tallied as a
+    // leaf, breaking the guarantee that these three counts sum to the records
+    // declared. The `container` flag is what makes it visible.
+    const entries = [
+      { path: "hollow", uri: "u", mapped: false, state: "uncovered", container: true },
+      { path: "filled", uri: "u", mapped: true, state: "covered", container: true },
+      { path: "filled.city", uri: "u", mapped: true, state: "covered" },
+      { path: "amount", uri: "u", mapped: false, state: "uncovered" },
+    ];
+    assert.deepEqual(countContainerStates(entries), { covered: 1, partial: 0, uncovered: 1 });
+  });
+
+  it("still classifies a record with children when no flag is set", () => {
+    // The structural fallback, for entries from a producer older than the flag —
+    // a viz payload cached by a previous host (ADR-042). Losing it would report
+    // every record in such a payload as a leaf, which is a worse answer than the
+    // one bug the flag fixes.
+    const entries = [
+      { path: "address", uri: "u", mapped: true, state: "partial" },
+      { path: "address.city", uri: "u", mapped: true, state: "covered" },
+      { path: "address.line1", uri: "u", mapped: false, state: "uncovered" },
+    ];
+    assert.deepEqual(countContainerStates(entries), { covered: 0, partial: 1, uncovered: 0 });
+  });
+});
+
+describe("leafFieldEntries() — an empty record is not a leaf (ccc-3vaw)", () => {
+  it("keeps an empty record out of the leaf list and so out of the denominator", () => {
+    // ADR-034 counts leaves because a record is structure, not data — and a
+    // `record {}` carries no data whatsoever. Counting it made a schema's
+    // percentage move when a field with nothing in it was added, and put a path
+    // in `fields[]` that the CLI documents as leaves only.
+    const entries = [
+      { path: "amount", uri: "u", mapped: true, state: "covered" },
+      { path: "hollow", uri: "u", mapped: false, state: "uncovered", container: true },
+    ];
+    assert.deepEqual(
+      leafFieldEntries(entries).map((f) => f.path),
+      ["amount"],
+    );
+    const totals = summarizeFieldCoverage(entries);
+    assert.deepEqual(
+      { covered: totals.covered, total: totals.total, pct: totals.pct },
+      {
+        covered: 1,
+        total: 1,
+        pct: 100,
+      },
+    );
+  });
+
+  it("reports 0/0 for a schema of nothing but empty records", () => {
+    // The degenerate end of the same rule: there is no data here to be covered,
+    // so there is no denominator either. A percentage of 0 with a total of 2
+    // would claim the schema was unmapped when nothing about it is mappable.
+    const entries = [
+      { path: "a", uri: "u", mapped: false, state: "uncovered", container: true },
+      { path: "b", uri: "u", mapped: false, state: "uncovered", container: true },
+    ];
+    const totals = summarizeFieldCoverage(entries);
+    assert.deepEqual({ total: totals.total, covered: totals.covered }, { total: 0, covered: 0 });
+    assert.deepEqual(countContainerStates(entries), { covered: 0, partial: 0, uncovered: 2 });
   });
 });
 

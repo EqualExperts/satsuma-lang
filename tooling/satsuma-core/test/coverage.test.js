@@ -27,6 +27,8 @@ import {
   leafFieldEntries,
   resolveAllNLRefs,
   summarizeFieldCoverage,
+  countContainerStates,
+  declaresRecordBody,
 } from "@satsuma/core";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -40,11 +42,19 @@ before(async () => {
 
 // ── Test resolver ───────────────────────────────────────────────────────────
 
-/** Project extractSchemas() FieldDecls onto core's minimal coverage shape. */
+/**
+ * Project extractSchemas() FieldDecls onto core's minimal coverage shape.
+ *
+ * Mirrors the three real adapters, `container` included: it is taken from the
+ * declared type because an empty `record {}` has no children to give it away
+ * (ccc-3vaw). A test adapter that omitted it would model an adapter that does not
+ * exist and hide that case from every test here.
+ */
 function toCoverageFields(fields) {
   return fields.map((f) => ({
     name: f.name,
     line: f.startRow,
+    ...(declaresRecordBody(f.type) ? { container: true } : {}),
     children: f.children ? toCoverageFields(f.children) : undefined,
   }));
 }
@@ -749,6 +759,56 @@ ${arrows}
     // …and the fixture does contain a container that IS partial, so the check
     // above is discriminating rather than vacuously true of every entry.
     assertState(tgt, "addr", "partial");
+  });
+
+  it("marks an empty record as a container and judges it on its own path (ccc-3vaw)", () => {
+    // `record {}` is legal Satsuma with no children, so nothing about the entry
+    // list says it is structure — and it was reported as a leaf, entering the
+    // denominator and missing from the container tally. Two properties here: the
+    // entry carries `container`, and its state comes from its own path, since
+    // there is no subtree to roll up. `blob -> hollow` covers it; `spare` does not.
+    const EMPTY = `
+schema src { blob record {} spare INT }
+schema tgt { hollow record {} untouched record {} amount INT }
+mapping load {
+  source { src }
+  target { tgt }
+  blob -> hollow
+  spare -> amount
+}`;
+    const tgt = forRole(coverage(EMPTY, "load"), "target");
+    const byPath = new Map(tgt.fields.map((f) => [f.path, f]));
+    assert.equal(byPath.get("hollow").container, true);
+    assertState(tgt, "hollow", "covered");
+    assertState(tgt, "untouched", "uncovered");
+    // A leaf beside them keeps no flag at all, so the two are distinguishable.
+    assert.equal(byPath.get("amount").container, undefined);
+    // And the counting rule follows from the flag: one leaf, not three.
+    assert.deepEqual(summarizeFieldCoverage(tgt.fields).total, 1);
+    assert.deepEqual(countContainerStates(tgt.fields), {
+      covered: 1,
+      partial: 0,
+      uncovered: 1,
+    });
+  });
+
+  it("rolls a record of nothing but empty records up to partial", () => {
+    // The rollup unit is "has nothing declared beneath it", which is not the same
+    // set as the leaves: an empty record is a unit *and* a container. Were it
+    // dropped from the units, `outer` here would have none and could not be
+    // partial — it would read `covered` off one covered child.
+    const NESTED_EMPTY = `
+schema src { a record {} b record {} }
+schema tgt { outer record { first record {} second record {} } }
+mapping load {
+  source { src }
+  target { tgt }
+  a -> outer.first
+}`;
+    const tgt = forRole(coverage(NESTED_EMPTY, "load"), "target");
+    assertState(tgt, "outer", "partial");
+    assertState(tgt, "outer.first", "covered");
+    assertState(tgt, "outer.second", "uncovered");
   });
 
   it("propagates partial upward through every enclosing record, but not covered", () => {

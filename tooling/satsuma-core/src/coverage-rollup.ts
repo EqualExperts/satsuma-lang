@@ -70,7 +70,11 @@ export interface CoverageTotals {
    * and a consumer can render the split without risk of double counting.
    */
   coveredNl: number;
-  /** Leaf fields declared. Zero for a schema with no leaves. */
+  /**
+   * Leaf fields declared. Zero for a schema with no leaves — which includes a
+   * schema of nothing but empty `record {}` fields, since those are structure
+   * and carry no data to measure (`ccc-3vaw`).
+   */
   total: number;
   /**
    * covered/total as a whole-number percentage, per
@@ -86,7 +90,9 @@ export interface CoverageTotals {
  * Reported *alongside* a percentage, never inside one: a record is structure,
  * so it is excluded from the ratio by ADR-034, but "two records are only partly
  * mapped" is exactly what a reviewer wants next to "9/12". The three counts sum
- * to the number of record and `list_of record` fields declared.
+ * to the number of record and `list_of record` fields declared — **every one of
+ * them**, an empty `record {}` included, which needs
+ * {@link FieldCoverageEntry.container} to see (`ccc-3vaw`).
  */
 export interface ContainerStateCounts {
   /** Containers every one of whose descendant leaves is covered. */
@@ -185,7 +191,7 @@ export function summarizeFieldCoverage(fields: FieldCoverageEntry[]): CoverageTo
  */
 export function leafFieldEntries(fields: FieldCoverageEntry[]): FieldCoverageEntry[] {
   const paths = new Set(fields.map((f) => f.path));
-  return fields.filter((f) => !hasDescendant(f.path, paths));
+  return fields.filter((f) => !isContainerEntry(f, paths));
 }
 
 /**
@@ -198,16 +204,33 @@ export function leafFieldEntries(fields: FieldCoverageEntry[]): FieldCoverageEnt
  * that two records need attention without a number that double-counts their
  * children.
  *
- * Containers and leaves partition the list, so a schema with no records reports
- * three zeroes.
+ * Containers and leaves partition the list — every entry is counted here or by
+ * {@link leafFieldEntries} and never by both — so the three counts sum to the
+ * record and `list_of record` fields the schema declares, and a schema with no
+ * records reports three zeroes.
  */
 export function countContainerStates(fields: FieldCoverageEntry[]): ContainerStateCounts {
   const paths = new Set(fields.map((f) => f.path));
   const counts: ContainerStateCounts = { covered: 0, partial: 0, uncovered: 0 };
   for (const field of fields) {
-    if (hasDescendant(field.path, paths)) counts[field.state]++;
+    if (isContainerEntry(field, paths)) counts[field.state]++;
   }
   return counts;
+}
+
+/**
+ * True when an entry is structure rather than data, and so belongs in the
+ * container tally and out of the denominator.
+ *
+ * The declared flag decides it. The structural test behind it is the fallback for
+ * entries from a producer older than {@link FieldCoverageEntry.container} — right
+ * for every record with children, and blind to `record {}`, which is the bug the
+ * flag exists to fix (`ccc-3vaw`). Keeping the fallback means a cached viz payload
+ * (ADR-042) still classifies its non-empty records correctly instead of reporting
+ * every record as a leaf.
+ */
+function isContainerEntry(entry: FieldCoverageEntry, paths: Set<string>): boolean {
+  return entry.container === true || hasDescendant(entry.path, paths);
 }
 
 /** True when any entry's path sits below `path`, i.e. `path` is a record. */
@@ -416,15 +439,24 @@ function unionInto(accumulated: FieldCoverageEntry[], incoming: FieldCoverageEnt
  * over a flat list because that is the shape the union holds.
  *
  * Mutates `fields` in place. Leaf entries are left exactly as unioned.
+ *
+ * The units rolled up are the entries with nothing declared beneath them, which
+ * is **not** the same set as {@link leafFieldEntries}: an empty `record {}` has
+ * no descendants and so is a unit here, while being a container for counting.
+ * Its state is decided on its own path (`coverageForField`), so it unions like a
+ * leaf and must carry its verdict upward — a record whose children are all empty
+ * records would otherwise have no units at all and keep the OR-ed state
+ * `unionInto` left behind, reporting `covered` where one of two children is a gap.
  */
 function recomputeContainerStates(fields: FieldCoverageEntry[]): void {
-  const leaves = new Set(leafFieldEntries(fields).map((f) => f.path));
+  const paths = new Set(fields.map((f) => f.path));
+  const units = new Set(fields.filter((f) => !hasDescendant(f.path, paths)).map((f) => f.path));
 
-  // Tally each leaf against every container it sits beneath, so one pass over
-  // the leaves settles every ancestor at every depth.
+  // Tally each unit against every container it sits beneath, so one pass over
+  // them settles every ancestor at every depth.
   const tallies = new Map<string, { total: number; covered: number; tier?: CoverageTier }>();
   for (const field of fields) {
-    if (!leaves.has(field.path)) continue;
+    if (!units.has(field.path)) continue;
     for (let dot = field.path.indexOf("."); dot !== -1; dot = field.path.indexOf(".", dot + 1)) {
       const container = field.path.slice(0, dot);
       const tally = tallies.get(container) ?? { total: 0, covered: 0 };
@@ -439,7 +471,7 @@ function recomputeContainerStates(fields: FieldCoverageEntry[]): void {
 
   for (const field of fields) {
     const tally = tallies.get(field.path);
-    if (!tally) continue; // a leaf, or a record with no declared children
+    if (!tally) continue; // a unit: a leaf, or an empty record judged on its own path
     field.state =
       tally.covered === tally.total ? "covered" : tally.covered === 0 ? "uncovered" : "partial";
     field.mapped = field.state !== "uncovered";

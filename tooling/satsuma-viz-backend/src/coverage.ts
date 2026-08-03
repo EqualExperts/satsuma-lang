@@ -32,6 +32,7 @@ import type { DefinitionEntry, FieldInfo, WorkspaceIndex } from "./workspace-ind
 import { resolveDefinition } from "./workspace-index";
 import {
   computeMappingCoverage,
+  declaresRecordBody,
   extractMappings,
   extractNLRefData,
   resolveAllNLRefs,
@@ -170,11 +171,20 @@ function metricCardDef(metric: MetricCard): CoverageSchemaDefinition {
   };
 }
 
-/** Project a model `FieldEntry` onto core's minimal coverage field shape. */
+/**
+ * Project a model `FieldEntry` onto core's minimal coverage field shape.
+ *
+ * `container` is read off the declared type, which is the only place an empty
+ * `record {}` still announces itself: the model gives every field a `children`
+ * array, so an empty record and a scalar are identical in that list and the
+ * record was counted as data (`ccc-3vaw`). The model's type text spells the list
+ * form out (`list_of record`), which `declaresRecordBody` accepts.
+ */
 function toCoverageField(field: FieldEntry): CoverageField {
   return {
     name: field.name,
     line: field.location.line,
+    ...(declaresRecordBody(field.type) ? { container: true } : {}),
     children: field.children.map(toCoverageField),
   };
 }

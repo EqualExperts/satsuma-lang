@@ -109,6 +109,10 @@ mapped") and says nothing when it has none, because a fully covered record needs
 no attention and an uncovered one is already in the list below. --json always
 carries the full covered/partial/uncovered split, per schema.
 
+An empty 'record {}' is structure as much as a populated one, so it is excluded
+from the percentage too and counted among the records: adding a field with nothing
+inside it never moves a figure. An arrow onto one still covers it.
+
 Names can be namespace-qualified (e.g. crm::orders).
 
 JSON shape (--json):

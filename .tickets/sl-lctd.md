@@ -2,7 +2,7 @@
 id: sl-lctd
 status: closed
 deps: []
-links: []
+links: [ccc-3vaw]
 created: 2026-08-02T21:41:45Z
 type: task
 priority: 3
