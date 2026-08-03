@@ -331,6 +331,14 @@ jobs:
         working-directory: tooling/satsuma-lsp
         run: npx tsc
 
+      # LSP tests run through a bare tsc + node --test here rather than
+      # `npm test`, so npm's implicit pretest hook (where test:typecheck lives)
+      # never fires. Run it explicitly so the CST-symbol compile-time
+      # regression (sl-851u) actually gates this job.
+      - name: Run LSP test:typecheck
+        working-directory: tooling/satsuma-lsp
+        run: npm run test:typecheck
+
       - name: Run LSP server tests with coverage
         working-directory: tooling/satsuma-lsp
         run: |
@@ -610,6 +618,16 @@ jobs:
             tooling/vscode-satsuma/node_modules
             tooling/satsuma-lsp/node_modules
           key: workspace-${{ github.sha }}
+
+      # test:coverage bypasses each package's `pretest` (npm only auto-runs
+      # pretest before a script literally named `test`), so the CST-symbol
+      # compile-time regression (sl-851u) would silently not gate CI without
+      # this explicit step. Only satsuma-core and satsuma-viz-backend define
+      # test:typecheck; the other shards skip it.
+      - name: Run test:typecheck
+        if: matrix.module == 'satsuma-core' || matrix.module == 'satsuma-viz-backend'
+        working-directory: tooling/${{ matrix.module }}
+        run: npm run test:typecheck
 
       - name: Run test:coverage
         working-directory: tooling/${{ matrix.module }}
