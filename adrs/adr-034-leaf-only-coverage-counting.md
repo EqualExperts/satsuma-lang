@@ -1,6 +1,6 @@
 # ADR-034 — Leaf-Only Coverage Counting on a Field's Own Flag
 
-**Status:** Accepted — amended by ADR-037
+**Status:** Accepted — amended by ADR-037 and ADR-040
 **Date:** 2026-07-31 (sl-4qvp, feature 35)
 
 ## Context
