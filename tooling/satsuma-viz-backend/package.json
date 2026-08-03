@@ -31,8 +31,9 @@
     "prebuild": "npm run build:core && npm run build:viz-model",
     "build": "tsc",
     "prepare": "npm run build",
-    "pretest": "npm run prebuild && tsc",
+    "pretest": "npm run prebuild && tsc && npm run test:typecheck",
     "test": "node --test test/**/*.test.js",
+    "test:typecheck": "tsc --project tsconfig.type-tests.json",
     "test:coverage": "c8 --reporter=text --reporter=lcov --reporter=json-summary --include='dist/**/*.js' --exclude='dist/**/*.d.ts' node --test test/**/*.test.js"
   },
   "dependencies": {

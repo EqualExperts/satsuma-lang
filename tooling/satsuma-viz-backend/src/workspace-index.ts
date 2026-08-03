@@ -32,7 +32,7 @@ import {
   isMetricSchema,
   createAtRefRegex,
 } from "@satsuma/core";
-import type { FieldDecl } from "@satsuma/core";
+import type { FieldDecl, SatsumaCstType, SatsumaGrammarSymbol } from "@satsuma/core";
 
 // ---------- Data structures ----------
 
@@ -549,7 +549,7 @@ export function findMappingsUsing(index: WorkspaceIndex, schemaName: string): st
 // In v2, metrics are schema_block nodes with (metric, ...) metadata.
 // The schema_block entry defaults to "schema"; indexTopLevel upgrades it to
 // "metric" for nodes that pass isMetricSchema().
-const BLOCK_KINDS: Record<string, DefinitionEntry["kind"]> = {
+const BLOCK_KINDS: Partial<Record<SatsumaCstType, DefinitionEntry["kind"]>> = {
   schema_block: "schema",
   fragment_block: "fragment",
   transform_block: "transform",
@@ -897,7 +897,7 @@ function arrowFullPathRange(pathNode: SyntaxNode): Range | null {
 }
 
 /** Extract the schemas named in a source_block or target_block within a mapping body. */
-function getMappingBodySchemas(body: SyntaxNode, blockType: string): string[] {
+function getMappingBodySchemas(body: SyntaxNode, blockType: SatsumaGrammarSymbol): string[] {
   const names: string[] = [];
   for (const ch of body.namedChildren) {
     if (ch.type === blockType) {
