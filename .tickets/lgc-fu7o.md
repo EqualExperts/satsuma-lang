@@ -43,3 +43,9 @@ Found by Feature 41 R3's viz edge-completeness property (sl-hi0z), which is mark
 
 A multi-source arrow produces one drawn edge per source field, each attached to the card declaring that source. Hovering any source field highlights the edge from that field's own card. LayoutEdge.sourceField has a doc comment stating which form it holds, and holds that form for both bare and schema-qualified authored refs. Feature 41's multi-source viz property has its todo marker removed. Harness Playwright coverage for a multi-source mapping's rendered edges.
 
+
+## Notes
+
+**2026-08-03T22:45:49Z**
+
+Feature 41 R3 pinned this defect in an executable test rather than skipping it. The test asserts the CURRENT (wrong) behaviour and will go RED when this ticket is fixed, with a comment naming the invariant to replace it with. `{ todo: ... }` is not usable in this repo: node's JUnit reporter puts a `failure=` attribute on a failing todo testcase, and dorny/test-reporter then fails CI's Test report check.
