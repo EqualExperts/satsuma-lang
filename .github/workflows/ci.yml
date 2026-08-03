@@ -228,7 +228,13 @@ jobs:
             tooling/satsuma-lsp/node_modules
           key: workspace-${{ github.sha }}
 
-      - name: Generate parser
+      - name: Check generated CST contract is up to date
+        run: npm run check:cst-symbols
+
+      - name: Test CST contract generator
+        run: npm run test:generator
+
+      - name: Generate parser and CST contract
         run: npm run generate
 
       - name: Check generated sources are up to date

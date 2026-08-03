@@ -44,7 +44,8 @@ test/
     nested_arrows.txt    Nested arrow bodies
     recovery.txt         Error-recovery cases
 scripts/
-  smoke-check.js          Parses .stm files, emits JSON summary (Node.js)
+  generate-cst-symbols.mjs  Emits core's typed CST symbol contract
+  smoke-check.js            Parses .stm files, emits JSON summary (Node.js)
 docs/
   cst-reference.md       Complete CST node type reference
 CONFLICTS.expected       Documented expected grammar conflicts (count = 3)
@@ -80,9 +81,16 @@ node scripts/smoke-check.js ../../examples/
 
 Whenever `grammar.js` is changed:
 
-1. Run `npm run build` to regenerate `src/parser.c` and recompile the binding.
+1. Run `npm run build` to regenerate the parser, the tracked CST symbol contract,
+   and the WASM binding.
 2. Run `npm test` to verify all corpus tests pass.
 3. If the conflict count changes, update `CONFLICTS.expected` to match.
+
+The grammar owns `src/node-types.json` and the generator. Its tracked TypeScript
+output lives at `../satsuma-core/src/generated/cst-types.ts`, where all consumers
+can obtain the public contract through `@satsuma/core`. CI runs
+`npm run check:cst-symbols` before generation so a stale committed artifact
+fails without being rewritten.
 
 ```bash
 tree-sitter generate --wasm
