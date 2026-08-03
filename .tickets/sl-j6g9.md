@@ -1,6 +1,6 @@
 ---
 id: sl-j6g9
-status: open
+status: closed
 deps: [sl-joeq]
 links: [sl-joeq, sl-f0x6]
 created: 2026-07-31T14:42:52Z
@@ -37,3 +37,8 @@ Exploratory test pass over the merged feature-35 + feature-38 work (main @ e831b
 Verified passing against the PRD's acceptance tests: name-shadowing at every depth (AT1-4, AT6 on deep-nested-bugs.stm), nested_arrow (AT7), flatten-in-each on examples/nested-iteration/pipeline.stm reporting 8/9 and 8/8 with orders.parcels.barcode the single gap (AT8, AT29), empty each body and computed-arrow-into-container both uncovered (AT16, AT17, per ADR-037), leaf-only percentages and depth invariance (AT18, AT19), whole-structure conferral including the empty-body and pipe-chain-body forms and the direct-vs-derived distinction (AT22-25, ADR-037/038). CLI, LSP and VS Code paths agree everywhere tested. fields --unmapped-by matches coverage --uncovered leaf for leaf across every mapping in examples/ and the CLI fixtures, with one exception (sl-ymxs).
 
 The epic stays open on its own acceptance criterion — 'coverage figures reported by the CLI, the VS Code status bar and the viz card are identical for the same workspace'. The viz card is not identical: it keeps a third derivation of covered paths (satsuma-viz/src/field-coverage.ts) that implements neither the NL @ref tier (sl-46wr, twelve shipped examples disagree) nor whole-structure conferral (sl-csrs). Also raised: sl-qead (a spread redeclaring an explicit field counts it twice, in the shipped corpus) and sl-lctd (R3/AT21 container state counts never reported by the CLI). Outside this epic: sl-8ba4 (--fail-under gates a rounded percentage, so 200/201 passes --fail-under 100), sl-ymxs, sl-v6rt.
+
+**2026-08-03T14:00:04Z**
+
+Cause: Feature 38 remained open after all coverage semantics, implementation, reporting, and cross-consumer parity children had shipped because a newly discovered fragment-redeclaration lint warning was parented to the coverage epic and the roadmap/PRD status was not reconciled.
+Fix: Archived the implemented PRD, moved Feature 38 into the shipped roadmap, unblocked Feature 39 dependencies, and detached sqdsp-00kv as a standalone lint follow-up. (commit a76836f6)
