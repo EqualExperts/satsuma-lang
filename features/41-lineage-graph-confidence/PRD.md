@@ -376,6 +376,37 @@ container header onto a schema root should mean; that remains `r0-7w76`.
    remaining requirements nor Feature 40, and are the work to begin immediately.
 6. **R6 waits for Feature 39 R5,** which is not yet ticketed. R6 must not
    pre-empt that design by inventing its own brands.
+7. **`ArrowEntry` does not gain a declaration-kind field — considered and
+   deferred, 2026-08-03.** The viz encodes an arrow's declaration kind
+   *structurally* (`eachBlocks` / `flattenBlocks` / `NestedArrowBlock`, and
+   `sourceFields: []` for a computed arrow — `viz-model.ts:1064`) while core
+   states it as data (`ExtractedArrow.kind`). Labelling it in the protocol was
+   assessed and rejected for now:
+
+   - it is **redundant** — every value is recoverable from position today, so a
+     label introduces a payload that can disagree with its own structure, the
+     opposite direction from Feature 39 R8's variant work on `FieldDecl`;
+   - it would **re-arm the derivation ADR-042 removed**. `MappingBlock.coverage`'s
+     doc-comment records that client-side coverage derivation fails partly because
+     the client lacks "the arrow's declaration kind"; supplying it hands back the
+     missing ingredient for the path deleted by `sl-46wr` / `sl-csrs`;
+   - `arrow.transform.kind` is already `"nl" | "map"`, so a sibling `kind`
+     containing `"map"` with a different meaning needs a clumsier name;
+   - as an LSP↔webview contract field it would land optional (as `coverage?` did),
+     so consumers keep the positional fallback and the derivation survives anyway;
+   - no logged defect motivates it — `3cdd-yavi` and `sl-l7u0` were path
+     qualification failures, not kind misclassification.
+
+   **Trigger to revisit:** a genuine kind disagreement surfaced by R5's parity
+   sweep (`sl-kwet`). That evidence would both justify the field and identify
+   which side was wrong. Until then R5 covers the risk without a protocol change.
+   The cheaper intermediate step, if the derivation risk needs cutting sooner, is
+   to export a named predicate from core for the "does this header count as an
+   arrow" decision and have the viz's walk call it — the shape of `sl-3yuz`.
+
+   Separately, `sl-k7i4` (a sourceless derived arrow renders an indistinguishable
+   empty Source cell) is a real user-visible bug that does **not** depend on this
+   decision: the renderer can treat `sourceFields.length === 0` as computed today.
 
 ## Ticket Map
 
