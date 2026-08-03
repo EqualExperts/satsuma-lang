@@ -1,6 +1,6 @@
 ---
 id: tcc-e35f
-status: in_progress
+status: closed
 deps: [gcsc-ejb2]
 links: []
 created: 2026-08-03T14:37:47Z
@@ -21,3 +21,10 @@ Import the R1 contract into core's public SyntaxNode and Tree types. Preserve we
 ## Acceptance Criteria
 
 SyntaxNode.type is SatsumaCstType and its child/parent properties recursively use the same typed interface; the public Tree root is typed; one documented core parser adapter narrows web-tree-sitter output and no extraction use site performs an arbitrary CST cast; child, children, allDescendants, formatter helpers, and other symbol-selecting core helpers accept SatsumaGrammarSymbol; every direct core CST comparison and switch compiles against the generated contract with ERROR handling explicit; a compile-time regression test proves an invalid or removed referenced symbol is rejected while adding a symbol does not impose exhaustive handling on partial walkers; existing and new core/parser tests pass.
+
+## Notes
+
+**2026-08-03T15:03:08Z**
+
+Cause: Core exposed web-tree-sitter CST discriminants and selectors as unchecked strings, so stale grammar symbols compiled and recovery nodes had no shared typed boundary.
+Fix: Added the recovery-aware generated-symbol node/tree contract, a single parser adapter, typed core helpers and comparisons, and compile-time plus runtime regression coverage (commit fe305085).
