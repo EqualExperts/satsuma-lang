@@ -595,7 +595,7 @@ schema users {
 #### Redeclaring a spread field
 
 **A spread contributes only those fields the body has not already declared.** An
-explicitly declared field *shadows* a same-named field reached through a spread:
+explicitly declared field _shadows_ a same-named field reached through a spread:
 the spread's copy is not a second field, and the body's declaration — its type,
 constraints and note — is the one that stands. Where two spreads in the same body
 declare a name, the first one wins.

@@ -2,8 +2,9 @@
 //
 // `load_ts` is written out in `contact` AND declared by `...meta`. It is one
 // field, so the schema has three leaves — id, load_ts, batch_id — and the two
-// mapped ones make it 2/3 (67%). Counting the spread's copy as a second field
-// reported 3/4 (75%), overstating coverage. Shared with the LSP and viz suites.
+// mapped ones make it 2/3 (66%, floored per ADR-040). Counting the spread's copy
+// as a second field reported 3/4 (75%), overstating coverage — and 75% happens
+// to be exact, so the rounding rule never hid it. Shared with LSP and viz.
 fragment meta {
   load_ts TIMESTAMPTZ
   batch_id STRING(36)

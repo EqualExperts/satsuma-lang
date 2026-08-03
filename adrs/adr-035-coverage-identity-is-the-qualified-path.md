@@ -1,6 +1,6 @@
 # ADR-035 — Coverage Identity Is the Qualified Field Path
 
-**Status:** Accepted
+**Status:** Accepted — amended by ADR-041
 **Date:** 2026-07-31 (sl-joeq)
 
 ## Context

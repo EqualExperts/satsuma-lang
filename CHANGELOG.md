@@ -2,6 +2,37 @@
 
 ## Unreleased
 
+### A spread no longer redeclares a field the schema body declared (`sl-qead`)
+
+**Percentages drop for any schema that redeclares a spread field.** A schema that
+wrote out a field _and_ spread a fragment declaring the same name counted it
+twice. The duplicate landed in the denominator and, when the field was mapped, in
+the numerator too, so a schema's percentage moved with how many times a name
+happened to be written — upward, since authors write out the fields they are
+working with.
+
+```satsuma
+fragment meta { load_ts TIMESTAMPTZ  batch_id STRING(36) }
+schema contact { id STRING(10)  load_ts TIMESTAMPTZ  ...meta }
+```
+
+`contact` has three fields. With two mapped it reported `3/4 75%`; it now reports
+`2/3 66%`. In the shipped examples, `vault::sat_contact_details` in
+`examples/namespaces/ns-platform.stm` goes from eleven leaves to ten. Re-baseline
+any `--fail-under` threshold set against a schema with a redeclaration; the old
+figure overstated the spec.
+
+`coverage --json` also stopped emitting two `fields[]` entries with the same
+`path`, which ADR-035 makes the identity of an entry — a consumer keying by path
+collapsed them and then disagreed with the printed totals.
+
+The language rule this settles, now in the v2 spec (§5.1, "Redeclaring a spread
+field"): **a spread contributes only the names the body has not already
+declared.** The explicit declaration wins, keeping its own type, constraints and
+note; between two spreads the first wins; shadowing is whole-field and never
+merges record children. Redeclaring stays legal and still raises no diagnostic —
+that is tracked separately. See ADR-041.
+
 ### `--fail-under` no longer passes an incomplete spec (`sl-8ba4`)
 
 **Some percentages move by a point.** `coverage` reported a percentage rounded to

@@ -1001,8 +1001,9 @@ describe("satsuma coverage — fragment spreads", () => {
     // sl-qead. `contact` writes out `load_ts` and also spreads `...meta`, which
     // declares it again — one field, declared twice. Emitting both copies put
     // the duplicate in the denominator and, because it is mapped, in the
-    // numerator too: 3/4 (75%) for a schema that is 2/3 (67%). The error
-    // overstates coverage, the one direction `--fail-under` must not fail in.
+    // numerator too: 3/4 (75%) for a schema that is 2/3 (66%, floored per
+    // ADR-040). The error overstates coverage, the one direction `--fail-under`
+    // must not fail in.
     const { stdout } = await run("coverage", REDECLARED_SPREAD, "--json");
     const target = schemaEntry(parseJson(stdout), "::contact_load", "target", "::contact");
     assert.deepEqual(
@@ -1015,7 +1016,7 @@ describe("satsuma coverage — fragment spreads", () => {
     );
     assert.equal(target.covered, 2);
     assert.equal(target.total, 3);
-    assert.equal(target.pct, 67);
+    assert.equal(target.pct, 66);
   });
 
   it("never emits two fields[] entries sharing a path, anywhere in the corpus", async () => {
