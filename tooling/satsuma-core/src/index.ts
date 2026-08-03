@@ -52,6 +52,7 @@ export {
   summarizeFieldCoverage,
   leafFieldEntries,
   countContainerStates,
+  coveragePercentage,
 } from "./coverage-rollup.js";
 export type {
   MappingCoverageInput,

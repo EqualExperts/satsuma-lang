@@ -104,12 +104,12 @@ Operations that check or compare workspace structure.
 
 Flags: `--json` (structured output), `--fix` (apply safe fixes), `--select <rules>` / `--ignore <rules>` (filter rules), `--quiet` (exit code only), `--rules` (list available rules).
 
-| Rule                   | Severity | Fixable | Description                                                         |
-| ---------------------- | -------- | ------- | ------------------------------------------------------------------- |
-| `hidden-source-in-nl`  | error    | yes     | NL text references a schema not in the mapping's source/target list |
-| `unresolved-nl-ref`    | warning  | no      | `@ref` in NL does not resolve to any known identifier               |
-| `duplicate-definition` | error    | no      | Named definition is declared more than once in a namespace          |
-| `unenumerated-record-target` | warning | no | Arrow targets a record without a record source or child arrows |
+| Rule                         | Severity | Fixable | Description                                                         |
+| ---------------------------- | -------- | ------- | ------------------------------------------------------------------- |
+| `hidden-source-in-nl`        | error    | yes     | NL text references a schema not in the mapping's source/target list |
+| `unresolved-nl-ref`          | warning  | no      | `@ref` in NL does not resolve to any known identifier               |
+| `duplicate-definition`       | error    | no      | Named definition is declared more than once in a namespace          |
+| `unenumerated-record-target` | warning  | no      | Arrow targets a record without a record source or child arrows      |
 
 ### coverage
 
@@ -137,6 +137,8 @@ Flags: `--mapping <name>`, `--schema <name>`, `--role source|target`, `--uncover
 Counting a resolved `@ref` is **resolution, not interpretation**: the author wrote `@` to mark a reference, and resolving it against the index reads no surrounding prose. Two things still do not count — a field prose merely _describes_ without an `@ref` (use `nl-refs` to find those), and an `@ref` that resolves to nothing (that is `lint`'s `unresolved-nl-ref`; letting it count would make coverage rise when a spec breaks). Policy judgements about which gaps are acceptable remain `lint`'s. See **ADR-036**, and **ADR-013** for why an `@ref` carries the same lineage weight as a declared source field.
 
 **Coverage matches whole paths, never bare field names.** `home_address.city` covers exactly that path — not a top-level `city`, and not `work_address.city`. Repeated leaf names across depths (`id`, `sku`, `code`, `BIC`) are normal in nested schemas, so name matching would report unmapped fields as mapped. In a multi-source mapping, an arrow's schema prefix resolves to the schema it names: `crm.consent.email_marketing` covers `consent.email_marketing` in `crm` and contributes nothing to any other source.
+
+**100% and 0% are reserved for the exact endpoints.** A percentage is a whole number, and only a fully covered population reports 100% — everything below it floors into 1–99%. So 200 of 201 leaves reports 99% and fails `--fail-under 100`, where rounding to nearest reported 100% and let the gate pass a spec with an unmapped field; and 1 of 201 reports 1% rather than a 0% that reads as nothing mapped. The number printed is the number gated: `--fail-under` compares the same figure the report shows.
 
 **Percentages count leaf fields only.** A `record` is structure, not data; counting it alongside its children would count the same data twice and let a schema's nesting depth move the number on its own. A record's own coverage is _derived_ from its leaves and has three states — covered (every leaf), partial (some), uncovered (none) — which is what the editor gutter and the viz overlay render; the percentage still counts the leaves it was derived from.
 

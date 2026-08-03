@@ -15,7 +15,9 @@
 
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { resolve, dirname } from "node:path";
+import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join, resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { run as _run } from "./helpers.js";
 
@@ -34,6 +36,29 @@ const NESTED_ARROW = resolve(__dirname, "fixtures/nested-arrow-lookup.stm");
 const MULTI_SOURCE = resolve(__dirname, "fixtures/coverage-multi-source.stm");
 
 const run = (...args: string[]) => _run(CLI, ...args);
+
+/**
+ * Write a throwaway workspace of `total` leaves with `mapped` of them mapped.
+ *
+ * Generated rather than committed as a fixture because the percentage rule's
+ * boundary needs a schema large enough that one leaf is worth under half a
+ * percent (sl-8ba4), and a 200-field file adds nothing a reader could not infer
+ * from this loop. Returns the file path and a cleanup that removes the temp dir.
+ */
+function writeLeafFixture(total: number, mapped: number): { file: string; cleanup: () => void } {
+  const fields = Array.from({ length: total }, (_, i) => `  f${i}  STRING`).join("\n");
+  const arrows = Array.from({ length: mapped }, (_, i) => `  f${i} -> f${i}`).join("\n");
+  const source = [
+    `schema big_s {\n${fields}\n}`,
+    `schema big_t {\n${fields}\n}`,
+    `mapping \`wide\` {\n  source { big_s }\n  target { big_t }\n\n${arrows}\n}`,
+  ].join("\n\n");
+
+  const dir = mkdtempSync(join(tmpdir(), "coverage-pct-"));
+  const file = join(dir, "wide.stm");
+  writeFileSync(file, `${source}\n`);
+  return { file, cleanup: () => rmSync(dir, { recursive: true, force: true }) };
+}
 
 /** Parse `--json` output, failing with the raw text when it is not JSON. */
 function parseJson(stdout: string): any {
@@ -694,10 +719,12 @@ describe("satsuma coverage --fail-under", () => {
       "--json",
     );
     assert.equal(code, 3);
+    // 2 of 3 leaves is 66%, not 67% — percentages floor between the endpoints
+    // so a figure never overstates what the counts support (sl-8ba4).
     assert.deepEqual(parseJson(stdout).gate, {
       role: "target",
       threshold: 100,
-      pct: 67,
+      pct: 66,
       met: false,
     });
   });
@@ -746,6 +773,47 @@ describe("satsuma coverage --fail-under", () => {
     const { code } = await run("coverage", WORKSPACE, "--fail-under", "0");
     assert.equal(code, 0);
   });
+
+  it("fails --fail-under 100 on a schema one leaf short of complete (sl-8ba4)", async () => {
+    // The gate's fail-open case. With the percentage rounded to nearest, 200 of
+    // 201 leaves reported 100% and this exited 0 — a merge gate passing a spec
+    // with an unmapped field. The report and the verdict must both refuse to
+    // call it complete, and they are the same number.
+    const { file, cleanup } = writeLeafFixture(201, 200);
+    try {
+      const { stdout, code } = await run("coverage", file, "--fail-under", "100");
+      assert.equal(code, 3, "one unmapped leaf must not satisfy a 100% gate");
+      assert.match(stdout, /200\/201\s+99%/, "the printed figure must not claim 100%");
+      assert.match(stdout, /--fail-under: target coverage 99% vs threshold 100% — NOT met/);
+    } finally {
+      cleanup();
+    }
+  });
+
+  it("passes --fail-under 100 once the last leaf is mapped", async () => {
+    // The other side of the boundary: 100% is reachable, so the stricter rule
+    // cannot be satisfied only by lowering the threshold.
+    const { file, cleanup } = writeLeafFixture(201, 201);
+    try {
+      const { stdout, code } = await run("coverage", file, "--fail-under", "100");
+      assert.equal(code, 0);
+      assert.match(stdout, /201\/201\s+100%/);
+    } finally {
+      cleanup();
+    }
+  });
+
+  it("reports 1%, not 0%, when a single leaf of many is mapped", async () => {
+    // Flooring alone would print 0% here, indistinguishable from a spec nothing
+    // touches — the review queue's strongest claim. Partial work stays visible.
+    const { file, cleanup } = writeLeafFixture(201, 1);
+    try {
+      const { stdout } = await run("coverage", file);
+      assert.match(stdout, /1\/201\s+1%/);
+    } finally {
+      cleanup();
+    }
+  });
 });
 
 // ── Nested containers on the real corpus (sl-qzy3) ──────────────────────────
@@ -787,7 +855,9 @@ describe("satsuma coverage — nested containers", () => {
     );
     assert.deepEqual(
       { covered: source.covered, total: source.total, pct: source.pct },
-      { covered: 8, total: 9, pct: 89 },
+      // 8 of 9 is 88.9%, reported as 88: 100% is reserved for a complete
+      // schema and everything below it floors (sl-8ba4).
+      { covered: 8, total: 9, pct: 88 },
     );
   });
 
