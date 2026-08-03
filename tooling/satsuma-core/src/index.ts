@@ -13,6 +13,22 @@ export type {
   SatsumaCstType,
 } from "./generated/cst-types.js";
 export { SATSUMA_FILE_EXTENSIONS, SATSUMA_FILE_GLOB, isSatsumaFilePath } from "./source-files.js";
+export {
+  canonicalizeEntityRef,
+  createAuthoredEntityRef,
+  createAuthoredFieldRef,
+  createCanonicalEntityRef,
+  createContainerQualifiedFieldRef,
+  createSchemaLocalPath,
+  qualifyContainerFieldRef,
+} from "./reference-stages.js";
+export type {
+  AuthoredEntityRef,
+  AuthoredFieldRef,
+  CanonicalEntityRef,
+  ContainerQualifiedFieldRef,
+  SchemaLocalPath,
+} from "./reference-stages.js";
 export { findFieldByPath, collectFieldNames } from "./field-utils.js";
 export type { FieldTreeNode } from "./field-utils.js";
 export { collectSemanticDiagnostics, validateSemanticWorkspace } from "./validate.js";
