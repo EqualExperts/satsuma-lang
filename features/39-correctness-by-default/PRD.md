@@ -213,6 +213,9 @@ migration `tcc-yb3z`, and viz-backend migration `tcc-chls`.
 
 ### R3 — Add generated-input properties for coverage and formatting (fixes P3)
 
+Tickets: semantic generators and coverage properties `cbdr-o6xn`, followed by
+generated formatter properties `cbdr-yp9m`.
+
 Add `fast-check` as a dev dependency of `satsuma-core`. Generators build a small
 semantic scenario first — declarations, refs, arrows, nesting, and spreads —
 then render valid Satsuma from that scenario. A property run must never discard
@@ -434,7 +437,7 @@ ADR-041. Prose is sufficient; mechanised proof is out of scope.
 
 ## Ticket Map
 
-Feature epic: `gcsc-qka8`. R1 and R2 now have concrete tickets; later rows
+Feature epic: `gcsc-qka8`. R1 through R3 now have concrete tickets; later rows
 remain the agreed ticket shape and will receive IDs when scheduled.
 
 | Work | Ticket shape | Depends on |
@@ -445,8 +448,8 @@ remain the agreed ticket shape and will receive IDs when scheduled.
 | R2 CLI CST-use migration (`tcc-ef1b`) | 1 task | `tcc-e35f` |
 | R2 LSP CST-use migration (`tcc-yb3z`) | 1 task | `tcc-e35f` |
 | R2 viz-backend CST-use migration (`tcc-chls`) | 1 task | `tcc-e35f` |
-| R3 semantic generators and coverage properties | 1 task | — |
-| R3 generated formatter properties | 1 task | semantic generator task |
+| R3 semantic generators and coverage properties (`cbdr-o6xn`) | 1 task | — |
+| R3 generated formatter properties (`cbdr-yp9m`) | 1 task | `cbdr-o6xn` |
 | R4 independent oracle and differential suite | 1 task | R3 semantic generator task |
 | R5 opaque path/ref stages | 1 core task plus consumer migration subtasks if needed | `sl-46wr`, `sl-csrs` |
 | R6 CLI test typecheck gate | 1 task | — |
