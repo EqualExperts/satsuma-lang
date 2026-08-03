@@ -34,6 +34,12 @@ const NESTED_ARROW = resolve(__dirname, "fixtures/nested-arrow-lookup.stm");
 // and written inside a namespace — the pairing that exercises prefix resolution
 // against the canonical index key (sl-joeq).
 const MULTI_SOURCE = resolve(__dirname, "fixtures/coverage-multi-source.stm");
+// PRD 38 acceptance test 21: `amount` beside `address record {city, line1,
+// postcode}` with only `address.city` mapped — 25%, one partly-mapped record.
+const PARTIAL_RECORD = resolve(__dirname, "fixtures/coverage-partial-record.stm");
+// Whole-structure conferral, and the fixture with more than one container in a
+// state: `tgt` ends with two partly-mapped records and one uncovered.
+const WHOLE_STRUCTURE = resolve(__dirname, "fixtures/coverage-whole-structure.stm");
 
 const run = (...args: string[]) => _run(CLI, ...args);
 
@@ -372,6 +378,7 @@ describe("satsuma coverage — JSON contract", () => {
       "covered_nl",
       "total",
       "pct",
+      "records",
       "fields",
     ]);
   });
@@ -885,6 +892,63 @@ describe("satsuma coverage — nested containers", () => {
     };
     walk(parseJson(stdout), "");
     assert.deepEqual(leaves, ["orders.parcels.barcode"]);
+  });
+
+  it("reports container states beside the percentage, not inside it (sl-lctd)", async () => {
+    // PRD 38 acceptance test 21. The ratio counts the three leaves under
+    // `address` and not `address` itself, and the container tally is the only
+    // place a JSON consumer can learn that the record is half mapped — `fields`
+    // lists leaves, so it cannot be reconstructed from there.
+    const { stdout, code } = await run("coverage", PARTIAL_RECORD, "--json");
+    assert.equal(code, 0);
+    const target = schemaEntry(parseJson(stdout), "::load payment", "target", "::payment");
+    assert.deepEqual(
+      { covered: target.covered, total: target.total, pct: target.pct },
+      { covered: 1, total: 4, pct: 25 },
+    );
+    assert.deepEqual(target.records, { covered: 0, partial: 1, uncovered: 0 });
+  });
+
+  it("carries the same container tally in the aggregate section", async () => {
+    // The two sections make different claims about a field, but a container's
+    // state is derived from the leaves each section already reports, so a
+    // consumer must be able to read the tally from whichever section it renders
+    // rather than falling back to the per-mapping one.
+    const { stdout } = await run("coverage", PARTIAL_RECORD, "--json");
+    const aggregate = parseJson(stdout).aggregate.schemas.find(
+      (s: any) => s.schema === "::payment" && s.role === "target",
+    );
+    assert.deepEqual(aggregate.records, { covered: 0, partial: 1, uncovered: 0 });
+  });
+
+  it("counts a wholly covered and a wholly uncovered container in their own states", async () => {
+    // The three states must partition the containers: `address` and `lines`
+    // arrive whole, `billing` and `enum_out` keep one gap each, and
+    // `scalar_into_record` gets nothing (ADR-038). A tally that only ever
+    // reported `partial` would still pass the test above.
+    const { stdout } = await run("coverage", WHOLE_STRUCTURE, "--json");
+    const target = schemaEntry(parseJson(stdout), "::whole_structure", "target", "::tgt");
+    assert.deepEqual(target.records, { covered: 4, partial: 2, uncovered: 1 });
+  });
+
+  it("names partly mapped records on the schema row and stays silent otherwise", async () => {
+    // The reviewer reading the terminal is the one who most needs the signal,
+    // and it was the one surface that never printed it. Only `partial` earns a
+    // phrase: a fully covered record needs no attention and an uncovered one is
+    // already in the list of gaps below the row.
+    const partial = await run("coverage", PARTIAL_RECORD);
+    assert.match(partial.stdout, /1\/4\s+25%\s+— 1 record partly mapped/);
+
+    // Every record in this fixture is fully covered on both sides.
+    const covered = await run("coverage", NESTED_ARROW);
+    assert.doesNotMatch(covered.stdout, /partly mapped/);
+  });
+
+  it("pluralises the count and leaves the percentage untouched", async () => {
+    // "2 records" rather than "2 record", and the ratio beside it still counts
+    // leaves only — the whole point of reporting containers separately.
+    const { stdout } = await run("coverage", WHOLE_STRUCTURE, "--role", "target");
+    assert.match(stdout, /— 2 records partly mapped/);
   });
 
   it("covers both sides of a braced src -> tgt arrow", async () => {

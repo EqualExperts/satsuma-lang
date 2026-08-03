@@ -1,0 +1,30 @@
+// Fixture for PRD 38 acceptance test 21: the headline partly-mapped record.
+//
+// One scalar beside a three-leaf record, with a single leaf of that record
+// covered. The target is therefore 1/4 — 25% — because a record is structure and
+// is excluded from the ratio (ADR-034), and `address` is the one container in
+// the partial state: `records: {covered: 0, partial: 1, uncovered: 0}`.
+//
+// satsuma-viz/test/schema-card-coverage.test.js asserts the same three figures
+// of the viz card, built from a card of the same shape, so the number a reviewer
+// reads in the terminal and the one they read in the overlay cannot drift apart.
+
+schema payment_feed {
+  city  STRING
+}
+
+schema payment {
+  amount  DECIMAL(10, 2)
+  address record {
+    city      STRING
+    line1     STRING
+    postcode  STRING
+  }
+}
+
+mapping `load payment` {
+  source { `payment_feed` }
+  target { `payment` }
+
+  city -> address.city
+}

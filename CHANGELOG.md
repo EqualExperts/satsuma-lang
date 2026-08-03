@@ -61,6 +61,30 @@ now reports on them.
 A mapping is identified to core by namespace and position rather than by label, so
 the CLI, the VS Code gutter and the viz card resolve the same mapping.
 
+### `coverage` reports partly-mapped records (`sl-lctd`)
+
+Percentages count leaf fields only, so "two of these records are half mapped" is
+a fact the number cannot carry — and until now the terminal never said it. The
+viz card had it in a tooltip; the reviewer reading the report, and the CI job
+gating on it, could not see it at all.
+
+A schema row now names its partly-mapped records beside the ratio:
+
+```text
+  target  payment    1/4   25%  — 1 record partly mapped
+```
+
+Only that state is printed: a record whose every leaf is covered needs no
+attention, and one with no covered leaf is already in the list of gaps below the
+row. `--json` gains a `records` object — `{covered, partial, uncovered}` — on
+every schema entry, in both the `mappings` and the `aggregate` section. It is
+additive; no existing key changes.
+
+The counts sit beside the percentage and stay out of it, so no figure moves and
+no `--fail-under` threshold needs re-baselining. They come from core's
+`countContainerStates`, the same function behind the viz card, so the two
+surfaces cannot disagree (ADR-034).
+
 ### A spread no longer redeclares a field the schema body declared (`sl-qead`)
 
 **Percentages drop for any schema that redeclares a spread field.** A schema that

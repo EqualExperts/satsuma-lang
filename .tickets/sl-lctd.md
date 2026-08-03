@@ -1,6 +1,6 @@
 ---
 id: sl-lctd
-status: open
+status: closed
 deps: []
 links: []
 created: 2026-08-02T21:41:45Z
@@ -30,3 +30,10 @@ Also state in the help text what the counts are not: they are reported beside th
 
 coverage --json carries container state counts for every schema in both sections, sourced from core. Human output names partly-mapped records when there are any and stays silent when there are none. The PRD 38 acceptance-test-21 fixture (amount + address record {city, line1, postcode}, only address.city mapped) reports 25% with records {covered: 0, partial: 1, uncovered: 0}. The JSON shape in coverage --help and in SATSUMA-CLI.md documents the new key.
 
+
+## Notes
+
+**2026-08-03T08:41:12Z**
+
+Cause: the container tally shipped in core (countContainerStates, ADR-034) and reached the viz card's tooltip, but satsuma coverage never rendered it — neither the schema rows nor the --json contract mentioned containers, so the reviewer reading the terminal and any JSON consumer could not see that a record was half mapped (fields[] lists leaves only, so it could not be reconstructed either).
+Fix: coverage.ts now reads countContainerStates for every schema in both sections. Human schema rows gain '— N record(s) partly mapped' beside the ratio, printed only when partial > 0 (a fully covered record needs no attention; an uncovered one is already in the gap list). --json gains a 'records' {covered, partial, uncovered} object on each schema entry under both 'mappings' and 'aggregate', sourced from core and never recomputed; namespace and workspace subtotals keep percentages only, since a container belongs to one schema. Documented in coverage --help and SATSUMA-CLI.md, including that the counts sit beside the percentage and are excluded from it. New fixture coverage-partial-record.stm carries PRD 38 acceptance test 21 (amount + address record{city,line1,postcode}, only address.city mapped) and the CLI reports 1/4 25% with records {covered: 0, partial: 1, uncovered: 0}.
