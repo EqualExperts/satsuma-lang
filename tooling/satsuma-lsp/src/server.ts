@@ -5,6 +5,7 @@ import {
   TextDocumentSyncKind,
   InitializeResult,
   FileChangeType,
+  TextDocumentIdentifier,
 } from "vscode-languageserver/node";
 import { TextDocument } from "vscode-languageserver-textdocument";
 import type { Tree } from "./parser-utils";
@@ -69,6 +70,20 @@ let workspaceFolders: string[] = [];
 
 // ---------- Initialisation ----------
 
+/**
+ * Narrow the client's untyped `initializationOptions` to the one field this
+ * server reads. `LSPAny` carries no structure of its own, so this is the
+ * boundary where client-supplied JSON becomes a typed value.
+ */
+function hasCliPath(value: unknown): value is { cliPath: string } {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "cliPath" in value &&
+    typeof (value as { cliPath?: unknown }).cliPath === "string"
+  );
+}
+
 connection.onInitialize(async (params): Promise<InitializeResult> => {
   // Initialise WASM parser — the .wasm and highlights.scm live next to server.js.
   // locateFile tells web-tree-sitter where to find its own runtime WASM
@@ -87,8 +102,8 @@ connection.onInitialize(async (params): Promise<InitializeResult> => {
   }
 
   // Accept CLI path from client initialization options
-  const initOptions = params.initializationOptions;
-  if (initOptions?.cliPath && typeof initOptions.cliPath === "string") {
+  const initOptions: unknown = params.initializationOptions;
+  if (hasCliPath(initOptions)) {
     cliPath = initOptions.cliPath;
   }
 
@@ -156,7 +171,9 @@ documents.onDidClose((event) => {
   // The index may hold modified-but-unsaved buffer content the user just
   // discarded by closing; re-index from what is actually on disk (sl-0tgo).
   reindexFromDisk(event.document.uri);
-  connection.sendDiagnostics({ uri: event.document.uri, diagnostics: [] });
+  // LSP diagnostic publishes are fire-and-forget notifications; nothing
+  // here needs to await or react to the result.
+  void connection.sendDiagnostics({ uri: event.document.uri, diagnostics: [] });
 });
 
 /**
@@ -216,7 +233,7 @@ documents.onDidSave(async (event) => {
       if (openTree) {
         sendMergedDiagnostics(uri, openTree);
       } else if (clearedUris.includes(uri)) {
-        connection.sendDiagnostics({ uri, diagnostics: [] });
+        void connection.sendDiagnostics({ uri, diagnostics: [] });
       }
     }
   } catch {
@@ -264,11 +281,14 @@ connection.onFoldingRanges((params) => {
   return computeFoldingRanges(tree);
 });
 
-connection.onRequest("textDocument/semanticTokens/full", (params) => {
-  const tree = trees.get(params.textDocument.uri);
-  if (!tree) return { data: [] };
-  return computeSemanticTokens(tree);
-});
+connection.onRequest(
+  "textDocument/semanticTokens/full",
+  (params: { textDocument: TextDocumentIdentifier }) => {
+    const tree = trees.get(params.textDocument.uri);
+    if (!tree) return { data: [] };
+    return computeSemanticTokens(tree);
+  },
+);
 
 connection.onHover((params) => {
   const tree = trees.get(params.textDocument.uri);
@@ -402,13 +422,19 @@ connection.onRequest(
 /** Return field locations for a schema/fragment (for coverage decorations). */
 connection.onRequest("satsuma/fieldLocations", (params: { name: string }) => {
   const defs = resolveDefinition(wsIndex, params.name, null);
-  if (defs.length === 0) return [];
-  const def = defs[0]!;
+  const [def] = defs;
+  if (!def) return [];
+  // Captured explicitly rather than read off `def` inside collect(): a
+  // narrowed const isn't re-narrowed inside a nested function declaration.
+  const defUri = def.uri;
   const result: { name: string; uri: string; line: number }[] = [];
-  function collect(fields: typeof def.fields, prefix: string): void {
+  // Derived from `defs` (never possibly-undefined) rather than the narrowed
+  // `def`, which a nested function declaration doesn't see as narrowed.
+  type FieldEntry = (typeof defs)[number]["fields"][number];
+  function collect(fields: FieldEntry[], prefix: string): void {
     for (const f of fields) {
       const dotPath = prefix ? `${prefix}.${f.name}` : f.name;
-      result.push({ name: dotPath, uri: def.uri, line: f.range.start.line });
+      result.push({ name: dotPath, uri: defUri, line: f.range.start.line });
       if (f.children.length > 0) collect(f.children, dotPath);
     }
   }
@@ -508,7 +534,7 @@ function sendMergedDiagnostics(uri: string, tree: Tree): void {
 
   // Publish-boundary guard: an empty message crashes the VS Code client's
   // diagnostic conversion and freezes all diagnostics for the file (sl-sme1).
-  connection.sendDiagnostics({
+  void connection.sendDiagnostics({
     uri,
     diagnostics: ensureNonEmptyMessages([...parseDiags, ...validateDiags, ...dedupedSemanticDiags]),
   });

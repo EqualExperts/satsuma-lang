@@ -24,7 +24,7 @@ function collectLenses(
   lenses: CodeLens[],
 ): void {
   if (node.type === "namespace_block") {
-    const nsName = node.childForFieldName("name")?.text ?? null;
+    const nsName = node.childForFieldName("name").text;
     for (const ch of node.namedChildren) {
       collectLenses(ch, nsName, uri, index, lenses);
     }
@@ -58,6 +58,10 @@ function collectLenses(
       break;
     case "transform_block":
       lenses.push(transformLens(qualName, range, index));
+      break;
+    default:
+      // No lens for any other top-level block kind — intentionally partial,
+      // not every CST symbol names a lens-bearing construct.
       break;
   }
 }

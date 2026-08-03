@@ -208,4 +208,33 @@ export default [
       ],
     },
   },
+  // satsuma-lsp source files (PRD 39 R7): the package R2 migrated to the
+  // generated CST type (tcc-yb3z), so it gets the same CST-narrowing rules as
+  // satsuma-core — see that block's comment for the switch-exhaustiveness
+  // rationale.
+  ...tseslint.configs.recommendedTypeChecked.map((config) => ({
+    ...config,
+    files: ["tooling/satsuma-lsp/src/**/*.ts"],
+  })),
+  {
+    files: ["tooling/satsuma-lsp/src/**/*.ts"],
+    languageOptions: {
+      parserOptions: {
+        projectService: true,
+        tsconfigRootDir: import.meta.dirname,
+      },
+    },
+    rules: {
+      "@typescript-eslint/no-unused-vars": [
+        "error",
+        { argsIgnorePattern: "^_", varsIgnorePattern: "^_" },
+      ],
+      "@typescript-eslint/no-non-null-assertion": "error",
+      "@typescript-eslint/no-unnecessary-condition": "error",
+      "@typescript-eslint/switch-exhaustiveness-check": [
+        "error",
+        { considerDefaultExhaustiveForUnions: true },
+      ],
+    },
+  },
 ];

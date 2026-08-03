@@ -68,7 +68,10 @@ function tryHover(node: SyntaxNode, tree: Tree): HoverResult | null {
       return hoverSpread(node, tree);
 
     case "spread_label":
-      return hoverSpread(node.parent!, tree);
+      // spread_label is never the document root, so parent is always
+      // defined in practice; null here would just mean "no hover", which
+      // the caller already handles by walking further up the tree.
+      return node.parent ? hoverSpread(node.parent, tree) : null;
 
     case "src_path":
     case "tgt_path":
@@ -191,7 +194,7 @@ function hoverBlock(node: SyntaxNode): HoverResult | null {
     // --- Namespace hover ---
     case "namespace_block": {
       const nsName = node.childForFieldName("name");
-      lines.push(`**namespace** \`${nsName?.text ?? name}\``);
+      lines.push(`**namespace** \`${nsName.text}\``);
       const blockChildren = node.namedChildren.filter((c) => c.type.endsWith("_block"));
       if (blockChildren.length > 0) {
         lines.push(`${blockChildren.length} block(s)`);

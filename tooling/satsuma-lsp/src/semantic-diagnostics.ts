@@ -241,8 +241,12 @@ function buildSemanticIndex(wsIndex: WorkspaceIndex): SemanticIndex {
     // surfaced by the CLI on-save validate fallback.
     const collidable = entries.filter((e) => e.kind !== "namespace");
     for (let i = 1; i < collidable.length; i++) {
-      const entry = collidable[i]!;
-      const prev = collidable[0]!;
+      // Both indices are always in range here: i < collidable.length by the
+      // loop condition, and index 0 exists whenever the loop body runs at
+      // all (i starts at 1, so collidable.length > 1).
+      const entry = collidable[i];
+      const prev = collidable[0];
+      if (!entry || !prev) continue;
       duplicates.push({
         kind: entry.kind,
         name,
@@ -299,6 +303,12 @@ function buildSemanticIndex(wsIndex: WorkspaceIndex): SemanticIndex {
             transforms.set(name, { file: entry.uri });
           }
           break;
+        case "namespace":
+          // Namespace entries have no per-symbol map of their own here (see
+          // the dedup comment above) — a namespace spread across files is
+          // not a definition this validator's schemas/fragments/etc. maps
+          // need to record.
+          break;
       }
     }
   }
@@ -318,7 +328,7 @@ function buildSemanticIndex(wsIndex: WorkspaceIndex): SemanticIndex {
 function defEntryToSchema(name: string, entry: DefinitionEntry): SemanticSchema {
   const ns = entry.namespace ?? undefined;
   return {
-    name: ns ? name.split("::").pop()! : name,
+    name: ns ? (name.split("::").pop() ?? name) : name,
     namespace: ns,
     file: entry.uri,
     row: entry.range.start.line,
@@ -330,7 +340,7 @@ function defEntryToSchema(name: string, entry: DefinitionEntry): SemanticSchema 
 function defEntryToFragment(name: string, entry: DefinitionEntry): SemanticFragment {
   const ns = entry.namespace ?? undefined;
   return {
-    name: ns ? name.split("::").pop()! : name,
+    name: ns ? (name.split("::").pop() ?? name) : name,
     namespace: ns,
     file: entry.uri,
     row: entry.range.start.line,
@@ -375,7 +385,7 @@ function defEntryToMapping(
   }
 
   return {
-    name: entry.namespace ? name.split("::").pop()! : name,
+    name: entry.namespace ? (name.split("::").pop() ?? name) : name,
     namespace: entry.namespace ?? undefined,
     file: entry.uri,
     row: entry.range.start.line,
