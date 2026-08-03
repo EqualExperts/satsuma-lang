@@ -1,6 +1,6 @@
 ---
 id: 3eb-4vjj
-status: open
+status: closed
 deps: []
 links: []
 created: 2026-06-04T10:40:01Z
@@ -16,11 +16,13 @@ gitleaks-action v3 requires an org-tier licence for org-owned repos. The CI step
 
 ## Notes
 
-**2026-08-03T13:29:11Z**
-
-## Notes
-
 **2026-08-03T13:30:00Z**
 
 Cause: gitleaks-action v3 requires an org-tier licence for org-owned repos; the EqualExperts org did not have one, so the CI step self-skipped since 2026-06-04.
 Fix: GITLEAKS_LICENSE was provisioned and set as a repo secret; no workflow change was needed. Updated the stale "disabled" caveats in SECURITY-REPORT.md to reflect the gate being active (commit 4acc48b9).
+
+**2026-08-03T13:35:16Z**
+
+Verified 2026-08-03: PR #441 CI run 30818352200, job "Secret scanning" — the
+gitleaks-action step ran to completion (conclusion: success), not skipped.
+Closing.
