@@ -193,6 +193,9 @@ A string census would measure references, not semantic completeness.
 
 ### R2 — Enforce typed CST symbols at parser boundaries and use sites (fixes P1)
 
+Tickets: core/parser foundation `tcc-e35f`, CLI migration `tcc-ef1b`, LSP
+migration `tcc-yb3z`, and viz-backend migration `tcc-chls`.
+
 - `SyntaxNode.type` becomes `SatsumaCstType`, and its recursive child/parent
   properties use the same typed node interface.
 - Web-tree-sitter’s external `Node.type: string` is narrowed in one audited
@@ -431,15 +434,17 @@ ADR-041. Prose is sufficient; mechanised proof is out of scope.
 
 ## Ticket Map
 
-Feature epic: `gcsc-qka8`. R1 is the first implementation stage; later rows
-remain the agreed ticket shape and will receive concrete IDs when scheduled.
+Feature epic: `gcsc-qka8`. R1 and R2 now have concrete tickets; later rows
+remain the agreed ticket shape and will receive IDs when scheduled.
 
 | Work | Ticket shape | Depends on |
 |---|---|---|
 | Feature 39 epic (`gcsc-qka8`) | 1 epic | — |
 | R1 generated CST artifact and stale check (`gcsc-ejb2`) | 1 task | — |
-| R2 typed core node/helpers and parser adapters | 1 task | R1 |
-| R2 consumer CST-use migration | 1 task per consumer package or tightly coupled group | typed core task |
+| R2 typed core node/helpers and parser adapter (`tcc-e35f`) | 1 task | `gcsc-ejb2` |
+| R2 CLI CST-use migration (`tcc-ef1b`) | 1 task | `tcc-e35f` |
+| R2 LSP CST-use migration (`tcc-yb3z`) | 1 task | `tcc-e35f` |
+| R2 viz-backend CST-use migration (`tcc-chls`) | 1 task | `tcc-e35f` |
 | R3 semantic generators and coverage properties | 1 task | — |
 | R3 generated formatter properties | 1 task | semantic generator task |
 | R4 independent oracle and differential suite | 1 task | R3 semantic generator task |
