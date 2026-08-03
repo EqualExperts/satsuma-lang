@@ -265,4 +265,38 @@ export default [
       ],
     },
   },
+  // satsuma-viz source files (PRD 39 R7): the Lit web component package has
+  // no CST dependency, so it needs only the base type-aware preset, not the
+  // CST-narrowing rules. Its tsconfig also gains noUncheckedIndexedAccess
+  // here — the one package that was missing it.
+  ...tseslint.configs.recommendedTypeChecked.map((config) => ({
+    ...config,
+    files: ["tooling/satsuma-viz/src/**/*.ts"],
+  })),
+  {
+    files: ["tooling/satsuma-viz/src/**/*.ts"],
+    languageOptions: {
+      parserOptions: {
+        projectService: true,
+        tsconfigRootDir: import.meta.dirname,
+      },
+    },
+    rules: {
+      "@typescript-eslint/no-unused-vars": [
+        "error",
+        { argsIgnorePattern: "^_", varsIgnorePattern: "^_" },
+      ],
+      "@typescript-eslint/no-non-null-assertion": "error",
+      // Lit's `@event=${this.method}` template binding is not an unbound
+      // method call: lit-html's EventPart.handleEvent explicitly invokes the
+      // listener via `.call(this.options?.host ?? this.element, event)"
+      // (lit-html/development/lit-html.js, class EventPart), and `host` is
+      // the component instance for every template rendered from a
+      // LitElement's own render(). This idiom is used throughout the
+      // package's ~15 components, so the rule is disabled here rather than
+      // rewriting every handler into an arrow-function class field for a
+      // binding guarantee the framework already provides.
+      "@typescript-eslint/unbound-method": "off",
+    },
+  },
 ];

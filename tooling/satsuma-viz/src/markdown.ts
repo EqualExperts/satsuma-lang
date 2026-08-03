@@ -42,12 +42,16 @@ export function renderMarkdown(text: string): string {
 
   while (i < lines.length) {
     const line = lines[i];
+    if (line === undefined) break;
 
     // Heading
     const hm = line.match(/^(#{1,3})\s+(.+)$/);
     if (hm) {
-      const level = hm[1].length;
-      output.push(`<h${level}>${inline(esc(hm[2]))}</h${level}>`);
+      const [, hashes, headingText] = hm;
+      if (hashes && headingText) {
+        const level = hashes.length;
+        output.push(`<h${level}>${inline(esc(headingText))}</h${level}>`);
+      }
       i++;
       continue;
     }
@@ -55,9 +59,11 @@ export function renderMarkdown(text: string): string {
     // Unordered list
     if (/^[-*]\s/.test(line)) {
       const items: string[] = [];
-      while (i < lines.length && /^[-*]\s/.test(lines[i])) {
-        items.push(`<li>${inline(esc(lines[i].replace(/^[-*]\s+/, "")))}</li>`);
+      let cur = lines[i];
+      while (i < lines.length && cur !== undefined && /^[-*]\s/.test(cur)) {
+        items.push(`<li>${inline(esc(cur.replace(/^[-*]\s+/, "")))}</li>`);
         i++;
+        cur = lines[i];
       }
       output.push(`<ul>${items.join("")}</ul>`);
       continue;
@@ -66,9 +72,11 @@ export function renderMarkdown(text: string): string {
     // Ordered list
     if (/^\d+\.\s/.test(line)) {
       const items: string[] = [];
-      while (i < lines.length && /^\d+\.\s/.test(lines[i])) {
-        items.push(`<li>${inline(esc(lines[i].replace(/^\d+\.\s+/, "")))}</li>`);
+      let cur = lines[i];
+      while (i < lines.length && cur !== undefined && /^\d+\.\s/.test(cur)) {
+        items.push(`<li>${inline(esc(cur.replace(/^\d+\.\s+/, "")))}</li>`);
         i++;
+        cur = lines[i];
       }
       output.push(`<ol>${items.join("")}</ol>`);
       continue;
@@ -82,15 +90,18 @@ export function renderMarkdown(text: string): string {
 
     // Paragraph: collect consecutive non-blank, non-special lines
     const para: string[] = [];
+    let cur = lines[i];
     while (
       i < lines.length &&
-      lines[i].trim() !== "" &&
-      !/^#{1,3}\s/.test(lines[i]) &&
-      !/^[-*]\s/.test(lines[i]) &&
-      !/^\d+\.\s/.test(lines[i])
+      cur !== undefined &&
+      cur.trim() !== "" &&
+      !/^#{1,3}\s/.test(cur) &&
+      !/^[-*]\s/.test(cur) &&
+      !/^\d+\.\s/.test(cur)
     ) {
-      para.push(inline(esc(lines[i])));
+      para.push(inline(esc(cur)));
       i++;
+      cur = lines[i];
     }
     if (para.length > 0) {
       output.push(`<p>${para.join("<br>")}</p>`);

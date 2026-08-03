@@ -364,12 +364,12 @@ export class SzMappingDetail extends LitElement {
 
   override connectedCallback() {
     super.connectedCallback();
-    this.addEventListener("field-hover", this._onFieldHover as EventListener);
+    this.addEventListener("field-hover", this._onFieldHover);
   }
 
   override disconnectedCallback() {
     super.disconnectedCallback();
-    this.removeEventListener("field-hover", this._onFieldHover as EventListener);
+    this.removeEventListener("field-hover", this._onFieldHover);
   }
 
   override updated(changed: Map<string, unknown>) {
@@ -465,9 +465,12 @@ export class SzMappingDetail extends LitElement {
           for (const sf of sourceFields) {
             const localSourcePath = resolveSchemaLocalFieldPath(sf, sourceSchema, m.sourceRefs);
             if (!localSourcePath) continue;
-            if (!result.has(sourceSchema.qualifiedId))
-              result.set(sourceSchema.qualifiedId, new Set());
-            result.get(sourceSchema.qualifiedId)!.add(localSourcePath);
+            let paths = result.get(sourceSchema.qualifiedId);
+            if (!paths) {
+              paths = new Set();
+              result.set(sourceSchema.qualifiedId, paths);
+            }
+            paths.add(localSourcePath);
           }
         }
       }
@@ -507,9 +510,9 @@ export class SzMappingDetail extends LitElement {
   /** Check if an arrow row should be highlighted. */
   private _isArrowHighlighted(a: ArrowEntry, scope: ContainerScope): boolean {
     if (this._hoveredArrow === a) return true;
-    if (!this._hoveredCardField || !this._hoveredCardSchema) return false;
+    if (!this._hoveredCardField || !this._hoveredCardSchema || !this.mapping) return false;
 
-    const m = this.mapping!;
+    const m = this.mapping;
     // Card fields are declared paths, so the arrow's authored path has to be
     // qualified against its container before the two can be compared — without
     // it, hovering `parcels.line1` never lit the `.line1 -> .line1` row that

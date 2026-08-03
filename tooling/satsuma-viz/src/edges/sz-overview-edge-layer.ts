@@ -160,11 +160,11 @@ export class SzOverviewEdgeLayer extends LitElement {
   }
 
   private _renderOverviewEdge(edge: OverviewEdge): SVGTemplateResult {
-    if (edge.points.length < 2) return svg``;
-
-    const d = this._buildRoutedPath(edge.points);
     const first = edge.points[0];
     const last = edge.points[edge.points.length - 1];
+    if (edge.points.length < 2 || !first || !last) return svg``;
+
+    const d = this._buildRoutedPath(edge.points);
 
     const hasHighlight = this.highlightNodes.size > 0;
     const connected =
@@ -188,12 +188,16 @@ export class SzOverviewEdgeLayer extends LitElement {
   private _buildRoutedPath(points: Array<{ x: number; y: number }>): string {
     if (points.length < 2) return "";
     const [first, ...rest] = points;
+    if (!first) return "";
     if (rest.length === 1) {
-      return `M ${first.x} ${first.y} L ${rest[0].x} ${rest[0].y}`;
+      const only = rest[0];
+      if (!only) return "";
+      return `M ${first.x} ${first.y} L ${only.x} ${only.y}`;
     }
     // Use cubic bezier for smooth horizontal-exit, vertical-mid, horizontal-enter routing
     if (rest.length === 3) {
       const [mid1, mid2, last] = rest;
+      if (!mid1 || !mid2 || !last) return "";
       const r = Math.min(20, Math.abs(mid1.y - mid2.y) / 2, Math.abs(mid1.x - first.x) / 2);
       return [
         `M ${first.x} ${first.y}`,
