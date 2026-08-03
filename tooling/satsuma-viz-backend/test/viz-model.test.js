@@ -1244,6 +1244,14 @@ describe("nested fragment spreads (sl-5nsv)", () => {
     ]);
   });
 
+  it("lists a field the body and a spread both declare only once", () => {
+    // sl-qead, the card's half of the parity claim. A schema card that printed
+    // `load_ts` twice would also feed a duplicated leaf list to the coverage
+    // meter, disagreeing with the 2/3 the CLI reports for the same file.
+    const contact = schemaNamed(fixture("redeclared-spread-field.stm"), "contact");
+    assert.deepEqual(leafPaths(contact.fields), ["id", "load_ts", "batch_id"]);
+  });
+
   it("keeps the declaring field's own display data when it gains children", () => {
     // Expansion runs over core's FieldDecl, which carries no constraints, notes
     // or source location. A record that merely acquires children must keep the

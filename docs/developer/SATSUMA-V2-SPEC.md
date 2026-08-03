@@ -291,7 +291,7 @@ schema customers {
 }
 ```
 
-The spread `...address fields` inlines all fields from the fragment into the schema.
+The spread `...address fields` inlines the fragment's fields into the schema — all of them, unless the schema body declares one of those names itself, in which case the body's declaration stands (see [Redeclaring a spread field](#redeclaring-a-spread-field)).
 
 ---
 
@@ -591,6 +591,39 @@ schema users {
   ...audit fields
 }
 ```
+
+#### Redeclaring a spread field
+
+**A spread contributes only those fields the body has not already declared.** An
+explicitly declared field *shadows* a same-named field reached through a spread:
+the spread's copy is not a second field, and the body's declaration — its type,
+constraints and note — is the one that stands. Where two spreads in the same body
+declare a name, the first one wins.
+
+```
+fragment `audit fields` {
+  created_at  TIMESTAMPTZ
+  created_by  VARCHAR(100)
+}
+
+schema users {
+  user_id     UUID (pk)
+  created_at  TIMESTAMPTZ (pk)   // this declaration stands
+  ...audit fields                // contributes created_by only
+}
+```
+
+`users` therefore has three fields, and `created_at` keeps its `(pk)`.
+
+Shadowing is whole-field, not a merge. If the body declares a record and a spread
+declares a record of the same name, the body's record stands entire and the
+fragment's version of its children contributes nothing — so the field set can
+always be read off the nearest declaration.
+
+Redeclaration is legal and carries no diagnostic today, but it is rarely
+deliberate: a reader has to know the fragment's contents to see that the spread
+adds less than it appears to. Prefer removing the redundant declaration, or the
+spread, when the two say the same thing.
 
 ### 5.2 Named Transforms
 

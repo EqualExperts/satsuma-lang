@@ -115,6 +115,47 @@ describe("expandEntityFields()", () => {
     const result = expandEntityFields(entity, null, resolve, lookup);
     assert.equal(result.filter((f) => f.name === "shared").length, 1);
   });
+
+  it("omits a fragment field whose name the body already declares", () => {
+    // The shadowing rule (sl-qead). Returning the fragment's copy as well put
+    // the same field in a schema twice — one path, two entries — which ADR-035
+    // forbids and which moved coverage percentages with how many times a name
+    // happened to be written.
+    const frag = fragment("::meta", [field("load_ts"), field("batch_id")]);
+    const entity = {
+      fields: [field("id"), field("load_ts")],
+      hasSpreads: true,
+      spreads: ["::meta"],
+    };
+    const resolve = (ref) => ref;
+    const lookup = (key) => (key === "::meta" ? frag : null);
+
+    assert.deepEqual(
+      expandEntityFields(entity, null, resolve, lookup).map((f) => f.name),
+      ["batch_id"],
+      "the spread contributes only what the body left unsaid",
+    );
+  });
+
+  it("gives a name to the first spread that declares it, not the last", () => {
+    // Two unrelated fragments can declare the same name without either being an
+    // ancestor of the other, so the diamond guard (which keys on the fragment)
+    // does not catch it — only the name-level rule does.
+    const first = fragment("::first", [field("load_ts")]);
+    const second = fragment("::second", [field("load_ts"), field("batch_id")]);
+    const entity = { fields: [], hasSpreads: true, spreads: ["::first", "::second"] };
+    const resolve = (ref) => ref;
+    const lookup = (key) => (key === "::first" ? first : key === "::second" ? second : null);
+
+    const result = expandEntityFields(entity, null, resolve, lookup);
+    assert.deepEqual(
+      result.map((f) => [f.name, f.fromFragment]),
+      [
+        ["load_ts", "::first"],
+        ["batch_id", "::second"],
+      ],
+    );
+  });
 });
 
 // ── expandNestedSpreads ───────────────────────────────────────────────────────
@@ -151,7 +192,11 @@ describe("expandNestedSpreads()", () => {
 
 describe("expandDeclaredFields()", () => {
   const addressFields = fragment("address_fields", [field("street"), field("city")]);
-  const entities = new Map([["address_fields", addressFields]]);
+  const meta = fragment("meta", [field("load_ts"), field("batch_id")]);
+  const entities = new Map([
+    ["address_fields", addressFields],
+    ["meta", meta],
+  ]);
   const resolveRef = makeEntityRefResolver(entities);
   const lookup = (key) => entities.get(key) ?? null;
 
@@ -206,6 +251,59 @@ describe("expandDeclaredFields()", () => {
       "address.street",
       "address.city",
       "street",
+      "city",
+    ]);
+  });
+
+  it("counts a field the body and a spread both declare exactly once", () => {
+    // sl-qead, at the level every coverage consumer reads. Three distinct
+    // leaves must yield three paths, not four: the duplicate landed in both the
+    // denominator and (when mapped) the numerator, so a schema's percentage
+    // depended on how many times a name was declared — overstating coverage,
+    // the one direction `--fail-under` must not fail in.
+    const schema = {
+      fields: [field("id"), field("load_ts")],
+      hasSpreads: true,
+      spreads: ["meta"],
+    };
+    assert.deepEqual(leaves(expandDeclaredFields(schema, null, resolveRef, lookup)), [
+      "id",
+      "load_ts",
+      "batch_id",
+    ]);
+  });
+
+  it("applies the same rule inside a record body", () => {
+    // The nested form of the collision. It reaches consumers through the same
+    // function, so it must not need its own dedupe at the call site.
+    const schema = {
+      fields: [
+        {
+          ...field("audit", "record", [field("load_ts")]),
+          hasSpreads: true,
+          spreads: ["meta"],
+        },
+      ],
+      hasSpreads: false,
+      spreads: [],
+    };
+    assert.deepEqual(leaves(expandDeclaredFields(schema, null, resolveRef, lookup)), [
+      "audit.load_ts",
+      "audit.batch_id",
+    ]);
+  });
+
+  it("keeps the explicit record's children when a spread declares that record too", () => {
+    // Shadowing is whole-field, not a deep merge: the body's `address` wins
+    // outright and the fragment's version contributes nothing, so a reader can
+    // predict the field set from the nearest declaration alone.
+    const schema = {
+      fields: [field("street", "record", [field("number")])],
+      hasSpreads: true,
+      spreads: ["address_fields"],
+    };
+    assert.deepEqual(leaves(expandDeclaredFields(schema, null, resolveRef, lookup)), [
+      "street.number",
       "city",
     ]);
   });
