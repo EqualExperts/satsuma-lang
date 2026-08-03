@@ -291,8 +291,13 @@ Expected workflow:
   **<ISO-8601 timestamp>**
 
   Cause: <1-2 sentences describing root cause>
-  Fix: <1-2 sentences describing what was changed> (commit <short-sha>)
+  Fix: <1-2 sentences describing what was changed> (commit immediately after <current short-sha>)
   ```
+  Reference the current `HEAD` short-sha (`git rev-parse --short HEAD`), not the fix
+  commit's own sha — that sha doesn't exist yet while you're authoring the note, and
+  waiting for it forces a second commit (and a second full pre-commit test run) just
+  to backfill it. "The commit immediately after `<sha>`" is unambiguous and lets the
+  ticket update and the fix land in one commit.
 - Worktree and server sync is handled manually outside the agent workflow.
 
 ## Agent Workflow
