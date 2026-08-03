@@ -17,3 +17,36 @@ Deliver Feature 41 from features/41-lineage-graph-confidence/PRD.md: point Featu
 
 R1-R6 are delivered through linked child tickets with their PRD acceptance tests passing; every child records its cause/fix note and passing relevant automated tests before closure; the PRD ticket map and status are reconciled when the epic closes; no lineage or graph semantics change and r0-7w76 remains undecided by this epic.
 
+
+## Notes
+
+**2026-08-03T22:51:42Z**
+
+R1, R2 and R3 delivered in PR #459 (branch feat/lineage-graph-confidence), plus
+Feature 40's sl-4871 spike, which unblocks the rest. Not merged. Decision log:
+features/41-lineage-graph-confidence/IMPLEMENTATION-NOTES.md.
+
+Closed: sl-puky, sl-dqyu, sl-hi0z. No production behaviour changed — every
+deliverable is a test, a test-only generator, or a doc, as the PRD promised.
+
+Remaining: sl-jsyn (R4) and sl-kwet (R5) still blocked on Feature 40's sl-prlp, per
+PRD decision 4 — deliberately not overridden, since sl-prlp is a production refactor
+with a byte-identical-output requirement across two commands. R4's oracle
+(scenarioAncestorsWithin / scenarioDescendantsWithin) shipped early inside R2, so R4
+is now a test file that calls one traversal. sl-jyee (R6) still blocked on Feature 39
+R5, which has no ticket.
+
+Four bugs found and raised, none fixed here: lgc-3f13 (P1, core — a namespaced
+mapping targeting a global schema makes graph, lineage and validate all name a
+schema that does not exist), lgc-4bxl (P1, viz — a computed arrow drawn as a phantom
+line from a same-named source field), lgc-fu7o (P1, viz — only the first source of a
+multi-source arrow drawn, hover points at the wrong card), lgc-wtz1 (P2 — graph
+--json spells the same entity two ways). Each has its property already written and
+pinned, so fixing it turns a test red with instructions attached.
+
+ADR-049 drafted with Status: Proposed, awaiting user sign-off.
+
+Two PRD corrections worth carrying: Feature 39 R4 shipped after the PRD was written
+(the coverage oracle is on main), and acceptance test 6 is not runnable as written —
+qualifyField has no guard to revert, so the pinned r0-7w76 test is the executable
+form of that claim.
