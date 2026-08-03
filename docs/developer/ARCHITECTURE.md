@@ -1,6 +1,6 @@
 # Satsuma Tooling Architecture
 
-> Last updated: 2026-08-03 — documented opaque reference stages at coverage boundaries (ADR-044).
+> Last updated: 2026-08-03 — documented `FieldDecl` structural variants (ADR-045).
 
 This document is the canonical architecture reference for the Satsuma language tooling — the packages under `tooling/` that parse, analyse, format, validate, visualize, and provide IDE support for `.stm` files. The design is influenced by [rust-analyzer's architecture](https://rust-analyzer.github.io/book/contributing/architecture.html), adapted for a tree-sitter-backed DSL rather than a full programming language compiler.
 
@@ -132,6 +132,8 @@ flowchart TD
 graph LR
   IDX["index.ts\n(re-exports all)"]
   TYPES["types.ts\nSyntaxNode · Tree · FieldDecl\nExtracted* · NLRefData · AtRef\nMappingContext · Resolution · …"]
+  FD["field-decl.ts\nvariant construction · classification\nrendered-type normalization"]
+  NEVER["assert-never.ts\nexhaustive-switch backstop"]
   GENCST["generated/cst-types.ts\nSatsumaNamedKind · SatsumaAnonymousToken\nSatsumaGrammarSymbol · SatsumaCstType"]
   CST["cst-utils.ts\nchild · children\nallDescendants\nlabelText · stringText"]
   CLS["classify.ts\nclassifyTransform\nclassifyArrow"]
@@ -148,8 +150,9 @@ graph LR
   COV["coverage.ts · coverage-paths.ts\nFieldCoverageEntry\nSchemaCoverageResult\nbuildCoveredFieldPaths()\nschemaLocalFieldPath()"]
   VAL["validate.ts\nSemanticIndex · SemanticDiagnostic\ncollectSemanticDiagnostics()"]
 
-  IDX --> TYPES & GENCST & CST & CLS & CAN & META & EXT & SPR & NL & FMT & STR & REF & PAR & PE & COV & VAL
-  EXT --> CST & CLS & CAN & META & TYPES
+  IDX --> TYPES & FD & NEVER & GENCST & CST & CLS & CAN & META & EXT & SPR & NL & FMT & STR & REF & PAR & PE & COV & VAL
+  FD --> TYPES
+  EXT --> CST & CLS & CAN & META & FD & TYPES
   SPR --> EXT & TYPES
   NL --> SPR & TYPES
   COV --> REF
@@ -163,7 +166,7 @@ graph LR
 | `SyntaxNode` | `types.ts` | Abstract CST node interface (structurally matches web-tree-sitter `Node`) |
 | `Tree` | `types.ts` | Parsed tree with `rootNode: SyntaxNode` |
 | `SatsumaCstType` | `generated/cst-types.ts` | Generated union of named CST kinds, anonymous grammar tokens, and tree-sitter's synthetic `ERROR` recovery type |
-| `FieldDecl` | `types.ts` | Recursive field: `{ name, type, isList?, children?, spreads?, metadata? }` |
+| `FieldDecl` | `types.ts` | JSON-compatible union of scalar, record, scalar-list, and record-list fields; only record-bearing variants expose `children` and spread state |
 | `ExtractedSchema` | `types.ts` | Schema block: name, namespace, fields, spreads, metadata |
 | `ExtractedMapping` | `types.ts` | Mapping block: sourceRefs, targetRef, arrows |
 | `ExtractedArrow` | `types.ts` | Arrow: sourceFields, targetField, transform steps, classification |
@@ -311,7 +314,12 @@ schema orders {
 }
 ```
 
-**Rule:** Any code that works with fields must recurse through `FieldDecl.children`. Use `satsuma-core`'s public `extractFieldTree()` to get the full recursive tree. Use `collectFieldPaths()` from `spread-expand.ts` to flatten to dotted paths (e.g. `line_items.product_id`).
+**Rule:** Any code that works with record-bearing fields must recurse through
+`FieldDecl.children`. The property exists only on the record and record-list
+variants; use `classifyFieldDecl()` when a consumer intentionally handles all
+four variants. Use `satsuma-core`'s public `extractFieldTree()` to get the full
+recursive tree. Use `collectFieldPaths()` from `spread-expand.ts` to flatten to
+dotted paths (e.g. `line_items.product_id`).
 
 The `fieldLocations` LSP handler was historically flat (only top-level fields). This was fixed in Feature 26 (ticket sl-ysy4) by routing through `extractFieldTree()`.
 

@@ -22,7 +22,9 @@ import {
   expandDeclaredFields,
   makeEntityRefResolver,
   extractFieldTree,
+  fieldDeclFromRenderedType,
   isMetricSchema,
+  renderFieldDeclType,
 } from "@satsuma/core";
 import type { MetaEntry, FieldDecl, SpreadEntity } from "@satsuma/core";
 
@@ -347,14 +349,13 @@ function definitionToSpreadEntity(def: DefinitionEntry): SpreadEntity {
 
 /** Convert an indexed FieldInfo to core's FieldDecl for spread expansion input. */
 function fieldInfoToDecl(fi: FieldInfo): FieldDecl {
-  return {
+  return fieldDeclFromRenderedType({
     name: fi.name,
     type: fi.type ?? "",
     startRow: fi.range.start.line,
     children: fi.children.map(fieldInfoToDecl),
-    hasSpreads: (fi.spreads?.length ?? 0) > 0,
-    spreads: fi.spreads ?? [],
-  };
+    ...(fi.spreads ? { spreads: fi.spreads } : {}),
+  });
 }
 
 /** Convert a SchemaCard to core's SpreadEntity interface for spread expansion. */
@@ -368,13 +369,12 @@ function schemaToSpreadEntity(s: SchemaCard): SpreadEntity {
 
 /** Convert a viz FieldEntry to core's FieldDecl for spread expansion input. */
 function fieldEntryToDecl(fe: FieldEntry): FieldDecl {
-  return {
+  return fieldDeclFromRenderedType({
     name: fe.name,
     type: fe.type,
     children: fe.children.map(fieldEntryToDecl),
-    hasSpreads: (fe.spreads?.length ?? 0) > 0,
-    spreads: fe.spreads ?? [],
-  };
+    ...(fe.spreads ? { spreads: fe.spreads } : {}),
+  });
 }
 
 /**
@@ -417,7 +417,7 @@ function mergeExpandedField(decl: FieldDecl, original: FieldEntry | undefined): 
 function expandedFieldToEntry(decl: FieldDecl): FieldEntry {
   return {
     name: decl.name,
-    type: decl.type,
+    type: renderFieldDeclType(decl),
     constraints: [],
     metadata: [],
     notes: [],
@@ -723,10 +723,7 @@ function fieldDeclToEntry(decl: FieldDecl, uri: string, cstNode: SyntaxNode | nu
 
   // Build the type string: core uses "record" for nested, but viz distinguishes
   // "list_of record", "list_of <type>", and plain types.
-  let type = decl.type;
-  if (decl.isList && decl.type === "record") type = "list_of record";
-  else if (decl.isList && decl.type) type = `list_of ${decl.type}`;
-  else if (decl.isList) type = "list_of";
+  const type = renderFieldDeclType(decl);
 
   // Child fields: recursively zip with nested CST nodes
   const nestedBody = cstNode ? child(cstNode, "schema_body") : null;
@@ -784,7 +781,7 @@ function makeVizLookup(wsIndex: WorkspaceIndex): DefinitionLookup {
       const def = wsIndex.definitions.get(key)?.find((d) => d.kind === "schema");
       if (!def) return null;
       return {
-        fields: def.fields.map((f) => ({ name: f.name, type: f.type ?? "" })),
+        fields: def.fields.map(fieldInfoToDecl),
         hasSpreads: false,
       };
     },
@@ -793,7 +790,7 @@ function makeVizLookup(wsIndex: WorkspaceIndex): DefinitionLookup {
       const def = wsIndex.definitions.get(key)?.find((d) => d.kind === "fragment");
       if (!def) return null;
       return {
-        fields: def.fields.map((f) => ({ name: f.name, type: f.type ?? "" })),
+        fields: def.fields.map(fieldInfoToDecl),
         hasSpreads: false,
       };
     },
@@ -807,10 +804,10 @@ function makeVizLookup(wsIndex: WorkspaceIndex): DefinitionLookup {
           yield [
             key,
             {
-              fields: schemaDef.fields.map((f) => ({ name: f.name, type: f.type ?? "" })),
+              fields: schemaDef.fields.map(fieldInfoToDecl),
               hasSpreads: false,
             },
-          ] as [string, { fields: { name: string; type: string }[]; hasSpreads: boolean }];
+          ];
         }
       }
     },

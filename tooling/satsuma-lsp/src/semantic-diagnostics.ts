@@ -23,7 +23,7 @@ import {
   createScopedIndex,
   getImportReachableUris,
 } from "./workspace-index";
-import { validateSemanticWorkspace } from "@satsuma/core";
+import { fieldDeclFromRenderedType, validateSemanticWorkspace } from "@satsuma/core";
 import type {
   SemanticIndex,
   SemanticSchema,
@@ -31,6 +31,7 @@ import type {
   SemanticMapping,
   SemanticMetric,
   SemanticDiagnostic,
+  FieldDecl,
   ResolvedFileImport,
   ImportScopeViolation,
 } from "@satsuma/core";
@@ -321,11 +322,7 @@ function defEntryToSchema(name: string, entry: DefinitionEntry): SemanticSchema 
     namespace: ns,
     file: entry.uri,
     row: entry.range.start.line,
-    fields: entry.fields.map((f) => ({
-      name: f.name,
-      type: f.type ?? "",
-      children: f.children.map((c) => ({ name: c.name, type: c.type ?? "" })),
-    })),
+    fields: entry.fields.map(fieldInfoToDecl),
   };
 }
 
@@ -337,12 +334,18 @@ function defEntryToFragment(name: string, entry: DefinitionEntry): SemanticFragm
     namespace: ns,
     file: entry.uri,
     row: entry.range.start.line,
-    fields: entry.fields.map((f) => ({
-      name: f.name,
-      type: f.type ?? "",
-      children: f.children.map((c) => ({ name: c.name, type: c.type ?? "" })),
-    })),
+    fields: entry.fields.map(fieldInfoToDecl),
   };
+}
+
+/** Normalize the workspace index's rendered type spelling for core validation. */
+function fieldInfoToDecl(field: DefinitionEntry["fields"][number]): FieldDecl {
+  return fieldDeclFromRenderedType({
+    name: field.name,
+    type: field.type,
+    children: field.children.map(fieldInfoToDecl),
+    ...(field.spreads ? { spreads: field.spreads } : {}),
+  });
 }
 
 /**

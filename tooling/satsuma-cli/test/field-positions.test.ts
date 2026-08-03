@@ -14,7 +14,7 @@ import { describe, it } from "node:test";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import "./setup.js";
-import { extractSchemas, extractFragments } from "@satsuma/core";
+import { extractSchemas, extractFragments, fieldDeclFromRenderedType } from "@satsuma/core";
 import { parseSource } from "../dist/parser.js";
 import { buildIndex } from "../dist/index-builder.js";
 import { expandEntityFields, expandNestedSpreads } from "../dist/spread-expand.js";
@@ -46,7 +46,11 @@ describe("fieldDeclarationRow()", () => {
   it("reports a schema's own field at its extracted declaration row", () => {
     // The common case: core's extractFieldTree always sets startRow, and it is
     // a row in the same file the command reports, so it passes straight through.
-    const field: ExpandedField = { name: "id", type: "INT", startRow: 12 };
+    const field: ExpandedField = fieldDeclFromRenderedType({
+      name: "id",
+      type: "INT",
+      startRow: 12,
+    });
     assert.equal(fieldDeclarationRow(field, CONSUMER, false), 12);
   });
 
@@ -55,9 +59,7 @@ describe("fieldDeclarationRow()", () => {
     // the consuming schema's file would send a jump link into the wrong file at
     // a plausible-looking line, so the consuming entity's row wins.
     const field: ExpandedField = {
-      name: "email",
-      type: "STRING",
-      startRow: 3,
+      ...fieldDeclFromRenderedType({ name: "email", type: "STRING", startRow: 3 }),
       fromFragment: "contact",
     };
     assert.equal(fieldDeclarationRow(field, CONSUMER, false), CONSUMER.row);
@@ -67,14 +69,21 @@ describe("fieldDeclarationRow()", () => {
     // Only the field copied directly out of the fragment carries fromFragment;
     // its children do not. Without inherited provenance a nested child of a
     // spread record would silently fall back to the fragment's row.
-    const child: ExpandedField = { name: "city", type: "STRING", startRow: 4 };
+    const child: ExpandedField = fieldDeclFromRenderedType({
+      name: "city",
+      type: "STRING",
+      startRow: 4,
+    });
     assert.equal(fieldDeclarationRow(child, CONSUMER, true), CONSUMER.row);
   });
 
   it("returns undefined when the field carries no position at all", () => {
     // Absence must propagate as absence. Substituting 0 would read as line 1
     // and point a reader at the top of the file (sl-5sjp).
-    assert.equal(fieldDeclarationRow({ name: "id", type: "INT" }, CONSUMER, false), undefined);
+    assert.equal(
+      fieldDeclarationRow(fieldDeclFromRenderedType({ name: "id", type: "INT" }), CONSUMER, false),
+      undefined,
+    );
   });
 });
 

@@ -96,23 +96,28 @@ export interface MetaEntrySlice {
 
 export type MetaEntry = MetaEntryTag | MetaEntryKV | MetaEntryEnum | MetaEntryNote | MetaEntrySlice;
 
-// ── Extracted record shapes ─────────────────────────────────────────────────
+// ── Extracted field shapes ──────────────────────────────────────────────────
 
-export interface FieldDecl {
+declare const scalarTypeExpressionBrand: unique symbol;
+
+/**
+ * A scalar type expression such as `INT`, `VARCHAR(MAX)`, or the empty string
+ * used for a metadata-only field declaration.
+ *
+ * The brand keeps the reserved `record` keyword out of scalar variants without
+ * changing the string stored at runtime. Construct values through
+ * `createScalarTypeExpression` at parser or protocol boundaries.
+ */
+export type ScalarTypeExpression = string & {
+  readonly [scalarTypeExpressionBrand]: "ScalarTypeExpression";
+};
+
+/** Properties shared by every field declaration variant. */
+export interface FieldDeclBase {
   /** The field name as written in source (backtick quoting stripped). */
   name: string;
-  /** The type expression text (e.g. "INT", "STRING"), or "record" for nested record fields. */
-  type: string;
-  /** Nested field declarations for record-typed fields. */
-  children?: FieldDecl[];
-  /** True when the field is declared with the `list_of` keyword. */
-  isList?: boolean;
   /** Metadata entries from an inline metadata block on this field. */
   metadata?: MetaEntry[];
-  /** True when any child position contains a fragment spread. */
-  hasSpreads?: boolean;
-  /** Names of fragments spread into this field's record body. */
-  spreads?: string[];
   /**
    * 0-indexed row of the field_decl node's start position in the source file.
    * Sourced from `node.startPosition.row` in the CST. Present when the field
@@ -126,3 +131,69 @@ export interface FieldDecl {
    */
   startColumn?: number;
 }
+
+/** A single primitive value, including metadata-only fields with an empty type. */
+export interface ScalarFieldDecl extends FieldDeclBase {
+  /** Scalar type expression exactly as authored; never the reserved `record` keyword. */
+  type: ScalarTypeExpression;
+  /** Scalar fields are not lists; explicit false is accepted at compatibility boundaries. */
+  isList?: false;
+  /** Scalar fields cannot own a nested record body. */
+  children?: never;
+  /** Scalar fields cannot contain fragment spreads. */
+  hasSpreads?: never;
+  /** Scalar fields cannot name fragments from a record body. */
+  spreads?: never;
+}
+
+/** A nested record value with an explicit, possibly empty, field body. */
+export interface RecordFieldDecl extends FieldDeclBase {
+  /** The stable runtime spelling for a record-bearing field. */
+  type: "record";
+  /** A non-list record may retain an explicit false from the extractor. */
+  isList?: false;
+  /** Fields declared inside the record body. */
+  children: FieldDecl[];
+  /** True when the authored body contains at least one fragment spread. */
+  hasSpreads?: boolean;
+  /** Fragment names spread directly into this record body. */
+  spreads?: string[];
+}
+
+/** A list whose elements are primitive scalar values. */
+export interface ScalarListFieldDecl extends FieldDeclBase {
+  /** Type expression of each scalar list element. */
+  type: ScalarTypeExpression;
+  /** The list marker separates this shape from a scalar field. */
+  isList: true;
+  /** Scalar-list elements cannot own a nested record body. */
+  children?: never;
+  /** Scalar-list elements cannot contain fragment spreads. */
+  hasSpreads?: never;
+  /** Scalar-list elements cannot name fragments from a record body. */
+  spreads?: never;
+}
+
+/** A list whose elements are records with an explicit, possibly empty, body. */
+export interface RecordListFieldDecl extends FieldDeclBase {
+  /** The stable runtime spelling for each record element. */
+  type: "record";
+  /** The list marker distinguishes this shape from a single record. */
+  isList: true;
+  /** Fields declared inside the record element body. */
+  children: FieldDecl[];
+  /** True when the authored body contains at least one fragment spread. */
+  hasSpreads?: boolean;
+  /** Fragment names spread directly into this record element body. */
+  spreads?: string[];
+}
+
+/**
+ * A field declaration in one of the four shapes the grammar can emit.
+ *
+ * The union deliberately uses the existing `type`, `isList`, and `children`
+ * properties, so tightening the TypeScript contract does not add a serialized
+ * discriminator or change CLI/LSP/VizModel payloads.
+ */
+export type FieldDecl =
+  ScalarFieldDecl | RecordFieldDecl | ScalarListFieldDecl | RecordListFieldDecl;

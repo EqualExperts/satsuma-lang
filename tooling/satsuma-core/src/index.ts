@@ -111,8 +111,22 @@ export type {
   MetaEntryEnum,
   MetaEntryNote,
   MetaEntrySlice,
+  ScalarTypeExpression,
+  FieldDeclBase,
+  ScalarFieldDecl,
+  RecordFieldDecl,
+  ScalarListFieldDecl,
+  RecordListFieldDecl,
   FieldDecl,
 } from "./types.js";
+export {
+  createScalarTypeExpression,
+  classifyFieldDecl,
+  fieldDeclFromRenderedType,
+  renderFieldDeclType,
+} from "./field-decl.js";
+export type { ClassifiedFieldDecl, RenderedFieldDeclInput } from "./field-decl.js";
+export { assertNever } from "./assert-never.js";
 export {
   child,
   children,

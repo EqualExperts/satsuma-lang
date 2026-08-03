@@ -2,6 +2,22 @@
 
 ## Unreleased
 
+### `FieldDecl` now rejects impossible field shapes (`cbdr-hqhh`)
+
+**This is a TypeScript source-contract change for consumers of `@satsuma/core`;
+runtime objects and JSON output keep their existing properties.** `FieldDecl` is
+now a union of scalar, record, scalar-list, and record-list variants. A scalar
+cannot carry `children` or fragment-spread state, and a record list must carry
+its record body, even when that body is empty.
+
+Code constructing scalar declarations should pass dynamic type strings through
+`createScalarTypeExpression`. LSP- or visualization-style type strings such as
+`list_of STRING` can use `fieldDeclFromRenderedType`, which normalizes the
+rendered spelling into core's existing `{ type: "STRING", isList: true }` shape.
+Use `classifyFieldDecl` with `assertNever` when handling every variant
+exhaustively. No Satsuma syntax, CLI JSON field, LSP payload, or VizModel field
+has changed.
+
 ## v0.12.0 — 2026-08-03
 
 ### Nested lineage keeps its target namespace (`nfl-8o6u`)

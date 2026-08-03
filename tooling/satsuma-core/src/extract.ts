@@ -8,6 +8,7 @@
 
 import { canonicalRef } from "./canonical-ref.js";
 import { classifyTransform, classifyArrow } from "./classify.js";
+import { createScalarTypeExpression } from "./field-decl.js";
 import { extractMetadata } from "./meta-extract.js";
 import {
   child,
@@ -20,7 +21,17 @@ import {
   sourceRefStructuralText,
   isPresent,
 } from "./cst-utils.js";
-import type { Classification, FieldDecl, MetaEntry, PipeStep, SyntaxNode } from "./types.js";
+import type {
+  Classification,
+  FieldDecl,
+  MetaEntry,
+  PipeStep,
+  RecordFieldDecl,
+  RecordListFieldDecl,
+  ScalarFieldDecl,
+  ScalarListFieldDecl,
+  SyntaxNode,
+} from "./types.js";
 import type { SatsumaCstType, SatsumaGrammarSymbol } from "./generated/cst-types.js";
 
 // ── Internal field tree ────────────────────────────────────────────────────
@@ -57,9 +68,9 @@ function extractDirectFields(bodyNode: SyntaxNode): FieldDecl[] {
     let name = inner?.text ?? "";
     if (inner?.type === "backtick_name") name = name.slice(1, -1);
     const meta = extractMetadata(child(fd, "metadata_block"));
-    const decl: FieldDecl = {
+    const decl: ScalarFieldDecl = {
       name,
-      type: typeNode?.text ?? "",
+      type: createScalarTypeExpression(typeNode?.text ?? ""),
       startRow: fd.startPosition.row,
       startColumn: fd.startPosition.column,
     };
@@ -97,14 +108,23 @@ export function extractFieldTree(bodyNode: SyntaxNode): FieldTree {
       if (innerBody) {
         const isList = hasListOfKeyword(c);
         const nested = extractFieldTree(innerBody);
-        const decl: FieldDecl = {
-          name,
-          type: "record",
-          isList,
-          children: nested.fields,
-          startRow: c.startPosition.row,
-          startColumn: c.startPosition.column,
-        };
+        const decl: RecordFieldDecl | RecordListFieldDecl = isList
+          ? {
+              name,
+              type: "record",
+              isList: true,
+              children: nested.fields,
+              startRow: c.startPosition.row,
+              startColumn: c.startPosition.column,
+            }
+          : {
+              name,
+              type: "record",
+              isList: false,
+              children: nested.fields,
+              startRow: c.startPosition.row,
+              startColumn: c.startPosition.column,
+            };
         if (meta.length > 0) decl.metadata = meta;
         if (nested.hasSpreads) {
           decl.hasSpreads = true;
@@ -116,24 +136,32 @@ export function extractFieldTree(bodyNode: SyntaxNode): FieldTree {
         const isList = hasListOfKeyword(c);
         const hasRecordKeyword = c.children?.some((ch) => !ch.isNamed && ch.text === "record");
         if (hasRecordKeyword) {
-          const decl: FieldDecl = {
-            name,
-            type: "record",
-            isList: isList || undefined,
-            children: [],
-            startRow: c.startPosition.row,
-            startColumn: c.startPosition.column,
-          };
+          const decl: RecordFieldDecl | RecordListFieldDecl = isList
+            ? {
+                name,
+                type: "record",
+                isList: true,
+                children: [],
+                startRow: c.startPosition.row,
+                startColumn: c.startPosition.column,
+              }
+            : {
+                name,
+                type: "record",
+                children: [],
+                startRow: c.startPosition.row,
+                startColumn: c.startPosition.column,
+              };
           if (meta.length > 0) decl.metadata = meta;
           fields.push(decl);
         } else {
-          const decl: FieldDecl = {
+          const decl: ScalarFieldDecl | ScalarListFieldDecl = {
             name,
-            type: typeNode?.text ?? "",
+            type: createScalarTypeExpression(typeNode?.text ?? ""),
             startRow: c.startPosition.row,
             startColumn: c.startPosition.column,
+            ...(isList ? { isList: true as const } : {}),
           };
-          if (isList) decl.isList = true;
           if (meta.length > 0) decl.metadata = meta;
           fields.push(decl);
         }

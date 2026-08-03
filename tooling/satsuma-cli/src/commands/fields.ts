@@ -11,6 +11,7 @@
  */
 
 import type { Command } from "commander";
+import { assertNever, classifyFieldDecl } from "@satsuma/core";
 import { loadWorkspace } from "../load-workspace.js";
 import { runCommand, CommandError, EXIT_NOT_FOUND } from "../command-runner.js";
 import { resolveIndexKey } from "../index-builder.js";
@@ -25,9 +26,9 @@ import type {
   MetricRecord,
 } from "../types.js";
 
-interface FieldWithTags extends FieldDecl {
+type FieldWithTags = FieldDecl & {
   tags?: string[];
-}
+};
 
 export function register(program: Command): void {
   program
@@ -169,11 +170,9 @@ Examples:
 }
 
 function deepCopyFields(fields: FieldDecl[]): FieldWithTags[] {
-  return fields.map((f) => {
-    const copy: FieldWithTags = { ...f };
-    if (f.children) copy.children = deepCopyFields(f.children);
-    return copy;
-  });
+  return fields.map((field) =>
+    field.children ? { ...field, children: deepCopyFields(field.children) } : { ...field },
+  );
 }
 
 /**
@@ -252,9 +251,18 @@ function printFieldTree(
 ): void {
   const maxName = Math.max(...fields.map((f) => f.name.length), 4);
   const displayType = (f: FieldWithTags): string => {
-    if (!f.isList) return f.type;
-    const inner = f.children && f.children.length > 0 ? "record" : f.type;
-    return `list_of ${inner}`;
+    const classified = classifyFieldDecl(f);
+    switch (classified.kind) {
+      case "scalar":
+      case "record":
+        return classified.field.type;
+      case "scalar-list":
+        return classified.field.type ? `list_of ${classified.field.type}` : "list_of";
+      case "record-list":
+        return "list_of record";
+      default:
+        return assertNever(classified, "Unhandled FieldDecl variant");
+    }
   };
   const maxType = Math.max(...fields.map((f) => displayType(f).length), 4);
   const pad = "  ".repeat(indent);
