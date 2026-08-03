@@ -21,6 +21,7 @@ const assert = require("node:assert/strict");
 const { initTestParser, parse } = require("./helper");
 const { createWorkspaceIndex, indexFile } = require("../dist/workspace-index");
 const { buildVizModel } = require("../dist/viz-model");
+const { buildModelFromSources } = require("../dist/model-from-sources");
 const { summarizeFieldCoverage } = require("@satsuma/core");
 
 before(async () => {
@@ -156,6 +157,37 @@ mapping orphan {
 }`);
     const mapping = model.namespaces.flatMap((ns) => ns.mappings).find((m) => m.id === "orphan");
     assert.equal(mapping.coverage, undefined);
+  });
+
+  it("keeps coverage through the lineage merge, for a schema imported from another file", () => {
+    // Coverage is attached per file, *before* mergeVizModels, which upgrades an
+    // imported stub card to its full definition. ADR-042 records that as a
+    // residual risk: it is safe only because a stub carries the index's fields,
+    // so the tree the merge swaps in is the tree that was judged. This pins the
+    // property both ways round — single-file and merged must agree, and a
+    // cross-file source schema must be counted rather than skipped.
+    const docs = [
+      { uri: "file:///lib.stm", source: `schema shared { a STRING b STRING }` },
+      {
+        uri: "file:///main.stm",
+        source: `import { shared } from "./lib.stm"
+schema tgt { a STRING b STRING }
+mapping load { source { shared } target { tgt } shared.a -> a }`,
+      },
+    ];
+
+    const figures = (lineage) => {
+      const model = buildModelFromSources("file:///main.stm", docs, { lineage });
+      const mapping = model.namespaces.flatMap((ns) => ns.mappings)[0];
+      return (mapping.coverage?.schemas ?? []).map((s) => {
+        const t = summarizeFieldCoverage(s.fields);
+        return `${s.role} ${s.schemaId} ${t.covered}/${t.total}`;
+      });
+    };
+
+    const expected = ["source shared 1/2", "target tgt 1/2"];
+    assert.deepEqual(figures(false), expected);
+    assert.deepEqual(figures(true), expected, "the lineage merge must not drop or alter coverage");
   });
 
   it("credits a leaf named only by a resolved NL @ref, in the nl tier", () => {
