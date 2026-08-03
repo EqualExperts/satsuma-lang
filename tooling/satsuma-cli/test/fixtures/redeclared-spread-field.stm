@@ -1,0 +1,24 @@
+// Fixture for sl-qead: a spread redeclares a field the body already declares.
+//
+// `load_ts` is written out in `contact` AND declared by `...meta`. It is one
+// field, so the schema has three leaves — id, load_ts, batch_id — and the two
+// mapped ones make it 2/3 (67%). Counting the spread's copy as a second field
+// reported 3/4 (75%), overstating coverage. Shared with the LSP and viz suites.
+fragment meta {
+  load_ts TIMESTAMPTZ
+  batch_id STRING(36)
+}
+
+schema contact {
+  id STRING(10)
+  load_ts TIMESTAMPTZ
+  ...meta
+}
+
+mapping contact_load {
+  source { raw_contact }
+  target { contact }
+
+  raw_id -> id
+  raw_ts -> load_ts
+}

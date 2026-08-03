@@ -152,6 +152,24 @@ describe("LSP coverage adapter — fragment spreads", () => {
     );
   });
 
+  it("counts a field the body and a spread both declare exactly once", () => {
+    // sl-qead, the gutter's half of the parity claim. `contact` writes out
+    // `load_ts` and also spreads `...meta`, which declares it again. Two
+    // decorations on one line is the visible symptom; the CLI reports 2/3 for
+    // this file and the gutter must be counting the same three leaves.
+    const target = coverage(fixture("redeclared-spread-field.stm"), "contact_load").schemas.find(
+      (s) => s.role === "target",
+    );
+    assert.deepEqual(
+      target.fields.map((f) => [f.path, f.state]),
+      [
+        ["id", "covered"],
+        ["load_ts", "covered"],
+        ["batch_id", "uncovered"],
+      ],
+    );
+  });
+
   it("keeps two records spread from one fragment independently covered", () => {
     // The examples/lib/sfdc_fragments.stm shape. Both records materialise a
     // field named `Street` from the same fragment, so a coverage model keyed by

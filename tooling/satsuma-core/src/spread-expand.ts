@@ -163,8 +163,27 @@ function expandNestedFieldPaths(
 
 /**
  * Expand fragment spreads for a single entity (schema or fragment), returning
- * the expanded field objects (not paths). Useful for commands that need the
- * actual field objects rather than just path strings.
+ * *only the fields the spreads contribute* — the caller already has the ones
+ * the body wrote out, and concatenates the two.
+ *
+ * **Rule: a spread contributes only names the body has not already declared.**
+ * An explicit declaration shadows a same-named field reached through a spread,
+ * and the first spread to contribute a name shadows any later one. A shadowed
+ * field is not returned at all, so `[...entity.fields, ...expandEntityFields()]`
+ * holds each name exactly once.
+ *
+ * This is what makes the concatenation safe (sl-qead). Emitting the shadowed
+ * copy too put the same field in a schema twice: `sat_contact_details` declares
+ * `load_ts` and spreads `...standard_metadata`, which declares it again, and
+ * coverage counted eleven leaves in a ten-leaf schema — the duplicate landing in
+ * both numerator and denominator, so the percentage moved with how many times a
+ * name happened to be written. ADR-035 makes the qualified path a coverage
+ * entry's identity, so two entries sharing one path is a contract violation on
+ * its own terms.
+ *
+ * Shadowing is whole-field: a record shadowed by an explicit record keeps the
+ * explicit body, and the fragment's version of its children is not merged in.
+ * See "Fragment spreads" in the v2 spec.
  */
 export function expandEntityFields(
   entity: SpreadEntity | null | undefined,
@@ -176,12 +195,27 @@ export function expandEntityFields(
   if (!entity?.hasSpreads) return expandedFields;
 
   const visited = new Set<string>();
-  collectExpandedFields(entity, currentNs, resolveRef, lookupFragment, expandedFields, visited, []);
+  // Seeded with what the body declares, so those names win over any spread.
+  const declared = new Set((entity.fields ?? []).map((f) => f.name));
+  collectExpandedFields(
+    entity,
+    currentNs,
+    resolveRef,
+    lookupFragment,
+    expandedFields,
+    visited,
+    [],
+    declared,
+  );
   return expandedFields;
 }
 
 /**
  * Recursively collect expanded field objects from fragment spreads.
+ *
+ * `declared` carries the names already spoken for — the entity's own fields
+ * plus everything collected so far — and grows as fields are taken, which is
+ * how nearer declarations shadow further ones through transitive spreads.
  */
 function collectExpandedFields(
   entity: SpreadEntity,
@@ -191,6 +225,7 @@ function collectExpandedFields(
   fields: ExpandedField[],
   visited: Set<string>,
   chain: string[],
+  declared: Set<string>,
 ): void {
   const spreads = entity.spreads ?? [];
   if (spreads.length === 0) return;
@@ -207,14 +242,22 @@ function collectExpandedFields(
     if (!fragment) continue;
 
     for (const f of fragment.fields) {
+      if (declared.has(f.name)) continue; // shadowed by the body or an earlier spread
+      declared.add(f.name);
       fields.push({ ...f, fromFragment: resolvedKey });
     }
 
     if (fragment.hasSpreads) {
-      collectExpandedFields(fragment, currentNs, resolveRef, lookupFragment, fields, visited, [
-        ...chain,
-        resolvedKey,
-      ]);
+      collectExpandedFields(
+        fragment,
+        currentNs,
+        resolveRef,
+        lookupFragment,
+        fields,
+        visited,
+        [...chain, resolvedKey],
+        declared,
+      );
     }
   }
 }
@@ -270,6 +313,10 @@ export function expandNestedSpreads(
  * childless leaf, and the viz expanded only the schema-level form. Three
  * numbers, one file. Consumers now call this rather than sequencing the two
  * passes themselves.
+ *
+ * Each name appears once at each level: a field the body declares shadows a
+ * same-named field from a spread, so the returned tree yields no duplicate
+ * dotted paths. `expandEntityFields` owns that rule and explains why.
  *
  * The input is never mutated — `expandNestedSpreads` works in place, and index
  * records are shared with every other command in the process, so the field tree

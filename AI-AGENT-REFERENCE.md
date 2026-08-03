@@ -132,6 +132,19 @@ Workspace scope is also file-based everywhere:
   - IDE/LSP features for an open file use only that file's import-reachable graph
   - the surrounding folder is never an implicit merged scope
 
+## Fragment spreads in a schema body
+A spread contributes only the names the body has not already declared. An
+explicit declaration shadows the fragment's field of the same name — the
+body's type, constraints and note stand, and the field exists once, not twice:
+  fragment meta { load_ts TIMESTAMPTZ  batch_id STRING(36) }
+  schema contact {
+    id       STRING(10)
+    load_ts  TIMESTAMPTZ (pk)   // this one stands
+    ...meta                     // contributes batch_id only
+  }
+`contact` has three fields. Where two spreads declare a name, the first wins.
+Shadowing is whole-field, never a merge of record children.
+
 ## Source blocks — not just schema names
   source {
     schema_ref

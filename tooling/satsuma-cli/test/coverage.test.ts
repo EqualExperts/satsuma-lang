@@ -951,6 +951,9 @@ describe("satsuma coverage — key spelling", () => {
 describe("satsuma coverage — fragment spreads", () => {
   const NESTED_SPREAD = resolve(__dirname, "fixtures/nested-record-spread.stm");
   const LIST_OF_SPREAD = resolve(__dirname, "fixtures/list-of-record-spread.stm");
+  const REDECLARED_SPREAD = resolve(__dirname, "fixtures/redeclared-spread-field.stm");
+  /** The shipped example the duplicate-path bug was actually found in. */
+  const NS_PLATFORM = resolve(__dirname, "../../../examples/namespaces/ns-platform.stm");
 
   it("counts the leaves a spread materialises inside a record body", async () => {
     // `address record { ...address_fields }` declares three leaves. Counting the
@@ -992,5 +995,61 @@ describe("satsuma coverage — fragment spreads", () => {
     assert.equal(target.covered, 2);
     assert.equal(target.total, 4);
     assert.equal(target.pct, 50);
+  });
+
+  it("counts a field the body and a spread both declare exactly once", async () => {
+    // sl-qead. `contact` writes out `load_ts` and also spreads `...meta`, which
+    // declares it again — one field, declared twice. Emitting both copies put
+    // the duplicate in the denominator and, because it is mapped, in the
+    // numerator too: 3/4 (75%) for a schema that is 2/3 (67%). The error
+    // overstates coverage, the one direction `--fail-under` must not fail in.
+    const { stdout } = await run("coverage", REDECLARED_SPREAD, "--json");
+    const target = schemaEntry(parseJson(stdout), "::contact_load", "target", "::contact");
+    assert.deepEqual(
+      target.fields.map((f: any) => [f.path, f.mapped]),
+      [
+        ["id", true],
+        ["load_ts", true],
+        ["batch_id", false],
+      ],
+    );
+    assert.equal(target.covered, 2);
+    assert.equal(target.total, 3);
+    assert.equal(target.pct, 67);
+  });
+
+  it("never emits two fields[] entries sharing a path, anywhere in the corpus", async () => {
+    // ADR-035 makes the qualified path a coverage entry's identity, so this is
+    // a contract on the JSON itself and not just on these fixtures: a consumer
+    // keying fields[] by path silently collapses a duplicate and then disagrees
+    // with the printed totals. Swept over the shipped examples because the bug
+    // was found there (vault::sat_contact_details), not in contrived input.
+    for (const file of [REDECLARED_SPREAD, NS_PLATFORM]) {
+      const report = parseJson((await run("coverage", file, "--json")).stdout);
+      for (const mapping of report.mappings) {
+        for (const schema of mapping.schemas) {
+          const paths = schema.fields.map((f: any) => f.path);
+          assert.deepEqual(
+            paths.filter((p: string, i: number) => paths.indexOf(p) !== i),
+            [],
+            `${schema.schema} in ${file} lists a path twice`,
+          );
+        }
+      }
+    }
+  });
+
+  it("reports the corpus schema that exposed the bug with its true leaf count", async () => {
+    // vault::sat_contact_details declares load_ts and spreads
+    // ...standard_metadata, which declares it again. Coverage reported eleven
+    // leaves for a ten-leaf schema — the shipped corpus, not a contrived file.
+    const report = parseJson((await run("coverage", NS_PLATFORM, "--json")).stdout);
+    const entries = report.mappings
+      .flatMap((m: any) => m.schemas)
+      .filter((s: any) => s.schema === "vault::sat_contact_details");
+    assert.ok(entries.length > 0, "the corpus schema should appear in the report");
+    for (const entry of entries) {
+      assert.equal(entry.total, 10);
+    }
   });
 });
