@@ -447,15 +447,41 @@ export const monotonicScenarioArbitrary = leafCountArbitrary.chain((leafCount) =
 );
 
 /**
- * General recovery-free semantic inputs reused by generated formatter tests.
- * The union deliberately includes flat, nested, whole-structure, unresolved,
- * and spread/redeclaration forms instead of generating grammar text directly.
+ * A nested leaf and a top-level leaf sharing one name, with only the nested
+ * path referenced. This is the smallest family that distinguishes path
+ * identity from the bare-segment registration defect behind sl-joeq.
  */
-export const semanticScenarioArbitrary = fc.oneof(
+export const repeatedNameScenarioArbitrary = leafCountArbitrary.map((leafCount) => {
+  const repeatedName = "shared_value";
+  const siblingLeaves = leafNames(leafCount).map(scalarField);
+  const fields = [
+    scalarField(repeatedName),
+    recordField("group", [scalarField(repeatedName), ...siblingLeaves]),
+  ];
+  return mappingScenario({
+    sourceFields: fields,
+    targetFields: fields,
+    arrows: [{ sources: [`group.${repeatedName}`], target: `group.${repeatedName}` }],
+  });
+});
+
+/**
+ * Scenarios broad enough for an independent oracle to cross-check the full
+ * production parser/extraction boundary, including every R3 semantic family.
+ */
+export const differentialCoverageScenarioArbitrary = fc.oneof(
   coverageEndpointScenarioArbitrary.map(({ scenario }) => scenario),
   spreadRedeclarationScenarioArbitrary.map(({ scenario }) => scenario),
   wholeStructureScenarioArbitrary.map(({ scenario }) => scenario),
   nonContainerSourceScenarioArbitrary.map(({ scenario }) => scenario),
   renestingScenarioArbitrary.map(({ nested }) => nested),
   monotonicScenarioArbitrary.map(({ after }) => after),
+  repeatedNameScenarioArbitrary,
 );
+
+/**
+ * General recovery-free semantic inputs reused by generated formatter tests.
+ * The union deliberately includes flat, nested, whole-structure, unresolved,
+ * and spread/redeclaration forms instead of generating grammar text directly.
+ */
+export const semanticScenarioArbitrary = differentialCoverageScenarioArbitrary;
