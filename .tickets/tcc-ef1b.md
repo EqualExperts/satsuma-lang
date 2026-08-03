@@ -1,6 +1,6 @@
 ---
 id: tcc-ef1b
-status: in_progress
+status: closed
 deps: [tcc-e35f]
 links: []
 created: 2026-08-03T14:38:22Z
@@ -21,3 +21,10 @@ CLI file I/O remains in tooling/satsuma-cli/src/parser.ts, but parser output mus
 ## Acceptance Criteria
 
 CLI SyntaxNode and Tree usages consume the shared core contract rather than a string-typed clone; parseFile and parseSource use the audited parser adapter without use-site casts; cst-query and other local symbol-selecting helpers accept SatsumaGrammarSymbol; direct CST comparisons and switch labels across CLI commands compile against the generated union, with domain model type fields left unchanged; a generated-symbol rename/removal affecting a CLI use site produces a compile failure; focused parser/query tests and the full CLI test suite pass.
+
+## Notes
+
+**2026-08-03T15:09:07Z**
+
+Cause: The CLI duplicated core CST types and accepted arbitrary strings in block lookup and dynamic selector paths, allowing grammar drift to compile.
+Fix: Reused the shared core node/tree contract, typed CLI selectors and CST maps with generated symbols, enforced CLI test typechecking, and added a stale-symbol compile-time regression (commit 6f4c0981).
