@@ -73,6 +73,24 @@ export const EXIT_PARSE_ERROR = 2;
 export const EXIT_THRESHOLD_NOT_MET = 3;
 
 /**
+ * `lint`: the command could not run as instructed — an unusable
+ * `satsuma.config.yaml`, or a rule id that does not exist named by
+ * `--select`/`--ignore`/`lint.suppress`.
+ *
+ * Numerically the same as {@link EXIT_THRESHOLD_NOT_MET} but a different
+ * meaning, which is intentional and command-scoped: `lint` publishes its own
+ * exit-code table (PRD 37 R5), following the `fmt --check` precedent of a
+ * command owning codes that mean something specific to it. The two never
+ * collide in one invocation — `lint` has no threshold gate and `coverage`
+ * reads no lint rules.
+ *
+ * Distinct from {@link EXIT_PARSE_ERROR} on purpose: `2` means "the workspace
+ * has lint errors", so "lint never got far enough to judge the workspace"
+ * needs its own code for CI to tell a failing gate from a broken setup.
+ */
+export const EXIT_LINT_CANNOT_RUN = 3;
+
+/**
  * Structured failure raised by command handlers and shared utilities.
  *
  * Throwing a `CommandError` is the canonical way for a handler to abort
