@@ -125,7 +125,7 @@ export function parseSatsumaConfig(
   try {
     document = parseYaml(text);
   } catch (err: unknown) {
-    const message = (err as { message?: string })?.message ?? String(err);
+    const message = (err as { message?: string }).message ?? String(err);
     return { ok: false, errors: [`invalid YAML: ${message}`] };
   }
 
@@ -337,7 +337,12 @@ function describe(value: unknown): string {
   if (Array.isArray(value)) return "a list";
   if (isPlainObject(value)) return "a mapping";
   if (typeof value === "string") return `the string "${value}"`;
-  return String(value);
+  // YAML's scalar kinds are exhausted above; only number/boolean/undefined
+  // can reach here, all of which stringify safely (no [object Object] risk).
+  if (typeof value === "number" || typeof value === "boolean" || value === undefined) {
+    return String(value);
+  }
+  return "an unrecognised value";
 }
 
 /** Warn about keys we do not recognise, so a misspelled section is visible. */
