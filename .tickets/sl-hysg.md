@@ -1,6 +1,6 @@
 ---
 id: sl-hysg
-status: open
+status: closed
 deps: [sl-npi6]
 links: []
 created: 2026-07-31T13:14:15Z
@@ -26,3 +26,12 @@ Canonicalise the representative: enter the SCC at its lexicographically smallest
 
 Minimal-snippet tests in core: two mappings forming a-b-a yield exactly one warning with canonical path and both mapping names; self-mapping yields no warning (regression-locks the roadmap decision); three-schema cycle reported once regardless of declaration order; a densely connected component containing several elementary cycles yields exactly one finding and names the component's other schemas; representative path is identical across shuffled file/mapping orderings; no truncation cap is needed or present; CLI-level tests cover registration and --json shape; all suites pass locally.
 
+
+## Notes
+
+**2026-08-03T17:52:28Z**
+
+**2026-08-03T17:52:28Z**
+
+Cause: Every traversal in the toolchain is cycle-guarded, so an unintended cycle across distinct schemas showed up only as lineage output that quietly omitted an expected upstream hop — guarding is not reporting, and users had no diagnostic pointing at the cause.
+Fix: Added detectLineageCycles() in satsuma-core/src/lint-lineage-cycle.ts — schema-level edges with self-mapping edges dropped per-edge before detection (roadmap decision cited in the module), iterative Tarjan SCCs, one finding per component with a canonical representative path (entry at the smallest id, BFS shortest cycle over sorted adjacency), each hop attributed to its mapping and unvisited members named — plus a thin lineage-cycle wrapper in the CLI's lint-engine. 18 core tests lock it, determinism under shuffled mapping order included. (commit immediately after acbb3b96)

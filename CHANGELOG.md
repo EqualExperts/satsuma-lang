@@ -17,6 +17,63 @@ rendered spelling into core's existing `{ type: "STRING", isList: true }` shape.
 Use `classifyFieldDecl` with `assertNever` when handling every variant
 exhaustively. No Satsuma syntax, CLI JSON field, LSP payload, or VizModel field
 has changed.
+### BREAKING: `satsuma lint` publishes its own exit-code table (`sl-1u6r`)
+
+**Any CI job keying off lint's exit codes needs to be re-read.** `lint` previously
+returned `2` both for error-severity findings and for failing to run at all — an
+unreadable workspace, a bad path, an unusable `satsuma.config.yaml` — so a script
+could not tell a failing lint gate from a broken checkout. It now has its own
+table, following the `fmt --check` precedent:
+
+| Code | Meaning                                                                     |
+| ---- | --------------------------------------------------------------------------- |
+| `0`  | No findings, or warnings only without strict mode                           |
+| `1`  | Warnings present and strict mode active                                     |
+| `2`  | Error-severity findings present                                             |
+| `3`  | Lint could not run — unusable config, unknown rule id, unreadable workspace |
+
+What changed in practice:
+
+- **`2` no longer means "could not run".** `satsuma lint /nonexistent/path` exited
+  `2` and now exits `3`. A job that treated `2` as "the workspace has lint errors"
+  was previously also catching setup failures under that label; it now sees them
+  separately. `2` continues to mean error-severity findings, which is what it has
+  meant in practice all along.
+- **`1` is new, and opt-in.** Warnings remain advisory by default and still exit
+  `0`. They exit `1` only under `--strict` or `lint.strict: true`, so no existing
+  job changes behaviour by upgrading.
+
+`--strict` and `--no-strict` both exist and win over `lint.strict` in either
+direction, so a workspace can commit a gate and one job can still opt out. A
+suppressed rule produces no findings and therefore can never trigger a strict
+failure.
+
+### Two structural lint rules (`sl-j30s`, `sl-hysg`)
+
+**`satsuma lint` reports two new warnings.** Both are warning-severity and not
+fixable, so no existing exit code changes unless you also opt into strict mode.
+
+- **`type-mismatch-direct-arrow`** — a bare `src -> tgt` asserts the value passes
+  through unchanged, so connecting a `STRING` to a `DATE` is almost always a
+  mis-picked field, a schema edit that outran its mappings, or a missing transform.
+  Types are compared on their base token, case-insensitively: `String` matches
+  `STRING` and `VARCHAR(255)` matches `VARCHAR`. Nothing else is presumed
+  equivalent — declare your own equivalences in `lint.typeAliases`, which this rule
+  is the first consumer of. An arrow carrying _any_ transform body is never
+  type-checked, `map { … }` value maps included: a transform may legitimately change
+  type, and judging that is interpretation the CLI leaves to agents.
+- **`lineage-cycle`** — the schema-level mapping graph (the edges `satsuma lineage`
+  and `graph --compact` draw) contains a cycle. Self-mappings are excluded, since
+  that is how an increment is expressed. One finding is reported per
+  strongly-connected component rather than per elementary cycle, with a canonical
+  representative path, the mapping behind each hop, and the component members the
+  path does not visit — nothing is capped or truncated.
+
+Detection for both lives in `@satsuma/core`, so the LSP can mirror them as editor
+diagnostics without a second implementation.
+
+`lint.typeAliases` and `lint.strict` are now enforced, so the warnings the CLI
+printed to say they were inert are gone.
 
 ## v0.12.0 — 2026-08-03
 

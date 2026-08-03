@@ -242,15 +242,46 @@ describe("satsuma lint --config", () => {
     assert.match(result.stderr, /unresolved-nl-ref/);
   });
 
-  it("warns that lint.strict is parsed but not yet enforced", async () => {
-    // strict: true with no enforcement would read as an active gate. Until
-    // sl-1u6r ships, the CLI must say so out loud.
-    const dir = workspaceWithFinding();
-    const configPath = join(dir, "strict.yaml");
-    writeFileSync(configPath, "lint:\n  strict: true\n", "utf8");
+  it("applies lint.typeAliases to the type-mismatch rule", async () => {
+    // The end-to-end proof that the alias section reaches the rule. Without it
+    // the config would parse a setting nothing consumed — the failure mode the
+    // config was added to prevent. Alias *semantics* are core's tests.
+    const dir = mkdtempSync(join(tmpdir(), "satsuma-lint-aliases-"));
+    writeFileSync(
+      join(dir, "pipeline.stm"),
+      [
+        "schema src {",
+        "  id  STRING",
+        "}",
+        "",
+        "schema dst {",
+        "  id  TEXT",
+        "}",
+        "",
+        "mapping `copy id` {",
+        "  source { `src` }",
+        "  target { `dst` }",
+        "",
+        "  id -> id",
+        "}",
+        "",
+      ].join("\n"),
+      "utf8",
+    );
+    const configPath = join(dir, "aliases.yaml");
+    writeFileSync(configPath, "lint:\n  typeAliases:\n    - [STRING, TEXT]\n", "utf8");
 
-    const result = await run(CLI, "lint", join(dir, "pipeline.stm"), "--config", configPath);
-    assert.match(result.stderr, /lint\.strict is not enforced yet/);
-    assert.equal(result.code, 0);
+    const withoutConfig = await run(CLI, "lint", join(dir, "pipeline.stm"), "--json");
+    assert.match(withoutConfig.stdout, /type-mismatch-direct-arrow/);
+
+    const withConfig = await run(
+      CLI,
+      "lint",
+      join(dir, "pipeline.stm"),
+      "--json",
+      "--config",
+      configPath,
+    );
+    assert.doesNotMatch(withConfig.stdout, /type-mismatch-direct-arrow/);
   });
 });

@@ -146,7 +146,16 @@ Run `satsuma validate pipeline.stm`. The CLI validates the entry file and its tr
 Run `satsuma lineage --from <schema> pipeline.stm`. For field-level edges: `satsuma arrows <schema.field>`.
 
 **How do I lint my Satsuma files?**
-Run `satsuma lint pipeline.stm`. Use `--fix` for auto-fixing. Use `--json` for CI integration.
+Run `satsuma lint pipeline.stm`. Use `--fix` for auto-fixing, `--json` for CI integration, and `--rules` to see what it checks. See the [rule table](SATSUMA-CLI.md#validate-vs-lint) for each rule's severity, fixability, and exemptions.
+
+**How do I make lint warnings fail my build?**
+Run `satsuma lint pipeline.stm --strict`, or commit `lint: { strict: true }` in `satsuma.config.yaml`. Warnings then exit 1, distinctly from exit 2 for error-severity findings and exit 3 for "lint could not run", so CI can tell a policy failure from a broken workspace. See [Lint exit codes](SATSUMA-CLI.md#lint-exit-codes).
+
+**How do I tell lint that two of my declared type names mean the same thing?**
+List them as a group under `lint.typeAliases` in `satsuma.config.yaml` — e.g. `- [STRING, TEXT, VARCHAR]`. Nothing is presumed equivalent by default beyond case and type parameters, so `type-mismatch-direct-arrow` reports `STRING -> TEXT` until you say otherwise. See [Workspace configuration](SATSUMA-CLI.md#workspace-configuration).
+
+**How do I stop lint reporting a rule I have decided not to follow?**
+Add its id to `lint.suppress` in `satsuma.config.yaml` (the persistent form of `--ignore`), or pass `--ignore <rules>` for one run. A suppressed rule produces no findings, so it cannot fail a `--strict` build either.
 
 **How do I find out which fields aren't mapped yet?**
 Run `satsuma coverage pipeline.stm --uncovered`. Read the **aggregate** section to decide a field is genuinely unmapped — the per-mapping section lists fields another mapping may already populate. See [SATSUMA-CLI.md](SATSUMA-CLI.md#coverage).

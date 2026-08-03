@@ -100,9 +100,9 @@ Operations that check or compare workspace structure.
 
 `validate` checks **structural correctness**: parse errors, undefined references, missing schemas. It answers "is this workspace well-formed?"
 
-`lint` checks **policy and conventions**: duplicate definitions, hidden schema dependencies in NL text, unresolved NL `@ref` references. It answers "does this workspace follow best practices?" Some lint rules support `--fix` for safe, deterministic autofix.
+`lint` checks **policy and conventions**: duplicate definitions, hidden schema dependencies in NL text, unresolved NL `@ref` references, bare arrows connecting mismatched types, and cycles in the schema-level mapping graph. It answers "does this workspace follow best practices?" Some lint rules support `--fix` for safe, deterministic autofix.
 
-Flags: `--json` (structured output), `--fix` (apply safe fixes), `--select <rules>` / `--ignore <rules>` (filter rules), `--config <path>` (config file, see [Workspace configuration](#workspace-configuration)), `--quiet` (exit code only), `--rules` (list available rules).
+Flags: `--json` (structured output), `--fix` (apply safe fixes), `--select <rules>` / `--ignore <rules>` (filter rules), `--config <path>` (config file, see [Workspace configuration](#workspace-configuration)), `--strict` / `--no-strict` (whether warnings fail the run), `--quiet` (exit code only), `--rules` (list available rules).
 
 A rule id that does not exist is an error wherever it is written — `--select`, `--ignore`, or the config file — and exits `3`. A typo that silently suppressed nothing would leave the author believing a rule was off.
 
@@ -112,6 +112,24 @@ A rule id that does not exist is an error wherever it is written — `--select`,
 | `unresolved-nl-ref`          | warning  | no      | `@ref` in NL does not resolve to any known identifier               |
 | `duplicate-definition`       | error    | no      | Named definition is declared more than once in a namespace          |
 | `unenumerated-record-target` | warning  | no      | Arrow targets a record without a record source or child arrows      |
+| `type-mismatch-direct-arrow` | warning  | no      | Bare arrow connects fields whose declared types differ              |
+| `lineage-cycle`              | warning  | no      | Schema-level mapping graph contains a cycle                         |
+
+#### type-mismatch-direct-arrow
+
+A **bare** arrow — `src -> tgt` with no transform body — asserts that the value passes through unchanged. Between a `STRING` and a `DATE` that cannot be true, and in practice it is a mis-picked field, a schema edit that outran its mappings, or a transform nobody wrote down. The message names both qualified field paths and both declared types, so `lint --json` consumers can group findings by type-pair.
+
+Types are compared on their **base token, case-insensitively**: `String` matches `STRING`, and everything from the first `(` onwards is ignored, so `VARCHAR(255)` matches `VARCHAR` and `UUID(pk)` matches `UUID`. Nothing else is presumed equivalent — declaring that `TEXT` is a `STRING` is a convention decision the CLI leaves to you, via `lint.typeAliases`.
+
+**An arrow carrying a transform body is never type-checked.** Any transform body means the author has said "something happens here", and judging whether that something preserves type is natural-language interpretation, which the CLI leaves to agents. This includes `map { … }` value maps, which convert values and so may legitimately change type. The rule is also silent when either side declares no type, when the path resolves to no declared field (that is `validate`'s `field-not-in-schema`), when the arrow has several sources (no one of them is _the_ type of the result), and when two source schemas declare the same unqualified field name with different types — qualify the path (`b.email -> email`) to get it checked.
+
+#### lineage-cycle
+
+The graph is the one `satsuma lineage` and `graph --compact` traverse: directed edges from each mapping's source schemas to its target schemas. Traversal in this toolchain is cycle-guarded, which means a cycle shows up only as lineage output that quietly omits an expected upstream hop — guarding is not reporting, and this rule is the report.
+
+**A self-mapping is never a cycle.** An edge whose source and target are the same schema is dropped before detection, because that is how an incremental load is expressed — a recorded product decision, not an implementation convenience (see `docs/product-owner/ROADMAP.md`). The exemption is per-edge, so a mapping with `source { a }` and `target { a, b }` still contributes `a -> b`.
+
+One finding is reported **per strongly-connected component**, not per elementary cycle: a densely cross-linked platform graph can hold combinatorially many cycles that all describe the same tangle, and untangling the component is what a reviewer does anyway. The finding shows a canonical representative path (entered at the component's lexicographically smallest schema, shortest cycle from there), the mapping responsible for each hop, and — when the component is larger than the path — the schemas the path does not visit. Nothing is truncated.
 
 ### Workspace configuration
 
@@ -135,13 +153,24 @@ lint:
   strict: false
 ```
 
-**Precedence — one rule.** Flags win over config, and the union of `--ignore` and `lint.suppress` is suppressed. The single exception: `--select` means "run exactly these", so a rule named on the command line runs even when the config suppresses it — naming a rule is an unambiguous instruction to run it.
+**Precedence — one rule.** Flags win over config, and the union of `--ignore` and `lint.suppress` is suppressed. The single exception: `--select` means "run exactly these", so a rule named on the command line runs even when the config suppresses it — naming a rule is an unambiguous instruction to run it. `--strict` / `--no-strict` follow the same rule, overriding `lint.strict` in either direction.
 
 Unrecognised settings are reported as warnings and ignored, so a config written for a newer CLI still runs. Anything that makes the file unusable — invalid YAML, a wrong-shaped setting, an unknown rule id — aborts the run with exit `3` rather than falling back to defaults: linting with rules the author did not ask for, and reporting success, is worse than refusing to lint.
 
-`lint.typeAliases` and `lint.strict` are accepted and validated now, but nothing consumes them yet — the CLI prints a warning saying so, so a config cannot look like an active gate when no code enforces it. Their consumers ship with the type-mismatch rule and strict-mode exit codes respectively.
+#### Lint exit codes
 
-Lint exit codes: `0` no error-severity findings, `2` error-severity findings present, `3` lint could not run.
+`lint` publishes its own exit-code table, following the `fmt --check` precedent of a command owning codes that mean something specific to it:
+
+| Code | Meaning                                                                     |
+| ---- | --------------------------------------------------------------------------- |
+| `0`  | No findings, or warnings only without strict mode                           |
+| `1`  | Warnings present and strict mode active                                     |
+| `2`  | Error-severity findings present                                             |
+| `3`  | Lint could not run — unusable config, unknown rule id, unreadable workspace |
+
+Errors outrank warnings: a workspace with both reports `2`, because fixing the errors comes first either way. Warnings stay advisory by default, so adding a config file — or a new warning-severity rule — cannot break an existing CI job. A suppressed rule produces no findings at all and so can never trigger a strict failure.
+
+> **Breaking change (v0.12.0).** Previously `2` doubled as "error-severity findings" _and_ "lint could not run", so a CI job could not tell a failing gate from a broken checkout. `2` now means only the former; "could not run" moved to `3`. See `CHANGELOG.md`.
 
 ### coverage
 
@@ -378,7 +407,7 @@ Cycles are handled gracefully — each field is visited at most once. NL-derived
 | 1    | Not found or no results         |
 | 2    | Parse error or filesystem error |
 
-Two commands add a code that means something specific to them, so a script can tell a failing gate from a broken run: `coverage --fail-under` exits `3` when measured coverage is below the threshold, and `lint` exits `3` when it could not run at all (see [Workspace configuration](#workspace-configuration)). They never collide in one invocation — `lint` has no threshold and `coverage` reads no rules.
+Two commands add codes that mean something specific to them, so a script can tell a failing gate from a broken run. `coverage --fail-under` exits `3` when measured coverage is below the threshold. **`lint` publishes its own table entirely** — see [Lint exit codes](#lint-exit-codes) — where `1` means "warnings under `--strict`", `2` means "the workspace has lint errors", and `3` means "lint could not run". The command-specific codes never collide in one invocation: `lint` has no threshold gate and takes no lookup argument that can fail to resolve, and `coverage` reads no lint rules.
 
 ## How Agents Use the CLI
 

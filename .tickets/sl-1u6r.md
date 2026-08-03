@@ -1,6 +1,6 @@
 ---
 id: sl-1u6r
-status: open
+status: closed
 deps: [sl-npi6]
 links: []
 created: 2026-07-31T13:14:15Z
@@ -29,3 +29,12 @@ This moves lint's "could not run" case off 2 and leaves 2 meaning "the workspace
 
 Full exit-code matrix tested: clean 0; warnings without --strict 0; warnings with --strict 1; error findings 2; unparseable workspace 3; --strict flag overrides config strict false; suppressed rules do not trigger strict failure; lint exit-code table documented in command help and SATSUMA-CLI.md; the code change for error findings (2) and parse failures (3) called out in CHANGELOG.md as breaking for CI consumers; CLI tests pass locally.
 
+
+## Notes
+
+**2026-08-03T17:52:28Z**
+
+**2026-08-03T17:52:28Z**
+
+Cause: lint returned 2 both for error-severity findings and for failing to run at all, so 2 contradicted the CLI-wide table's 'parse or filesystem error' and CI could not tell a failing gate from a broken checkout. Adding strict mode on top would have given 1 a third meaning.
+Fix: Pinned lint's own table (0 clean or advisory warnings, 1 strict warnings, 2 error findings, 3 could not run) via a new EXIT_LINT_STRICT_WARNINGS constant, a lintExitCode() helper stating the whole rule in one place, and a loadLintWorkspace() wrapper remapping the loader's 2 to 3; added --strict/--no-strict overriding lint.strict in either direction. Documented in the command help, SATSUMA-CLI.md, HOW-DO-I.md and called out as breaking in CHANGELOG.md. 15 CLI tests cover the matrix. (commit immediately after acbb3b96)

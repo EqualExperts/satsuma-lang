@@ -22,15 +22,15 @@ A paint-only coverage overlay on the viz overview, uncovered-field treatment in 
 
 **Source:** `features/36-viz-coverage-and-chain-view/PRD.md`
 
-### Feature 37 — Structural Lint Rules (not started)
+### Feature 37 — Structural Lint Rules (complete)
 
-Two warning-severity lint rules — `type-mismatch-direct-arrow` (bare arrows between fields of different declared types) and `lineage-cycle` (schema-level cycles) — plus a `satsuma.config.yaml` loader for type aliases, rule suppression, and strict mode. Six tickets, none started (epic `sl-iffm`). Independent of Features 36 and 38.
+Two warning-severity lint rules — `type-mismatch-direct-arrow` (bare arrows between fields of different declared types) and `lineage-cycle` (schema-level cycles) — plus a `satsuma.config.yaml` loader for type aliases, rule suppression, and strict mode. All five tickets closed (epic `sl-iffm`). Detection for both rules lives in `@satsuma/core`, so the deferred LSP mirroring needs no re-implementation.
 
-**Sequencing:** `sl-npi6` (the config loader) gates everything else — `sl-j30s`, `sl-hysg`, `sl-1u6r`, then `sl-ay8a` for docs.
+**Breaking change shipped:** lint now publishes its own exit-code table (0 clean or advisory warnings, 1 strict warnings, 2 error findings, 3 could not run). It previously returned `2` both for error findings and for failing to run, so CI consumers keying on the old codes must change — called out in `CHANGELOG.md`.
 
-**Breaking change to plan for:** lint gets its own documented exit-code table (0/1/2/3). It currently returns `2` for error findings where `2` is documented as "parse error", so CI consumers keying on today's codes will need to change.
+**Recorded decision the cycle rule honours:** self-mappings (same source and target schema) are legitimate — they represent increments — and do not count as cycles. See the note at the foot of this page. The exemption is applied per-edge, so `source { a } target { a, b }` still contributes `a -> b`.
 
-**Recorded decision this rule must honour:** self-mappings (same source and target schema) are legitimate — they represent increments — and do not count as cycles. See the note at the foot of this page.
+**Still deferred:** LSP diagnostics for both rules, a built-in type-compatibility matrix (users declare their own via `lint.typeAliases`), field-level cycle detection, and autofixes for either rule.
 
 **Source:** `features/37-lint-structural-rules/PRD.md`
 
