@@ -12,6 +12,7 @@ import fc from "fast-check";
 import {
   collectParseErrors,
   computeMappingCoverage,
+  createCanonicalEntityRef,
   declaresRecordBody,
   expandDeclaredFields,
   extractFragments,
@@ -224,6 +225,7 @@ export function coverageForScenario(scenario) {
   const lookupFragment = (key) => fragments.get(key) ?? null;
   const schemas = new Map(
     extractSchemas(tree.rootNode).map((schema) => {
+      const key = entityKey(schema);
       const fields = expandDeclaredFields(
         schema,
         schema.namespace,
@@ -231,8 +233,12 @@ export function coverageForScenario(scenario) {
         lookupFragment,
       );
       return [
-        entityKey(schema),
-        { uri: "file:///generated.stm", fields: toCoverageFields(fields) },
+        key,
+        {
+          canonicalRef: createCanonicalEntityRef(key.includes("::") ? key : `::${key}`),
+          uri: "file:///generated.stm",
+          fields: toCoverageFields(fields),
+        },
       ];
     }),
   );

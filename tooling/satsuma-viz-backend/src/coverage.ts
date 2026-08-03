@@ -31,13 +31,16 @@ import type { Tree } from "./parser-utils";
 import type { DefinitionEntry, FieldInfo, WorkspaceIndex } from "./workspace-index";
 import { resolveDefinition } from "./workspace-index";
 import {
+  canonicalizeEntityRef,
   computeMappingCoverage,
+  createCanonicalEntityRef,
   declaresRecordBody,
   extractMappings,
   extractNLRefData,
   resolveAllNLRefs,
 } from "@satsuma/core";
 import type {
+  CanonicalEntityRef,
   CoverageField,
   CoverageSchemaDefinition,
   CoverageSchemaResolver,
@@ -77,7 +80,7 @@ export function attachMappingCoverage(
     // The resolver is per namespace, not per model: a reference is resolved
     // relative to where the mapping is declared, so `stg_gl_entries` written
     // inside `namespace staging` means `staging::stg_gl_entries`.
-    const resolveSchema = makeCardResolver(cards, ns.name, wsIndex);
+    const resolveSchema = makeCardResolver(cards, ns.name);
     for (const mapping of ns.mappings) {
       // Identified by its start row, which names the block outright. A label is
       // not an identity: two namespaces may declare `mapping load`, and matching
@@ -119,8 +122,8 @@ function indexCardsByQualifiedId(
  * A bare `stg_gl_entries` written inside `namespace staging` therefore has to be
  * resolved against `mappingNamespace` first, exactly as `resolveMappingRef`
  * resolves the model's own `sourceRefs`. Resolving it namespace-blind instead
- * left every namespaced mapping's own-namespace target reporting 0%. The index
- * is consulted for that one step; the *fields* still come from the card.
+ * left every namespaced mapping's own-namespace target reporting 0%. The card
+ * index is canonicalized for that step, and the fields come from the same card.
  *
  * The canonical `schemaId` reported back is the card's `qualifiedId`, so results
  * for one schema line up when a consumer rolls them up across mappings that name
@@ -129,20 +132,12 @@ function indexCardsByQualifiedId(
 function makeCardResolver(
   cards: Map<string, CoverageSchemaDefinition>,
   mappingNamespace: string | null,
-  wsIndex: WorkspaceIndex,
 ): CoverageSchemaResolver {
-  return (writtenRef: string): CoverageSchemaDefinition | null => {
-    // Already qualified, or declared at file scope: the written form is the key.
-    const direct = cards.get(writtenRef);
-    if (direct) return direct;
-    // Unqualified inside a namespace — the mapping's own namespace wins, which
-    // is the order resolveDefinition applies.
-    if (writtenRef.includes("::")) return null;
-    for (const def of resolveDefinition(wsIndex, writtenRef, mappingNamespace)) {
-      const card = cards.get(def.namespace ? `${def.namespace}::${writtenRef}` : writtenRef);
-      if (card) return card;
-    }
-    return null;
+  return (writtenRef): CoverageSchemaDefinition | null => {
+    const canonicalRef = canonicalizeEntityRef(writtenRef, mappingNamespace, cards);
+    if (!canonicalRef) return null;
+    const cardKey = canonicalRef.startsWith("::") ? canonicalRef.slice(2) : canonicalRef;
+    return cards.get(cardKey) ?? null;
   };
 }
 
@@ -150,6 +145,7 @@ function makeCardResolver(
 function schemaCardDef(schema: SchemaCard): CoverageSchemaDefinition {
   return {
     schemaId: schema.qualifiedId,
+    canonicalRef: canonicalCardRef(schema.qualifiedId),
     uri: schema.location.uri,
     fields: schema.fields.map(toCoverageField),
   };
@@ -166,9 +162,15 @@ function schemaCardDef(schema: SchemaCard): CoverageSchemaDefinition {
 function metricCardDef(metric: MetricCard): CoverageSchemaDefinition {
   return {
     schemaId: metric.qualifiedId,
+    canonicalRef: canonicalCardRef(metric.qualifiedId),
     uri: metric.location.uri,
     fields: metric.fields.map((f) => ({ name: f.name, line: f.location.line })),
   };
+}
+
+/** Convert the model's qualified-id storage spelling into core's canonical form. */
+function canonicalCardRef(qualifiedId: string): CanonicalEntityRef {
+  return createCanonicalEntityRef(qualifiedId.includes("::") ? qualifiedId : `::${qualifiedId}`);
 }
 
 /**

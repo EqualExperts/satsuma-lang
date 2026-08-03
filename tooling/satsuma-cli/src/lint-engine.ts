@@ -9,6 +9,9 @@
 
 import {
   capitalize,
+  createAuthoredEntityRef,
+  createCanonicalEntityRef,
+  createContainerQualifiedFieldRef,
   declaredFieldKind,
   schemaLocalFieldPath,
   stripNLRefScopePrefix,
@@ -586,12 +589,14 @@ function endpointKind(
   index: ExtractedWorkspace,
 ): "container" | "leaf" | null {
   for (const ref of schemaRefs) {
-    const schema = index.schemas.get(resolveCanonicalKey(ref));
+    const canonicalKey = resolveCanonicalKey(ref);
+    const schema = index.schemas.get(canonicalKey);
     if (!schema || schema.hasSpreads) continue;
     const local = schemaLocalFieldPath(
-      path,
-      [ref],
-      schemaRefs.filter((r) => r !== ref),
+      createContainerQualifiedFieldRef(path),
+      createAuthoredEntityRef(ref),
+      createCanonicalEntityRef(canonicalKey.includes("::") ? canonicalKey : `::${canonicalKey}`),
+      schemaRefs.filter((r) => r !== ref).map(createAuthoredEntityRef),
       (name) => schema.fields.some((f) => f.name === name),
     );
     if (local === null) continue;

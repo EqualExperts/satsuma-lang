@@ -44,6 +44,14 @@
  * modules can be reasoned about independently.
  */
 
+import { createSchemaLocalPath } from "./reference-stages.js";
+import type {
+  AuthoredEntityRef,
+  CanonicalEntityRef,
+  ContainerQualifiedFieldRef,
+  SchemaLocalPath,
+} from "./reference-stages.js";
+
 // ── The covered-path model ───────────────────────────────────────────────────
 
 /**
@@ -61,9 +69,9 @@
  */
 export interface CoveredFieldPaths {
   /** Paths an arrow or resolved NL `@ref` referenced exactly. */
-  direct: ReadonlySet<string>;
+  direct: ReadonlySet<SchemaLocalPath>;
   /** Proper ancestor prefixes of direct paths — containers something was written *into*. */
-  ancestors: ReadonlySet<string>;
+  ancestors: ReadonlySet<SchemaLocalPath>;
 }
 
 /**
@@ -88,9 +96,9 @@ export interface CoveredFieldPaths {
  * and it failed in the dangerous direction, silently reporting an incomplete
  * spec as complete. Callers must pass the schema-local qualified path.
  */
-export function buildCoveredFieldPaths(paths: Iterable<string>): CoveredFieldPaths {
-  const direct = new Set<string>();
-  const ancestors = new Set<string>();
+export function buildCoveredFieldPaths(paths: Iterable<SchemaLocalPath>): CoveredFieldPaths {
+  const direct = new Set<SchemaLocalPath>();
+  const ancestors = new Set<SchemaLocalPath>();
   for (const path of paths) {
     if (!path) continue;
     direct.add(path);
@@ -104,17 +112,17 @@ export function buildCoveredFieldPaths(paths: Iterable<string>): CoveredFieldPat
  * direct path. This is the boolean every consumer renders as "mapped", reached
  * through the `FieldCoverageEntry` list coverage.ts builds from it.
  */
-export function isCoveredPath(path: string, covered: CoveredFieldPaths): boolean {
+export function isCoveredPath(path: SchemaLocalPath, covered: CoveredFieldPaths): boolean {
   return covered.direct.has(path) || covered.ancestors.has(path);
 }
 
 /** Proper dotted prefixes of a path, shortest first: "a.b.c" → ["a", "a.b"]. */
-function properPrefixesOf(path: string): string[] {
-  const prefixes: string[] = [];
+function properPrefixesOf(path: SchemaLocalPath): SchemaLocalPath[] {
+  const prefixes: SchemaLocalPath[] = [];
   let prefix = "";
   for (const part of path.split(".").slice(0, -1)) {
     prefix = prefix ? `${prefix}.${part}` : part;
-    prefixes.push(prefix);
+    prefixes.push(createSchemaLocalPath(prefix));
   }
   return prefixes;
 }
@@ -154,7 +162,7 @@ function properPrefixesOf(path: string): string[] {
  *    is always fully canonical, so without this a global schema's NL coverage
  *    would never match.
  */
-export function schemaRefPrefixes(schemaRef: string): string[] {
+export function schemaRefPrefixes(schemaRef: AuthoredEntityRef | CanonicalEntityRef): string[] {
   const namespaceEnd = schemaRef.lastIndexOf("::");
   if (namespaceEnd < 0) return [schemaRef, `::${schemaRef}`];
   return [schemaRef, schemaRef.slice(namespaceEnd + 2)];
@@ -186,26 +194,28 @@ export function schemaRefPrefixes(schemaRef: string): string[] {
  * rather than to a prefix that only looks like one.
  *
  * @param fieldRef         Path as authored on the arrow, already container-qualified.
- * @param schemaRefs       Every form this schema may be named by — the reference
- *                         as written in the mapping and, when it differs, the
- *                         resolved canonical id.
+ * @param authoredSchemaRef  The schema reference exactly as written in the mapping.
+ * @param canonicalSchemaRef The unique workspace identity returned by resolution.
  * @param otherSchemaRefs  The other schemas referenced on this side of the mapping.
  * @param declaresTopLevel True when this schema declares a top-level field of the
  *                         given name. Supply it to disambiguate rules 1 and 2.
  */
 export function schemaLocalFieldPath(
-  fieldRef: string,
-  schemaRefs: readonly string[],
-  otherSchemaRefs: readonly string[],
+  fieldRef: ContainerQualifiedFieldRef,
+  authoredSchemaRef: AuthoredEntityRef,
+  canonicalSchemaRef: CanonicalEntityRef,
+  otherSchemaRefs: readonly AuthoredEntityRef[],
   declaresTopLevel?: (name: string) => boolean,
-): string | null {
+): SchemaLocalPath | null {
   const firstSegment = fieldRef.split(".")[0] ?? fieldRef;
   const shadowedByOwnField = declaresTopLevel?.(firstSegment) ?? false;
 
   if (!shadowedByOwnField) {
-    for (const prefix of schemaRefs.flatMap(schemaRefPrefixes)) {
+    for (const prefix of [authoredSchemaRef, canonicalSchemaRef].flatMap(schemaRefPrefixes)) {
       if (fieldRef === prefix) return null;
-      if (fieldRef.startsWith(`${prefix}.`)) return fieldRef.slice(prefix.length + 1);
+      if (fieldRef.startsWith(`${prefix}.`)) {
+        return createSchemaLocalPath(fieldRef.slice(prefix.length + 1));
+      }
     }
   }
 
@@ -214,5 +224,5 @@ export function schemaLocalFieldPath(
     .some((prefix) => fieldRef === prefix || fieldRef.startsWith(`${prefix}.`));
   if (namesAnotherSchema) return null;
 
-  return fieldRef;
+  return createSchemaLocalPath(fieldRef);
 }

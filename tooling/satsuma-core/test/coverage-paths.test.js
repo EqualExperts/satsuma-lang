@@ -9,7 +9,28 @@
 
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { buildCoveredFieldPaths, isCoveredPath, schemaLocalFieldPath } from "@satsuma/core";
+import {
+  buildCoveredFieldPaths,
+  createAuthoredEntityRef,
+  createCanonicalEntityRef,
+  createContainerQualifiedFieldRef,
+  isCoveredPath,
+  schemaLocalFieldPath,
+} from "@satsuma/core";
+
+/** Exercise schema localization through every validated stage boundary. */
+function localize(fieldRef, authoredSchemaRef, otherSchemaRefs = [], declaresTopLevel) {
+  const canonicalRef = authoredSchemaRef.includes("::")
+    ? authoredSchemaRef
+    : `::${authoredSchemaRef}`;
+  return schemaLocalFieldPath(
+    createContainerQualifiedFieldRef(fieldRef),
+    createAuthoredEntityRef(authoredSchemaRef),
+    createCanonicalEntityRef(canonicalRef),
+    otherSchemaRefs.map(createAuthoredEntityRef),
+    declaresTopLevel,
+  );
+}
 
 // ── Path identity (sl-joeq, ADR-035) ────────────────────────────────────────
 //
@@ -157,32 +178,32 @@ describe("schemaLocalFieldPath()", () => {
   // this same reduction, so it is pinned once here.
 
   it("strips a prefix naming the schema itself", () => {
-    assert.equal(schemaLocalFieldPath("crm.email", ["crm"], []), "email");
+    assert.equal(localize("crm.email", "crm"), "email");
   });
 
   it("leaves an already-local path untouched", () => {
     // Single-source mappings write bare paths, and a nested path's first segment
     // is a field name, not a schema name.
-    assert.equal(schemaLocalFieldPath("customer.email", ["orders"], []), "customer.email");
+    assert.equal(localize("customer.email", "orders"), "customer.email");
   });
 
   it("returns null for a path naming another schema in the same block", () => {
     // Multi-source mappings report each schema separately; crediting one
     // schema's arrow to a sibling is the over-count sl-joeq is about.
-    assert.equal(schemaLocalFieldPath("ledger.email", ["crm"], ["ledger"]), null);
+    assert.equal(localize("ledger.email", "crm", ["ledger"]), null);
   });
 
   it("accepts a namespaced schema by its bare name as well as its qualified id", () => {
     // Arrows keep authored text: inside `namespace crm` an arrow writes
     // `customers.id` while the index reports `crm::customers` (sl-iqud).
-    assert.equal(schemaLocalFieldPath("customers.id", ["crm::customers"], []), "id");
-    assert.equal(schemaLocalFieldPath("crm::customers.id", ["crm::customers"], []), "id");
+    assert.equal(localize("customers.id", "crm::customers"), "id");
+    assert.equal(localize("crm::customers.id", "crm::customers"), "id");
   });
 
   it("treats a sibling schema's bare-name prefix as belonging to that sibling", () => {
     // The bare form has to be recognised on the rival side too, or a namespaced
     // multi-source mapping credits every arrow to every schema.
-    assert.equal(schemaLocalFieldPath("orders.total", ["crm::customers"], ["crm::orders"]), null);
+    assert.equal(localize("orders.total", "crm::customers", ["crm::orders"]), null);
   });
 
   it("returns null for a bare reference that is just the schema's name", () => {
@@ -190,15 +211,15 @@ describe("schemaLocalFieldPath()", () => {
     // (`flatten contacts -> tgt`), and extraction reports that target verbatim.
     // Without this rule `tgt` would enter the covered set as though a field of
     // that name had been written (sl-vu22).
-    assert.equal(schemaLocalFieldPath("tgt", ["tgt"], []), null);
-    assert.equal(schemaLocalFieldPath("customers", ["crm::customers"], []), null);
+    assert.equal(localize("tgt", "tgt"), null);
+    assert.equal(localize("customers", "crm::customers"), null);
   });
 
   it("keeps a bare reference that names a declared field, not the schema", () => {
     // A single-source mapping's `id -> id` is a field reference even when the
     // schema is called `id`; the declaration settles it.
     assert.equal(
-      schemaLocalFieldPath("id", ["id"], [], (n) => n === "id"),
+      localize("id", "id", [], (n) => n === "id"),
       "id",
     );
   });
@@ -207,11 +228,8 @@ describe("schemaLocalFieldPath()", () => {
     // A schema and one of its own top-level fields can collide. The declared
     // field is concrete evidence, so the path is read as-is rather than stripped.
     const declaresTopLevel = (name) => name === "orders";
-    assert.equal(
-      schemaLocalFieldPath("orders.amount", ["orders"], [], declaresTopLevel),
-      "orders.amount",
-    );
+    assert.equal(localize("orders.amount", "orders", [], declaresTopLevel), "orders.amount");
     // Without the declaration the same input is a schema-qualified reference.
-    assert.equal(schemaLocalFieldPath("orders.amount", ["orders"], []), "amount");
+    assert.equal(localize("orders.amount", "orders"), "amount");
   });
 });
