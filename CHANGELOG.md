@@ -2,6 +2,28 @@
 
 ## Unreleased
 
+### `--fail-under` no longer passes an incomplete spec (`sl-8ba4`)
+
+**Some percentages move by a point.** `coverage` reported a percentage rounded to
+nearest, and the gate compared it, so 200 of 201 mapped leaves printed
+`200/201 100%` and `--fail-under 100` exited 0 — a merge gate failing open on the
+one thing it exists to catch.
+
+100% and 0% are now reserved for the exact endpoints: only a fully covered
+population reports 100%, only an entirely uncovered one reports 0%, and
+everything between them floors into 1–99%. 200/201 reports 99% and fails
+`--fail-under 100`; 1/201 reports 1% rather than a 0% that reads as nothing
+mapped.
+
+Existing figures that were rounded up drop by a point — `8/9` now reports 88%
+instead of 89%, so a threshold set just under a rounded-up figure (`--fail-under 89`
+on that schema) will start failing. It was passing on a number that overstated
+the spec. Thresholds at or below the true percentage are unaffected.
+
+The rule lives in core's `coveragePercentage()`, exported for consumers, so the
+CLI table, `--json`, the VS Code status bar, the viz card and the gate cannot
+disagree about it (ADR-034's single-definition rule).
+
 ### A whole-record arrow must carry a record to cover one (`3ct-cs4y`)
 
 Tightens the change below, before anyone sets a `--fail-under` threshold against

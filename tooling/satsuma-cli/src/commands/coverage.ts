@@ -146,6 +146,12 @@ pipeline can gate one mapping or one schema rather than the whole workspace.
 The figure gated is the COMBINED one, both tiers together: the gate asks "is this
 spec complete", and an @ref is a declaration of intent, not a hint.
 
+Percentages are whole numbers, and the two endpoints are reserved: 100% means
+every leaf is covered and 0% means none is. Anything in between floors into
+1-99%, so 200 of 201 leaves reports 99% and fails --fail-under 100 rather than
+rounding up to a pass, and 1 of 201 reports 1% rather than flooring to a 0% that
+reads as nothing mapped. The number printed is the number gated.
+
 Exit codes:
   0  report produced (and the --fail-under threshold met, if given)
   1  --mapping/--schema named something that does not exist, nothing matched, or
@@ -477,6 +483,11 @@ interface CoverageGate {
  * 0% coverage, it is nothing to measure: `--schema customers --fail-under 90`
  * where `customers` is only ever a source would otherwise report a spec failure
  * caused entirely by the invocation.
+ *
+ * Compares `totals.pct` rather than re-deriving a ratio, deliberately: core's
+ * `coveragePercentage` reserves 100 for a complete spec and floors everything
+ * below it, so the figure a reviewer reads is the figure gated. Gating a
+ * separately-computed ratio is how the two came apart in `sl-8ba4`.
  */
 function evaluateGate(
   aggregate: AggregateCoverage,

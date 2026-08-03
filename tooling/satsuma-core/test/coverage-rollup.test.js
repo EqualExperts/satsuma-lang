@@ -25,6 +25,7 @@ import {
   aggregateCoverage,
   summarizeFieldCoverage,
   countContainerStates,
+  coveragePercentage,
 } from "@satsuma/core";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -111,7 +112,7 @@ describe("summarizeFieldCoverage()", () => {
       { path: "address.line2", uri: "u", mapped: false },
       { path: "id", uri: "u", mapped: true },
     ]);
-    assert.deepEqual(totals, expectTotals(2, 3, 67));
+    assert.deepEqual(totals, expectTotals(2, 3, 66));
   });
 
   it("does not let a partly covered record vouch for its uncovered leaves", () => {
@@ -131,15 +132,51 @@ describe("summarizeFieldCoverage()", () => {
     assert.deepEqual(summarizeFieldCoverage([]), expectTotals(0, 0, 0));
   });
 
-  it("rounds the percentage to a whole number", () => {
-    // The CLI table and --fail-under both compare whole numbers, so rounding
-    // has to happen once, here, not per renderer.
+  it("reduces the percentage to a whole number in one place, not per renderer", () => {
+    // The CLI table, the status bar and --fail-under all compare whole numbers,
+    // so the reduction happens here and every consumer inherits the same rule.
     const totals = summarizeFieldCoverage([
       { path: "a", uri: "u", mapped: true },
       { path: "b", uri: "u", mapped: false },
       { path: "c", uri: "u", mapped: false },
     ]);
     assert.equal(totals.pct, 33);
+  });
+});
+
+// ── The percentage rule (sl-8ba4) ───────────────────────────────────────────
+
+describe("coveragePercentage()", () => {
+  it("reports 100 only when every leaf is covered", () => {
+    // The bug this rule exists for: rounding to nearest turned 200/201 into 100,
+    // so `--fail-under 100` passed a spec with an unmapped field — a merge gate
+    // failing open. 100 now means exactly complete, and nothing else does.
+    assert.equal(coveragePercentage(201, 201), 100);
+    assert.equal(coveragePercentage(200, 201), 99);
+    assert.equal(coveragePercentage(2000, 2001), 99);
+  });
+
+  it("reports 0 only when no leaf is covered", () => {
+    // The mirror-image lie flooring would introduce on its own: 1/201 floors to
+    // 0 and reads as "nothing is mapped". Partial work must stay visible, so the
+    // bottom is held off 0 for any non-zero numerator.
+    assert.equal(coveragePercentage(0, 201), 0);
+    assert.equal(coveragePercentage(1, 201), 1);
+    assert.equal(coveragePercentage(1, 100000), 1);
+  });
+
+  it("floors everything between the endpoints, so a figure never overstates", () => {
+    // 8/9 is 88.9%: it reports 88, and `--fail-under 89` therefore fails on it.
+    // Every printed figure is a claim the counts can support.
+    assert.equal(coveragePercentage(8, 9), 88);
+    assert.equal(coveragePercentage(2, 3), 66);
+    assert.equal(coveragePercentage(1, 2), 50);
+    assert.equal(coveragePercentage(1, 3), 33);
+  });
+
+  it("reports 0 for a schema with no leaves rather than dividing by zero", () => {
+    // Calling an empty schema complete would let it satisfy any threshold.
+    assert.equal(coveragePercentage(0, 0), 0);
   });
 });
 
@@ -242,7 +279,7 @@ mapping load_memos {
     // tgt is a target of two mappings; double counting it would halve the
     // workspace percentage for no reason.
     const { aggregate: result } = aggregate(SRC);
-    assert.deepEqual(entry(result, "target", "tgt").totals, expectTotals(2, 3, 67));
+    assert.deepEqual(entry(result, "target", "tgt").totals, expectTotals(2, 3, 66));
   });
 
   it("reports a record as covered when two mappings between them write every leaf", () => {
@@ -369,7 +406,7 @@ namespace billing {
     const crm = result.namespaces.find((n) => n.namespace === "crm");
     const billing = result.namespaces.find((n) => n.namespace === "billing");
     assert.deepEqual(crm.source, expectTotals(1, 2, 50), "crm::customers: id read, email not");
-    assert.deepEqual(billing.source, expectTotals(2, 3, 67), "billing::invoices: memo not read");
+    assert.deepEqual(billing.source, expectTotals(2, 3, 66), "billing::invoices: memo not read");
     assert.deepEqual(billing.target, expectTotals(2, 2, 100), "billing::ledger fully populated");
   });
 

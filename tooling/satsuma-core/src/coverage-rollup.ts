@@ -72,7 +72,11 @@ export interface CoverageTotals {
   coveredNl: number;
   /** Leaf fields declared. Zero for a schema with no leaves. */
   total: number;
-  /** covered/total as a whole-number percentage; 0 when `total` is 0. */
+  /**
+   * covered/total as a whole-number percentage, per
+   * {@link coveragePercentage}'s rule: 100 and 0 mean *exactly* complete and
+   * *exactly* nothing, and every state in between reports 1–99.
+   */
   pct: number;
 }
 
@@ -166,7 +170,7 @@ export function summarizeFieldCoverage(fields: FieldCoverageEntry[]): CoverageTo
     coveredDeclared: coveredLeaves.length - coveredNl,
     coveredNl,
     total: leaves.length,
-    pct: percentage(coveredLeaves.length, leaves.length),
+    pct: coveragePercentage(coveredLeaves.length, leaves.length),
   };
 }
 
@@ -215,9 +219,34 @@ function hasDescendant(path: string, paths: Set<string>): boolean {
   return false;
 }
 
-/** Whole-number percentage, defined as 0 when there is nothing to cover. */
-function percentage(covered: number, total: number): number {
-  return total > 0 ? Math.round((covered / total) * 100) : 0;
+/**
+ * The whole-number percentage every consumer reports and `--fail-under` gates.
+ *
+ * **Rule: 100 and 0 are reserved for the exact endpoints; everything between
+ * them floors into 1–99.** Rounding to nearest is what a gate cannot survive
+ * (`sl-8ba4`): 200 of 201 leaves rounds to 100, so `--fail-under 100` passed a
+ * spec with an unmapped field — failing open in the one direction a merge gate
+ * must not. Flooring alone fixes the gate but introduces the mirror-image lie at
+ * the bottom, where 1 of 201 reports 0% and reads as "nothing is mapped".
+ *
+ * So the two endpoints are decided by the counts, not by arithmetic on them:
+ *
+ * - `covered === total` → 100. The only way to print 100.
+ * - `covered === 0` → 0. The only way to print 0 (with `total === 0`, below).
+ * - otherwise → `floor`, clamped up to 1, so partial work never reports as none.
+ *
+ * A reviewer and CI therefore read the same number, which is why the gate reads
+ * `pct` rather than re-deriving a ratio of its own.
+ *
+ * `total === 0` reports 0: a schema with no leaves has nothing to cover, and
+ * calling that complete would let an empty schema satisfy any threshold.
+ */
+export function coveragePercentage(covered: number, total: number): number {
+  if (total <= 0) return 0;
+  if (covered >= total) return 100;
+  if (covered <= 0) return 0;
+  // Floor, then hold the bottom off 0 — a covered leaf must be visible.
+  return Math.max(1, Math.floor((covered / total) * 100));
 }
 
 /** Sum a set of totals, recomputing the percentage from the summed counts. */
@@ -232,7 +261,7 @@ function sumTotals(parts: Iterable<CoverageTotals>): CoverageTotals {
     coveredNl += part.coveredNl;
     total += part.total;
   }
-  return { covered, coveredDeclared, coveredNl, total, pct: percentage(covered, total) };
+  return { covered, coveredDeclared, coveredNl, total, pct: coveragePercentage(covered, total) };
 }
 
 // ── Aggregation ─────────────────────────────────────────────────────────────

@@ -1,6 +1,6 @@
 ---
 id: sl-8ba4
-status: open
+status: closed
 deps: []
 links: []
 created: 2026-08-02T21:40:55Z
@@ -44,3 +44,10 @@ The rule belongs in core's percentage() so the CLI, the LSP status bar and the v
 
 A 201-leaf fixture with 200 leaves mapped reports below 100% and exits 3 under --fail-under 100. A fully-mapped schema reports 100% and exits 0. A schema with no covered leaf reports 0%. The rounding rule is documented in coverage --help and in SATSUMA-CLI.md, and tested at the boundary in core (percentage()) rather than only through the CLI.
 
+## Notes
+
+**2026-08-03T06:35:00Z**
+
+Cause: CoverageTotals.pct was Math.round((covered/total)*100), and evaluateGate compared that rounded figure, so any population large enough for one leaf to be worth under half a percent reported 100% while a field was unmapped — 200/201 printed "200/201 100%" and --fail-under 100 exited 0.
+Fix: replaced percentage() with an exported coveragePercentage() in satsuma-core/src/coverage-rollup.ts implementing rule (a) from the ticket's design — 100 only when covered === total, 0 only when covered === 0 or total === 0, otherwise floor clamped up to 1 so partial work never reports as none. Every consumer reads totals.pct, so the CLI table, --json, the VS Code status bar, the viz card and the gate all moved together. Rounding rule documented in coverage --help and SATSUMA-CLI.md next to the exit codes, with a CHANGELOG entry for the percentages that drop by a point (8/9 now 88%, 2/3 now 66%).
+Tests: four boundary cases on coveragePercentage() in core (201/201, 200/201, 2000/2001, 1/201, 1/100000, 8/9, 0/0), and three CLI tests over a generated 201-leaf workspace asserting exit 3 with "200/201 99%" under --fail-under 100, exit 0 at 201/201, and 1% rather than 0% at 1/201. Stale expectations updated in core (three), CLI (two) and vscode (one).

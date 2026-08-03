@@ -100,13 +100,14 @@ describe("groupCoverageByUri", () => {
 describe("computeTargetCoverageStats", () => {
   it("counts leaves, agreeing with satsuma coverage rather than its own rule", () => {
     // 3cc-t6uo: this counted top-level fields only, so it reported 1/2 (50%)
-    // where `satsuma coverage` reported 2/3 (67%) for the same mapping — a
+    // where `satsuma coverage` reported 2/3 (66%) for the same mapping — a
     // twelve-field `address` record counted as one unit, and one mapped leaf read
     // as a fully covered record. Two percentages for one mapping, and a user with
     // the terminal open beside the editor could not tell which was wrong. The
-    // count now comes from core's summarizeFieldCoverage.
+    // count now comes from core's summarizeFieldCoverage — including its rounding
+    // rule, so 2/3 reads 66% in both places rather than 67% here (sl-8ba4).
     const stats = computeTargetCoverageStats(sampleSchemas());
-    assert.deepEqual(stats, { mapped: 2, total: 3, pct: 67, mappedNl: 1 });
+    assert.deepEqual(stats, { mapped: 2, total: 3, pct: 66, mappedNl: 1 });
   });
 
   it("reports how much of the figure is inferred from prose", () => {

@@ -298,7 +298,7 @@ mapping `sighting rows` {
 ```
 $ satsuma coverage sighting-rows.stm
 
-  source  colony_survey             5/12   42%
+  source  colony_survey             5/12   41%
   target  sighting_rows_parquet      4/4  100%
     uncovered in colony_survey (source): 7 fields
       surveyed_at, observer.ranger_id, observer.email, weather_tags,
@@ -534,7 +534,7 @@ expresses. A `flatten` header takes a full path of any depth
 flattens in one block.
 
 ```
-  source  colony_submission_xml             6/7   86%
+  source  colony_submission_xml             6/7   85%
   target  colony_sighting_rows_parquet      5/5  100%
     uncovered in colony_submission_xml (source): 1 field
       Survey.Colony.GridRef
@@ -709,7 +709,7 @@ design:
 $ satsuma coverage puffin-point.stm
 
 mapping sighting rows
-  source  colony_survey             5/12   42%
+  source  colony_survey             5/12   41%
   target  sighting_rows_parquet      4/4  100%
     uncovered in colony_survey (source): 7 fields
       surveyed_at, observer.ranger_id, observer.email, weather_tags,
@@ -742,6 +742,12 @@ satsuma coverage pipeline.stm --fail-under 80 --role source
 exits **3** when the threshold is missed (distinct from 1 for a bad
 `--mapping`/`--schema` name, so CI can tell an incomplete spec from a broken
 invocation).
+
+**`--fail-under 100` means every leaf.** Percentages reserve 100% and 0% for the
+exact endpoints and floor everything between, so a single unmapped leaf in a
+201-leaf schema reports 99% and fails the gate rather than rounding up to a pass.
+This matters most on nested schemas, because they are where leaf counts get large
+enough for one field to disappear into a rounding.
 
 For nested work specifically:
 
