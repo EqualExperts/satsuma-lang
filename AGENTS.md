@@ -23,6 +23,7 @@ All tooling is parser-backed. Downstream tools should be built on the tree-sitte
 - `scripts/`: utility scripts used during development
 - `tooling/tree-sitter-satsuma/`: tree-sitter grammar (318 corpus tests), generated parser artifacts, and queries
 - `tooling/satsuma-core/`: **the shared library every other package builds on** (679 tests) — parsing, extraction, validation, formatting, NL `@ref` resolution, and the single definition of coverage semantics. Logic that more than one consumer needs belongs here; see [Core vs Consumer Packages](#core-vs-consumer-packages)
+- `tooling/satsuma-scenario-gen/`: **test-only** generator of semantic Satsuma scenarios shared by every package's property suites — builds scenarios as plain data, renders them to source, and states the ground truth that follows by construction. Must never depend on `@satsuma/core` (core's tests depend on it, so the reverse edge would be a cycle); the adapters that drive production pipelines live in each consumer's test tree
 - `tooling/satsuma-cli/`: TypeScript CLI tool for workspace extraction, validation, and structural analysis (1031 tests)
 - `tooling/satsuma-lsp/`: editor-agnostic Language Server (semantic tokens, diagnostics, go-to-definition, find-references, completions, hover, rename, code lens, folding, document symbols); runnable standalone via `npx satsuma-lsp --stdio` (300 tests)
 - `tooling/satsuma-viz-model/`: the VizModel protocol contract (6 tests) — the payload shape the LSP produces and the viz component consumes, defined once so neither can drift

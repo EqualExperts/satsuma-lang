@@ -1,31 +1,32 @@
 /**
- * generated-scenarios.js — Semantic-first generated Satsuma test inputs.
+ * arbitraries.js — fast-check generators over the scenario model.
  *
- * Property tests build bounded declarations, mappings, arrows, nesting, and
- * fragment spreads as plain semantic data, then render that data to Satsuma.
- * This module owns test generation and rendering only: expected coverage rules
- * stay in the property tests, and R4's independent oracle remains separate.
+ * Each arbitrary is a *named semantic family*, not an arbitrary text generator:
+ * it produces the smallest scenario shape that exercises one rule, together with
+ * whatever ground truth follows from the shape by construction (an expected path
+ * set, a leaf count, a bijection between two scenarios). Properties assert
+ * against that, never against a second implementation of the rule.
+ *
+ * Owns: the generated input domains and their by-construction expectations.
+ * Does not own: rendering (render.js) or any production pipeline call — those
+ * belong to the consuming package's adapter.
  */
 
-import assert from "node:assert/strict";
 import fc from "fast-check";
 import {
-  collectParseErrors,
-  computeMappingCoverage,
-  createCanonicalEntityRef,
-  declaresRecordBody,
-  expandDeclaredFields,
-  extractFragments,
-  extractSchemas,
-  getParser,
-  makeEntityRefResolver,
-} from "@satsuma/core";
+  fieldTreeForPath,
+  leafNames,
+  mappingScenario,
+  MAX_GENERATED_LEAVES,
+  nestedPath,
+  nestFields,
+  recordField,
+  scalarField,
+  semanticLeafPaths,
+} from "./model.js";
 
 /** Enough runs to explore combinations while keeping the full repository suite quick. */
 const GENERATED_PROPERTY_RUNS = 100;
-
-/** Maximum generated leaves; small bounds make shrunk counterexamples reviewable. */
-const MAX_GENERATED_LEAVES = 5;
 
 /** Shared fast-check settings; fast-check adds the replay seed and path on failure. */
 export const GENERATED_PROPERTY_PARAMETERS = Object.freeze({
@@ -35,222 +36,6 @@ export const GENERATED_PROPERTY_PARAMETERS = Object.freeze({
   // report is what places the final shrunk Satsuma beside the seed and path.
   includeErrorInReport: true,
 });
-
-// ── Semantic model ─────────────────────────────────────────────────────────
-
-/** @typedef {{ name: string, kind: "scalar" }} ScalarField */
-/**
- * @typedef {{
- *   name: string,
- *   kind: "record",
- *   fields: SemanticField[],
- *   spreads?: string[],
- * }} RecordField
- */
-/** @typedef {ScalarField | RecordField} SemanticField */
-/**
- * @typedef {{
- *   name: string,
- *   fields: SemanticField[],
- *   spreads?: string[],
- * }} SemanticEntity
- */
-/** @typedef {{ sources: string[], target: string }} SemanticArrow */
-/**
- * @typedef {{
- *   name: string,
- *   sources: string[],
- *   targets: string[],
- *   arrows: SemanticArrow[],
- * }} SemanticMapping
- */
-/**
- * @typedef {{
- *   fragments: SemanticEntity[],
- *   schemas: SemanticEntity[],
- *   mapping: SemanticMapping,
- * }} SemanticScenario
- */
-
-/** Construct one scalar declaration in the generated semantic model. */
-function scalarField(name) {
-  return { name, kind: "scalar" };
-}
-
-/** Construct one record declaration in the generated semantic model. */
-function recordField(name, fields, spreads = []) {
-  return { name, kind: "record", fields, ...(spreads.length > 0 ? { spreads } : {}) };
-}
-
-/** Stable leaf names derived from a generated count rather than arbitrary text. */
-function leafNames(count) {
-  return Array.from({ length: count }, (_, index) => `field_${index}`);
-}
-
-/** A minimal two-schema mapping scenario used by most generated properties. */
-function mappingScenario({ sourceFields, targetFields, arrows, fragments = [] }) {
-  return {
-    fragments,
-    schemas: [
-      { name: "src", fields: sourceFields },
-      { name: "tgt", fields: targetFields },
-    ],
-    mapping: { name: "load", sources: ["src"], targets: ["tgt"], arrows },
-  };
-}
-
-/** Prefix every field path with the same generated record chain. */
-function nestFields(fields, depth) {
-  let nested = fields;
-  for (let level = depth - 1; level >= 0; level -= 1) {
-    nested = [recordField(`group_${level}`, nested)];
-  }
-  return nested;
-}
-
-/** Prefix one leaf path with the record chain produced by {@link nestFields}. */
-function nestedPath(path, depth) {
-  const prefixes = Array.from({ length: depth }, (_, level) => `group_${level}`);
-  return [...prefixes, path].join(".");
-}
-
-/** Turn one dotted path into the smallest semantic field tree declaring it. */
-function fieldTreeForPath(path) {
-  const [head, ...tail] = path.split(".");
-  return tail.length === 0
-    ? [scalarField(head)]
-    : [recordField(head, fieldTreeForPath(tail.join(".")))];
-}
-
-/** Every semantic leaf path, qualified from the schema root. */
-export function semanticLeafPaths(fields, prefix = "") {
-  return fields.flatMap((field) => {
-    const path = prefix ? `${prefix}.${field.name}` : field.name;
-    return field.kind === "record" ? semanticLeafPaths(field.fields, path) : [path];
-  });
-}
-
-// ── Rendering and strict parsing ───────────────────────────────────────────
-
-/** Render fields and spreads at one declaration level. */
-function renderMembers(fields, spreads, indent) {
-  const members = fields.map((field) => renderField(field, indent));
-  members.push(...(spreads ?? []).map((spread) => `${indent}...${spread}`));
-  return members.join("\n");
-}
-
-/** Render one scalar or record field declaration. */
-function renderField(field, indent) {
-  if (field.kind === "scalar") return `${indent}${field.name} STRING`;
-
-  const body = renderMembers(field.fields, field.spreads, `${indent}  `);
-  return body.length > 0
-    ? `${indent}${field.name} record {\n${body}\n${indent}}`
-    : `${indent}${field.name} record {}`;
-}
-
-/** Render a schema-shaped fragment or schema declaration. */
-function renderEntity(keyword, entity) {
-  const body = renderMembers(entity.fields, entity.spreads, "  ");
-  return body.length > 0
-    ? `${keyword} ${entity.name} {\n${body}\n}`
-    : `${keyword} ${entity.name} {}`;
-}
-
-/** Render the generated mapping, preserving the semantic arrow order. */
-function renderMapping(mapping) {
-  const lines = [
-    `mapping ${mapping.name} {`,
-    `  source { ${mapping.sources.join(", ")} }`,
-    `  target { ${mapping.targets.join(", ")} }`,
-    ...mapping.arrows.map((arrow) => `  ${arrow.sources.join(", ")} -> ${arrow.target}`),
-    "}",
-  ];
-  return lines.join("\n");
-}
-
-/** Render one semantic scenario into a complete Satsuma source file. */
-export function renderScenario(scenario) {
-  return [
-    ...scenario.fragments.map((fragment) => renderEntity("fragment", fragment)),
-    ...scenario.schemas.map((schema) => renderEntity("schema", schema)),
-    renderMapping(scenario.mapping),
-  ].join("\n\n");
-}
-
-/**
- * Parse generated source and reject every ERROR or MISSING recovery node.
- *
- * The source is included in the assertion message. When fast-check shrinks a
- * failure, its seed/path report therefore sits beside the final shrunk Satsuma
- * input instead of an opaque semantic object.
- */
-export function parseGeneratedScenario(scenario) {
-  const source = renderScenario(scenario);
-  const tree = getParser().parse(source);
-  assert.ok(tree, `generated Satsuma returned no parse tree:\n${source}`);
-  const errors = collectParseErrors(tree);
-  assert.deepEqual(errors, [], `generated Satsuma must be recovery-free:\n${source}`);
-  return { source, tree };
-}
-
-/** Project extracted fields onto the deliberately narrow coverage input shape. */
-function toCoverageFields(fields) {
-  return fields.map((field) => ({
-    name: field.name,
-    line: field.startRow,
-    ...(declaresRecordBody(field.type) ? { container: true } : {}),
-    children: field.children ? toCoverageFields(field.children) : undefined,
-  }));
-}
-
-/** Canonical key for a generated schema or fragment extracted from the CST. */
-function entityKey(entity) {
-  assert.ok(entity.name, "generated entities always carry a name");
-  return entity.namespace ? `${entity.namespace}::${entity.name}` : entity.name;
-}
-
-/**
- * Run the production parser, extraction, spread expansion, and coverage path.
- *
- * Expected values are intentionally not built here. Each property states its
- * invariant directly, while R4 will supply the independent semantic oracle.
- */
-export function coverageForScenario(scenario) {
-  const { source, tree } = parseGeneratedScenario(scenario);
-  const fragments = new Map(
-    extractFragments(tree.rootNode).map((fragment) => [entityKey(fragment), fragment]),
-  );
-  const resolveFragment = makeEntityRefResolver(fragments);
-  const lookupFragment = (key) => fragments.get(key) ?? null;
-  const schemas = new Map(
-    extractSchemas(tree.rootNode).map((schema) => {
-      const key = entityKey(schema);
-      const fields = expandDeclaredFields(
-        schema,
-        schema.namespace,
-        resolveFragment,
-        lookupFragment,
-      );
-      return [
-        key,
-        {
-          canonicalRef: createCanonicalEntityRef(key.includes("::") ? key : `::${key}`),
-          uri: "file:///generated.stm",
-          fields: toCoverageFields(fields),
-        },
-      ];
-    }),
-  );
-  const result = computeMappingCoverage(
-    tree,
-    scenario.mapping.name,
-    (schemaId) => schemas.get(schemaId) ?? null,
-  );
-  return { source, tree, result };
-}
-
-// ── Scenario arbitraries ───────────────────────────────────────────────────
 
 /** Non-empty generated leaf count shared by coverage domains. */
 const leafCountArbitrary = fc.integer({ min: 1, max: MAX_GENERATED_LEAVES });

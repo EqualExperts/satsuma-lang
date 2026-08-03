@@ -2,7 +2,7 @@
  * generated-format-properties.test.js — Formatter properties over generated Satsuma.
  *
  * These checks extend the canonical examples corpus with bounded semantic
- * scenarios from generated-scenarios.js. Inputs are rendered from declarations
+ * scenarios from `@satsuma/scenario-gen`. Inputs are rendered from declarations
  * and mappings, not arbitrary grammar text, and must parse without recovery
  * before the formatter is allowed to run.
  */
@@ -14,11 +14,8 @@ import { fileURLToPath } from "node:url";
 import fc from "fast-check";
 import { collectParseErrors, format, getParser, initParser } from "@satsuma/core";
 import { cstStructure } from "./support/cst-structure.js";
-import {
-  GENERATED_PROPERTY_PARAMETERS,
-  parseGeneratedScenario,
-  semanticScenarioArbitrary,
-} from "./support/generated-scenarios.js";
+import { GENERATED_PROPERTY_PARAMETERS, semanticScenarioArbitrary } from "@satsuma/scenario-gen";
+import { parseGeneratedScenario } from "./support/scenario-pipeline.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const WASM_PATH = resolve(__dirname, "../../tree-sitter-satsuma/tree-sitter-satsuma.wasm");

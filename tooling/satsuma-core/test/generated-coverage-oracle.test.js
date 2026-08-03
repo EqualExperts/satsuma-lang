@@ -14,10 +14,10 @@ import fc from "fast-check";
 import { initParser, summarizeFieldCoverage } from "@satsuma/core";
 import { coverageOracleForScenario } from "./support/coverage-oracle.js";
 import {
-  coverageForScenario,
   differentialCoverageScenarioArbitrary,
   GENERATED_PROPERTY_PARAMETERS,
-} from "./support/generated-scenarios.js";
+} from "@satsuma/scenario-gen";
+import { coverageForScenario } from "./support/scenario-pipeline.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const WASM_PATH = resolve(__dirname, "../../tree-sitter-satsuma/tree-sitter-satsuma.wasm");
