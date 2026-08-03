@@ -417,12 +417,30 @@ connection.onRequest("satsuma/fieldLocations", (params: { name: string }) => {
   return result;
 });
 
-/** Return per-field coverage for both source and target schemas of a mapping. */
-connection.onRequest("satsuma/mappingCoverage", (params: { uri: string; mappingName: string }) => {
-  const tree = trees.get(params.uri);
-  if (!tree) return { schemas: [] };
-  return computeMappingCoverage(params.uri, tree, params.mappingName, scopeIndex(params.uri));
-});
+/**
+ * Return per-field coverage for both source and target schemas of a mapping.
+ *
+ * `mappingRow` identifies the block outright and should always be sent — a label
+ * is not unique (two namespaces may each declare `mapping load`) and an anonymous
+ * block has none, so resolving by name alone reports the first block carrying it.
+ * The client gets the row from `satsuma/actionContext`, which read it off the very
+ * node the cursor sits in. `mappingName` alone is still accepted, for a client
+ * that predates the field.
+ */
+connection.onRequest(
+  "satsuma/mappingCoverage",
+  (params: { uri: string; mappingName: string; mappingRow?: number }) => {
+    const tree = trees.get(params.uri);
+    if (!tree) return { schemas: [] };
+    return computeMappingCoverage(
+      params.uri,
+      tree,
+      params.mappingName,
+      scopeIndex(params.uri),
+      params.mappingRow,
+    );
+  },
+);
 
 connection.onRequest(
   "satsuma/actionContext",
@@ -434,7 +452,15 @@ connection.onRequest(
     };
   }) => {
     const tree = trees.get(params.uri);
-    if (!tree) return { schemaName: null, fieldPath: null, mappingName: null, targetSchema: null };
+    if (!tree) {
+      return {
+        schemaName: null,
+        fieldPath: null,
+        mappingName: null,
+        mappingRow: null,
+        targetSchema: null,
+      };
+    }
     return computeActionContext(
       tree,
       params.position.line,

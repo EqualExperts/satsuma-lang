@@ -258,12 +258,39 @@ describe("sz-schema-card renders the verdict it was given", () => {
     assert.match(text, /Coverage not computed/);
   });
 
-  it("renders every row unmarked when coverage was not computed", async () => {
-    // The rows must claim no verdict either, and looking one up must not crash.
+  it("marks rows as unknown, not unmapped, when coverage was not computed", async () => {
+    // The rows have to agree with the header. Collapsing "not computed" to the
+    // `unmapped` verdict made every field read as a gap directly beneath a header
+    // saying no figure existed — and left automation unable to tell those rows
+    // from genuine uncovered results. `unknown` is a third state, so both a reader
+    // and a test can see there is no verdict.
     const card = await makeCard(AMOUNT_AND_ADDRESS, null);
     const text = renderText(card);
-    assert.match(text, /data-coverage="?unmapped/);
+    assert.match(text, /data-coverage="?unknown/);
+    assert.match(text, /data-coverage-state="?unknown/);
+    assert.doesNotMatch(text, /data-coverage="?unmapped/);
+    assert.doesNotMatch(text, /data-coverage-state="?uncovered/);
     assert.doesNotMatch(text, /data-coverage-tier="?(nl|declared)/);
+    assert.match(text, /coverage not computed/);
+  });
+
+  it("keeps unmapped for a real uncovered verdict", async () => {
+    // The counterpart: `unknown` must not swallow the genuine case, or the
+    // distinction is useless in the other direction.
+    const card = await makeCard(
+      AMOUNT_AND_ADDRESS,
+      entries(
+        ["amount", "uncovered"],
+        ["address", "uncovered"],
+        ["address.city", "uncovered"],
+        ["address.line1", "uncovered"],
+        ["address.postcode", "uncovered"],
+      ),
+    );
+    const text = renderText(card);
+    assert.match(text, /data-coverage="?unmapped/);
+    assert.match(text, /data-coverage-state="?uncovered/);
+    assert.doesNotMatch(text, /data-coverage="?unknown/);
   });
 
   it("still shows 0/N when coverage says nothing is covered", async () => {

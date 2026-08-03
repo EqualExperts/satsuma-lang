@@ -8,6 +8,18 @@ export interface ActionContext {
   schemaName: string | null;
   fieldPath: string | null;
   mappingName: string | null;
+  /**
+   * 0-indexed start row of the enclosing `mapping` block, or null when the cursor
+   * is not inside one.
+   *
+   * **This, not `mappingName`, identifies the mapping.** A label is not unique —
+   * two namespaces may each declare `mapping load` — and an anonymous block has
+   * none at all, so a consumer that asks core about a mapping by label alone gets
+   * the first block carrying it. The cursor is already inside the right block, so
+   * the row is free to carry and settles the question outright; `satsuma
+   * coverage`'s figures and the gutter's disagreed until it did.
+   */
+  mappingRow: number | null;
   targetSchema: string | null;
 }
 
@@ -20,42 +32,56 @@ export function computeActionContext(
 ): ActionContext {
   const node = nodeAtPosition(tree, line, character);
   if (!node) {
-    return { schemaName: null, fieldPath: null, mappingName: null, targetSchema: null };
+    return {
+      schemaName: null,
+      fieldPath: null,
+      mappingName: null,
+      mappingRow: null,
+      targetSchema: null,
+    };
   }
 
   const ctx = findNodeContext(node);
-  const { mappingName, targetSchema } = inferMappingContext(node);
+  const { mappingName, mappingRow, targetSchema } = inferMappingContext(node);
 
   if (!ctx) {
-    return { schemaName: null, fieldPath: null, mappingName, targetSchema };
+    return { schemaName: null, fieldPath: null, mappingName, mappingRow, targetSchema };
   }
 
   return {
     schemaName: inferSchemaName(ctx),
     fieldPath: inferFieldPath(ctx),
     mappingName,
+    mappingRow,
     targetSchema,
   };
 }
 
 /**
- * Walk up the CST from the cursor node to find an enclosing named mapping_block,
- * then extract the mapping name and the first target schema reference.
+ * Walk up the CST from the cursor node to find the enclosing mapping_block, then
+ * extract its name, its start row and the first target schema reference.
+ *
+ * The row comes from the same node the name does. Returning only the name threw
+ * away the one thing that identifies the block — see
+ * {@link ActionContext.mappingRow}.
  */
 function inferMappingContext(node: SyntaxNode): {
   mappingName: string | null;
+  mappingRow: number | null;
   targetSchema: string | null;
 } {
   let current: SyntaxNode | null = node;
   while (current) {
     if (current.type === "mapping_block") {
-      const mappingName = labelText(current);
-      const targetSchema = extractTargetSchema(current);
-      return { mappingName, targetSchema };
+      return {
+        mappingName: labelText(current),
+        mappingRow: current.startPosition.row,
+        targetSchema: extractTargetSchema(current),
+      };
     }
     current = current.parent;
   }
-  return { mappingName: null, targetSchema: null };
+  return { mappingName: null, mappingRow: null, targetSchema: null };
 }
 
 function extractTargetSchema(mappingNode: SyntaxNode): string | null {

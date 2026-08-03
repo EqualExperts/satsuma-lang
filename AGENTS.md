@@ -22,9 +22,14 @@ All tooling is parser-backed. Downstream tools should be built on the tree-sitte
 - `skills/`: Agent Skills following the [agentskills.io](https://agentskills.io) standard (Excel-to-Satsuma conversion skill, Satsuma-to-Excel export skill)
 - `scripts/`: utility scripts used during development
 - `tooling/tree-sitter-satsuma/`: tree-sitter grammar (318 corpus tests), generated parser artifacts, and queries
+- `tooling/satsuma-core/`: **the shared library every other package builds on** (572 tests) — parsing, extraction, validation, formatting, NL `@ref` resolution, and the single definition of coverage semantics. Logic that more than one consumer needs belongs here; see [Core vs Consumer Packages](#core-vs-consumer-packages)
 - `tooling/satsuma-cli/`: TypeScript CLI tool for workspace extraction, validation, and structural analysis (987 tests)
-- `tooling/satsuma-lsp/`: editor-agnostic Language Server (semantic tokens, diagnostics, go-to-definition, find-references, completions, hover, rename, code lens, folding, document symbols); runnable standalone via `npx satsuma-lsp --stdio`
-- `tooling/vscode-satsuma/`: VS Code extension (LSP client, commands, webview panels) and TextMate grammar; delegates language intelligence to `satsuma-lsp`
+- `tooling/satsuma-lsp/`: editor-agnostic Language Server (semantic tokens, diagnostics, go-to-definition, find-references, completions, hover, rename, code lens, folding, document symbols); runnable standalone via `npx satsuma-lsp --stdio` (299 tests)
+- `tooling/satsuma-viz-model/`: the VizModel protocol contract (6 tests) — the payload shape the LSP produces and the viz component consumes, defined once so neither can drift
+- `tooling/satsuma-viz-backend/`: workspace indexing and VizModel assembly shared by the LSP and browser hosts (182 tests); also computes the field coverage the payload carries (ADR-042)
+- `tooling/satsuma-viz/`: the `satsuma-viz` Lit web component (128 tests) — overview graph and per-mapping detail view, embedded in the VS Code webview and the site playground
+- `tooling/satsuma-viz-harness/`: Playwright harness for the viz component (99 tests) — human-in-the-loop, see [Viz harness Playwright tests](#viz-harness-playwright-tests-human-in-the-loop-workflow)
+- `tooling/vscode-satsuma/`: VS Code extension (LSP client, commands, webview panels) and TextMate grammar; delegates language intelligence to `satsuma-lsp` (34 tests)
 
 ## Platform Lineage Entry Point
 

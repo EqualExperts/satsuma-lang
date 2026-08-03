@@ -59,35 +59,42 @@ import type { MappingCoverageResult } from "@satsuma/core";
  * parse tree) — it is retained because the request handler passes it and
  * because a future scoped resolver may need the requesting document.
  *
- * `mappingName` may be namespace-qualified (`crm::load`), and should be whenever
- * the caller knows the namespace. A bare label is ambiguous: two mappings may
- * carry the same one in different namespaces, and core then matches the
- * first-declared block, reporting its arrows under the other's name. The
- * `satsuma/mappingCoverage` request accepts either form so a client holding only
- * a label still works, at that cost.
+ * **Pass `mappingRow` whenever the caller has it** — it identifies the block
+ * outright, and every caller reaching this through `satsuma/actionContext` does,
+ * because that request read the row off the very node the cursor sits in. Without
+ * it a label has to be matched, and a label is not unique: two namespaces may each
+ * declare `mapping load`, so core matches the first-declared block and the gutter
+ * reports one mapping's arrows under the other's name. That is not hypothetical —
+ * it is what left the editor disagreeing with `satsuma coverage` after the CLI and
+ * the viz were fixed.
+ *
+ * `mappingName` is still accepted alone, for a client predating the field, and is
+ * split on a qualifying `ns::` when it carries one.
  */
 export function computeMappingCoverage(
   uri: string,
   tree: Tree,
   mappingName: string,
   wsIndex: WorkspaceIndex,
+  mappingRow?: number,
 ): MappingCoverageResult {
   return computeCoverage(
     tree,
-    mappingTargetOf(mappingName),
-    (schemaId) => resolveSchema(wsIndex, schemaId),
+    mappingTargetOf(mappingName, mappingRow),
+    (schemaId, mappingNamespace) => resolveSchema(wsIndex, schemaId, mappingNamespace),
     resolveNLRefs(uri, tree, wsIndex),
   );
 }
 
 /**
- * Split a possibly-qualified mapping name into an exact selector.
+ * Turn what the request supplied into the most precise target available.
  *
- * `crm::load` names one mapping; a bare `load` cannot, so it is passed through as
- * a label and matched as before. Split on the *last* `::` so a namespace
- * containing one still resolves.
+ * A row wins outright. Failing that, `crm::load` names one mapping; a bare `load`
+ * cannot, so it is passed through as a label and matched as before. The `::` split
+ * takes the *last* occurrence so a namespace containing one still resolves.
  */
-function mappingTargetOf(mappingName: string): MappingTarget {
+function mappingTargetOf(mappingName: string, mappingRow?: number): MappingTarget {
+  if (mappingRow !== undefined) return { row: mappingRow };
   const separator = mappingName.lastIndexOf("::");
   if (separator < 0) return mappingName;
   return {
@@ -115,6 +122,20 @@ function resolveNLRefs(uri: string, tree: Tree, wsIndex: WorkspaceIndex): Resolv
 /**
  * Resolve a schema reference to core's coverage input shape.
  *
+ * **Resolved relative to `mappingNamespace`.** A mapping inside `namespace crm`
+ * normally writes `orders`, not `crm::orders`, and this passed `null` as the
+ * scope — so `resolveDefinition` looked only at file scope, found nothing, and
+ * core skipped the schema. Every namespaced mapping with unqualified references
+ * therefore reported *no* coverage in the editor while `satsuma coverage`
+ * reported it correctly: the gutter painted nothing and the status bar had no
+ * figure. The namespace now comes from core, which located the mapping and so
+ * already knows it.
+ *
+ * The canonical `schemaId` is reported back so results line up when they are
+ * rolled up across mappings that name the same schema differently — a mapping in
+ * `crm` writing `orders` and one outside writing `crm::orders` are the same
+ * schema.
+ *
  * Only `kind === "schema"` definitions participate: a mapping's source/target
  * blocks may name something the index also knows as another kind, and coverage
  * is defined over declared schema fields.
@@ -126,11 +147,21 @@ function resolveNLRefs(uri: string, tree: Tree, wsIndex: WorkspaceIndex): Resolv
  * }` to the gutter as a single childless leaf, while `satsuma coverage` reported
  * the three leaves the fragment materialises (sl-5nsv).
  */
-function resolveSchema(wsIndex: WorkspaceIndex, schemaId: string): CoverageSchemaDefinition | null {
-  const defs = resolveDefinition(wsIndex, schemaId, null);
+function resolveSchema(
+  wsIndex: WorkspaceIndex,
+  schemaId: string,
+  mappingNamespace: string | null,
+): CoverageSchemaDefinition | null {
+  const defs = resolveDefinition(wsIndex, schemaId, mappingNamespace);
   const def = defs.find((d) => d.kind === "schema");
   if (!def) return null;
-  return { uri: def.uri, fields: expandedFields(wsIndex, def).map(toCoverageField) };
+  const canonicalId =
+    def.namespace && !schemaId.includes("::") ? `${def.namespace}::${schemaId}` : schemaId;
+  return {
+    schemaId: canonicalId,
+    uri: def.uri,
+    fields: expandedFields(wsIndex, def).map(toCoverageField),
+  };
 }
 
 /**

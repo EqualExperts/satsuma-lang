@@ -192,6 +192,15 @@ export class SzSchemaCard extends LitElement {
       background: transparent;
     }
 
+    /* Coverage not computed: neither filled nor the hollow ring that reads as a
+       gap. A dashed, faded outline says "no verdict" rather than "no coverage"
+       — see the coverage property's doc comment. */
+    .port.unknown {
+      border: 1.5px dashed var(--sz-text-muted);
+      background: transparent;
+      opacity: 0.45;
+    }
+
     .field-name {
       font-family: var(--sz-font-mono);
       font-size: 12px;
@@ -722,7 +731,13 @@ export class SzSchemaCard extends LitElement {
 
   private _renderField(f: FieldEntry, depth: number, prefix = ""): TemplateResult {
     const fieldPath = prefix ? `${prefix}.${f.name}` : f.name;
-    const entry = this._coverageByPath().get(fieldPath);
+    // Three states, not two. With `coverage` null nothing was computed, and a row
+    // must not then read as a gap: the header says no figure was produced, and a
+    // hollow "unmapped" dot beside it would contradict it — a reader would see
+    // every field as unmapped, and automation could not tell those rows from real
+    // uncovered results.
+    const unavailable = this.coverage === null;
+    const entry = unavailable ? undefined : this._coverageByPath().get(fieldPath);
     // A record is "mapped" as soon as anything beneath it is, which is the
     // threshold a port dot has always painted on; `state` carries the finer
     // distinction for anyone who needs it.
@@ -737,14 +752,18 @@ export class SzSchemaCard extends LitElement {
     // Use the dotted path so nested customer.email is distinguishable from a
     // sibling top-level email field (sl-eikr).
     const fieldTestId = `${this.testIdPrefix}-field-${sanitizeTestIdSegment(fieldPath)}`;
-    const coverageState = isMapped ? "mapped" : "unmapped";
+    // `unknown` rather than `unmapped`/`uncovered`: those two are verdicts, and
+    // there is no verdict here. Automation keys on these, so the third state has
+    // to be nameable.
+    const coverageState = unavailable ? "unknown" : isMapped ? "mapped" : "unmapped";
+    const portClass = unavailable ? "unknown" : isMapped ? "mapped" : "unmapped";
 
     return html`
       <div
         class="field-row ${depth > 0 ? "nested" : ""} ${hlClass}"
         data-testid=${fieldTestId}
         data-coverage=${coverageState}
-        data-coverage-state=${entry?.state ?? "uncovered"}
+        data-coverage-state=${unavailable ? "unknown" : (entry?.state ?? "uncovered")}
         data-coverage-tier=${entry?.tier ?? ""}
         style=${depth > 0 ? `padding-left: ${12 + depth * 20}px` : ""}
         @click=${() => this._navigate(f.location)}
@@ -752,7 +771,7 @@ export class SzSchemaCard extends LitElement {
         @mouseleave=${() => this._onFieldHover(null)}
         title=${this._fieldTitle(f, entry)}
       >
-        <span class="port ${isMapped ? "mapped" : "unmapped"}"></span>
+        <span class="port ${portClass}"></span>
         <span class="field-name">${f.name}</span>
         <span class="field-type">${f.type}</span>
         <span class="badges">
@@ -921,9 +940,13 @@ export class SzSchemaCard extends LitElement {
    * reviewer has to be able to tell which they are looking at. `partial` is
    * called out for the same reason — a record row's dot says "something under
    * here is mapped" and cannot say "not all of it".
+   *
+   * When coverage was not computed the row says so, rather than saying nothing
+   * and leaving the bare type to be read alongside an unmarked dot as a gap.
    */
   private _fieldTitle(f: FieldEntry, entry: FieldCoverageEntry | undefined): string {
     const base = `${f.name}: ${f.type}`;
+    if (this.coverage === null) return `${base} — coverage not computed`;
     if (!entry?.mapped) return base;
     const how = entry.tier === "nl" ? "mapped via an @ref in prose" : "mapped";
     return entry.state === "partial" ? `${base} — partly ${how}` : `${base} — ${how}`;

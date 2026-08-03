@@ -58,7 +58,15 @@ describe("viz automation helpers", () => {
     const mod = await import("../dist/satsuma-viz.js");
     const card = new mod.SzSchemaCard();
     card.testIdPrefix = "src-customers";
-    card.mappedFields = new Set(["customer.email"]);
+    card.coverage = [
+      {
+        path: "customer.email",
+        uri: "file:///t.stm",
+        mapped: true,
+        state: "covered",
+        tier: "declared",
+      },
+    ];
     const child = {
       name: "email",
       type: "STRING",
@@ -73,7 +81,16 @@ describe("viz automation helpers", () => {
     const serialized = [...childTpl.strings, ...childTpl.values.map(String)].join(" ");
     assert.match(serialized, /src-customers-field-customer-email/);
     assert.match(serialized, /data-coverage/);
-    assert.match(serialized, /mapped/);
+    // Asserted against the interpolated values, not as a substring of the joined
+    // output: this serialization concatenates `strings` and `values` separately,
+    // so an attribute name is never adjacent to its value, and a bare /mapped/
+    // matched the word inside "unmapped". The case therefore kept passing after
+    // the property it set was renamed away and the card was rendering no verdict
+    // at all — Playwright asserts the exact attribute values, so the unit test
+    // should too.
+    const values = childTpl.values.map(String);
+    assert.ok(values.includes("mapped"), `expected a mapped verdict, got ${values.join()}`);
+    assert.ok(values.includes("covered"), `expected state=covered, got ${values.join()}`);
     // The parent struct must not collide with a top-level "email" segment.
     assert.ok(!/src-customers-field-email[^-]/.test(serialized));
   });
@@ -85,7 +102,7 @@ describe("viz automation helpers", () => {
     const mod = await import("../dist/satsuma-viz.js");
     const card = new mod.SzSchemaCard();
     card.testIdPrefix = "src-legacy";
-    card.mappedFields = new Set();
+    card.coverage = [];
     const legacyField = {
       name: "amount",
       type: "DECIMAL",
@@ -109,7 +126,7 @@ describe("viz automation helpers", () => {
     const mod = await import("../dist/satsuma-viz.js");
     const card = new mod.SzSchemaCard();
     card.testIdPrefix = "src-orders";
-    card.mappedFields = new Set();
+    card.coverage = [];
     const field = {
       name: "order_key",
       type: "VARCHAR",
