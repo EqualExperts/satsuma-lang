@@ -10,3 +10,4 @@
 export * from "./workspace-index";
 export * from "./viz-model";
 export * from "./model-from-sources";
+export * from "./coverage";

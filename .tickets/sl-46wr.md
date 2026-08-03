@@ -1,6 +1,6 @@
 ---
 id: sl-46wr
-status: open
+status: closed
 deps: []
 links: [sl-csrs, sl-3de8, sl-5nsv]
 created: 2026-08-02T21:40:23Z
@@ -41,3 +41,10 @@ Note the viz card renders a tier-blind boolean today; ADR-036 requires consumers
 
 The viz path and satsuma coverage --json report identical covered counts, totals and percentages for every file under examples/ — asserted by a sweep-style test or at minimum by extending tooling/satsuma-viz/test/coverage-parity.test.js with a fixture whose coverage includes an nl-tier leaf. examples/contracts/buy-to-om-order.stm reports 8/8 on the source side from the viz path. The parity test fails if the NL tier is removed from either side.
 
+
+## Notes
+
+**2026-08-03T07:08:36Z**
+
+Cause: the viz maintained a third derivation of covered paths (satsuma-viz/src/field-coverage.ts, buildMappingCoveredFields), walking the model's arrows. A leaf named only by a resolved NL @ref is covered (ADR-036) but nothing about that is visible in an arrow's endpoints, so the schema card reported every such leaf as a gap while satsuma coverage and the VS Code gutter reported it covered.
+Fix: deleted the derivation. @satsuma/viz-backend now calls core's computeMappingCoverage when it assembles a VizModel and attaches the result — tiers and all — to each MappingBlock.coverage; the card selects and counts those entries via core's summarizeFieldCoverage/countContainerStates, and renders the tier in a data attribute and tooltip. core's fieldCoverageFromCoveredPaths and the whole flat-set view (buildCoveredFieldSet, isCoveredFieldPath) are gone: a set of paths cannot express either the tier or ADR-037's conferral, so it was the shape that made this class of bug possible. Pinned by a corpus sweep (satsuma-cli/test/coverage-viz-parity.test.ts) asserting the viz path and satsuma coverage agree on covered count, denominator and percentage for every mapping the model renders in every examples/**.stm — 0 disagreements, down from 45 — plus nl-tier cases on the new coverage-nl-tier.stm fixture.

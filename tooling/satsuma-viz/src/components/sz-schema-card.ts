@@ -4,8 +4,7 @@ import { unsafeHTML } from "lit/directives/unsafe-html.js";
 import type { SchemaCard, FieldEntry } from "../model.js";
 import { SzNavigateEvent, SzFieldHoverEvent, SzFieldLineageEvent } from "../satsuma-viz.js";
 import { renderMarkdown } from "../markdown.js";
-import { isCoveredFieldPath } from "@satsuma/core/coverage-paths";
-import { fieldCoverageFromCoveredPaths } from "@satsuma/core/coverage";
+import type { FieldCoverageEntry } from "@satsuma/core/coverage";
 import { summarizeFieldCoverage, countContainerStates } from "@satsuma/core/coverage-rollup";
 import type { CoverageTotals, ContainerStateCounts } from "@satsuma/core/coverage-rollup";
 import {
@@ -496,9 +495,22 @@ export class SzSchemaCard extends LitElement {
   @property({ type: Object })
   schema: SchemaCard | null = null;
 
-  /** Set of mapped target field names — set by parent to indicate which fields have arrows. */
-  @property({ type: Object })
-  mappedFields: Set<string> = new Set();
+  /**
+   * This schema's field coverage, as computed by `@satsuma/core` and carried in
+   * the model — one entry per declared field, in declaration order.
+   *
+   * **Set by the parent; never derived here.** The card used to receive a set of
+   * covered paths and work the rest out itself, which quietly cost it two
+   * coverage rules it had no way to see: the resolved NL `@ref` tier (ADR-036)
+   * and whole-structure conferral (ADR-037). Both live in core, and the card
+   * disagreed with `satsuma coverage` on twelve shipped examples until it began
+   * consuming core's verdicts instead (sl-46wr, sl-csrs).
+   *
+   * Empty means the parent supplied nothing — the card then renders its fields
+   * with no coverage marking rather than claiming they are all unmapped.
+   */
+  @property({ type: Array })
+  coverage: FieldCoverageEntry[] = [];
 
   /** Compact mode: hides fields, port dots, constraints, spread indicators, lineage buttons.
    *  Shows namespace::name in header when schema has a namespace (qualifiedId contains ::). */
@@ -600,7 +612,7 @@ export class SzSchemaCard extends LitElement {
 
     if (this.compact) return this._renderCompact(s);
 
-    const { totals, containers } = this._coverage(s);
+    const { totals, containers } = this._coverage();
     const hasNotes = s.notes.length > 0;
     const metaPills = s.metadata.filter((m) => m.key !== "note");
     const isReport = this._isReport(s);
@@ -693,7 +705,11 @@ export class SzSchemaCard extends LitElement {
 
   private _renderField(f: FieldEntry, depth: number, prefix = ""): TemplateResult {
     const fieldPath = prefix ? `${prefix}.${f.name}` : f.name;
-    const isMapped = isCoveredFieldPath(fieldPath, this.mappedFields);
+    const entry = this._coverageByPath().get(fieldPath);
+    // A record is "mapped" as soon as anything beneath it is, which is the
+    // threshold a port dot has always painted on; `state` carries the finer
+    // distinction for anyone who needs it.
+    const isMapped = entry?.mapped ?? false;
     const hasWarning = f.comments.some((c) => c.kind === "warning");
     const hasQuestion = f.comments.some((c) => c.kind === "question");
     const hasPii = f.constraints.includes("pii");
@@ -711,11 +727,13 @@ export class SzSchemaCard extends LitElement {
         class="field-row ${depth > 0 ? "nested" : ""} ${hlClass}"
         data-testid=${fieldTestId}
         data-coverage=${coverageState}
+        data-coverage-state=${entry?.state ?? "uncovered"}
+        data-coverage-tier=${entry?.tier ?? ""}
         style=${depth > 0 ? `padding-left: ${12 + depth * 20}px` : ""}
         @click=${() => this._navigate(f.location)}
         @mouseenter=${() => this._onFieldHover(fieldPath)}
         @mouseleave=${() => this._onFieldHover(null)}
-        title=${f.name + ": " + f.type}
+        title=${this._fieldTitle(f, entry)}
       >
         <span class="port ${isMapped ? "mapped" : "unmapped"}"></span>
         <span class="field-name">${f.name}</span>
@@ -814,31 +832,66 @@ export class SzSchemaCard extends LitElement {
   }
 
   /**
-   * The card's coverage figures, counted by core.
+   * `coverage` indexed by field path, for the row renderer.
    *
-   * **The card does not compute its own denominator** (ADR-034). It used to:
-   * `_countFields`/`_countMapped` counted every node, records included, so one
-   * covered leaf lifted the numerator once per ancestor level and a schema of
-   * `amount` plus `address record { city, line1, postcode }` with only
-   * `address.city` mapped read as 2/5 — 40% — where `satsuma coverage` reported
-   * 25% and the VS Code status bar reported something different again (sl-hcan).
-   * Coverage is counted in *leaves* because a record is structure, not data:
-   * counting it alongside its children counts the same data twice and lets
-   * nesting depth move the percentage on its own.
+   * Rebuilt only when the `coverage` array identity changes: `_renderField` runs
+   * once per row and a linear scan per row would make rendering quadratic in the
+   * field count, which a wide schema card notices.
+   */
+  private _coverageIndex: Map<string, FieldCoverageEntry> | null = null;
+  private _coverageIndexFor: FieldCoverageEntry[] | null = null;
+
+  private _coverageByPath(): Map<string, FieldCoverageEntry> {
+    if (this._coverageIndexFor !== this.coverage || this._coverageIndex === null) {
+      this._coverageIndex = new Map(this.coverage.map((entry) => [entry.path, entry]));
+      this._coverageIndexFor = this.coverage;
+    }
+    return this._coverageIndex;
+  }
+
+  /**
+   * The card's coverage figures, counted by core from the entries it was given.
+   *
+   * **The card computes neither the verdicts nor the denominator.** It used to do
+   * both, and lost a rule each time one was added. `_countFields`/`_countMapped`
+   * counted every node, records included, so a schema of `amount` plus `address
+   * record { city, line1, postcode }` with only `address.city` mapped read as 2/5
+   * — 40% — where `satsuma coverage` reported 25% (sl-hcan); coverage is counted
+   * in *leaves* because a record is structure, not data. Deriving the covered set
+   * from the model's arrows then missed the NL `@ref` tier and whole-structure
+   * conferral (sl-46wr, sl-csrs). Both jobs now belong to core, and this method
+   * is the whole of what is left.
    *
    * Container states come back beside the ratio rather than inside it — a
    * reviewer wants to know two records are partly mapped, but that fact must not
    * enter the number.
    */
-  private _coverage(s: SchemaCard): {
+  private _coverage(): {
     totals: CoverageTotals;
     containers: ContainerStateCounts;
   } {
-    const entries = fieldCoverageFromCoveredPaths(s.fields, s.location.uri, this.mappedFields);
     return {
-      totals: summarizeFieldCoverage(entries),
-      containers: countContainerStates(entries),
+      totals: summarizeFieldCoverage(this.coverage),
+      containers: countContainerStates(this.coverage),
     };
+  }
+
+  /**
+   * A field row's tooltip: its type, plus how it came to be covered when that is
+   * not the ordinary case.
+   *
+   * The NL tier is called out because ADR-036 requires a consumer to *show* the
+   * distinction rather than let a reader assume every covered field has an arrow:
+   * a hop inferred from prose is a weaker claim than a declared one, and a
+   * reviewer has to be able to tell which they are looking at. `partial` is
+   * called out for the same reason — a record row's dot says "something under
+   * here is mapped" and cannot say "not all of it".
+   */
+  private _fieldTitle(f: FieldEntry, entry: FieldCoverageEntry | undefined): string {
+    const base = `${f.name}: ${f.type}`;
+    if (!entry?.mapped) return base;
+    const how = entry.tier === "nl" ? "mapped via an @ref in prose" : "mapped";
+    return entry.state === "partial" ? `${base} — partly ${how}` : `${base} — ${how}`;
   }
 
   /**
@@ -861,7 +914,7 @@ export class SzSchemaCard extends LitElement {
     // Leaf count, the same unit the expanded card's ratio is denominated in
     // (ADR-034). One card must not answer "how many fields?" two ways depending
     // on whether it happens to be compact.
-    const totalFields = this._coverage(s).totals.total;
+    const totalFields = this._coverage().totals.total;
     const metaPills = s.metadata.filter((m) => m.key !== "note");
     const isReport = this._isReport(s);
 

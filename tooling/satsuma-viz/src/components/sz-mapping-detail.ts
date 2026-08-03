@@ -19,6 +19,7 @@ import {
 import type { ContainerScope } from "../field-coverage.js";
 import { highlightAtRefs } from "../markdown.js";
 import { qualifyChildArrowPath } from "@satsuma/core/extract";
+import type { FieldCoverageEntry } from "@satsuma/core/coverage";
 
 function sanitizeTestIdSegment(value: string): string {
   const lowered = value.toLowerCase();
@@ -329,13 +330,19 @@ export class SzMappingDetail extends LitElement {
   @property({ type: Object })
   targetSchema: SchemaCard | null = null;
 
-  /** Set of mapped field names for source schemas. */
+  /**
+   * Core's coverage entries for each source schema, keyed by `qualifiedId`.
+   *
+   * Source and target coverage are separate properties because they answer
+   * separate questions — what this mapping *reads* versus what it *writes* — and
+   * one schema can legitimately appear on both sides of one mapping.
+   */
   @property({ type: Object })
-  sourceMappedFields: Map<string, Set<string>> = new Map();
+  sourceCoverage: Map<string, FieldCoverageEntry[]> = new Map();
 
-  /** Set of mapped field names for the target schema. */
-  @property({ type: Object })
-  targetMappedFields: Set<string> = new Set();
+  /** Core's coverage entries for the target schema. */
+  @property({ type: Array })
+  targetCoverage: FieldCoverageEntry[] = [];
 
   @property({ type: String, attribute: "namespace-label" })
   namespaceLabel: string | null = null;
@@ -557,7 +564,7 @@ export class SzMappingDetail extends LitElement {
             (s) => html`
               <sz-schema-card
                 .schema=${s}
-                .mappedFields=${this.sourceMappedFields.get(s.qualifiedId) ?? new Set()}
+                .coverage=${this.sourceCoverage.get(s.qualifiedId) ?? []}
                 .highlightFields=${sourceHL.get(s.qualifiedId) ?? new Set()}
                 highlightColor="source"
                 test-id-prefix=${`${sourcePrefix}-${sanitizeTestIdSegment(s.qualifiedId)}`}
@@ -578,7 +585,7 @@ export class SzMappingDetail extends LitElement {
             this.targetSchema
               ? html`<sz-schema-card
                   .schema=${this.targetSchema}
-                  .mappedFields=${this.targetMappedFields}
+                  .coverage=${this.targetCoverage}
                   .highlightFields=${targetHL}
                   highlightColor="target"
                   test-id-prefix=${`${targetPrefix}-${sanitizeTestIdSegment(this.targetSchema.qualifiedId)}`}

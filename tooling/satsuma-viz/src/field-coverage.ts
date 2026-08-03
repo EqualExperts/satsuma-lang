@@ -1,12 +1,31 @@
 /**
- * field-coverage.ts — Shared mapping-detail coverage helpers for satsuma-viz.
+ * field-coverage.ts — Reading field coverage, and resolving arrow paths, in satsuma-viz.
  *
- * The web component should consume the same nested-field coverage semantics as
- * the LSP coverage path utilities instead of comparing leaf names ad hoc.
+ * Two jobs that used to be one. **Resolving** an arrow's paths against the
+ * containers and schemas it refers to is this module's own work, and every
+ * hover, highlight and layout surface goes through {@link forEachMappingArrow}
+ * and {@link resolveSchemaLocalFieldPath} so they cannot disagree about what an
+ * arrow points at. **Coverage** is not: it arrives precomputed by `@satsuma/core`
+ * in `MappingBlock.coverage`, and the functions here only select and combine
+ * those entries.
+ *
+ * That split is the fix for sl-46wr and sl-csrs. This module used to derive its
+ * own covered-path set by walking the model's arrows — a third derivation
+ * alongside the CLI's and the LSP's — and it counted declared arrows only. Two
+ * coverage rules are invisible in an arrow's endpoints: a leaf named by a
+ * resolved NL `@ref` is covered (ADR-036), and an arrow onto a record covers
+ * that record's subtree when it enumerates no children (ADR-037). Neither could
+ * be seen from here, so the schema card disagreed with `satsuma coverage` on
+ * twelve of the shipped examples, and every rule added to coverage had to be
+ * written twice or the card drifted again. Nothing in this module decides what
+ * is covered any more.
  */
 
-import { buildCoveredFieldSet, schemaLocalFieldPath } from "@satsuma/core/coverage-paths";
+import { schemaLocalFieldPath } from "@satsuma/core/coverage-paths";
+import { unionFieldCoverage } from "@satsuma/core/coverage-rollup";
+import { uncoveredFieldCoverage } from "@satsuma/core/coverage";
 import { qualifyChildArrowPath } from "@satsuma/core/extract";
+import type { CoverageField, FieldCoverageEntry } from "@satsuma/core/coverage";
 import type {
   ArrowEntry,
   EachBlock,
@@ -227,83 +246,85 @@ export function countMappingArrows(mapping: MappingBlock): number {
   return count;
 }
 
+// ── Reading core's coverage out of the model ────────────────────────────────
+
 /**
- * Build schema-local covered-field sets for one mapping detail view.
+ * The coverage entries for one schema card in one mapping and role, as core
+ * computed them.
+ *
+ * Falls back to "every field uncovered" when the mapping carries no coverage —
+ * a model assembled without a workspace index, or a payload cached by a host
+ * predating `MappingBlock.coverage`. The fallback is core's
+ * {@link uncoveredFieldCoverage} rather than an empty list because the card
+ * still needs a denominator, and a card that counts its own fields is how the
+ * ratio started including containers (sl-hcan).
+ *
+ * `role` matters: a schema may sit on both sides of one mapping, and the detail
+ * view renders it as two cards asking two different questions — what this
+ * mapping *reads* from it, and what this mapping *writes* into it.
  */
-export function buildMappingCoveredFields(
+export function mappingSchemaCoverage(
   mapping: MappingBlock,
-  sourceSchemas: SchemaCard[],
-  targetSchema: SchemaCard | null,
-): { sourceMapped: Map<string, Set<string>>; targetMapped: Set<string> } {
-  const sourceFieldRefs = new Map<string, string[]>();
-  for (const schema of sourceSchemas) sourceFieldRefs.set(schema.qualifiedId, []);
-
-  const targetFieldRefs: string[] = [];
-
-  // Resolution reads the *qualified* paths: `.line1` under `each parcels ->
-  // packed` declares no field on its own, and matching it as authored resolved
-  // to nothing, so every relative-path arrow contributed no coverage (3cdd-yavi).
-  forEachMappingArrow(mapping, ({ sourceFields, targetField }) => {
-    if (targetSchema) {
-      const targetPath = resolveSchemaLocalFieldPath(targetField, targetSchema, [
-        mapping.targetRef,
-      ]);
-      if (targetPath) targetFieldRefs.push(targetPath);
-    }
-
-    for (const sourceField of sourceFields) {
-      for (const schema of sourceSchemas) {
-        const localPath = resolveSchemaLocalFieldPath(sourceField, schema, mapping.sourceRefs);
-        if (localPath) sourceFieldRefs.get(schema.qualifiedId)!.push(localPath);
-      }
-    }
-  });
-
-  const sourceMapped = new Map<string, Set<string>>();
-  for (const [schemaId, refs] of sourceFieldRefs) {
-    sourceMapped.set(schemaId, buildCoveredFieldSet(refs));
-  }
-
-  return {
-    sourceMapped,
-    targetMapped: buildCoveredFieldSet(targetFieldRefs),
-  };
+  schema: SchemaCard,
+  role: "source" | "target",
+): FieldCoverageEntry[] {
+  const found = mapping.coverage?.schemas.find(
+    (s) => s.role === role && s.schemaId === schema.qualifiedId,
+  );
+  return found
+    ? found.fields
+    : uncoveredFieldCoverage(toCoverageFields(schema.fields), schema.location.uri);
 }
 
 /**
- * Build the overview-level mapped-field index across the whole VizModel.
+ * Coverage for every schema card in the model, unioned across every mapping and
+ * both roles — what the overview card reports.
+ *
+ * The overview asks "does anything in this workspace touch this field?", so a
+ * schema read by one mapping and written by another is reported once, with both
+ * contributions merged. Merging is core's {@link unionFieldCoverage}: a leaf is
+ * covered when any mapping covers it, under the strongest tier any of them
+ * claims, and containers are then re-derived from the unioned leaves — which is
+ * not the same as OR-ing the containers, since two mappings that each cover half
+ * of a record cover all of it between them.
+ *
+ * Every declared schema gets an entry, seeded with its own all-uncovered field
+ * list, so a schema no mapping references reports `0/N` rather than dropping out
+ * of the index and leaving its card with nothing to count.
  */
-export function buildMappedFieldsIndex(model: VizModel): Map<string, Set<string>> {
-  const index = new Map<string, Set<string>>();
-  const allSchemas = new Map(
-    model.namespaces.flatMap((ns) =>
-      ns.schemas.map((schema) => [schema.qualifiedId, schema] as const),
-    ),
-  );
+export function buildCoverageIndex(model: VizModel): Map<string, FieldCoverageEntry[]> {
+  const contributions = new Map<string, FieldCoverageEntry[][]>();
+
+  // Seed first: the card's own field tree defines the denominator and the row
+  // order, and every mapping's entries merge into it.
+  for (const ns of model.namespaces) {
+    for (const schema of ns.schemas) {
+      contributions.set(schema.qualifiedId, [
+        uncoveredFieldCoverage(toCoverageFields(schema.fields), schema.location.uri),
+      ]);
+    }
+  }
 
   for (const ns of model.namespaces) {
     for (const mapping of ns.mappings) {
-      const sourceSchemas = mapping.sourceRefs
-        .map((schemaId) => allSchemas.get(schemaId))
-        .filter((schema): schema is SchemaCard => schema != null);
-      const targetSchema = allSchemas.get(mapping.targetRef) ?? null;
-      const { sourceMapped, targetMapped } = buildMappingCoveredFields(
-        mapping,
-        sourceSchemas,
-        targetSchema,
-      );
-
-      for (const [schemaId, covered] of sourceMapped) {
-        if (!index.has(schemaId)) index.set(schemaId, new Set());
-        for (const path of covered) index.get(schemaId)!.add(path);
-      }
-
-      if (targetSchema) {
-        if (!index.has(targetSchema.qualifiedId)) index.set(targetSchema.qualifiedId, new Set());
-        for (const path of targetMapped) index.get(targetSchema.qualifiedId)!.add(path);
+      for (const covered of mapping.coverage?.schemas ?? []) {
+        contributions.get(covered.schemaId)?.push(covered.fields);
       }
     }
   }
 
+  const index = new Map<string, FieldCoverageEntry[]>();
+  for (const [schemaId, lists] of contributions) {
+    index.set(schemaId, unionFieldCoverage(lists));
+  }
   return index;
+}
+
+/** Project the model's field entries onto core's minimal coverage field shape. */
+function toCoverageFields(fields: FieldEntry[]): CoverageField[] {
+  return fields.map((f) => ({
+    name: f.name,
+    line: f.location.line,
+    children: toCoverageFields(f.children),
+  }));
 }

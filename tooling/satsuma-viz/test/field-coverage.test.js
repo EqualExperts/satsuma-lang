@@ -34,9 +34,10 @@ describe("field-coverage helpers", () => {
 
   it("loads the bundle exports", async () => {
     mod = await import("../dist/satsuma-viz.js");
-    assert.equal(typeof mod.buildMappingCoveredFields, "function");
     assert.equal(typeof mod.resolveSchemaLocalFieldPath, "function");
     assert.equal(typeof mod.schemaHasFieldPath, "function");
+    assert.equal(typeof mod.mappingSchemaCoverage, "function");
+    assert.equal(typeof mod.buildCoverageIndex, "function");
   });
 
   it("resolves unqualified nested source paths against the owning schema", () => {
@@ -57,47 +58,6 @@ describe("field-coverage helpers", () => {
       ]),
       "region",
     );
-  });
-
-  it("builds mapping coverage sets that include nested parents and children", () => {
-    const orderEvents = schema("order_events", [
-      field("customer", [field("email"), field("tier")]),
-    ]);
-    const target = schema("completed_orders", [field("customer_email")]);
-    const mapping = {
-      id: "completed orders",
-      sourceRefs: ["order_events", "customer_profiles"],
-      targetRef: "completed_orders",
-      arrows: [
-        {
-          sourceFields: ["customer.email"],
-          targetField: "customer_email",
-          transform: null,
-          metadata: [],
-          comments: [],
-          location: loc,
-        },
-      ],
-      eachBlocks: [],
-      flattenBlocks: [],
-      nestedArrows: [],
-      sourceBlock: null,
-      notes: [],
-      comments: [],
-      location: loc,
-    };
-
-    const { sourceMapped, targetMapped } = mod.buildMappingCoveredFields(
-      mapping,
-      [orderEvents],
-      target,
-    );
-
-    const sourceSet = sourceMapped.get("order_events");
-    assert.ok(sourceSet);
-    assert.equal(sourceSet.has("customer"), true);
-    assert.equal(sourceSet.has("customer.email"), true);
-    assert.equal(targetMapped.has("customer_email"), true);
   });
 
   it("strips authored bare-id prefixes for namespaced schemas (sl-iqud)", () => {
@@ -129,59 +89,6 @@ describe("field-coverage helpers", () => {
       mod.resolveSchemaLocalFieldPath("orders.id", customers, ["crm::customers", "crm::orders"]),
       null,
     );
-  });
-
-  it("covers both schemas of a namespaced multi-source mapping (sl-iqud)", () => {
-    // End-to-end coverage repro from the ticket: a namespaced join mapping
-    // with bare-prefixed arrow refs left sourceMapped empty for both schemas.
-    const customers = schema("customers", [field("id"), field("email")], "crm::customers");
-    const orders = schema("orders", [field("customer_id"), field("total")], "crm::orders");
-    const target = schema(
-      "customer_orders",
-      [field("email"), field("total")],
-      "crm::customer_orders",
-    );
-    const mapping = {
-      id: "join_orders",
-      sourceRefs: ["crm::customers", "crm::orders"],
-      targetRef: "crm::customer_orders",
-      arrows: [
-        {
-          sourceFields: ["customers.email"],
-          targetField: "email",
-          transform: null,
-          metadata: [],
-          comments: [],
-          location: loc,
-        },
-        {
-          sourceFields: ["orders.total"],
-          targetField: "total",
-          transform: null,
-          metadata: [],
-          comments: [],
-          location: loc,
-        },
-      ],
-      eachBlocks: [],
-      flattenBlocks: [],
-      nestedArrows: [],
-      sourceBlock: null,
-      notes: [],
-      comments: [],
-      location: loc,
-    };
-
-    const { sourceMapped, targetMapped } = mod.buildMappingCoveredFields(
-      mapping,
-      [customers, orders],
-      target,
-    );
-
-    assert.deepEqual([...sourceMapped.get("crm::customers")], ["email"]);
-    assert.deepEqual([...sourceMapped.get("crm::orders")], ["total"]);
-    assert.equal(targetMapped.has("email"), true);
-    assert.equal(targetMapped.has("total"), true);
   });
 });
 
@@ -383,14 +290,15 @@ describe("sz-mapping-detail hover lookups recurse into nestedEach (sl-fm0q)", ()
 // matching an arrow against a *declared field* has to qualify first — and until
 // this ticket nothing did, so `resolveSchemaLocalFieldPath(".line1", …)` split
 // to ["", "line1"], matched no field, and every relative-path arrow silently
-// contributed nothing to coverage, hover highlighting or overview edges.
+// contributed nothing to hover highlighting or overview edges.
+//
+// Asserted on the resolved paths themselves rather than through coverage: since
+// sl-46wr coverage is core's answer, not this module's, so the property this
+// module still owns is "what absolute path does this arrow name?".
 
 describe("relative arrow paths resolve against their container (3cdd-yavi)", () => {
   /** @type {typeof import("../dist/satsuma-viz.js")} */
   let mod;
-
-  const src = schema("s", [field("addr", [field("line1")]), field("orders", [field("id")])]);
-  const tgt = schema("t", [field("address", [field("line1")]), field("orders", [field("id")])]);
 
   /** A mapping whose only arrow sits inside `blocks`, authored relatively. */
   const mappingWith = (over) => ({
@@ -419,31 +327,33 @@ describe("relative arrow paths resolve against their container (3cdd-yavi)", () 
     ...over,
   });
 
+  /** Every arrow's resolved `source -> target` pair, in walk order. */
+  const resolvedPaths = (mapping) => {
+    const pairs = [];
+    mod.forEachMappingArrow(mapping, ({ sourceFields, targetField }) => {
+      pairs.push(`${sourceFields.join(",")} -> ${targetField}`);
+    });
+    return pairs;
+  };
+
   before(async () => {
     mod = await import("../dist/satsuma-viz.js");
   });
 
-  it("counts a nested_arrow body's relative arrow as covering the qualified leaf", () => {
+  it("qualifies a nested_arrow body's relative arrow against the header", () => {
     // The ticket's headline case: `.line1 -> .line1` under `addr -> address`
-    // covers addr.line1 and address.line1 on their respective cards.
+    // names addr.line1 and address.line1. The header itself is an arrow too —
+    // it maps record to record — so both appear.
     const mapping = mappingWith({
       nestedArrows: [block("addr", "address", { arrows: [arrow(".line1", ".line1")] })],
     });
-    const { sourceMapped, targetMapped } = mod.buildMappingCoveredFields(mapping, [src], tgt);
-
-    assert.equal(sourceMapped.get("s").has("addr.line1"), true);
-    assert.equal(targetMapped.has("address.line1"), true);
-    // The containers come along as ancestors of a covered leaf, which is what
-    // makes the record row render as touched rather than as a gap.
-    assert.equal(targetMapped.has("address"), true);
+    assert.deepEqual(resolvedPaths(mapping), ["addr -> address", "addr.line1 -> address.line1"]);
   });
 
   it("accumulates prefixes through a flatten nested inside an each", () => {
     // The sl-vu22 shape. Each container level contributes one segment, so the
     // rule has to compose — a single level of qualification would resolve
     // `.sku` to `parcels.sku` and still match nothing.
-    const deepSrc = schema("s", [field("orders", [field("parcels", [field("sku")])])]);
-    const deepTgt = schema("t", [field("orders", [field("packed", [field("sku")])])]);
     const mapping = mappingWith({
       eachBlocks: [
         block("orders", "orders", {
@@ -451,24 +361,19 @@ describe("relative arrow paths resolve against their container (3cdd-yavi)", () 
         }),
       ],
     });
-
-    const { sourceMapped, targetMapped } = mod.buildMappingCoveredFields(
-      mapping,
-      [deepSrc],
-      deepTgt,
-    );
-    assert.equal(sourceMapped.get("s").has("orders.parcels.sku"), true);
-    assert.equal(targetMapped.has("orders.packed.sku"), true);
+    assert.deepEqual(resolvedPaths(mapping), ["orders.parcels.sku -> orders.packed.sku"]);
   });
 
   it("leaves a mapping-level arrow untouched, dot and all", () => {
     // At mapping-body level there is no container to resolve against, so a
-    // stray leading dot must stay unresolvable rather than be quietly matched
-    // to a top-level field — coverage must never rise on a malformed path.
+    // stray leading dot must stay as authored rather than be quietly matched to
+    // a top-level field — nothing may rise on a malformed path.
     const mapping = mappingWith({ arrows: [arrow(".orders", ".orders")] });
-    const { sourceMapped, targetMapped } = mod.buildMappingCoveredFields(mapping, [src], tgt);
+    assert.deepEqual(resolvedPaths(mapping), [".orders -> .orders"]);
 
-    assert.equal(sourceMapped.get("s").has("orders"), false);
-    assert.equal(targetMapped.has("orders"), false);
+    // And it still resolves to no declared field, which is what keeps it out of
+    // every path-matched surface.
+    const src = schema("s", [field("orders", [field("id")])]);
+    assert.equal(mod.resolveSchemaLocalFieldPath(".orders", src, ["s"]), null);
   });
 });

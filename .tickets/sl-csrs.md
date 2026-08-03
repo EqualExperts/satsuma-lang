@@ -1,6 +1,6 @@
 ---
 id: sl-csrs
-status: open
+status: closed
 deps: []
 links: [sl-46wr, sl-3de8]
 created: 2026-08-02T21:40:38Z
@@ -31,3 +31,10 @@ Fix with sl-46wr, by having the host pass core's computed FieldCoverageEntry lis
 
 A viz-path/CLI parity test over a fixture containing a whole-record arrow, a whole-list_of-record arrow, an empty-body arrow and a pipe-chain-body arrow asserts identical leaf verdicts, container states and percentages. The enumerating form still confers only its enumerated children.
 
+
+## Notes
+
+**2026-08-03T07:08:36Z**
+
+Cause: second half of sl-46wr's root cause. ADR-037's whole-structure conferral is gated on the arrow's declaration kind and on whether its body enumerates children, neither of which survives into a flat set of covered paths, so the viz's own derivation reported every leaf under a record-to-record or list_of-record arrow as uncovered.
+Fix: fixed with sl-46wr by deleting the derivation — the viz now consumes core's FieldCoverageEntry list, which already has conferral applied. New fixture tooling/satsuma-cli/test/fixtures/coverage-whole-structure.stm carries all five forms the rule distinguishes on one file (bare record-to-record, list_of record, empty body, pipe-chain body, and the enumerating form that must confer only what it lists) plus ADR-038's scalar-into-record case; satsuma coverage reports src 12/14 and tgt 11/15 on it and the viz parity suite asserts the same figures and the per-leaf verdicts.

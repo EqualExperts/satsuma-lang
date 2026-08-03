@@ -18,7 +18,8 @@ import {
 import { SzOpenMappingEvent } from "./edges/sz-overview-edge-layer.js";
 import tokens from "./tokens.css";
 import { renderMarkdown } from "./markdown.js";
-import { buildMappedFieldsIndex, buildMappingCoveredFields } from "./field-coverage.js";
+import { buildCoverageIndex, mappingSchemaCoverage } from "./field-coverage.js";
+import type { FieldCoverageEntry } from "@satsuma/core/coverage";
 import { metricAsSchemaCard } from "./metric-adapter.js";
 
 export { VizModel } from "./model.js";
@@ -44,9 +45,10 @@ export {
 } from "./layout/geometry.js";
 import { countMappingArrows } from "./field-coverage.js";
 export {
-  buildMappingCoveredFields,
-  buildMappedFieldsIndex,
+  buildCoverageIndex,
+  mappingSchemaCoverage,
   countMappingArrows,
+  forEachMappingArrow,
   resolveSchemaLocalFieldPath,
   schemaHasFieldPath,
 } from "./field-coverage.js";
@@ -970,8 +972,13 @@ export class SatsumaViz extends LitElement {
   @state()
   private _expandedModels = new Map<string, VizModel[]>();
 
+  /**
+   * Core's coverage entries per schema, unioned across every mapping on screen
+   * — what the overview cards report. Rebuilt with the layout, from the *merged*
+   * model, so a schema pulled in by a cross-file expansion is counted too.
+   */
   @state()
-  private _mappedFieldsBySchema = new Map<string, Set<string>>();
+  private _coverageBySchema = new Map<string, FieldCoverageEntry[]>();
 
   @state()
   private _renderedNamespaceBoxes: Array<{
@@ -1176,8 +1183,8 @@ export class SatsumaViz extends LitElement {
     // Build a merged model that includes expanded cross-file schemas
     const mergedModel = this._buildMergedModel();
 
-    // Build mapped fields index for card rendering
-    this._mappedFieldsBySchema = this._buildMappedFieldsIndex();
+    // Coverage index for card rendering, over the same model that is laid out.
+    this._coverageBySchema = buildCoverageIndex(mergedModel);
 
     try {
       const [detail, overview] = await Promise.all([
@@ -1964,11 +1971,16 @@ export class SatsumaViz extends LitElement {
       .filter((s): s is SchemaCard => s !== null);
     const expandedTarget = resolveEndpoint(mapping.targetRef);
 
-    const { sourceMapped, targetMapped } = buildMappingCoveredFields(
-      mapping,
-      sourceSchemas,
-      expandedTarget,
+    // Coverage per side, straight from core's per-mapping result. The detail
+    // view asks a *per-mapping* question — what does this mapping read, what
+    // does it write — which is not the overview's union across mappings, so the
+    // two indexes are deliberately built from different shapes.
+    const sourceCoverage = new Map(
+      sourceSchemas.map((s) => [s.qualifiedId, mappingSchemaCoverage(mapping, s, "source")]),
     );
+    const targetCoverage = expandedTarget
+      ? mappingSchemaCoverage(mapping, expandedTarget, "target")
+      : [];
 
     const namespaceLabel = this._namespaceForMapping(mapping);
 
@@ -1979,8 +1991,8 @@ export class SatsumaViz extends LitElement {
         .mapping=${mapping}
         .sourceSchemas=${sourceSchemas}
         .targetSchema=${expandedTarget}
-        .sourceMappedFields=${sourceMapped}
-        .targetMappedFields=${targetMapped}
+        .sourceCoverage=${sourceCoverage}
+        .targetCoverage=${targetCoverage}
         .namespaceLabel=${namespaceLabel}
       ></sz-mapping-detail>
     `;
@@ -2361,7 +2373,7 @@ export class SatsumaViz extends LitElement {
             ...ns.schemas.flatMap((s) => {
               const node = layout.nodes.get(s.qualifiedId);
               if (!node) return [html``];
-              const mapped = this._mappedFieldsBySchema.get(s.qualifiedId) ?? new Set();
+              const coverage = this._coverageBySchema.get(s.qualifiedId) ?? [];
               const isExpanded = expandedIds.has(s.qualifiedId);
               const results = [
                 html`
@@ -2374,7 +2386,7 @@ export class SatsumaViz extends LitElement {
                       data-testid=${`detail-schema-card-${sanitizeTestIdSegment(s.qualifiedId)}`}
                       .testIdPrefix=${`detail-schema-card-${sanitizeTestIdSegment(s.qualifiedId)}`}
                       .schema=${s}
-                      .mappedFields=${mapped}
+                      .coverage=${coverage}
                       .namespaceLabel=${ns.name}
                     ></sz-schema-card>
                   </div>
@@ -2451,12 +2463,12 @@ export class SatsumaViz extends LitElement {
   private _renderFlexCards(ns: NamespaceGroup) {
     return html`
       ${ns.schemas.map((s) => {
-        const mapped = this._mappedFieldsBySchema.get(s.qualifiedId) ?? new Set();
+        const coverage = this._coverageBySchema.get(s.qualifiedId) ?? [];
         return html`<sz-schema-card
           data-testid=${`fallback-schema-card-${sanitizeTestIdSegment(s.qualifiedId)}`}
           .testIdPrefix=${`fallback-schema-card-${sanitizeTestIdSegment(s.qualifiedId)}`}
           .schema=${s}
-          .mappedFields=${mapped}
+          .coverage=${coverage}
           .namespaceLabel=${ns.name}
         ></sz-schema-card>`;
       })}
@@ -2671,9 +2683,6 @@ export class SatsumaViz extends LitElement {
       width: maxX - minX + padding * 2,
       height: maxY - minY + padding * 2,
     };
-  }
-  private _buildMappedFieldsIndex(): Map<string, Set<string>> {
-    return this.model ? buildMappedFieldsIndex(this.model) : new Map();
   }
 }
 

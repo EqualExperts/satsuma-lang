@@ -12,7 +12,24 @@
  *           ├─ MappingBlock[]     (one per mapping block)
  *           ├─ MetricCard[]       (one per metric block)
  *           └─ FragmentCard[]     (one per fragment block)
+ *
+ * Field coverage travels *in* this payload rather than being derived from it —
+ * see {@link MappingBlock.coverage}. That is why this otherwise self-contained
+ * contract package depends on `@satsuma/core`: the coverage types it carries are
+ * core's, verbatim, so a consumer reading them cannot be reading a re-derivation.
  */
+
+import type { MappingCoverageResult } from "@satsuma/core";
+
+// Coverage types are part of this contract, so a consumer needs no second
+// import to read the payload it just received.
+export type {
+  MappingCoverageResult,
+  SchemaCoverageResult,
+  FieldCoverageEntry,
+  FieldCoverageState,
+  CoverageTier,
+} from "@satsuma/core";
 
 // ---------- Top-level document model ----------
 
@@ -120,6 +137,27 @@ export interface MappingBlock {
   notes: NoteBlock[];
   comments: CommentEntry[];
   location: SourceLocation;
+  /**
+   * Per-field coverage for this mapping, one entry per schema its `source {}`
+   * and `target {}` blocks name — computed by core's `computeMappingCoverage`
+   * when the model was assembled.
+   *
+   * **The client must render these verdicts, never re-derive them.** Deriving
+   * covered paths from `arrows`/`eachBlocks` on the client looks equivalent and
+   * is not: it silently omits every coverage rule that is not visible in an
+   * arrow's endpoints — the resolved NL `@ref` tier (ADR-036) and
+   * whole-structure conferral (ADR-037), which need the ref resolver and the
+   * arrow's declaration kind respectively. The viz did derive its own set until
+   * sl-46wr / sl-csrs, and disagreed with `satsuma coverage` on twelve of the
+   * shipped examples. Counting is core's too: `summarizeFieldCoverage` and
+   * `countContainerStates` over these entries (ADR-034).
+   *
+   * Optional because a model may be assembled without a workspace index to
+   * resolve schemas against, and because a payload cached by an older host will
+   * not carry it. Absent means "not computed" — it is not the same as "nothing
+   * is covered", and a consumer must not render 0% for it.
+   */
+  coverage?: MappingCoverageResult;
 }
 
 /** A single arrow within a mapping, each_block, or flatten_block. */

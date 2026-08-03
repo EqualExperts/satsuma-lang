@@ -23,11 +23,7 @@ export { initParser, getParser, getLanguage, createQuery } from "./parser.js";
 export type { ParserInitOptions } from "./parser.js";
 export { collectParseErrors } from "./parse-errors.js";
 export type { ParseErrorEntry } from "./parse-errors.js";
-export {
-  computeMappingCoverage,
-  declaredFieldKind,
-  fieldCoverageFromCoveredPaths,
-} from "./coverage.js";
+export { computeMappingCoverage, declaredFieldKind, uncoveredFieldCoverage } from "./coverage.js";
 export type {
   CoverageTier,
   FieldCoverageState,
@@ -40,8 +36,6 @@ export type {
 } from "./coverage.js";
 export {
   buildCoveredFieldPaths,
-  buildCoveredFieldSet,
-  isCoveredFieldPath,
   isCoveredPath,
   schemaLocalFieldPath,
   schemaRefPrefixes,
@@ -49,6 +43,7 @@ export {
 export type { CoveredFieldPaths } from "./coverage-paths.js";
 export {
   aggregateCoverage,
+  unionFieldCoverage,
   summarizeFieldCoverage,
   leafFieldEntries,
   countContainerStates,
