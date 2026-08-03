@@ -1,0 +1,21 @@
+{
+  "name": "@satsuma/scenario-gen",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Test-only generator of semantic Satsuma scenarios and their ground truth — shared by every package's property suites",
+  "license": "MIT",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "main": "./src/index.js",
+  "files": [
+    "src"
+  ],
+  "scripts": {
+    "test": "node --test test/**/*.test.js"
+  },
+  "dependencies": {
+    "fast-check": "^4.9.0"
+  }
+}

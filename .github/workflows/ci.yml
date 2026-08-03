@@ -52,6 +52,7 @@ jobs:
             tooling/satsuma-cli/src/generated
             tooling/satsuma-cli/dist
             tooling/satsuma-core/node_modules
+            tooling/satsuma-scenario-gen/node_modules
             tooling/satsuma-core/dist
             tooling/satsuma-viz-backend/node_modules
             tooling/satsuma-viz-backend/dist
@@ -85,6 +86,7 @@ jobs:
             tooling/satsuma-cli/src/generated
             tooling/satsuma-cli/dist
             tooling/satsuma-core/node_modules
+            tooling/satsuma-scenario-gen/node_modules
             tooling/satsuma-core/dist
             tooling/satsuma-viz-backend/node_modules
             tooling/satsuma-viz-backend/dist
@@ -135,6 +137,7 @@ jobs:
             tooling/satsuma-cli/src/generated
             tooling/satsuma-cli/dist
             tooling/satsuma-core/node_modules
+            tooling/satsuma-scenario-gen/node_modules
             tooling/satsuma-core/dist
             tooling/satsuma-viz-backend/node_modules
             tooling/satsuma-viz-backend/dist
@@ -214,6 +217,7 @@ jobs:
             tooling/satsuma-cli/src/generated
             tooling/satsuma-cli/dist
             tooling/satsuma-core/node_modules
+            tooling/satsuma-scenario-gen/node_modules
             tooling/satsuma-core/dist
             tooling/satsuma-viz-backend/node_modules
             tooling/satsuma-viz-backend/dist
@@ -296,6 +300,7 @@ jobs:
             tooling/satsuma-cli/src/generated
             tooling/satsuma-cli/dist
             tooling/satsuma-core/node_modules
+            tooling/satsuma-scenario-gen/node_modules
             tooling/satsuma-core/dist
             tooling/satsuma-viz-backend/node_modules
             tooling/satsuma-viz-backend/dist
@@ -398,6 +403,7 @@ jobs:
             tooling/satsuma-cli/src/generated
             tooling/satsuma-cli/dist
             tooling/satsuma-core/node_modules
+            tooling/satsuma-scenario-gen/node_modules
             tooling/satsuma-core/dist
             tooling/satsuma-viz-backend/node_modules
             tooling/satsuma-viz-backend/dist
@@ -440,6 +446,7 @@ jobs:
             tooling/satsuma-cli/src/generated
             tooling/satsuma-cli/dist
             tooling/satsuma-core/node_modules
+            tooling/satsuma-scenario-gen/node_modules
             tooling/satsuma-core/dist
             tooling/satsuma-viz-backend/node_modules
             tooling/satsuma-viz-backend/dist
@@ -530,6 +537,7 @@ jobs:
             tooling/satsuma-cli/src/generated
             tooling/satsuma-cli/dist
             tooling/satsuma-core/node_modules
+            tooling/satsuma-scenario-gen/node_modules
             tooling/satsuma-core/dist
             tooling/satsuma-viz-backend/node_modules
             tooling/satsuma-viz-backend/dist
@@ -605,6 +613,7 @@ jobs:
             tooling/satsuma-cli/src/generated
             tooling/satsuma-cli/dist
             tooling/satsuma-core/node_modules
+            tooling/satsuma-scenario-gen/node_modules
             tooling/satsuma-core/dist
             tooling/satsuma-viz-backend/node_modules
             tooling/satsuma-viz-backend/dist

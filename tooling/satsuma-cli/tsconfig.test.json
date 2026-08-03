@@ -7,6 +7,16 @@
     "declarationMap": false,
     "sourceMap": false,
     "noUncheckedIndexedAccess": false,
+    // `@satsuma/scenario-gen` is a test-only package of plain ESM `.js` carrying
+    // JSDoc types, with deliberately no build step (sl-puky) and so no `.d.ts`.
+    // These two options are what let the TypeScript test suite read those types:
+    // `allowJs` to consider `.js` at all, and `maxNodeModuleJsDepth: 1` because
+    // TypeScript otherwise ignores JavaScript reached through `node_modules`.
+    // A `paths` mapping to the source would be narrower but hits TS6059 — the
+    // generator's files sit outside this package's `rootDir`. `checkJs` stays
+    // off: the generator's own correctness is not this typecheck's business.
+    "allowJs": true,
+    "maxNodeModuleJsDepth": 1,
     "paths": {
       "#src/*": ["./src/*"]
     }

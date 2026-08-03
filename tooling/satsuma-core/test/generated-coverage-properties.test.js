@@ -24,17 +24,16 @@ import {
 } from "@satsuma/core";
 import {
   coverageEndpointScenarioArbitrary,
-  coverageForScenario,
   dottedPathsArbitrary,
   GENERATED_PROPERTY_PARAMETERS,
   monotonicScenarioArbitrary,
   nonContainerSourceScenarioArbitrary,
-  parseGeneratedScenario,
   renestingScenarioArbitrary,
   schemaLocalRefScenarioArbitrary,
   spreadRedeclarationScenarioArbitrary,
   wholeStructureScenarioArbitrary,
-} from "./support/generated-scenarios.js";
+} from "@satsuma/scenario-gen";
+import { coverageForScenario, parseGeneratedScenario } from "./support/scenario-pipeline.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const WASM_PATH = resolve(__dirname, "../../tree-sitter-satsuma/tree-sitter-satsuma.wasm");
