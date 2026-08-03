@@ -27,4 +27,4 @@ generated formatter properties reuse cbdr-o6xn's semantic scenarios and renderer
 **2026-08-03T15:52:53Z**
 
 Cause: Formatter round-trip guarantees were exercised only by the fixed examples corpus, leaving valid combinations from the new semantic generator unexplored.
-Fix: Reused the recovery-free semantic generator for independent idempotence, CST-equivalence, and error-free reparse properties, sharing the corpus serializer (commit 194fd06d).
+Fix: Reused the recovery-free semantic generator for independent idempotence, CST-equivalence, and error-free reparse properties, sharing the corpus serializer (commit 724d5de7).

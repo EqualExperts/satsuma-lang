@@ -27,4 +27,4 @@ fast-check is added only to satsuma-core devDependencies and npm audit reports n
 **2026-08-03T15:48:11Z**
 
 Cause: Coverage and path semantics were protected only by hand-selected examples, so small combinations such as spread collisions or source/target shape changes could escape the suite.
-Fix: Added a semantic-first fast-check generator, strict recovery-free rendering, reproducible failure diagnostics, and generated properties for all eight R3 coverage/path invariants (commit 380beaaa).
+Fix: Added a semantic-first fast-check generator, strict recovery-free rendering, reproducible failure diagnostics, and generated properties for all eight R3 coverage/path invariants (commit d747d887).
