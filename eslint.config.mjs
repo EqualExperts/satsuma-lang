@@ -89,8 +89,9 @@ export default [
   },
   // TypeScript test files and the viz harness package (satsuma-cli tests, viz-harness
   // source + tests) — baseline TypeScript rules without type-info (no tsconfig needed).
-  // Other TS packages (core, lsp, viz, vscode-satsuma) are linted incrementally as
-  // they are migrated to include test files in their tsconfigs.
+  // Other TS packages (core, lsp, viz-backend, viz, vscode-satsuma) are linted
+  // incrementally as they are migrated to include test files in their tsconfigs
+  // (PRD 39 R7).
   ...tseslint.configs.recommended.map((config) => ({
     ...config,
     files: ["tooling/satsuma-cli/test/**/*.ts", "tooling/satsuma-viz-harness/**/*.ts"],
@@ -129,6 +130,32 @@ export default [
   })),
   {
     files: ["tooling/satsuma-cli/src/**/*.ts"],
+    languageOptions: {
+      parserOptions: {
+        projectService: true,
+        tsconfigRootDir: import.meta.dirname,
+      },
+    },
+    rules: {
+      "@typescript-eslint/no-unused-vars": [
+        "error",
+        { argsIgnorePattern: "^_", varsIgnorePattern: "^_" },
+      ],
+      "@typescript-eslint/no-non-null-assertion": "error",
+    },
+  },
+  // satsuma-viz-model source files: first package landed under the PRD 39 R7
+  // rollout. The package has no CST dependency, so it needs no CST-narrowing
+  // rules (no-unnecessary-condition, switch-exhaustiveness-check — those apply
+  // only to packages migrated to the generated CST type in R2). Its one test
+  // file is plain JS, so unlike satsuma-cli this block needs no test-file
+  // carve-out.
+  ...tseslint.configs.recommendedTypeChecked.map((config) => ({
+    ...config,
+    files: ["tooling/satsuma-viz-model/src/**/*.ts"],
+  })),
+  {
+    files: ["tooling/satsuma-viz-model/src/**/*.ts"],
     languageOptions: {
       parserOptions: {
         projectService: true,
