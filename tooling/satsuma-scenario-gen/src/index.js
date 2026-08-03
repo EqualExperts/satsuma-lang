@@ -25,6 +25,7 @@ export {
   MAX_GENERATED_LEAVES,
   fieldTreeForPath,
   leafNames,
+  listRecordField,
   mappingScenario,
   nestFields,
   nestedPath,
@@ -33,7 +34,62 @@ export {
   semanticLeafPaths,
 } from "./model.js";
 
-export { renderEntity, renderMapping, renderScenario } from "./render.js";
+export { renderDeclaration, renderEntity, renderMapping, renderScenario } from "./render.js";
+
+// ── Workspace-shaped scenarios (sl-dqyu) ───────────────────────────────────
+
+export {
+  canonicalEndpoint,
+  canonicalEntityRef,
+  computedArrow,
+  eachBlock,
+  endpoint,
+  entityRef,
+  flattenArrows,
+  flattenBlock,
+  mapArrow,
+  mappingDecl,
+  nlTransform,
+  scenarioFile,
+  scenarioWorkspace,
+  schemaDecl,
+  workspaceMappings,
+  workspaceSchemas,
+} from "./workspace-model.js";
+
+export { renderWorkspace, renderWorkspaceFile } from "./workspace-render.js";
+
+export {
+  scenarioAncestorsWithin,
+  scenarioDeclaredFieldPaths,
+  scenarioDeclaredLeafPaths,
+  scenarioDescendantsWithin,
+  scenarioFieldEdges,
+  scenarioReachableWithin,
+  scenarioSchemaEdges,
+  scenarioSchemaProjection,
+} from "./ground-truth.js";
+
+export {
+  chainWorkspaceArbitrary,
+  computedArrowWorkspaceArbitrary,
+  containerWorkspaceArbitrary,
+  cyclicWorkspaceArbitrary,
+  diamondWorkspaceArbitrary,
+  kitchenSinkWorkspace,
+  metricWorkspaceArbitrary,
+  multiFileWorkspaceArbitrary,
+  multiSourceWorkspaceArbitrary,
+  namespacedWorkspaceArbitrary,
+  nlRefWorkspaceArbitrary,
+  permutationArbitrary,
+  permuteWorkspaceDeclarations,
+  schemaRootContainerWorkspaceArbitrary,
+  spreadWorkspaceArbitrary,
+  splitWorkspaceAcrossFiles,
+  workspacePermutationsArbitrary,
+  workspaceScenarioArbitrary,
+} from "./workspace-arbitraries.js";
 
 export {
   GENERATED_PROPERTY_PARAMETERS,
@@ -59,4 +115,14 @@ export {
  * @typedef {import("./model.js").ScenarioArrow} ScenarioArrow
  * @typedef {import("./model.js").ScenarioMapping} ScenarioMapping
  * @typedef {import("./model.js").Scenario} Scenario
+ * @typedef {import("./workspace-model.js").ScenarioEndpoint} ScenarioEndpoint
+ * @typedef {import("./workspace-model.js").ScenarioEntityRef} ScenarioEntityRef
+ * @typedef {import("./workspace-model.js").ScenarioTransform} ScenarioTransform
+ * @typedef {import("./workspace-model.js").ScenarioWorkspaceArrow} ScenarioWorkspaceArrow
+ * @typedef {import("./workspace-model.js").ScenarioSchemaDecl} ScenarioSchemaDecl
+ * @typedef {import("./workspace-model.js").ScenarioMappingDecl} ScenarioMappingDecl
+ * @typedef {import("./workspace-model.js").ScenarioFile} ScenarioFile
+ * @typedef {import("./workspace-model.js").ScenarioWorkspace} ScenarioWorkspace
+ * @typedef {import("./ground-truth.js").ScenarioFieldEdge} ScenarioFieldEdge
+ * @typedef {import("./ground-truth.js").ScenarioSchemaEdge} ScenarioSchemaEdge
  */

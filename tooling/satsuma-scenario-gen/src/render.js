@@ -26,18 +26,28 @@ function renderMembers(fields, spreads, indent) {
 function renderField(field, indent) {
   if (field.kind === "scalar") return `${indent}${field.name} STRING`;
 
+  const keyword = field.isList ? "list_of record" : "record";
   const body = renderMembers(field.fields, field.spreads, `${indent}  `);
   return body.length > 0
-    ? `${indent}${field.name} record {\n${body}\n${indent}}`
-    : `${indent}${field.name} record {}`;
+    ? `${indent}${field.name} ${keyword} {\n${body}\n${indent}}`
+    : `${indent}${field.name} ${keyword} {}`;
 }
 
-/** Render a schema-shaped fragment or schema declaration. */
-export function renderEntity(keyword, entity) {
+/**
+ * Render a schema-shaped declaration under a caller-supplied header.
+ *
+ * The header is everything up to the opening brace — `schema orders`, or
+ * `schema mrr (metric, metric_name "mrr")`. Splitting it out is what lets the
+ * workspace renderer attach a metadata block without restating field rendering.
+ */
+export function renderDeclaration(header, entity) {
   const body = renderMembers(entity.fields, entity.spreads, "  ");
-  return body.length > 0
-    ? `${keyword} ${entity.name} {\n${body}\n}`
-    : `${keyword} ${entity.name} {}`;
+  return body.length > 0 ? `${header} {\n${body}\n}` : `${header} {}`;
+}
+
+/** Render a schema-shaped fragment or schema declaration with no metadata. */
+export function renderEntity(keyword, entity) {
+  return renderDeclaration(`${keyword} ${entity.name}`, entity);
 }
 
 /** Render the generated mapping, preserving the semantic arrow order. */
