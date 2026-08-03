@@ -1,6 +1,6 @@
 ---
 id: cbdr-yp9m
-status: in_progress
+status: closed
 deps: [cbdr-o6xn]
 links: []
 created: 2026-08-03T15:34:49Z
@@ -21,3 +21,10 @@ Consume the test-only scenario renderer from cbdr-o6xn rather than creating a se
 ## Acceptance Criteria
 
 generated formatter properties reuse cbdr-o6xn's semantic scenarios and renderer; every property test opens with a purpose comment naming the invariant it protects; generated source parses with no ERROR or MISSING nodes before formatting and formatted output reparses with no recovery nodes; format(format(source)) equals format(source); formatting preserves CST structure under the repository's existing structure comparison; failures report seed, replay path, and shrunk source; canonical corpus round-trip tests and all focused formatter regressions remain in place; the complete satsuma-core test suite passes.
+
+## Notes
+
+**2026-08-03T15:52:53Z**
+
+Cause: Formatter round-trip guarantees were exercised only by the fixed examples corpus, leaving valid combinations from the new semantic generator unexplored.
+Fix: Reused the recovery-free semantic generator for independent idempotence, CST-equivalence, and error-free reparse properties, sharing the corpus serializer (commit 194fd06d).
