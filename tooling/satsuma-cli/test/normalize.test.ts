@@ -8,13 +8,20 @@
 
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
+import { fieldDeclFromRenderedType } from "@satsuma/core";
+import type { FieldDecl } from "@satsuma/core";
 import { matchFields } from "#src/normalize.js";
+
+/** Build strict core fixtures while these tests stay focused on CLI matching. */
+function field(name: string, type: string, children?: FieldDecl[]): FieldDecl {
+  return fieldDeclFromRenderedType({ name, type, ...(children ? { children } : {}) });
+}
 
 describe("matchFields", () => {
   it("matches fields by normalized name", () => {
     // Verifies the full matching pipeline: normalization + lookup + result shape.
-    const src = [{ name: "FirstName", type: "VARCHAR" }];
-    const tgt = [{ name: "first_name", type: "VARCHAR" }];
+    const src = [field("FirstName", "VARCHAR")];
+    const tgt = [field("first_name", "VARCHAR")];
     const result = matchFields(src, tgt);
     assert.equal(result.matched.length, 1);
     assert.equal(result.matched[0].source, "FirstName");
@@ -24,14 +31,8 @@ describe("matchFields", () => {
 
   it("returns source-only and target-only correctly", () => {
     // Ensures unmatched fields on each side are correctly categorised.
-    const src = [
-      { name: "id", type: "INT" },
-      { name: "email", type: "VARCHAR" },
-    ];
-    const tgt = [
-      { name: "email", type: "VARCHAR" },
-      { name: "phone", type: "VARCHAR" },
-    ];
+    const src = [field("id", "INT"), field("email", "VARCHAR")];
+    const tgt = [field("email", "VARCHAR"), field("phone", "VARCHAR")];
     const result = matchFields(src, tgt);
     assert.equal(result.matched.length, 1);
     assert.deepEqual(result.sourceOnly, ["id"]);
@@ -47,14 +48,8 @@ describe("matchFields", () => {
 
   it("flattens nested fields into dotted paths for matching", () => {
     // Nested source "address.city" should match flat target "city" by leaf name.
-    const src = [
-      {
-        name: "address",
-        type: "record",
-        children: [{ name: "city", type: "VARCHAR" }],
-      },
-    ];
-    const tgt = [{ name: "city", type: "VARCHAR" }];
+    const src = [field("address", "record", [field("city", "VARCHAR")])];
+    const tgt = [field("city", "VARCHAR")];
     const result = matchFields(src, tgt);
     assert.ok(
       result.matched.some((m) => m.source === "address.city" && m.target === "city"),
@@ -64,14 +59,8 @@ describe("matchFields", () => {
 
   it("matches cross-level: flat source matches nested target by leaf name", () => {
     // Flat source "city" should match nested target "address.city" by leaf.
-    const src = [{ name: "city", type: "VARCHAR" }];
-    const tgt = [
-      {
-        name: "address",
-        type: "record",
-        children: [{ name: "city", type: "VARCHAR" }],
-      },
-    ];
+    const src = [field("city", "VARCHAR")];
+    const tgt = [field("address", "record", [field("city", "VARCHAR")])];
     const result = matchFields(src, tgt);
     assert.ok(
       result.matched.some((m) => m.source === "city"),
@@ -82,11 +71,8 @@ describe("matchFields", () => {
   it("uses first-wins when two target fields normalize identically", () => {
     // Both "first_name" and "firstName" normalize to "firstname".
     // The first one in the target list should win.
-    const src = [{ name: "FIRST_NAME", type: "VARCHAR" }];
-    const tgt = [
-      { name: "first_name", type: "VARCHAR" },
-      { name: "firstName", type: "VARCHAR" },
-    ];
+    const src = [field("FIRST_NAME", "VARCHAR")];
+    const tgt = [field("first_name", "VARCHAR"), field("firstName", "VARCHAR")];
     const result = matchFields(src, tgt);
     assert.equal(result.matched.length, 1);
     assert.equal(result.matched[0].target, "first_name", "first occurrence wins");
@@ -95,19 +81,9 @@ describe("matchFields", () => {
   it("deeply nested fields are flattened correctly", () => {
     // Two levels of nesting: address.billing.zip
     const src = [
-      {
-        name: "address",
-        type: "record",
-        children: [
-          {
-            name: "billing",
-            type: "record",
-            children: [{ name: "zip", type: "VARCHAR" }],
-          },
-        ],
-      },
+      field("address", "record", [field("billing", "record", [field("zip", "VARCHAR")])]),
     ];
-    const tgt = [{ name: "zip", type: "VARCHAR" }];
+    const tgt = [field("zip", "VARCHAR")];
     const result = matchFields(src, tgt);
     assert.ok(
       result.matched.some((m) => m.source === "address.billing.zip"),
@@ -117,17 +93,8 @@ describe("matchFields", () => {
 
   it("parent record names appear as both container and matchable fields", () => {
     // "address" itself is a field, plus its child "city" is also a field.
-    const src = [
-      {
-        name: "address",
-        type: "record",
-        children: [{ name: "city", type: "VARCHAR" }],
-      },
-    ];
-    const tgt = [
-      { name: "address", type: "record" },
-      { name: "city", type: "VARCHAR" },
-    ];
+    const src = [field("address", "record", [field("city", "VARCHAR")])];
+    const tgt = [field("address", "record", []), field("city", "VARCHAR")];
     const result = matchFields(src, tgt);
     assert.ok(
       result.matched.some((m) => m.source === "address" && m.target === "address"),

@@ -54,9 +54,10 @@ function mergeFields(existing: FieldDecl[], incoming: FieldDecl[]): void {
     if (!prev) {
       existing.push(f);
       byName.set(f.name, f);
-    } else if (f.children?.length) {
-      // Recursively merge children when both sides are records
-      if (!prev.children) prev.children = [];
+    } else if (f.children?.length && prev.children) {
+      // Schema declarations split across files merge only like-shaped record
+      // bodies. A scalar declaration cannot be mutated into an invalid record
+      // variant; duplicate validation reports that conflicting declaration.
       mergeFields(prev.children, f.children);
     }
   }

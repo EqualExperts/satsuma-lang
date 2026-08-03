@@ -236,6 +236,58 @@ describe("extractImports()", () => {
 // ── extractFieldTree ──────────────────────────────────────────────────────────
 
 describe("extractFieldTree()", () => {
+  it("emits the four FieldDecl variants without adding runtime discriminator fields", () => {
+    // R8 tightens only the TypeScript source contract; exact object comparison
+    // locks the scalar, record, scalar-list, and record-list JSON-compatible shape.
+    const recordBody = schemaBody([fieldDecl("city", "STRING", 2, 4)]);
+    const record = n(
+      "field_decl",
+      [fieldName("address"), recordBody],
+      "address record { city STRING }",
+      1,
+      ["record"],
+    );
+    const scalarList = n(
+      "field_decl",
+      [fieldName("tags"), n("type_expr", [], "STRING")],
+      "tags list_of STRING",
+      3,
+      ["list_of"],
+    );
+    const recordList = n(
+      "field_decl",
+      [fieldName("items"), schemaBody([])],
+      "items list_of record {}",
+      4,
+      ["list_of", "record"],
+    );
+
+    assert.deepEqual(
+      extractFieldTree(schemaBody([fieldDecl("id", "UUID"), record, scalarList, recordList]))
+        .fields,
+      [
+        { name: "id", type: "UUID", startRow: 0, startColumn: 0 },
+        {
+          name: "address",
+          type: "record",
+          isList: false,
+          children: [{ name: "city", type: "STRING", startRow: 2, startColumn: 4 }],
+          startRow: 1,
+          startColumn: 0,
+        },
+        { name: "tags", type: "STRING", startRow: 3, startColumn: 0, isList: true },
+        {
+          name: "items",
+          type: "record",
+          isList: true,
+          children: [],
+          startRow: 4,
+          startColumn: 0,
+        },
+      ],
+    );
+  });
+
   it("extracts scalar fields", () => {
     const body = schemaBody([fieldDecl("id", "INT"), fieldDecl("name", "STRING")]);
     const result = extractFieldTree(body);

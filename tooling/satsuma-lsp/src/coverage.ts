@@ -33,6 +33,7 @@ import {
   declaresRecordBody,
   expandDeclaredFields,
   extractNLRefData,
+  fieldDeclFromRenderedType,
   resolveAllNLRefs,
 } from "@satsuma/core";
 import type {
@@ -206,14 +207,13 @@ function toSpreadEntity(def: DefinitionEntry): SpreadEntity {
  * unresolved spreads so nested expansion can see them.
  */
 function toFieldDecl(field: FieldInfo): FieldDecl {
-  return {
+  return fieldDeclFromRenderedType({
     name: field.name,
     type: field.type ?? "",
     startRow: field.range.start.line,
     children: field.children.map(toFieldDecl),
-    hasSpreads: (field.spreads?.length ?? 0) > 0,
-    spreads: field.spreads ?? [],
-  };
+    ...(field.spreads ? { spreads: field.spreads } : {}),
+  });
 }
 
 /**

@@ -41,9 +41,10 @@ export interface SpreadEntity {
   row?: number;
 }
 
-export interface ExpandedField extends FieldDecl {
+export type ExpandedField = FieldDecl & {
+  /** Canonical fragment key that contributed this expanded field. */
   fromFragment?: string;
-}
+};
 
 export interface SpreadDiagnostic {
   file: string;

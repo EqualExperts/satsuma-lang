@@ -31,6 +31,7 @@ import {
   extractFieldTree,
   isMetricSchema,
   createAtRefRegex,
+  renderFieldDeclType,
 } from "@satsuma/core";
 import type { FieldDecl, SatsumaCstType, SatsumaGrammarSymbol } from "@satsuma/core";
 
@@ -1184,11 +1185,10 @@ function extractBodySpreads(body: SyntaxNode | null): string[] {
  * decl's startRow/startColumn.
  */
 function fieldDeclToInfo(decl: FieldDecl, cstNode: SyntaxNode | null): FieldInfo {
-  // Build the type string: core uses "record" for nested, LSP distinguishes list_of variants
-  let type: string | null = decl.type || null;
-  if (decl.isList && decl.type === "record") type = "list_of record";
-  else if (decl.isList && decl.type) type = `list_of ${decl.type}`;
-  else if (decl.isList) type = "list_of";
+  // Preserve null for metadata-only fields while rendering list variants with
+  // the spelling the LSP and VizModel protocols have always exposed.
+  const renderedType = renderFieldDeclType(decl);
+  const type: string | null = renderedType || null;
 
   // Range from CST node (precise) or from core position data (approximate)
   const nameNode = cstNode ? child(cstNode, "field_name") : null;
