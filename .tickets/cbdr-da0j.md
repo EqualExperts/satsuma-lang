@@ -1,6 +1,6 @@
 ---
 id: cbdr-da0j
-status: open
+status: in_progress
 deps: [cbdr-o6xn]
 links: []
 created: 2026-08-03T16:03:45Z
