@@ -93,7 +93,10 @@ export function computeRename(
   // definition, and findReferences returns only refs resolving to that key,
   // so same-named symbols in other namespaces are never touched (sl-p256).
   const refs = findReferences(index, resolveReferenceKey(index, oldName, ctx.namespace ?? null));
-  const oldBare = oldName.includes("::") ? oldName.split("::").pop()! : oldName;
+  // A string containing "::" always splits into at least 2 parts, so pop()
+  // always returns a defined string; the fallback exists only for
+  // noUncheckedIndexedAccess.
+  const oldBare = oldName.includes("::") ? (oldName.split("::").pop() ?? oldName) : oldName;
   for (const ref of refs) {
     // For references authored qualified ("ns::oldName"), only replace the
     // name part — rewriting the whole range would delete the "ns::" prefix.

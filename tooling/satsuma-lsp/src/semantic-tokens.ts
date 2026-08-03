@@ -183,7 +183,7 @@ export function computeSemanticTokens(tree: Tree): { data: number[] } {
       for (let i = 0; i < sourceLines.length; i++) {
         const line = startRow + i;
         const col = i === 0 ? node.startPosition.column : 0;
-        const len = sourceLines[i]!.length;
+        const len = (sourceLines[i] ?? "").length;
         if (len > 0) {
           builder.push(line, col, len, mapping.typeIndex, mapping.modifierBits);
         }
@@ -280,7 +280,7 @@ function emitSplitStringTokens(node: SyntaxNode, builder: SemanticTokensBuilder)
     // Find starting line for this segment
     let segLineIdx = 0;
     for (let l = lineOffsets.length - 1; l >= 0; l--) {
-      if (seg.offset >= lineOffsets[l]!) {
+      if (seg.offset >= (lineOffsets[l] ?? 0)) {
         segLineIdx = l;
         break;
       }
@@ -293,11 +293,14 @@ function emitSplitStringTokens(node: SyntaxNode, builder: SemanticTokensBuilder)
         // First line of the node — offset relative to node start column
         col = startCol + (i === 0 ? seg.offset : 0);
       } else {
-        // Subsequent lines — offset from start of that line
-        const lineStartOffset = lineOffsets[segLineIdx + i]!;
+        // Subsequent lines — offset from start of that line. segLineIdx + i
+        // indexes a real line of `text` (lineOffsets has one entry per line
+        // of text, and segLines' extra lines are genuine text lines), so the
+        // fallback is unreachable in practice.
+        const lineStartOffset = lineOffsets[segLineIdx + i] ?? 0;
         col = (i === 0 ? seg.offset : lineStartOffset) - lineStartOffset;
       }
-      const len = segLines[i]!.length;
+      const len = (segLines[i] ?? "").length;
       if (len > 0) {
         builder.push(row, col, len, typeIndex, modBits);
       }

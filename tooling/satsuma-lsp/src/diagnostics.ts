@@ -73,7 +73,6 @@ function walkComments(node: SyntaxNode, out: Diagnostic[]): void {
   // Walk all children (not just named) to find them.
   for (let i = 0; i < node.childCount; i++) {
     const child = node.child(i);
-    if (!child) continue;
 
     if (child.type === "warning_comment") {
       const text = child.text.replace(/^\/\/!\s*/, "");

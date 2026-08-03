@@ -271,8 +271,10 @@ function resolveContext(
       // Try as a dotted path (e.g., "schema.field")
       if (ctx.name.includes(".")) {
         const parts = ctx.name.split(".");
-        const schemaName = parts[0]!;
-        const fieldName = parts[parts.length - 1]!;
+        // A string containing "." always splits into at least 2 parts, so
+        // both ends are defined; the fallbacks exist only for
+        // noUncheckedIndexedAccess.
+        const [schemaName = "", fieldName = ""] = [parts[0], parts[parts.length - 1]];
         return resolveFieldInSchemas(index, [schemaName], fieldName, ctx.namespace);
       }
 
@@ -337,7 +339,7 @@ function findEnclosingNamespace(node: SyntaxNode): string | null {
   let current: SyntaxNode | null = node.parent;
   while (current) {
     if (current.type === "namespace_block") {
-      return current.childForFieldName("name")?.text ?? null;
+      return current.childForFieldName("name").text;
     }
     current = current.parent;
   }
@@ -414,8 +416,10 @@ function extractPathFieldName(pathNode: SyntaxNode): string | null {
     return text.slice(1, -1).split(".")[0] ?? null;
   }
 
-  // Handle dotted paths: take the first segment
-  const firstSegment = text.split(".")[0]!;
+  // Handle dotted paths: take the first segment. split() on a non-empty
+  // string always yields at least one element (`text` is non-empty per the
+  // guard above), so the fallback exists only for noUncheckedIndexedAccess.
+  const firstSegment = text.split(".")[0] ?? "";
   // Handle namespaced: ns::field → take field part
   if (firstSegment.includes("::")) {
     return firstSegment.split("::").pop() ?? null;

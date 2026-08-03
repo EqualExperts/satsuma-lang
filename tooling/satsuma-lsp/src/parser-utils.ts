@@ -243,14 +243,14 @@ function isWordToken(node: SyntaxNode): boolean {
  */
 export function nodeAtPosition(tree: Tree, line: number, character: number): SyntaxNode | null {
   const exact = narrowCst(tree.rootNode.descendantForPosition({ row: line, column: character }));
-  if (exact && isWordToken(exact)) return exact;
+  if (isWordToken(exact)) return exact;
   if (character > 0) {
     const left = narrowCst(
       tree.rootNode.descendantForPosition({ row: line, column: character - 1 }),
     );
-    if (left && isWordToken(left)) return left;
+    if (isWordToken(left)) return left;
   }
-  return exact ?? null;
+  return exact;
 }
 
 // ---------- CST → LSP helpers ----------
