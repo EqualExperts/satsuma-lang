@@ -475,6 +475,10 @@ function processTopLevelBlock(
     case "mapping_block":
       group.mappings.push(extractMapping(uri, node, namespace, wsIndex));
       break;
+    default:
+      // No VizModel card for any other top-level block kind — intentionally
+      // partial, not every CST symbol names a renderable construct here.
+      break;
   }
 }
 
@@ -508,7 +512,8 @@ function collectTopLevelComments(
  *  preceding block found in `group`. */
 function collectSiblingComments(uri: string, siblings: SyntaxNode[], group: NamespaceGroup): void {
   for (let i = 0; i < siblings.length; i++) {
-    const node = siblings[i]!;
+    const node = siblings[i];
+    if (!node) continue;
     if (node.type !== "warning_comment" && node.type !== "question_comment") {
       continue;
     }
@@ -533,7 +538,8 @@ function findPrecedingBlock(
 ): CommentEntry[] | null {
   // Walk backwards from the comment to find the preceding block
   for (let j = commentIndex - 1; j >= 0; j--) {
-    const prev = allNodes[j]!;
+    const prev = allNodes[j];
+    if (!prev) continue;
     if (prev.type === "schema_block") {
       const name = labelText(prev);
       const schema = group.schemas.find((s) => s.id === name);
@@ -936,6 +942,10 @@ function extractMapping(
           break;
         case "note_block":
           notes.push(extractNoteBlock(uri, ch));
+          break;
+        default:
+          // Comments and punctuation between arrows/blocks — not a construct
+          // this walker collects.
           break;
       }
     }
@@ -1510,7 +1520,8 @@ function extractComments(uri: string, node: SyntaxNode): CommentEntry[] {
     const nodeIndex = siblings.indexOf(node);
     if (nodeIndex >= 0) {
       for (let i = nodeIndex + 1; i < siblings.length; i++) {
-        const sib = siblings[i]!;
+        const sib = siblings[i];
+        if (!sib) continue;
         if (sib.type === "warning_comment" && sib.startPosition.row === node.endPosition.row) {
           comments.push({
             kind: "warning",
@@ -1657,10 +1668,11 @@ function nodeLocation(uri: string, node: SyntaxNode): SourceLocation {
  * @param models     - One VizModel per import-reachable file (including the primary).
  */
 export function mergeVizModels(primaryUri: string, models: VizModel[]): VizModel {
-  if (models.length === 0) {
+  const [first] = models;
+  if (!first) {
     return { uri: primaryUri, fileNotes: [], namespaces: [] };
   }
-  if (models.length === 1) return models[0]!;
+  if (models.length === 1) return first;
 
   // Put primary model first so its entities take precedence in dedup.
   const sorted = [...models].sort((a, b) =>
@@ -1702,7 +1714,13 @@ export function mergeVizModels(primaryUri: string, models: VizModel[]): VizModel
         if (!kept) {
           keptSchemas.set(s.qualifiedId, { group: target, index: target.schemas.length });
           target.schemas.push(s);
-        } else if (kept.group.schemas[kept.index]!.isStub && !s.isStub) {
+        } else if (
+          // kept.index was recorded as the push position when the entry was
+          // inserted below, and schemas is only ever pushed to, never spliced —
+          // the fallback exists only for noUncheckedIndexedAccess.
+          (kept.group.schemas[kept.index]?.isStub ?? false) &&
+          !s.isStub
+        ) {
           // Upgrade a kept stub to the full definition (see doc comment above).
           kept.group.schemas[kept.index] = s;
         }
@@ -1730,7 +1748,10 @@ export function mergeVizModels(primaryUri: string, models: VizModel[]): VizModel
   }
 
   // Only include the primary file's notes — upstream file notes would be noise.
-  const primary = sorted[0]!;
+  // models.length >= 1 here (the ===0 case returns above), and sort()
+  // preserves length, so sorted[0] is always defined.
+  const [primary] = sorted;
+  if (!primary) return { uri: primaryUri, fileNotes: [], namespaces: [] };
   const fileNotes = primary.uri === primaryUri ? primary.fileNotes : [];
 
   // Build ordered namespace list: global first (if present), then named.
