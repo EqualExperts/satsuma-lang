@@ -2,7 +2,7 @@
 id: sl-j6g9
 status: open
 deps: [sl-joeq]
-links: [sl-joeq]
+links: [sl-joeq, sl-f0x6]
 created: 2026-07-31T14:42:52Z
 type: epic
 priority: 1
