@@ -24,3 +24,9 @@ Doc review 2026-07-31 settled four further points. (1) Config file is satsuma.co
 
 Cause: Epic complete — all five children closed (sl-npi6 config loader, sl-j30s type-mismatch rule, sl-hysg lineage-cycle rule, sl-1u6r exit-code table and strict mode, sl-ay8a docs).
 Fix: Both detectors live in @satsuma/core (lint-type-mismatch.ts, lint-lineage-cycle.ts) with thin CLI wrappers, so the deferred LSP mirroring needs no re-implementation. PRD marked COMPLETE and the ROADMAP entry updated with what shipped and what stays deferred. (commit immediately after acbb3b96)
+
+**2026-08-03T18:21:58Z**
+
+**2026-08-03T18:21:58Z**
+
+Decision records: ADR-046 (a command may publish its own exit-code table when the CLI-wide meanings contradict it — names the fmt/coverage precedent as a pattern and requires the non-collision argument to live on each constant), ADR-047 (lint policy detection in core beside semantic validation, with LintFinding kept distinct from SemanticDiagnostic — extends ADR-020/ADR-025 without superseding either), ADR-048 (a graph finding reports one strongly-connected component, not every cycle through it). No existing ADR superseded. ARCHITECTURE.md updated with the core lint modules and LintFinding. (commit immediately after 4d2372ec)

@@ -22,9 +22,9 @@ All tooling is parser-backed. Downstream tools should be built on the tree-sitte
 - `skills/`: Agent Skills following the [agentskills.io](https://agentskills.io) standard (Excel-to-Satsuma conversion skill, Satsuma-to-Excel export skill)
 - `scripts/`: utility scripts used during development
 - `tooling/tree-sitter-satsuma/`: tree-sitter grammar (318 corpus tests), generated parser artifacts, and queries
-- `tooling/satsuma-core/`: **the shared library every other package builds on** (675 tests) — parsing, extraction, validation, formatting, NL `@ref` resolution, and the single definition of coverage semantics. Logic that more than one consumer needs belongs here; see [Core vs Consumer Packages](#core-vs-consumer-packages)
+- `tooling/satsuma-core/`: **the shared library every other package builds on** (679 tests) — parsing, extraction, validation, formatting, NL `@ref` resolution, and the single definition of coverage semantics. Logic that more than one consumer needs belongs here; see [Core vs Consumer Packages](#core-vs-consumer-packages)
 - `tooling/satsuma-cli/`: TypeScript CLI tool for workspace extraction, validation, and structural analysis (1031 tests)
-- `tooling/satsuma-lsp/`: editor-agnostic Language Server (semantic tokens, diagnostics, go-to-definition, find-references, completions, hover, rename, code lens, folding, document symbols); runnable standalone via `npx satsuma-lsp --stdio` (299 tests)
+- `tooling/satsuma-lsp/`: editor-agnostic Language Server (semantic tokens, diagnostics, go-to-definition, find-references, completions, hover, rename, code lens, folding, document symbols); runnable standalone via `npx satsuma-lsp --stdio` (300 tests)
 - `tooling/satsuma-viz-model/`: the VizModel protocol contract (6 tests) — the payload shape the LSP produces and the viz component consumes, defined once so neither can drift
 - `tooling/satsuma-viz-backend/`: workspace indexing and VizModel assembly shared by the LSP and browser hosts (182 tests); also computes the field coverage the payload carries (ADR-042)
 - `tooling/satsuma-viz/`: the `satsuma-viz` Lit web component (128 tests) — overview graph and per-mapping detail view, embedded in the VS Code webview and the site playground
