@@ -11,7 +11,7 @@ import type { Tree } from "./parser-utils";
 import * as fs from "fs";
 import * as path from "path";
 import { fileURLToPath, pathToFileURL } from "url";
-import { getParser, initParser } from "./parser-utils";
+import { initParser, parseSource } from "./parser-utils";
 import { setHighlightsSource } from "./semantic-tokens";
 import { computeDiagnostics, ensureNonEmptyMessages } from "./diagnostics";
 import { computeDocumentSymbols } from "./symbols";
@@ -182,7 +182,7 @@ function reindexFromDisk(uri: string): void {
 function parseTreeFromDisk(uri: string): Tree | null {
   try {
     const content = fs.readFileSync(fileURLToPath(uri), "utf-8");
-    return getParser().parse(content) ?? null;
+    return parseSource(content);
   } catch {
     return null;
   }
@@ -228,7 +228,6 @@ documents.onDidSave(async (event) => {
 // watches both registered extensions, so the gate must accept both — a
 // bare .endsWith(".stm") check silently dropped .satsuma events (sl-v215).
 connection.onDidChangeWatchedFiles((params) => {
-  const parser = getParser();
   for (const change of params.changes) {
     if (!isSatsumaFilePath(change.uri)) continue;
 
@@ -242,8 +241,8 @@ connection.onDidChangeWatchedFiles((params) => {
       try {
         const fsPath = fileURLToPath(change.uri);
         const content = fs.readFileSync(fsPath, "utf-8");
-        const tree = parser.parse(content);
-        if (tree) indexFile(wsIndex, change.uri, tree);
+        const tree = parseSource(content);
+        indexFile(wsIndex, change.uri, tree);
       } catch {
         // File unreadable — skip
       }
@@ -474,10 +473,7 @@ connection.onRequest(
 // ---------- Helpers ----------
 
 function parseDocument(doc: TextDocument): Tree {
-  const parser = getParser();
-  const tree = parser.parse(doc.getText());
-  if (!tree) throw new Error("parse returned null");
-  return tree;
+  return parseSource(doc.getText());
 }
 
 /** Build a workspace index scoped to the import-reachable files of `uri`. */
@@ -520,14 +516,12 @@ function sendMergedDiagnostics(uri: string, tree: Tree): void {
 
 /** Recursively find all Satsuma source files in a directory and index them. */
 function indexWorkspaceFolder(folderPath: string): void {
-  const parser = getParser();
   const sourceFiles = findSatsumaSourceFiles(folderPath);
 
   for (const filePath of sourceFiles) {
     try {
       const content = fs.readFileSync(filePath, "utf-8");
-      const tree = parser.parse(content);
-      if (!tree) continue;
+      const tree = parseSource(content);
       const uri = pathToFileURL(filePath).toString();
       indexFile(wsIndex, uri, tree);
     } catch {

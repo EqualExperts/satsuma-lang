@@ -10,7 +10,7 @@
 const { describe, it, before } = require("node:test");
 const assert = require("node:assert/strict");
 const { initTestParser, parse } = require("./helper");
-const { nodeAtPosition } = require("../dist/parser-utils");
+const { createQuery, getLanguage, nodeAtPosition, queryCaptures } = require("../dist/parser-utils");
 
 before(async () => {
   await initTestParser();
@@ -67,5 +67,19 @@ describe("nodeAtPosition", () => {
     // the raw position already resolves the token.
     const tree = parse(SOURCE);
     assert.equal(nodeAtPosition(tree, 0, 0).text, "schema");
+  });
+});
+
+describe("queryCaptures", () => {
+  it("preserves concrete navigation APIs on nodes returned by a query", () => {
+    // Query captures originate in web-tree-sitter's string-typed API. This
+    // regression proves the LSP adapter returns the same usable runtime nodes.
+    const tree = parse(SOURCE);
+    const query = createQuery(getLanguage(), "(schema_block) @schema");
+    const [capture] = queryCaptures(query, tree.rootNode);
+
+    assert.equal(capture.node.type, "schema_block");
+    assert.equal(typeof capture.node.descendantForPosition, "function");
+    assert.equal(capture.node.parent.type, "source_file");
   });
 });

@@ -96,7 +96,7 @@ declare module "web-tree-sitter" {
     tree: Tree;
     get typeId(): number;
     get grammarId(): number;
-    get type(): import("@satsuma/core").SatsumaCstType;
+    get type(): string;
     get grammarType(): string;
     get isNamed(): boolean;
     get isExtra(): boolean;

@@ -4,10 +4,10 @@ import {
   SemanticTokenModifiers,
   SemanticTokensLegend,
 } from "vscode-languageserver";
-import type { Tree, Query } from "web-tree-sitter";
+import type { Query } from "web-tree-sitter";
 import { createAtRefRegex } from "@satsuma/core";
-import { getLanguage, createQuery } from "./parser-utils";
-import type { SyntaxNode } from "./parser-utils";
+import { getLanguage, createQuery, queryCaptures, walkDescendants } from "./parser-utils";
+import type { SyntaxNode, Tree } from "./parser-utils";
 
 // ---------- Legend ----------
 
@@ -127,7 +127,7 @@ function getHighlightsQuery(): Query {
  */
 export function computeSemanticTokens(tree: Tree): { data: number[] } {
   const query = getHighlightsQuery();
-  const captures = query.captures(tree.rootNode);
+  const captures = queryCaptures(query, tree.rootNode);
 
   // Pre-scan: identify nl_string/multiline_string nodes that contain @refs.
   // These need split tokenisation instead of a single string token.
@@ -146,7 +146,7 @@ export function computeSemanticTokens(tree: Tree): { data: number[] } {
   const seen = new Set<string>();
   const builder = new SemanticTokensBuilder();
 
-  for (const capture of captures as Array<{ name: string; node: SyntaxNode }>) {
+  for (const capture of captures) {
     const mapping = CAPTURE_MAP[capture.name];
     if (!mapping) continue;
 
@@ -209,27 +209,14 @@ function nodeId(node: SyntaxNode): string {
  */
 function collectNlRefNodes(root: SyntaxNode): Set<string> {
   const result = new Set<string>();
-  const cursor = root.walk();
-  let reachedRoot = false;
-
-  do {
-    const node = cursor.currentNode;
+  walkDescendants(root, (node) => {
     if (node.type === "nl_string" || node.type === "multiline_string") {
       AT_REF_RE.lastIndex = 0;
       if (AT_REF_RE.test(node.text)) {
         result.add(nodeId(node));
       }
     }
-    if (cursor.gotoFirstChild()) continue;
-    if (cursor.gotoNextSibling()) continue;
-    while (true) {
-      if (!cursor.gotoParent()) {
-        reachedRoot = true;
-        break;
-      }
-      if (cursor.gotoNextSibling()) break;
-    }
-  } while (!reachedRoot);
+  });
 
   return result;
 }
