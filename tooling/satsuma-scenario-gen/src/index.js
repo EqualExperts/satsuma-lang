@@ -19,7 +19,18 @@
  * Exported type names carry a `Scenario` prefix on purpose: core's `validate.ts`
  * already exports `SemanticMapping`, `SemanticArrow` and `SemanticSchema` for
  * the unrelated semantic-validation model, and the collision would mislead.
+ *
+ * ## What this barrel does and does not expose
+ *
+ * Four things: the **constructors** a suite needs to author a scenario, the
+ * **renderers** that turn one into source, the **ground truth** a property asserts
+ * against, and the **arbitraries**. Nothing else — the modules also export helpers
+ * to each other (`canonicalEndpoint`, `flattenArrows`, `workspaceMappings`,
+ * `renderEntity`) and those stay internal, because a consumer reaching for them is
+ * usually about to re-derive something the ground truth already states.
  */
+
+// ── Authoring a scenario ───────────────────────────────────────────────────
 
 export {
   MAX_GENERATED_LEAVES,
@@ -34,18 +45,10 @@ export {
   semanticLeafPaths,
 } from "./model.js";
 
-export { renderDeclaration, renderEntity, renderMapping, renderScenario } from "./render.js";
-
-// ── Workspace-shaped scenarios (sl-dqyu) ───────────────────────────────────
-
 export {
-  canonicalEndpoint,
-  canonicalEntityRef,
   computedArrow,
   eachBlock,
   endpoint,
-  entityRef,
-  flattenArrows,
   flattenBlock,
   mapArrow,
   mappingDecl,
@@ -53,42 +56,30 @@ export {
   scenarioFile,
   scenarioWorkspace,
   schemaDecl,
-  workspaceMappings,
-  workspaceSchemas,
 } from "./workspace-model.js";
 
-export { renderWorkspace, renderWorkspaceFile } from "./workspace-render.js";
+// ── Rendering to Satsuma ───────────────────────────────────────────────────
+
+export { renderScenario } from "./render.js";
+export { renderWorkspace } from "./workspace-render.js";
+
+// ── Ground truth ───────────────────────────────────────────────────────────
+// Derived from the scenario alone. `scenarioAncestorsWithin`,
+// `scenarioDescendantsWithin` and `scenarioSchemaProjection` are R4's oracle
+// (sl-jsyn), shipped ahead of it because depth-bounded reachability over a
+// scenario's own arrows is a property of the scenario, not of the traversal R4
+// waits on.
 
 export {
   scenarioAncestorsWithin,
   scenarioDeclaredFieldPaths,
-  scenarioDeclaredLeafPaths,
   scenarioDescendantsWithin,
   scenarioFieldEdges,
-  scenarioReachableWithin,
   scenarioSchemaEdges,
   scenarioSchemaProjection,
 } from "./ground-truth.js";
 
-export {
-  chainWorkspaceArbitrary,
-  computedArrowWorkspaceArbitrary,
-  containerWorkspaceArbitrary,
-  cyclicWorkspaceArbitrary,
-  diamondWorkspaceArbitrary,
-  kitchenSinkWorkspace,
-  metricWorkspaceArbitrary,
-  multiFileWorkspaceArbitrary,
-  multiSourceWorkspaceArbitrary,
-  namespacedWorkspaceArbitrary,
-  nlRefWorkspaceArbitrary,
-  permutationArbitrary,
-  permuteWorkspaceDeclarations,
-  spreadWorkspaceArbitrary,
-  splitWorkspaceAcrossFiles,
-  workspacePermutationsArbitrary,
-  workspaceScenarioArbitrary,
-} from "./workspace-arbitraries.js";
+// ── Generated domains ──────────────────────────────────────────────────────
 
 export {
   GENERATED_PROPERTY_PARAMETERS,
@@ -105,6 +96,25 @@ export {
   spreadRedeclarationScenarioArbitrary,
   wholeStructureScenarioArbitrary,
 } from "./arbitraries.js";
+
+export {
+  chainWorkspaceArbitrary,
+  computedArrowWorkspaceArbitrary,
+  containerWorkspaceArbitrary,
+  cyclicWorkspaceArbitrary,
+  diamondWorkspaceArbitrary,
+  kitchenSinkWorkspace,
+  metricWorkspaceArbitrary,
+  multiFileWorkspaceArbitrary,
+  multiSourceWorkspaceArbitrary,
+  namespacedWorkspaceArbitrary,
+  nlRefWorkspaceArbitrary,
+  permuteWorkspaceDeclarations,
+  spreadWorkspaceArbitrary,
+  splitWorkspaceAcrossFiles,
+  workspacePermutationsArbitrary,
+  workspaceScenarioArbitrary,
+} from "./workspace-arbitraries.js";
 
 /**
  * @typedef {import("./model.js").ScenarioScalarField} ScenarioScalarField

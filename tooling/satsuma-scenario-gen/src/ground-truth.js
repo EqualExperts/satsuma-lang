@@ -32,7 +32,6 @@
  * anything the *toolchain* is expected to do with them.
  */
 
-import { semanticLeafPaths } from "./model.js";
 import {
   canonicalEndpoint,
   canonicalEntityRef,
@@ -95,20 +94,6 @@ export function scenarioDeclaredFieldPaths(workspace) {
       schema.namespace ? `${schema.namespace}::${schema.name}` : schema.name,
     );
     return declaredPaths(fieldsWithSpreads(schema, fragments)).map((path) => `${prefix}.${path}`);
-  });
-  return [...new Set(paths)].sort();
-}
-
-/** Every declared *leaf* path, for properties about coverage denominators. */
-export function scenarioDeclaredLeafPaths(workspace) {
-  const fragments = fragmentsOf(workspace);
-  const paths = workspaceSchemas(workspace).flatMap(({ schema }) => {
-    const prefix = canonicalEntityRef(
-      schema.namespace ? `${schema.namespace}::${schema.name}` : schema.name,
-    );
-    return semanticLeafPaths(fieldsWithSpreads(schema, fragments)).map(
-      (path) => `${prefix}.${path}`,
-    );
   });
   return [...new Set(paths)].sort();
 }
@@ -282,8 +267,11 @@ function adjacency(edges, direction) {
  *
  * `maxDepth` counts hops, matching `--depth`: depth 1 is immediate neighbours.
  * Cycles terminate because a field is enqueued at most once.
+ *
+ * Module-private: the two direction wrappers below are the API, and a caller that
+ * chose its own `direction` string would be one typo from a silently empty answer.
  */
-export function scenarioReachableWithin(edges, start, maxDepth, direction) {
+function scenarioReachableWithin(edges, start, maxDepth, direction) {
   const next = adjacency(edges, direction);
   const distance = new Map();
   let frontier = [start];

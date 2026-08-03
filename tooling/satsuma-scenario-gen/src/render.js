@@ -51,7 +51,7 @@ export function renderEntity(keyword, entity) {
 }
 
 /** Render the generated mapping, preserving the semantic arrow order. */
-export function renderMapping(mapping) {
+function renderMapping(mapping) {
   const lines = [
     `mapping ${mapping.name} {`,
     `  source { ${mapping.sources.join(", ")} }`,
