@@ -202,7 +202,9 @@ function walkImportGraph(
   const queue = [canonicalizeFileUri(entryUri)];
 
   while (queue.length > 0) {
-    const uri = queue.pop()!;
+    // queue.length > 0 was just checked by the while condition.
+    const uri = queue.pop();
+    if (uri === undefined) continue;
     if (reachable.has(uri)) continue;
     reachable.add(uri);
 
@@ -470,7 +472,10 @@ export function findReferences(index: WorkspaceIndex, name: string): ReferenceEn
 
     // Bare references bind here when authored inside this namespace
     // (namespace-local resolution wins over global).
-    const bare = name.split("::").pop()!;
+    // A string containing "::" always splits into at least 2 parts, so
+    // pop() always returns a defined string; the fallback exists only for
+    // noUncheckedIndexedAccess.
+    const bare = name.split("::").pop() ?? name;
     for (const ref of index.references.get(bare) ?? []) {
       if (resolveReferenceKey(index, bare, ref.namespace) === name) {
         results.push(ref);
@@ -954,7 +959,9 @@ function extractArrowFieldName(pathNode: SyntaxNode): string | null {
   const stripped = text.startsWith(".") ? text.slice(1) : text;
 
   // Take the first segment (before any dots)
-  const firstSegment = stripped.split(".")[0]!;
+  // split() on any string always yields at least one element; the
+  // fallback exists only for noUncheckedIndexedAccess.
+  const firstSegment = stripped.split(".")[0] ?? "";
 
   // Handle namespaced: ns::field → take field part
   if (firstSegment.includes("::")) {
