@@ -1,6 +1,6 @@
 ---
 id: tcc-yb3z
-status: in_progress
+status: closed
 deps: [tcc-e35f]
 links: []
 created: 2026-08-03T14:38:22Z
@@ -21,3 +21,10 @@ The audited boundary belongs in parser-utils, which already owns LSP parser and 
 ## Acceptance Criteria
 
 LSP parser output and query-capture nodes cross one documented parser-utils narrowing boundary; the LSP's concrete node type preserves required web-tree-sitter methods while exposing SatsumaCstType recursively; child/children and equivalent helper parameters use SatsumaGrammarSymbol; every direct CST comparison and switch label in LSP handlers compiles against the generated contract, while LSP protocol discriminants remain unchanged; no arbitrary CST casts are introduced outside the audited adapter; an invalid referenced grammar symbol fails the LSP typecheck; all 299-or-current LSP tests pass with focused parser-utils and recovery coverage updated.
+
+## Notes
+
+**2026-08-03T15:18:52Z**
+
+Cause: LSP concrete nodes were typed through a package-wide ambient override, while navigation and query APIs still leaked string discriminants or required scattered casts.
+Fix: Added one documented parser-utils narrowing boundary, a recursively typed concrete node/tree contract, typed query captures and selectors, and compile-time plus focused runtime coverage (commit 92e6a788).
