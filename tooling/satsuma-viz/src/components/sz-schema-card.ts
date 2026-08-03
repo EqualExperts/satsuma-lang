@@ -4,7 +4,7 @@ import { unsafeHTML } from "lit/directives/unsafe-html.js";
 import type { SchemaCard, FieldEntry } from "../model.js";
 import { SzNavigateEvent, SzFieldHoverEvent, SzFieldLineageEvent } from "../satsuma-viz.js";
 import { renderMarkdown } from "../markdown.js";
-import type { FieldCoverageEntry } from "@satsuma/core/coverage";
+import type { FieldCoverageEntry, FieldCoverageState } from "@satsuma/core/coverage";
 import { uncoveredFieldCoverage } from "@satsuma/core/coverage";
 import { toCoverageFields } from "../field-coverage.js";
 import { summarizeFieldCoverage, countContainerStates } from "@satsuma/core/coverage-rollup";
@@ -28,6 +28,27 @@ export interface SzCompactToggledDetail {
   /** The state the user asked for: true = expand fields, false = collapse. */
   expanded: boolean;
 }
+
+/**
+ * The port-dot style each coverage state renders as.
+ *
+ * **Keyed by the state, never by `entry.mapped`.** `mapped` is true for both
+ * `covered` and `partial` (it means "not uncovered"), so a class chosen from it
+ * painted a partly covered record with the same solid dot as a fully covered
+ * one: the state core computes and the payload carries was discarded at the last
+ * rendering step, and partial coverage was invisible on the card (sl-f0x6). A
+ * total map over {@link FieldCoverageState} also means a fourth state added to
+ * that union fails to compile here rather than silently collapsing into one of
+ * these styles.
+ *
+ * The "coverage not computed" case is deliberately absent — it is not one of
+ * core's verdicts, and {@link SzSchemaCard._portClass} handles it separately.
+ */
+const PORT_CLASS_BY_COVERAGE_STATE: Record<FieldCoverageState, string> = {
+  covered: "mapped",
+  partial: "partial",
+  uncovered: "unmapped",
+};
 
 function sanitizeTestIdSegment(value: string): string {
   const lowered = value.toLowerCase();
@@ -190,6 +211,18 @@ export class SzSchemaCard extends LitElement {
     .port.unmapped {
       border: 1.5px solid var(--sz-text-muted);
       background: transparent;
+    }
+
+    /* Partly covered: something under this record is mapped and something is
+       not. A half-filled dot inside an accent ring reads as the state between
+       the solid dot and the hollow one, and it is a difference in *shape* — at
+       the 8px port size a difference in shade alone would not survive (sl-f0x6).
+       The ring takes the accent rather than the muted outline of .port.unmapped
+       because part of this subtree is mapped; the unfilled half is what still
+       needs attention. */
+    .port.partial {
+      border: 1.5px solid var(--sz-orange-dark);
+      background: linear-gradient(to right, var(--sz-orange-dark) 0 50%, transparent 50% 100%);
     }
 
     /* Coverage not computed: neither filled nor the hollow ring that reads as a
@@ -731,17 +764,19 @@ export class SzSchemaCard extends LitElement {
 
   private _renderField(f: FieldEntry, depth: number, prefix = ""): TemplateResult {
     const fieldPath = prefix ? `${prefix}.${f.name}` : f.name;
-    // Three states, not two. With `coverage` null nothing was computed, and a row
-    // must not then read as a gap: the header says no figure was produced, and a
-    // hollow "unmapped" dot beside it would contradict it — a reader would see
-    // every field as unmapped, and automation could not tell those rows from real
-    // uncovered results.
+    // With `coverage` null nothing was computed, and a row must not then read as
+    // a gap: the header says no figure was produced, and a hollow "unmapped" dot
+    // beside it would contradict it — a reader would see every field as unmapped,
+    // and automation could not tell those rows from real uncovered results.
     const unavailable = this.coverage === null;
     const entry = unavailable ? undefined : this._coverageByPath().get(fieldPath);
-    // A record is "mapped" as soon as anything beneath it is, which is the
-    // threshold a port dot has always painted on; `state` carries the finer
-    // distinction for anyone who needs it.
-    const isMapped = entry?.mapped ?? false;
+    // How much of this field is covered — core's tri-state, or `unknown` when no
+    // verdict exists. A path core reported nothing for is uncovered; a card with
+    // no coverage at all is `unknown`, per the paragraph above. This drives both
+    // the port dot and the attribute automation reads.
+    const coverageState: FieldCoverageState | "unknown" = unavailable
+      ? "unknown"
+      : (entry?.state ?? "uncovered");
     const hasWarning = f.comments.some((c) => c.kind === "warning");
     const hasQuestion = f.comments.some((c) => c.kind === "question");
     const hasPii = f.constraints.includes("pii");
@@ -752,18 +787,24 @@ export class SzSchemaCard extends LitElement {
     // Use the dotted path so nested customer.email is distinguishable from a
     // sibling top-level email field (sl-eikr).
     const fieldTestId = `${this.testIdPrefix}-field-${sanitizeTestIdSegment(fieldPath)}`;
-    // `unknown` rather than `unmapped`/`uncovered`: those two are verdicts, and
-    // there is no verdict here. Automation keys on these, so the third state has
-    // to be nameable.
-    const coverageState = unavailable ? "unknown" : isMapped ? "mapped" : "unmapped";
-    const portClass = unavailable ? "unknown" : isMapped ? "mapped" : "unmapped";
+    // The older, coarser attribute, kept byte-identical for the automation built
+    // on it: a record is "mapped" as soon as anything beneath it is (core's
+    // `entry.mapped`, i.e. state !== "uncovered"). `unknown` rather than
+    // `unmapped` when nothing was computed — those two are verdicts and there is
+    // no verdict here, so the third case has to be nameable.
+    const mappedVerdict =
+      coverageState === "unknown"
+        ? "unknown"
+        : coverageState === "uncovered"
+          ? "unmapped"
+          : "mapped";
 
     return html`
       <div
         class="field-row ${depth > 0 ? "nested" : ""} ${hlClass}"
         data-testid=${fieldTestId}
-        data-coverage=${coverageState}
-        data-coverage-state=${unavailable ? "unknown" : (entry?.state ?? "uncovered")}
+        data-coverage=${mappedVerdict}
+        data-coverage-state=${coverageState}
         data-coverage-tier=${entry?.tier ?? ""}
         style=${depth > 0 ? `padding-left: ${12 + depth * 20}px` : ""}
         @click=${() => this._navigate(f.location)}
@@ -771,7 +812,7 @@ export class SzSchemaCard extends LitElement {
         @mouseleave=${() => this._onFieldHover(null)}
         title=${this._fieldTitle(f, entry)}
       >
-        <span class="port ${portClass}"></span>
+        <span class="port ${this._portClass(coverageState)}"></span>
         <span class="field-name">${f.name}</span>
         <span class="field-type">${f.type}</span>
         <span class="badges">
@@ -860,6 +901,18 @@ export class SzSchemaCard extends LitElement {
     );
   }
 
+  /**
+   * The port-dot class for a row reporting `coverage`.
+   *
+   * Four states reach a dot and each gets its own style: core's three verdicts
+   * via {@link PORT_CLASS_BY_COVERAGE_STATE}, plus `unknown` for a card whose
+   * coverage was never computed — which must not borrow the hollow ring that
+   * reads as a measured gap (see {@link coverage}).
+   */
+  private _portClass(coverage: FieldCoverageState | "unknown"): string {
+    return coverage === "unknown" ? "unknown" : PORT_CLASS_BY_COVERAGE_STATE[coverage];
+  }
+
   private _commentText(f: FieldEntry, kind: "warning" | "question"): string {
     return f.comments
       .filter((c) => c.kind === kind)
@@ -937,9 +990,9 @@ export class SzSchemaCard extends LitElement {
    * The NL tier is called out because ADR-036 requires a consumer to *show* the
    * distinction rather than let a reader assume every covered field has an arrow:
    * a hop inferred from prose is a weaker claim than a declared one, and a
-   * reviewer has to be able to tell which they are looking at. `partial` is
-   * called out for the same reason — a record row's dot says "something under
-   * here is mapped" and cannot say "not all of it".
+   * reviewer has to be able to tell which they are looking at. `partial` is named
+   * here too: the half-filled dot says a record is partly mapped at a glance, and
+   * this is where that reading is spelled out in words (sl-f0x6).
    *
    * When coverage was not computed the row says so, rather than saying nothing
    * and leaving the bare type to be read alongside an unmarked dot as a gap.

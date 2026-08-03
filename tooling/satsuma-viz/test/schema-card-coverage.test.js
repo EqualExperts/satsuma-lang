@@ -234,15 +234,14 @@ describe("sz-schema-card renders the verdict it was given", () => {
   });
 
   it("distinguishes a partly covered record from a fully covered one", async () => {
-    // Both render a filled port dot, because "something under here is mapped"
-    // is the threshold the dot has always painted on. Only the tri-state
-    // attribute and the tooltip can tell them apart, so both must carry it.
+    // The tri-state attribute and the tooltip are the machine-readable and the
+    // detailed forms of the distinction; the port class below is the one a reader
+    // sees without hovering. All three must carry it.
     const card = await makeCard(AMOUNT_AND_ADDRESS, ONLY_CITY);
     const text = renderText(card);
     assert.match(text, /data-coverage-state="?partial/);
     assert.match(text, /partly mapped/);
   });
-
   it("shows a field count instead of a ratio when coverage was not computed", async () => {
     // `null` is "not computed", not "nothing is mapped" — a model assembled
     // without a workspace index, or a cached payload from an older host. The
@@ -272,6 +271,10 @@ describe("sz-schema-card renders the verdict it was given", () => {
     assert.doesNotMatch(text, /data-coverage-state="?uncovered/);
     assert.doesNotMatch(text, /data-coverage-tier="?(nl|declared)/);
     assert.match(text, /coverage not computed/);
+    // The dot has to agree too: `unknown` gets its own faded, dashed style, and
+    // must not borrow the hollow ring a reader reads as a measured gap.
+    assert.match(text, /class="port unknown"/);
+    assert.doesNotMatch(text, /class="port (unmapped|mapped|partial)"/);
   });
 
   it("keeps unmapped for a real uncovered verdict", async () => {
@@ -310,5 +313,38 @@ describe("sz-schema-card renders the verdict it was given", () => {
     const text = renderText(card);
     assert.match(text, /header-count[^>]*>0\/4</);
     assert.match(text, /data-coverage-available="?true/);
+  });
+});
+
+// ── The port dot (sl-f0x6) ──────────────────────────────────────────────────
+//
+// The dot was chosen from `entry.mapped`, which is true for `covered` *and*
+// `partial`, so a record with one covered leaf out of three looked exactly like
+// one with all three covered: the state core computes and the payload carries was
+// discarded at the last rendering step, and partial coverage reached a reader only
+// by hovering the exact row. These cases pin the dot to the state instead.
+
+describe("sz-schema-card port dot", () => {
+  it("gives each of the three coverage states its own port class", async () => {
+    // One card, all three states: `address.city` covered, `amount` uncovered and
+    // `address` partial between them. Distinct classes are what lets a reader tell
+    // the states apart at a glance, so the property under test is that no two
+    // states share one — `partial` collapsing into `mapped` is the defect.
+    const text = renderText(await makeCard(AMOUNT_AND_ADDRESS, ONLY_CITY));
+    const classes = [...text.matchAll(/class="port ([a-z]+)"/g)].map((m) => m[1]);
+    // Declaration order: amount, address, address.city, address.line1, .postcode.
+    assert.deepEqual(classes, ["unmapped", "partial", "mapped", "unmapped", "unmapped"]);
+  });
+
+  it("styles every port class it renders", async () => {
+    // A class with no rule behind it renders an unstyled dot — the same defect
+    // reintroduced from the CSS side, and invisible to the case above. Pairing
+    // each class with its own selector is what makes the classes distinct on
+    // screen; this fails if a state is added to the class map without a style.
+    const mod = await import("../dist/satsuma-viz.js");
+    const cssText = [mod.SzSchemaCard.styles].flat().join("\n");
+    for (const portClass of ["mapped", "partial", "unmapped", "unknown"]) {
+      assert.match(cssText, new RegExp(`\\.port\\.${portClass}\\s*{`), `no rule for ${portClass}`);
+    }
   });
 });
