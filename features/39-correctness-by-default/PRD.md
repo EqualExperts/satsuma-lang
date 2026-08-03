@@ -454,7 +454,12 @@ remaining rows retain the agreed ticket shape until scheduled.
 | R5 opaque path/ref foundation (`cbdr-e6ft`) | 1 core task | `sl-46wr`, `sl-csrs` |
 | R5 coverage and consumer migration (`cbdr-5r4d`) | 1 task | `cbdr-e6ft` |
 | R6 CLI test typecheck gate (`cbdr-xgy5`) | 1 task | — |
-| R7 type-aware lint rollout | 1 task per package | R2 for CST-specific rules |
+| R7 viz-model type-aware lint (`sl-iwmd`) | 1 task | — |
+| R7 core type-aware lint + CST rules (`sl-1f8o`) | 1 task | `sl-iwmd` |
+| R7 LSP type-aware lint + CST rules (`sl-pq8n`) | 1 task | `sl-1f8o` |
+| R7 viz-backend type-aware lint + CST rules (`sl-fqj2`) | 1 task | `sl-pq8n` |
+| R7 viz type-aware lint + `noUncheckedIndexedAccess` (`sl-0dy0`) | 1 task | `sl-fqj2` |
+| R7 vscode-satsuma type-aware lint (`sl-6osm`) | 1 task | `sl-0dy0` |
 | R8 `FieldDecl` variants and consumer migration (`cbdr-hqhh`) | 1 task | schedule clear of active consumer-model work |
 | I1 bounded consistency model | optional spike | Feature 38 epic closed |
 | I2 compositional semantics proposal | optional spike | Feature 38 epic closed |
