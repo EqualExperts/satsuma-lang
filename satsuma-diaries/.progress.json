@@ -1,6 +1,6 @@
 {
-  "last_covered_date": "2026-07-22",
-  "last_entry_file": "satsuma-diaries/2026/07/2026-07-22.md",
-  "rolled_up_days": ["2026-06-13", "2026-07-13", "2026-07-14"],
-  "note": "Last entry written: 2026-07-22, a catch-up after a ~6-week gap. Covers the quiet mid-June LSP fixes (PR #323), the mid-July dependency wave + security hardening (SHA-pinning #368, webview/harness lockdown #369), and today's work: webview restore (#386), the 16-PR Dependabot clear-out (brace-expansion/js-yaml/c8/elkjs DoS + version bumps), and the site js-yaml DoS fix (#387). Next run will cover from 2026-07-23."
+  "last_covered_date": "2026-08-03",
+  "last_entry_file": "satsuma-diaries/2026/08/2026-08-03.md",
+  "rolled_up_days": ["2026-07-28"],
+  "note": "Four per-day entries written 2026-08-03 covering 2026-07-31 through 2026-08-03. The quiet 23–30 July stretch (four Dependabot bumps authored 28 July, plus the tmp gitignore) is folded into the 31 July entry's preamble. 31 July: dependency/lint/security clear-out + Feature 35 `satsuma coverage` (ADR-034) and the three counting bugs found straight after (ADR-035, ADR-036). 1 Aug: second coverage walker deleted (#412), NL @ref tier (#413), Feature 38 iteration 1 (#414). 2 Aug: Prettier/ruff format gates (#416/#418/#419), Semgrep gate fix (#417), Feature 38 iteration 2 tri-state + whole-subtree (#421, ADR-037), scalar-into-record tightening + lint rule (#423, ADR-038), features 30–35 archived (#422), viz coverage parity (#424, ADR-039). 3 Aug: exploratory pass + nested-data guide (#425), rounding gate sl-8ba4 + spec §4.4 sl-pn00 (#426, ADR-040), and the spread double-count sl-qead (#427, ADR-041), which merged while the entries were being written. Next run will cover from 2026-08-04."
 }
