@@ -1,6 +1,6 @@
 ---
 id: cbdr-o6xn
-status: in_progress
+status: closed
 deps: []
 links: []
 created: 2026-08-03T15:34:41Z
@@ -21,3 +21,10 @@ Add fast-check as a dev dependency of satsuma-core. Keep the scenario model, arb
 ## Acceptance Criteria
 
 fast-check is added only to satsuma-core devDependencies and npm audit reports no high or critical vulnerability introduced; a documented test-support module generates bounded semantic scenarios with declarations, nested leaves, authored refs, mappings/arrows, and spread/explicit redeclaration cases and renders valid Satsuma; generated semantic tests fail immediately with the seed, replay path, and shrunk source if rendering produces ERROR or MISSING nodes; purpose-commented properties prove all eight R3 invariants: exact 0%/100% endpoints for non-empty schemas, one coverage entry per qualified declared path after spread expansion, record-to-record whole-structure target expansion, no target subtree expansion from scalar or unresolved sources, exact proper-prefix ancestor derivation, the three schemaLocalFieldPath normalization cases, coverage-ratio preservation under structure-preserving re-nesting, and monotonic leaf coverage when a valid arrow is added; each property names its ADR or contract and uses minimal bounded inputs without filtering away invalid renders; existing hand-authored coverage/path regressions remain and the full satsuma-core suite passes.
+
+## Notes
+
+**2026-08-03T15:48:11Z**
+
+Cause: Coverage and path semantics were protected only by hand-selected examples, so small combinations such as spread collisions or source/target shape changes could escape the suite.
+Fix: Added a semantic-first fast-check generator, strict recovery-free rendering, reproducible failure diagnostics, and generated properties for all eight R3 coverage/path invariants (commit 380beaaa).
