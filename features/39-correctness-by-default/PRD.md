@@ -437,8 +437,8 @@ ADR-041. Prose is sufficient; mechanised proof is out of scope.
 
 ## Ticket Map
 
-Feature epic: `gcsc-qka8`. R1 through R4 now have concrete tickets; later rows
-remain the agreed ticket shape and will receive IDs when scheduled.
+Feature epic: `gcsc-qka8`. R1 through R4 and R6 now have concrete tickets;
+later rows remain the agreed ticket shape and will receive IDs when scheduled.
 
 | Work | Ticket shape | Depends on |
 |---|---|---|
@@ -452,7 +452,7 @@ remain the agreed ticket shape and will receive IDs when scheduled.
 | R3 generated formatter properties (`cbdr-yp9m`) | 1 task | `cbdr-o6xn` |
 | R4 independent oracle and differential suite (`cbdr-da0j`) | 1 task | `cbdr-o6xn` |
 | R5 opaque path/ref stages | 1 core task plus consumer migration subtasks if needed | `sl-46wr`, `sl-csrs` |
-| R6 CLI test typecheck gate | 1 task | — |
+| R6 CLI test typecheck gate (`cbdr-xgy5`) | 1 task | — |
 | R7 type-aware lint rollout | 1 task per package | R2 for CST-specific rules |
 | R8 `FieldDecl` variants and consumer migration | 1 task | schedule clear of active consumer-model work |
 | I1 bounded consistency model | optional spike | Feature 38 epic closed |

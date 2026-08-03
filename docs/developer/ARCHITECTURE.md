@@ -349,16 +349,30 @@ No CLI or LSP code needs to be imported.
 
 ## Test Strategy
 
-| Package | Test location | Approach |
-|---|---|---|
-| `tree-sitter-satsuma` | `test/corpus/`, `scripts/*.test.mjs` | Corpus tests for CST shapes plus deterministic contract-generation and stale-output tests |
-| `satsuma-core` | `test/*.test.js` | Unit tests against pure functions; no I/O, no WASM required |
-| `satsuma-cli` | `test/*.test.ts` | Integration tests via CLI commands and focused command helpers |
-| `satsuma-lsp` | `test/*.test.js` | Unit tests for LSP handlers, diagnostics, custom requests, and extraction adapters |
-| `satsuma-viz-backend` | `test/*.test.js` | Unit tests for VizModel builders and shared workspace-index behaviour |
-| `satsuma-viz-harness` | `tests/*.spec.ts` | Playwright browser tests for the rendered viz component |
+| Package | Test location | Approach | Test sources typechecked? |
+|---|---|---|---|
+| `tree-sitter-satsuma` | `test/corpus/`, `scripts/*.test.mjs` | Corpus tests for CST shapes plus deterministic contract-generation and stale-output tests | No — plain JS, baseline ESLint only |
+| `satsuma-core` | `test/*.test.js` | Unit tests against pure functions; no I/O, no WASM required | Yes — `npm run test:typecheck` |
+| `satsuma-cli` | `test/*.test.ts` | Integration tests via CLI commands and focused command helpers | Yes — `npm run test:typecheck` |
+| `satsuma-lsp` | `test/*.test.js` | Unit tests for LSP handlers, diagnostics, custom requests, and extraction adapters | Yes — `npm run test:typecheck` |
+| `satsuma-viz-backend` | `test/*.test.js` | Unit tests for VizModel builders and shared workspace-index behaviour | Yes — `npm run test:typecheck` |
+| `satsuma-viz-harness` | `tests/*.spec.ts` | Playwright browser tests for the rendered viz component | No — baseline ESLint only |
 
 Browser-level viz harness tests use the sentinel watcher workflow documented in `AGENTS.md`; agents should not run Playwright directly in the sandbox.
+
+"Typechecked" here means a dedicated `test:typecheck` script (`tsc --project
+tsconfig.type-tests.json` or equivalent) runs `tsc` over the package's test
+sources specifically, as a real build gate wired into `npm test`'s `pretest`
+hook, `scripts/run-repo-checks.sh`, and CI (Feature 39 R2/R6). Every package's
+test sources — typechecked or not — still get baseline ESLint, which reports
+syntax and rule violations but is not type-aware: it cannot catch a stale
+grammar symbol or a type mismatch the way `tsc` can. Do not read "typechecked"
+as "type-aware linted" — that is ESLint's `recommendedTypeChecked` config,
+tracked separately for production sources by Feature 39 R7, and no package's
+*test* sources are type-aware linted today. Packages without a `test:typecheck`
+script (`tree-sitter-satsuma`'s `scripts/*.test.mjs`, `satsuma-viz-model`,
+`satsuma-viz`, `satsuma-viz-harness`, `vscode-satsuma`) rely on baseline lint
+alone for their test sources.
 
 ---
 
