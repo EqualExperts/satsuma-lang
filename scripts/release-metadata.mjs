@@ -17,6 +17,19 @@ export const RELEASE_PACKAGE_PATHS = [
   "tooling/vscode-satsuma/package.json",
 ];
 
+/**
+ * Eleventy's global data file, and the only tracked source of the version the
+ * public site advertises. Every download link on the site is built from it
+ * (`site/cli.njk`, `site/vscode.njk`, `site/learn.njk`, `site/_includes/footer.njk`),
+ * so a release that leaves it behind ships a site pointing at the previous
+ * tag's artifacts. The rendered pages under `site/_site/` are gitignored build
+ * output and must not be edited here — Eleventy regenerates them from this file.
+ */
+export const SITE_DATA_PATH = "site/_data/site.json";
+
+/** Site fields holding the advertised version, both spelled `vX.Y.Z`. */
+const SITE_VERSION_KEYS = ["version", "version_tag"];
+
 const SEMVER_PATTERN = /^\d+\.\d+\.\d+(?:-[A-Za-z0-9.]+)?$/;
 const VERSION_HEADING_PATTERN = /^## v\d+\.\d+\.\d+(?:-[A-Za-z0-9.]+)? — /m;
 const HTML_COMMENT_PATTERN = /<!--[^]*?-->/g;
@@ -84,15 +97,13 @@ export function buildVersionBumpChanges(repoRoot, version, date) {
   const changelog = fs.readFileSync(changelogPath, "utf8");
   changes.set(changelogPath, promoteUnreleased(changelog, version, date));
 
-  const sitePath = path.join(repoRoot, "site");
-  if (fs.existsSync(sitePath) && oldVersion !== version) {
-    for (const htmlPath of walkHtmlFiles(sitePath)) {
-      const html = fs.readFileSync(htmlPath, "utf8");
-      const updated = html.replaceAll(`v${oldVersion}`, `v${version}`);
-      if (updated !== html) {
-        changes.set(htmlPath, updated);
-      }
+  const siteDataPath = path.join(repoRoot, SITE_DATA_PATH);
+  if (fs.existsSync(siteDataPath)) {
+    const siteData = readJson(siteDataPath);
+    for (const key of SITE_VERSION_KEYS) {
+      siteData[key] = `v${version}`;
     }
+    changes.set(siteDataPath, formatJson(siteData));
   }
 
   return { changes, oldVersion };
@@ -135,6 +146,19 @@ export function validateReleaseMetadata(repoRoot, tag) {
     const lockVersions = [lockJson.version, lockJson.packages?.[""]?.version];
     if (lockVersions.some((version) => version !== requestedVersion)) {
       throw new Error(`${relativeLockPath} does not consistently report ${requestedVersion}`);
+    }
+  }
+
+  // The site is checked here rather than left to review because its version is
+  // the one users act on: it addresses the release assets by tag, so a stale
+  // value serves the previous release's downloads from the current site.
+  const siteDataPath = path.join(repoRoot, SITE_DATA_PATH);
+  if (fs.existsSync(siteDataPath)) {
+    const siteData = readJson(siteDataPath);
+    for (const key of SITE_VERSION_KEYS) {
+      if (siteData[key] !== tag) {
+        throw new Error(`${SITE_DATA_PATH} ${key} is ${siteData[key]}, expected ${tag}`);
+      }
     }
   }
 
@@ -184,19 +208,6 @@ function readJson(filePath) {
 
 function formatJson(value) {
   return `${JSON.stringify(value, null, 2)}\n`;
-}
-
-function walkHtmlFiles(directory) {
-  const results = [];
-  for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
-    const entryPath = path.join(directory, entry.name);
-    if (entry.isDirectory()) {
-      results.push(...walkHtmlFiles(entryPath));
-    } else if (entry.isFile() && entry.name.endsWith(".html")) {
-      results.push(entryPath);
-    }
-  }
-  return results;
 }
 
 function defaultRepoRoot() {

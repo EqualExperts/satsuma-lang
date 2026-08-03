@@ -12,6 +12,7 @@ import path from "node:path";
 import test from "node:test";
 import {
   RELEASE_PACKAGE_PATHS,
+  SITE_DATA_PATH,
   applyVersionBump,
   extractReleaseNotes,
   promoteUnreleased,
@@ -31,6 +32,39 @@ test("a bump synchronizes every releasable package, including the standalone LSP
     assert.equal(lock.version, "0.12.0", `${packagePath} lock root`);
     assert.equal(lock.packages[""].version, "0.12.0", `${packagePath} lock package`);
   }
+});
+
+test("a bump advances the version the public site advertises", (t) => {
+  // Every download link on the site addresses the release assets by tag, so a
+  // bump that leaves site.json behind publishes a current site serving the
+  // previous release's artifacts. The rendered pages are build output and are
+  // deliberately not touched — Eleventy regenerates them from this file.
+  const repoRoot = createFixtureRepo(t);
+
+  applyVersionBump(repoRoot, "0.12.0", "2026-08-03");
+
+  assert.deepEqual(readJson(path.join(repoRoot, SITE_DATA_PATH)), {
+    version: "v0.12.0",
+    version_tag: "v0.12.0",
+  });
+});
+
+test("workflow validation rejects a release whose site still advertises the previous tag", (t) => {
+  // The guard that would have caught v0.12.0 shipping with a v0.11.0 site: a
+  // stale value here is invisible in the artifacts and only shows up as users
+  // downloading the wrong release.
+  const repoRoot = createFixtureRepo(t);
+  applyVersionBump(repoRoot, "0.12.0", "2026-08-03");
+  const siteDataPath = path.join(repoRoot, SITE_DATA_PATH);
+  fs.writeFileSync(
+    siteDataPath,
+    `${JSON.stringify({ version: "v0.12.0", version_tag: "v0.11.0" }, null, 2)}\n`,
+  );
+
+  assert.throws(
+    () => validateReleaseMetadata(repoRoot, "v0.12.0"),
+    /site\/_data\/site\.json version_tag is v0\.11\.0, expected v0\.12\.0/,
+  );
 });
 
 test("promotion preserves accumulated notes under the release and opens a fresh Unreleased section", () => {
@@ -95,6 +129,13 @@ function createFixtureRepo(t) {
   fs.writeFileSync(
     path.join(repoRoot, "CHANGELOG.md"),
     "# Changelog\n\n## Unreleased\n\n### Covered paths are correct\n\nDetails.\n\n## v0.11.0 — 2026-07-22\n\nOld notes.\n",
+  );
+
+  const siteDataPath = path.join(repoRoot, SITE_DATA_PATH);
+  fs.mkdirSync(path.dirname(siteDataPath), { recursive: true });
+  fs.writeFileSync(
+    siteDataPath,
+    `${JSON.stringify({ version: "v0.11.0", version_tag: "v0.11.0" }, null, 2)}\n`,
   );
 
   for (const packagePath of RELEASE_PACKAGE_PATHS) {
