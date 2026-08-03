@@ -272,12 +272,18 @@ export const multiFileWorkspaceArbitrary = fc
 // ── Namespaces ─────────────────────────────────────────────────────────────
 
 /**
- * A chain whose schemas alternate between file scope and two namespaces.
+ * A chain whose schemas are spread across file scope and two namespaces.
  *
  * `qualifyField` has a namespace-matching branch that strips a namespace from a
  * declared schema to compare its bare name against an authored prefix
  * (`canonical-ref.ts:68-72`). Nothing generated reached it before, and every
  * cross-namespace hop here does.
+ *
+ * **At least one schema is always namespaced.** An all-file-scope draw would not
+ * exercise the axis at all, and worse, it would make any property that loops over
+ * `namespaces` — every `--namespace` filter property — pass *vacuously* for that
+ * sample by iterating an empty list. The first schema is forced into a namespace
+ * rather than filtering the draw, so shrinking stays well behaved.
  */
 export const namespacedWorkspaceArbitrary = fc
   .integer({ min: 1, max: MAX_CHAIN_LENGTH })
@@ -287,7 +293,10 @@ export const namespacedWorkspaceArbitrary = fc
         minLength: length + 1,
         maxLength: length + 1,
       })
-      .map((namespaces) => {
+      .map((drawn) => {
+        const namespaces = drawn.some((namespace) => namespace !== null)
+          ? drawn
+          : ["ns_a", ...drawn.slice(1)];
         const { schemas, mappings } = chainWorkspace(length, namespaces);
         return { workspace: singleFile({ schemas, mappings }), namespaces };
       }),
