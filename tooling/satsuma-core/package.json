@@ -54,6 +54,10 @@
       "types": "./dist/source-files.d.ts",
       "default": "./dist/source-files.js"
     },
+    "./reference-stages": {
+      "types": "./dist/reference-stages.d.ts",
+      "default": "./dist/reference-stages.js"
+    },
     "./parser": {
       "types": "./dist/parser.d.ts",
       "default": "./dist/parser.js"
