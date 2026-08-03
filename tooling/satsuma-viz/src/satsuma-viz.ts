@@ -267,6 +267,27 @@ export interface MinimapModel {
  */
 const DETAIL_MINIMAP_OBJECTS_SELECTOR = "sz-schema-card, .mapping-header";
 
+/**
+ * `querySelector` narrowed to `HTMLElement`. `Element.querySelector`'s generic
+ * parameter defaults to `Element`, so a plain call returns `Element | null`;
+ * every lookup here is for one of this component's own rendered elements,
+ * always an `HTMLElement` in practice (never plain SVG/MathML content).
+ */
+function queryHtml(
+  root: { querySelector(selector: string): Element | null } | null | undefined,
+  selector: string,
+): HTMLElement | null {
+  return (root?.querySelector(selector) as HTMLElement | null) ?? null;
+}
+
+/** `querySelectorAll` narrowed to `HTMLElement[]` — see {@link queryHtml}. */
+function queryHtmlAll(
+  root: { querySelectorAll(selector: string): NodeListOf<Element> },
+  selector: string,
+): HTMLElement[] {
+  return Array.from(root.querySelectorAll(selector)) as HTMLElement[];
+}
+
 @customElement("satsuma-viz")
 export class SatsumaViz extends LitElement {
   static override styles = css`
@@ -1063,7 +1084,7 @@ export class SatsumaViz extends LitElement {
   override updated(changed: Map<string, unknown>) {
     if (changed.has("model") && this.model) {
       this._reconcileViewState(this.model);
-      this._runLayout();
+      void this._runLayout();
     }
 
     if (
@@ -1158,7 +1179,7 @@ export class SatsumaViz extends LitElement {
       next.set(schemaId, models);
     }
     this._expandedModels = next;
-    this._runLayout();
+    void this._runLayout();
   }
 
   /** Get the list of expanded file URIs for breadcrumb display. */
@@ -1200,11 +1221,14 @@ export class SatsumaViz extends LitElement {
 
   /** Merge the primary model with any expanded cross-file models. */
   private _buildMergedModel(): VizModel {
-    if (!this.model || this._expandedModels.size === 0) return this.model!;
+    // Only called from _runLayout(), which already guards on this.model.
+    const model = this.model;
+    if (!model) return { uri: "", fileNotes: [], namespaces: [] };
+    if (this._expandedModels.size === 0) return model;
 
     // Collect all namespaces from expanded models, avoiding duplicates
     const seenIds = new Set<string>();
-    const primaryNs = this.model.namespaces;
+    const primaryNs = model.namespaces;
     for (const ns of primaryNs) {
       for (const s of ns.schemas) seenIds.add(s.qualifiedId);
       for (const f of ns.fragments) seenIds.add(f.id);
@@ -1237,8 +1261,8 @@ export class SatsumaViz extends LitElement {
     }
 
     return {
-      uri: this.model.uri,
-      fileNotes: this.model.fileNotes,
+      uri: model.uri,
+      fileNotes: model.fileNotes,
       namespaces: [...primaryNs, ...extraNamespaces],
     };
   }
@@ -1373,7 +1397,13 @@ export class SatsumaViz extends LitElement {
       `;
     }
 
-    // Fallback to detail layout if overview isn't available
+    // Fallback to detail layout if overview isn't available. Reachable only
+    // when this._layout is set (the guards above return early for every
+    // other combination of _layout/_overviewLayout/_layoutError), but that
+    // isn't visible to the type checker across sibling if-blocks, so this is
+    // a real (if currently unreachable) guard rather than an assertion.
+    const layout = this._layout;
+    if (!layout) return html``;
     const allComments = this._collectAllComments();
     const hasComments = allComments.warnings.length > 0 || allComments.questions.length > 0;
     const hasFileNotes = this.model.fileNotes.length > 0;
@@ -1397,12 +1427,12 @@ export class SatsumaViz extends LitElement {
               class="viewport-inner"
               style="transform: translate(${this._panX}px, ${this._panY}px) scale(${this._zoom});"
             >
-              ${this._renderPositioned(this._layout!, filtered)}
+              ${this._renderPositioned(layout, filtered)}
             </div>
             <div class="zoom-indicator ${this._zoomIndicatorVisible ? "visible" : ""}">
               ${Math.round(this._zoom * 100)}%
             </div>
-            ${this._renderMinimap(this._layoutMinimap(this._layout!))}
+            ${this._renderMinimap(this._layoutMinimap(layout))}
           </div>
           ${showPane ? this._renderNotesPane(allComments) : ""}
         </div>
@@ -1411,7 +1441,9 @@ export class SatsumaViz extends LitElement {
   }
 
   private _renderToolbar(allNamespaces: NamespaceGroup[]) {
-    const namedNs = allNamespaces.filter((ns) => ns.name);
+    const namedNs = allNamespaces.filter(
+      (ns): ns is NamespaceGroup & { name: string } => ns.name !== null,
+    );
     const hasNamespaces = namedNs.length > 0;
     const inDetail = this._viewMode === "detail";
 
@@ -1486,7 +1518,7 @@ export class SatsumaViz extends LitElement {
                   <option value="" ?selected=${this._nsFilter === null}>All namespaces</option>
                   ${namedNs.map(
                     (ns) =>
-                      html`<option value=${ns.name!} ?selected=${this._nsFilter === ns.name}>
+                      html`<option value=${ns.name} ?selected=${this._nsFilter === ns.name}>
                         ${ns.name}
                       </option>`,
                   )}
@@ -1556,8 +1588,8 @@ export class SatsumaViz extends LitElement {
   }
 
   private _fit() {
-    const viewport = this.renderRoot?.querySelector?.(".viewport") as HTMLElement | null;
-    const canvas = this.renderRoot?.querySelector?.(".canvas") as HTMLElement | null;
+    const viewport = queryHtml(this.renderRoot, ".viewport");
+    const canvas = queryHtml(this.renderRoot, ".canvas");
     if (!viewport || !canvas) {
       this._resetPanZoom();
       return;
@@ -1598,7 +1630,7 @@ export class SatsumaViz extends LitElement {
     if (!this._layout) return;
 
     // Capture the canvas HTML and edge SVG
-    const canvas = this.renderRoot?.querySelector?.(".canvas") as HTMLElement | null;
+    const canvas = queryHtml(this.renderRoot, ".canvas");
     if (!canvas) return;
 
     // Serialize the canvas content (cards as foreignObject, edges as SVG)
@@ -2138,7 +2170,7 @@ export class SatsumaViz extends LitElement {
     const scale = Math.min(mmW / (map.width + 48), mmH / (map.height + 48));
 
     // Viewport rectangle (inverse of pan/zoom transform)
-    const host = this.renderRoot?.querySelector?.(".viewport") as HTMLElement | null;
+    const host = queryHtml(this.renderRoot, ".viewport");
     const vpW = host?.clientWidth ?? 800;
     const vpH = host?.clientHeight ?? 600;
     const vx = (-this._panX / this._zoom) * scale;
@@ -2178,7 +2210,7 @@ export class SatsumaViz extends LitElement {
     const my = e.clientY - rect.top;
 
     // Convert minimap coordinates to canvas coordinates and center the viewport
-    const host = this.renderRoot?.querySelector?.(".viewport") as HTMLElement | null;
+    const host = queryHtml(this.renderRoot, ".viewport");
     const vpW = host?.clientWidth ?? 800;
     const vpH = host?.clientHeight ?? 600;
 
@@ -2191,9 +2223,9 @@ export class SatsumaViz extends LitElement {
 
     // Position between the source schema cards
     const nodes = sb.schemas.map((id) => layout.nodes.get(id)).filter(Boolean);
-    if (nodes.length === 0) return html``;
+    const firstNode = nodes[0];
+    if (!firstNode) return html``;
 
-    const firstNode = nodes[0]!;
     const x = firstNode.x + firstNode.width + 12;
     let y = firstNode.y;
     const results = [];
@@ -2223,7 +2255,7 @@ export class SatsumaViz extends LitElement {
 
   private _collapseAll() {
     this._expandedModels = new Map();
-    this._runLayout();
+    void this._runLayout();
   }
 
   private _onNsFilterChange(e: Event) {
@@ -2533,7 +2565,7 @@ export class SatsumaViz extends LitElement {
   }
 
   private _measureNamespaceBoxes() {
-    const canvas = this.renderRoot?.querySelector?.(".canvas") as HTMLElement | null;
+    const canvas = queryHtml(this.renderRoot, ".canvas");
     if (!canvas || !this.model) {
       if (this._renderedNamespaceBoxes.length > 0) this._renderedNamespaceBoxes = [];
       return;
@@ -2563,9 +2595,7 @@ export class SatsumaViz extends LitElement {
       let found = false;
 
       for (const id of ids) {
-        const el = canvas.querySelector(
-          `.positioned-card[data-node-id="${CSS.escape(id)}"]`,
-        ) as HTMLElement | null;
+        const el = queryHtml(canvas, `.positioned-card[data-node-id="${CSS.escape(id)}"]`);
         if (!el) continue;
         found = true;
         minX = Math.min(minX, el.offsetLeft);
@@ -2608,7 +2638,7 @@ export class SatsumaViz extends LitElement {
       if (this._detailMinimap) this._detailMinimap = null;
       return;
     }
-    const canvas = this.renderRoot?.querySelector?.(".detail-inner") as HTMLElement | null;
+    const canvas = queryHtml(this.renderRoot, ".detail-inner");
     const detail = this.renderRoot?.querySelector?.("sz-mapping-detail");
     const shadow = detail?.shadowRoot ?? null;
     if (!canvas || !shadow || typeof canvas.getBoundingClientRect !== "function") {
@@ -2653,9 +2683,7 @@ export class SatsumaViz extends LitElement {
       ".source-block-label",
       ".source-block-filter",
     ];
-    const elements = selectors.flatMap(
-      (selector) => Array.from(canvas.querySelectorAll(selector)) as HTMLElement[],
-    );
+    const elements = selectors.flatMap((selector) => queryHtmlAll(canvas, selector));
 
     if (elements.length === 0) {
       const width = Math.max(canvas.scrollWidth, canvas.offsetWidth);

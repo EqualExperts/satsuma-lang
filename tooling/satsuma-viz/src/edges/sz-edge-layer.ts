@@ -281,18 +281,21 @@ export class SzEdgeLayer extends LitElement {
   }
 
   private _buildCurvePath(points: Array<{ x: number; y: number }>): string {
-    if (points.length === 2) {
+    const [first, second] = points;
+    if (!first) return "";
+
+    if (points.length === 2 && second) {
       // Simple cubic bezier with horizontal control points
-      const [p0, p1] = points;
-      const dx = (p1.x - p0.x) * 0.5;
-      return `M ${p0.x} ${p0.y} C ${p0.x + dx} ${p0.y}, ${p1.x - dx} ${p1.y}, ${p1.x} ${p1.y}`;
+      const dx = (second.x - first.x) * 0.5;
+      return `M ${first.x} ${first.y} C ${first.x + dx} ${first.y}, ${second.x - dx} ${second.y}, ${second.x} ${second.y}`;
     }
 
     // Multi-point: start with move, then curve through bend points
-    const parts = [`M ${points[0].x} ${points[0].y}`];
+    const parts = [`M ${first.x} ${first.y}`];
     for (let i = 1; i < points.length; i++) {
       const prev = points[i - 1];
       const curr = points[i];
+      if (!prev || !curr) continue;
       const dx = (curr.x - prev.x) * 0.4;
       parts.push(`C ${prev.x + dx} ${prev.y}, ${curr.x - dx} ${curr.y}, ${curr.x} ${curr.y}`);
     }
@@ -302,12 +305,12 @@ export class SzEdgeLayer extends LitElement {
   private _midpoint(points: Array<{ x: number; y: number }>): { x: number; y: number } {
     const mid = Math.floor(points.length / 2);
     if (points.length % 2 === 0) {
-      return {
-        x: (points[mid - 1].x + points[mid].x) / 2,
-        y: (points[mid - 1].y + points[mid].y) / 2,
-      };
+      const a = points[mid - 1];
+      const b = points[mid];
+      if (!a || !b) return { x: 0, y: 0 };
+      return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
     }
-    return points[mid];
+    return points[mid] ?? { x: 0, y: 0 };
   }
 
   private _onEdgeClick(edge: LayoutEdge) {

@@ -725,6 +725,7 @@ function addMappingEdges(mappings: MappingBlock[], edges: ElkEdge[], ctx: GraphC
     ) => {
       for (let i = 0; i < arrows.length; i++) {
         const a = arrows[i];
+        if (!a) continue;
         // Ports are keyed by declared field path, so an arrow authored
         // element-relative inside a container (`.line1 -> .line1`) has to be
         // qualified against that container before findPort can match it. Until
@@ -785,7 +786,9 @@ function addMappingEdges(mappings: MappingBlock[], edges: ElkEdge[], ctx: GraphC
       outer: ContainerScope,
     ) => {
       for (let j = 0; j < blocks.length; j++) {
-        const [block, scope] = blocks[j];
+        const entry = blocks[j];
+        if (!entry) continue;
+        const [block, scope] = entry;
         // The block header is itself relative to the block enclosing it, so its
         // qualified form — not its authored text — is what its children resolve
         // against. This is core's accumulation rule, one level per recursion.
@@ -1109,7 +1112,7 @@ export async function computeOverviewLayout(
 
   // Extract edge routes
   const overviewEdges: OverviewEdge[] = [];
-  for (const e of (result as ElkLayoutResult).edges ?? []) {
+  for (const e of result.edges ?? []) {
     const points: Array<{ x: number; y: number }> = [];
     for (const section of e.sections ?? []) {
       if (section.startPoint) points.push(section.startPoint);
