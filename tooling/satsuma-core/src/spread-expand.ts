@@ -197,7 +197,7 @@ export function expandEntityFields(
 
   const visited = new Set<string>();
   // Seeded with what the body declares, so those names win over any spread.
-  const declared = new Set((entity.fields ?? []).map((f) => f.name));
+  const declared = new Set(entity.fields.map((f) => f.name));
   collectExpandedFields(
     entity,
     currentNs,

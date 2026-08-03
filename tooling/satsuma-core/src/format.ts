@@ -302,8 +302,10 @@ function formatComment(node: SyntaxNode, indent: number): string {
   // Normalize: ensure single space after comment marker
   const match = text.match(/^(\/\/[!?]?)\s*(.*)/);
   if (match) {
-    const marker = match[1]!;
-    const body = match[2]!;
+    // Both groups are mandatory in the pattern above, so a successful match
+    // always populates them; the defaults exist only to satisfy the type
+    // checker under noUncheckedIndexedAccess.
+    const [, marker = "", body = ""] = match;
     if (body.length === 0) return ind(indent) + marker;
     return ind(indent) + marker + " " + body;
   }
@@ -315,8 +317,10 @@ function formatInlineComment(node: SyntaxNode): string {
   if (/^\/\/\s*---/.test(text)) return text;
   const match = text.match(/^(\/\/[!?]?)\s*(.*)/);
   if (match) {
-    const marker = match[1]!;
-    const body = match[2]!;
+    // Both groups are mandatory in the pattern above, so a successful match
+    // always populates them; the defaults exist only to satisfy the type
+    // checker under noUncheckedIndexedAccess.
+    const [, marker = "", body = ""] = match;
     if (body.length === 0) return marker;
     return marker + " " + body;
   }
@@ -330,7 +334,7 @@ function formatSchemaBlock(node: SyntaxNode, source: string, indent: number): st
   const meta = findChild(node, "metadata_block");
   const body = findChild(node, "schema_body");
 
-  let line = ind(indent) + "schema " + formatBlockLabel(label!);
+  let line = ind(indent) + "schema " + (label ? formatBlockLabel(label) : "");
   if (meta) line += " " + formatMetadataBlock(meta, source, indent);
   line += " {" + braceLineCommentSuffix(node);
 
@@ -352,7 +356,7 @@ function formatFragmentBlock(node: SyntaxNode, source: string, indent: number): 
   const label = findChild(node, "block_label");
   const body = findChild(node, "schema_body");
 
-  let line = ind(indent) + "fragment " + formatBlockLabel(label!);
+  let line = ind(indent) + "fragment " + (label ? formatBlockLabel(label) : "");
   line += " {" + braceLineCommentSuffix(node);
 
   const leading = collectBlockLeadingComments(node, indent);
@@ -833,7 +837,7 @@ function formatMapArrow(node: SyntaxNode, source: string, indent: number): strin
 
   let line = ind(indent);
   if (srcPaths.length > 0) line += srcPaths.map((s) => formatPath(s)).join(", ");
-  line += " -> " + formatPath(tgtPath!);
+  line += " -> " + (tgtPath ? formatPath(tgtPath) : "");
 
   if (meta) line += " " + formatMetadataInline(meta, source, indent);
 
@@ -849,7 +853,7 @@ function formatComputedArrow(node: SyntaxNode, source: string, indent: number): 
   const meta = findChild(node, "metadata_block");
   const pipeChain = findChild(node, "pipe_chain");
 
-  let line = ind(indent) + "-> " + formatPath(tgtPath!);
+  let line = ind(indent) + "-> " + (tgtPath ? formatPath(tgtPath) : "");
 
   if (meta) line += " " + formatMetadataInline(meta, source, indent);
 
@@ -865,7 +869,11 @@ function formatNestedArrow(node: SyntaxNode, source: string, indent: number): st
   const tgtPath = findChild(node, "tgt_path");
   const meta = findChild(node, "metadata_block");
 
-  let line = ind(indent) + formatPath(srcPath!) + " -> " + formatPath(tgtPath!);
+  let line =
+    ind(indent) +
+    (srcPath ? formatPath(srcPath) : "") +
+    " -> " +
+    (tgtPath ? formatPath(tgtPath) : "");
   if (meta) line += " " + formatMetadataInline(meta, source, indent);
 
   // Inner arrows
@@ -923,7 +931,13 @@ function formatEachFlattenBlock(
   const tgtPath = findChild(node, "tgt_path");
   const meta = findChild(node, "metadata_block");
 
-  let line = ind(indent) + keyword + " " + formatPath(srcPath!) + " -> " + formatPath(tgtPath!);
+  let line =
+    ind(indent) +
+    keyword +
+    " " +
+    (srcPath ? formatPath(srcPath) : "") +
+    " -> " +
+    (tgtPath ? formatPath(tgtPath) : "");
 
   if (meta) {
     line += " " + formatMetadataBlock(meta, source, indent);
@@ -1102,7 +1116,7 @@ function formatTransformBlock(node: SyntaxNode, source: string, indent: number):
   const label = findChild(node, "block_label");
   const pipeChain = findChild(node, "pipe_chain");
 
-  const line = ind(indent) + "transform " + formatBlockLabel(label!);
+  const line = ind(indent) + "transform " + (label ? formatBlockLabel(label) : "");
 
   if (!pipeChain) {
     return line + " { }";

@@ -306,7 +306,7 @@ interface MappingContext {
 function getExpandedFields(schema: SchemaLike, lookup: DefinitionLookup): FieldDecl[] {
   if (!schema.hasSpreads) return [];
   if (lookup.expandSpreads) {
-    return lookup.expandSpreads(schema as SpreadEntity, schema.namespace ?? null);
+    return lookup.expandSpreads(schema, schema.namespace ?? null);
   }
   // Default: use core's expandEntityFields with basic lookup
   const resolveRef: EntityRefResolver = (ref, ns) => {
@@ -319,12 +319,7 @@ function getExpandedFields(schema: SchemaLike, lookup: DefinitionLookup): FieldD
     return null;
   };
   const lookupFrag: SpreadEntityLookup = (key) => lookup.getFragment(key) ?? null;
-  return expandEntityFields(
-    schema as SpreadEntity,
-    schema.namespace ?? null,
-    resolveRef,
-    lookupFrag,
-  );
+  return expandEntityFields(schema, schema.namespace ?? null, resolveRef, lookupFrag);
 }
 
 // ── Field lookup: matching a ref to a declared field path ─────────────────────
@@ -443,7 +438,8 @@ function findFieldPathWithSpreads(
     const expanded = getExpandedFields(schema, lookup);
     return findNestedFieldPath([...schema.fields, ...expanded], names);
   }
-  const fieldName = names[0]!;
+  const fieldName = names[0];
+  if (fieldName === undefined) return null;
   const direct = findFieldPath(schema.fields, fieldName);
   if (direct) return direct;
   if (!schema.hasSpreads) return null;
@@ -541,9 +537,15 @@ export function resolveRef(
 
   if (classification === "dotted-field") {
     const names = segments.map((s) => s.name);
-    const schemaName = names[0]!;
+    const schemaName = names[0];
+    if (schemaName === undefined) return { resolved: false, resolvedTo: null };
     const fieldSegs = segments.slice(1);
 
+    // MappingContext.sources/targets are typed as required, but callers that
+    // construct a partial context object (e.g. `{}` for a standalone note with
+    // no enclosing mapping — see satsuma-cli's nl-ref-extract tests) can still
+    // reach this with either array missing.
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
     const allSchemas = [...(mappingContext.sources ?? []), ...(mappingContext.targets ?? [])];
     for (const s of allSchemas) {
       const key = contextSchemaKey(s, mappingContext.namespace, lookup);
@@ -618,7 +620,12 @@ export function resolveRef(
 
   // Bare identifier — a single segment whose name may legally contain "." or
   // "::" when backtick-quoted; entity-map lookups use the name verbatim.
-  const bareName = segments[0]!.name;
+  const bareSegment = segments[0];
+  if (bareSegment === undefined) return { resolved: false, resolvedTo: null };
+  const bareName = bareSegment.name;
+  // See the "dotted-field" branch above: mappingContext can be a partial
+  // object at real call sites (e.g. resolving a ref with no enclosing mapping).
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
   const allSchemaNames = [...(mappingContext.sources ?? []), ...(mappingContext.targets ?? [])];
   for (const s of allSchemaNames) {
     const key = contextSchemaKey(s, mappingContext.namespace, lookup);
@@ -711,7 +718,7 @@ function extractMappingNLRefs(
   const lbl = mappingNode.namedChildren.find((c) => c.type === "block_label");
   const inner = lbl?.namedChildren[0];
   let mappingName = inner?.text ?? null;
-  if (inner?.type === "backtick_name") mappingName = mappingName!.slice(1, -1);
+  if (inner && inner.type === "backtick_name") mappingName = inner.text.slice(1, -1);
   if (!mappingName) {
     mappingName = `<anon>@:${mappingNode.startPosition.row}`;
   }
@@ -1128,6 +1135,6 @@ export function isSchemaInMappingSources(
   mapping: MappingSourcesTargets | null | undefined,
 ): boolean {
   if (!mapping) return false;
-  const allRefs = [...(mapping.sources ?? []), ...(mapping.targets ?? [])];
+  const allRefs = [...mapping.sources, ...mapping.targets];
   return allRefs.some((r) => r === schemaRef || canonicalKey(r) === schemaRef);
 }

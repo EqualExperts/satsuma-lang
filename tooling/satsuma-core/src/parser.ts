@@ -135,9 +135,14 @@ export function initParser(wasmPath: string, options?: ParserInitOptions): Promi
     //
     // web-tree-sitter's CJS build exposes Parser, Language, etc. as named
     // exports with no default export. The fallback (mod.default ?? mod) handles
-    // both that case and future ESM builds that may add a default.
+    // both that case and future ESM builds that may add a default. Today's
+    // node16 CJS-interop types synthesize `default` as always-defined, so the
+    // linter sees the `??` as dead — but that synthesis is a types-only
+    // artifact of the current build, not a guarantee about a future
+    // web-tree-sitter release, which the type checker cannot see ahead of time.
     const mod = await import("web-tree-sitter");
-    const TreeSitter = (mod.default ?? mod) as unknown as typeof import("web-tree-sitter");
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- see comment above
+    const TreeSitter = mod.default ?? mod;
     _TreeSitter = TreeSitter;
     await TreeSitter.Parser.init(
       options?.locateFile ? { locateFile: options.locateFile } : undefined,

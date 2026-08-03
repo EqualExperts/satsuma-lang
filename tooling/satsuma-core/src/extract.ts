@@ -46,15 +46,7 @@ interface FieldTree {
  * Check whether a field_decl contains a "list_of" keyword token.
  */
 function hasListOfKeyword(fd: SyntaxNode): boolean {
-  if (fd.children) {
-    for (const c of fd.children) {
-      if (!c.isNamed && c.text === "list_of") return true;
-    }
-    return false;
-  }
-  const nameNode = child(fd, "field_name");
-  const nameEnd = nameNode ? nameNode.text.length : 0;
-  return fd.text.slice(nameEnd).trimStart().startsWith("list_of");
+  return fd.children.some((c) => !c.isNamed && c.text === "list_of");
 }
 
 /**
@@ -134,7 +126,7 @@ export function extractFieldTree(bodyNode: SyntaxNode): FieldTree {
         fields.push(decl);
       } else {
         const isList = hasListOfKeyword(c);
-        const hasRecordKeyword = c.children?.some((ch) => !ch.isNamed && ch.text === "record");
+        const hasRecordKeyword = c.children.some((ch) => !ch.isNamed && ch.text === "record");
         if (hasRecordKeyword) {
           const decl: RecordFieldDecl | RecordListFieldDecl = isList
             ? {
@@ -184,7 +176,7 @@ export function extractFieldTree(bodyNode: SyntaxNode): FieldTree {
  */
 function spreadLabelText(labelNode: SyntaxNode): string {
   const qn = child(labelNode, "qualified_name");
-  if (qn) return qualifiedNameText(qn)!;
+  if (qn) return qualifiedNameText(qn) ?? qn.text;
   const q = child(labelNode, "backtick_name");
   if (q) return q.text.slice(1, -1);
   const words = labelNode.namedChildren
@@ -400,7 +392,7 @@ function extractMetricMeta(meta: SyntaxNode | null): {
         if (!val) continue;
         for (const item of val.namedChildren) {
           if (item.type === "qualified_name") {
-            sources.push(qualifiedNameText(item)!);
+            sources.push(qualifiedNameText(item) ?? item.text);
           } else if (item.type === "identifier") {
             sources.push(item.text);
           }
@@ -822,15 +814,14 @@ function pathText(pathNode: SyntaxNode | null): string | null {
   if (inner.type === "backtick_path") return inner.text.slice(1, -1);
   if (inner.type === "namespaced_path") {
     const ids = inner.namedChildren.filter((c) => c.type === "identifier");
-    if (ids.length >= 2) {
-      const ns = ids[0]!.text;
-      const schema = ids[1]!.text;
+    const [ns, schema] = ids;
+    if (ns && schema) {
       const field =
         ids
           .slice(2)
           .map((c) => c.text)
           .join(".") || null;
-      return canonicalRef(ns, schema, field);
+      return canonicalRef(ns.text, schema.text, field);
     }
   }
   return inner.text;
