@@ -110,6 +110,9 @@ jobs:
 
       - run: npm run lint
 
+      - name: Test release tooling
+        run: npm run test:release
+
   satsuma-cli:
     name: Satsuma CLI
     needs: install
