@@ -27,4 +27,4 @@ All five opaque types and their validating constructors are exported from @satsu
 
 **2026-08-03T16:30:01Z**
 
-Cause: Authored refs, container-qualified refs, schema-local paths, and canonical entity ids were all represented as interchangeable strings, so TypeScript could not reject a transition at the wrong normalization stage. Fix: Added five opaque core reference types, validating constructors, and named container-qualification/entity-canonicalization transitions with runtime and compile-only coverage (commit immediately after bc967469).
+Cause: Authored refs, container-qualified refs, schema-local paths, and canonical entity ids were all represented as interchangeable strings, so TypeScript could not reject a transition at the wrong normalization stage. Fix: Added five opaque core reference types, validating constructors, and named container-qualification/entity-canonicalization transitions with runtime and compile-only coverage (commit immediately after ac9e6fc6).

@@ -1,6 +1,6 @@
 # Satsuma Tooling Architecture
 
-> Last updated: 2026-08-03 — documented the generated CST symbol contract boundary (ADR-043).
+> Last updated: 2026-08-03 — documented opaque reference stages at coverage boundaries (ADR-044).
 
 This document is the canonical architecture reference for the Satsuma language tooling — the packages under `tooling/` that parse, analyse, format, validate, visualize, and provide IDE support for `.stm` files. The design is influenced by [rust-analyzer's architecture](https://rust-analyzer.github.io/book/contributing/architecture.html), adapted for a tree-sitter-backed DSL rather than a full programming language compiler.
 
@@ -142,15 +142,17 @@ graph LR
   NL["nl-ref.ts\nDefinitionLookup (callback)\nAtRef · RefClassification\nextractAtRefs · classifyRef\nresolveRef · resolveAllAtRefs\nextractNLRefData"]
   FMT["format.ts\nformat(tree, source)"]
   STR["string-utils.ts\ncapitalize · truncate\nformatList · …"]
+  REF["reference-stages.ts\nAuthoredFieldRef · ContainerQualifiedFieldRef\nSchemaLocalPath · AuthoredEntityRef\nCanonicalEntityRef"]
   PAR["parser.ts\ninitParser() singleton\nparseSource()"]
   PE["parse-errors.ts\ncollectParseErrors()\nParseError"]
   COV["coverage.ts · coverage-paths.ts\nFieldCoverageEntry\nSchemaCoverageResult\nbuildCoveredFieldPaths()\nschemaLocalFieldPath()"]
   VAL["validate.ts\nSemanticIndex · SemanticDiagnostic\ncollectSemanticDiagnostics()"]
 
-  IDX --> TYPES & GENCST & CST & CLS & CAN & META & EXT & SPR & NL & FMT & STR & PAR & PE & COV & VAL
+  IDX --> TYPES & GENCST & CST & CLS & CAN & META & EXT & SPR & NL & FMT & STR & REF & PAR & PE & COV & VAL
   EXT --> CST & CLS & CAN & META & TYPES
   SPR --> EXT & TYPES
   NL --> SPR & TYPES
+  COV --> REF
   VAL --> CAN & TYPES
 ```
 
@@ -169,6 +171,8 @@ graph LR
 | `AtRef` | `types.ts` | `{ ref: string, offset: number }` — a single @-ref extracted from NL text |
 | `NLRefData` | `types.ts` | All NL strings + @-refs for a file |
 | `Resolution` | `types.ts` | `{ resolved: boolean, resolvedTo: { kind, name } \| null }` |
+| `AuthoredFieldRef` / `ContainerQualifiedFieldRef` / `SchemaLocalPath` | `reference-stages.ts` | Opaque strings that record field-reference normalization stages at compile time |
+| `AuthoredEntityRef` / `CanonicalEntityRef` | `reference-stages.ts` | Opaque strings that distinguish authored entity names from unique workspace identities |
 | `EntityFieldLookup` | `spread-expand.ts` | Callback for spread resolution: `(name, ns) => { fields } \| null` |
 | `DefinitionLookup` | `nl-ref.ts` | Callback for @-ref resolution: `(name, ns) => { kind, fields? } \| null` |
 | `SemanticIndex` | `validate.ts` | Minimal structural interface accepted by `collectSemanticDiagnostics`; satisfied by CLI `ExtractedWorkspace` |
@@ -176,6 +180,13 @@ graph LR
 | `FieldCoverageEntry` | `coverage.ts` | `{ path, mapped: boolean }` — coverage status for one field path |
 | `SchemaCoverageResult` | `coverage.ts` | Per-schema list of `FieldCoverageEntry` records |
 | `ParseError` | `parse-errors.ts` | `{ file, line, column, message }` — structural error from tree-sitter ERROR/MISSING nodes |
+
+Reference-stage brands are private and runtime-erased. CST, JSON, LSP, and
+VizModel boundaries continue to carry strings; consumers use core constructors
+when values enter stage-sensitive logic and named transitions when they advance
+from authored to qualified, schema-local, or canonical form. Coverage APIs accept
+the stage they actually require, so an omitted or reordered normalization step is
+a compile error without changing external protocols. See ADR-044.
 
 ---
 
