@@ -1,6 +1,6 @@
 # Satsuma Tooling Architecture
 
-> Last updated: 2026-08-03 — documented `FieldDecl` structural variants (ADR-045).
+> Last updated: 2026-08-03 — documented lint policy detection in core (ADR-047) and `FieldDecl` structural variants (ADR-045).
 
 This document is the canonical architecture reference for the Satsuma language tooling — the packages under `tooling/` that parse, analyse, format, validate, visualize, and provide IDE support for `.stm` files. The design is influenced by [rust-analyzer's architecture](https://rust-analyzer.github.io/book/contributing/architecture.html), adapted for a tree-sitter-backed DSL rather than a full programming language compiler.
 
@@ -149,10 +149,12 @@ graph LR
   PE["parse-errors.ts\ncollectParseErrors()\nParseError"]
   COV["coverage.ts · coverage-paths.ts\nFieldCoverageEntry\nSchemaCoverageResult\nbuildCoveredFieldPaths()\nschemaLocalFieldPath()"]
   VAL["validate.ts\nSemanticIndex · SemanticDiagnostic\ncollectSemanticDiagnostics()"]
+  LNT["lint-findings.ts · lint-type-mismatch.ts\nlint-lineage-cycle.ts\nLintFinding\ndetectTypeMismatches()\ndetectLineageCycles()"]
 
-  IDX --> TYPES & FD & NEVER & GENCST & CST & CLS & CAN & META & EXT & SPR & NL & FMT & STR & REF & PAR & PE & COV & VAL
+  IDX --> TYPES & FD & NEVER & GENCST & CST & CLS & CAN & META & EXT & SPR & NL & FMT & STR & REF & PAR & PE & COV & VAL & LNT
   FD --> TYPES
   EXT --> CST & CLS & CAN & META & FD & TYPES
+  LNT --> COV & REF & TYPES
   SPR --> EXT & TYPES
   NL --> SPR & TYPES
   COV --> REF
@@ -180,6 +182,7 @@ graph LR
 | `DefinitionLookup` | `nl-ref.ts` | Callback for @-ref resolution: `(name, ns) => { kind, fields? } \| null` |
 | `SemanticIndex` | `validate.ts` | Minimal structural interface accepted by `collectSemanticDiagnostics`; satisfied by CLI `ExtractedWorkspace` |
 | `SemanticDiagnostic` | `validate.ts` | `{ file, line, column, severity, rule, message }` — one semantic warning or error |
+| `LintFinding` | `lint-findings.ts` | Same six fields, deliberately a distinct type: a *policy* finding, suppressible via `satsuma.config.yaml`, where `SemanticDiagnostic` is a *correctness* one. See ADR-047 |
 | `FieldCoverageEntry` | `coverage.ts` | `{ path, mapped: boolean }` — coverage status for one field path |
 | `SchemaCoverageResult` | `coverage.ts` | Per-schema list of `FieldCoverageEntry` records |
 | `ParseError` | `parse-errors.ts` | `{ file, line, column, message }` — structural error from tree-sitter ERROR/MISSING nodes |
@@ -212,7 +215,7 @@ flowchart TD
   spreadBridge["spread-expand.ts<br/>EntityFieldLookup adapter<br/>ExtractedWorkspace -> core callbacks"]
   graphBuilder["graph-builder.ts<br/>schema-level graph for graph/lineage"]
   graphCommandBuilder["commands/graph-builder.ts<br/>rich schema + field graph"]
-  lintEngine["lint-engine.ts<br/>lint rule evaluation"]
+  lintEngine["lint-engine.ts<br/>lint rule registry, fixes,<br/>NL-hygiene rules; wraps core detectors"]
   semanticWarnings["semantic-warnings.ts<br/>validateSemanticWorkspace adapter"]
 
   core["@satsuma/core<br/>extract* · validateSemanticWorkspace<br/>nl-ref · spread expansion · parser"]
