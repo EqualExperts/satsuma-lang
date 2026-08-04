@@ -328,20 +328,17 @@ describe("resolveRef()", () => {
     assert.equal(r.resolvedTo.kind, "field");
   });
 
-  // sl-98cz: extraction records source/target lists exactly as authored, so a
-  // namespaced mapping's bare source name ("customers") arrives unqualified
-  // while the index keys the schema "crm::customers". resolveRef must try the
-  // namespace-qualified form before giving up, or every bare @field ref against
-  // a namespaced source schema becomes a false unresolved-nl-ref warning.
+  // sl-98cz, lgc-3f13: extraction records both source and target lists exactly as
+  // authored. resolveRef must try the namespace-qualified form before giving up,
+  // or every bare @field ref against a namespaced schema becomes a false warning.
 
   it("resolves a bare field against an unqualified source name inside a namespace (sl-98cz)", () => {
     const lookup = makeLookup({
       "crm::customers": { fields: [{ name: "account_id" }], hasSpreads: false },
       "crm::tgt": { fields: [{ name: "id" }], hasSpreads: false },
     });
-    // The ticket repro: sources raw, targets pre-qualified (extractMappings
-    // qualifies only targets), both fields must resolve symmetrically.
-    const ctx = { sources: ["customers"], targets: ["crm::tgt"], namespace: "crm" };
+    // Both refs arrive raw from extraction and must resolve symmetrically.
+    const ctx = { sources: ["customers"], targets: ["tgt"], namespace: "crm" };
     const src = resolveRef("account_id", ctx, lookup);
     assert.equal(src.resolved, true);
     assert.equal(src.resolvedTo.name, "crm::customers.account_id");
