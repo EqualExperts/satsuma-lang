@@ -244,14 +244,33 @@ function parseFromLogsArg(argv) {
   return dir;
 }
 
+/**
+ * Bring the workspace's build output up to date, for spawn mode only.
+ *
+ * Spawn mode runs each package's `npm run test` and then execs the built CLI to
+ * count its commands, and until feature 42's R4 both were kept honest by npm's
+ * implicit `pretest` hook rebuilding dist/ first. R4 deleted those hooks — the
+ * build order is Turborepo's now — so nothing in this script's own run produced
+ * the output it measures. Every number would then describe whatever happened to
+ * be on disk: a developer who adds a CLI command and runs this script directly,
+ * exactly as CI's failure message tells them to, would commit a cliCommands
+ * count one short and be told by CI that their file is out of date.
+ *
+ * --from-logs mode does not need this: it reads output that a caller
+ * (scripts/run-repo-checks.sh) already produced after its own build step.
+ */
+function buildWorkspace() {
+  execFileSync("npm", ["run", "build:all"], { cwd: REPO_ROOT, stdio: "inherit" });
+}
+
 function main() {
   const fromLogsDir = parseFromLogsArg(process.argv.slice(2));
   const previousStats = readPreviousStats();
 
-  // Package tests run (or their logs are read) before the CLI is introspected:
-  // satsuma-cli's own "test" script rebuilds dist/ via npm's automatic pretest
-  // hook, so by the time collectCliCommandCount() runs, dist/index.js is fresh
-  // in both run modes (run-repo-checks.sh also builds it explicitly first).
+  if (!fromLogsDir) {
+    buildWorkspace();
+  }
+
   const packages = collectPackageCounts(fromLogsDir, previousStats);
   const parserCorpusTests = collectCorpusTestCount(fromLogsDir, previousStats);
   const cliCommands = collectCliCommandCount();

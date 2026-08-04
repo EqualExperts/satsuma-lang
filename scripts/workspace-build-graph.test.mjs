@@ -138,9 +138,15 @@ function codeFilesOf(pkg) {
  * `npm install -g satsuma-cli`) is not a build dependency, and treating it as
  * one would make this test punish documentation.
  *
- *   1. A module specifier — `from "@satsuma/core"`, `require("satsuma-cli/x")`.
- *      Always counts: a bare specifier resolves through the sibling's
- *      `exports`, which for every built package here points into `dist/`.
+ *   1. A module specifier — `from "@satsuma/core"`, `require("satsuma-cli/x")`,
+ *      or a side-effect-only `import "@satsuma/viz";`. Always counts: a bare
+ *      specifier resolves through the sibling's `exports`, which for every built
+ *      package here points into `dist/`. The side-effect form is included
+ *      because it is idiomatic for a custom element imported only to register
+ *      itself, which is exactly what vscode-satsuma's webview does with
+ *      @satsuma/viz — a declared dependency today, so this catches nothing
+ *      right now, and is the one spelling of a real edge that would otherwise
+ *      be invisible.
  *   2. A relative path escaping into a sibling directory —
  *      `resolve(__dirname, "../../satsuma-cli/dist/index.js")` — *unless* it
  *      continues into one of COMMITTED_SUBDIRECTORIES, which is a read of
@@ -164,7 +170,7 @@ function siblingsReachedBy(text, packages, selfName) {
 
     // 1. Module specifier: the bare name, or the name followed by a subpath.
     const specifier = new RegExp(
-      `(?:from|require\\(|import\\()\\s*["']${escapeForRegExp(name)}(?:/[^"']*)?["']`,
+      `(?:from|require\\(|import\\(|import)\\s*["']${escapeForRegExp(name)}(?:/[^"']*)?["']`,
     );
     // 2. Relative escape into the sibling, excluding its committed subtrees.
     const intoOutput = new RegExp(`\\.\\./${directory}(?!/(?:${committed})[/"'])(?:["'/]|$)`, "m");
@@ -180,6 +186,93 @@ function siblingsReachedBy(text, packages, selfName) {
 
 function escapeForRegExp(literal) {
   return literal.replace(/[.*+?^${}()|[\]\\/]/g, "\\$&");
+}
+
+/**
+ * Repo-relative paths inside a *sibling package's committed tree* that `text`
+ * reads — the reaches siblingsReachedBy() deliberately ignores.
+ *
+ * These imply no build ordering, but they are still inputs, and Turborepo hashes
+ * only a package's own directory. A read of a file it does not hash is a cache
+ * hit waiting to happen, which is why the third invariant below exists.
+ *
+ * @param {string} text
+ * @param {Map<string, any>} packages
+ * @param {string} selfName
+ * @returns {Set<string>} e.g. "tooling/satsuma-cli/test/fixtures"
+ */
+function committedSiblingPathsReadBy(text, packages, selfName) {
+  const paths = new Set();
+  const committed = COMMITTED_SUBDIRECTORIES.map(escapeForRegExp).join("|");
+
+  for (const { name, dirName } of packages.values()) {
+    if (name === selfName) continue;
+    const pattern = new RegExp(
+      `\\.\\./${escapeForRegExp(dirName)}/((?:${committed})(?:/[A-Za-z0-9_.-]+)*)`,
+      "g",
+    );
+    for (const match of text.matchAll(pattern)) {
+      paths.add(`tooling/${dirName}/${match[1]}`);
+    }
+  }
+  return paths;
+}
+
+/**
+ * turbo.json's `globalDependencies`, parsed.
+ *
+ * turbo.json is JSONC — Turborepo accepts `//` comments and this repo uses them
+ * heavily to explain the task graph. `JSON.parse` cannot read it, and stripping
+ * `//` to end-of-line naively would truncate the `$schema` URL, so comments are
+ * removed with the string state tracked. Block comments are not handled because
+ * the file does not use them; if one appears, `JSON.parse` throws rather than
+ * silently mis-parsing.
+ */
+function readGlobalDependencies(turboJsonPath) {
+  const source = readFileSync(turboJsonPath, "utf8");
+  let stripped = "";
+  let inString = false;
+  for (let i = 0; i < source.length; i++) {
+    const character = source[i];
+    if (inString) {
+      // A backslash escapes the next character, including a closing quote.
+      if (character === "\\") {
+        stripped += character + (source[i + 1] ?? "");
+        i++;
+        continue;
+      }
+      if (character === '"') inString = false;
+      stripped += character;
+      continue;
+    }
+    if (character === '"') {
+      inString = true;
+      stripped += character;
+      continue;
+    }
+    if (character === "/" && source[i + 1] === "/") {
+      while (i < source.length && source[i] !== "\n") i++;
+      stripped += "\n";
+      continue;
+    }
+    stripped += character;
+  }
+  return JSON.parse(stripped).globalDependencies ?? [];
+}
+
+/**
+ * True when `path` falls under one of turbo.json's `globalDependencies` globs.
+ *
+ * Only the trailing-wildcard forms this repo actually uses are understood
+ * (`a/b/**`, `a/b/*`, and an exact path). A glob shape it cannot interpret is
+ * treated as *not* covering the path — erring towards a failing test rather than
+ * a silently unhashed input.
+ */
+function coveredByGlobalDependencies(path, globalDependencies) {
+  return globalDependencies.some((pattern) => {
+    const prefix = pattern.replace(/\/\*\*?$/, "");
+    return path === pattern || path === prefix || path.startsWith(`${prefix}/`);
+  });
 }
 
 // ── The invariants ───────────────────────────────────────────────────────────
@@ -222,6 +315,64 @@ describe("the workspace dependency graph Turborepo orders builds by", () => {
           .join(", ")} without declaring it. ` +
           `Turborepo derives build order from dependencies/devDependencies only, ` +
           `so an undeclared sibling's build is not ordered ahead of this package's.`,
+      );
+    });
+  }
+
+  // Everything a task reads must be something Turborepo hashes. The invariant
+  // above is about *ordering* and is satisfied by a declared dependency; this
+  // one is about *cache correctness*, and a declared dependency is only one of
+  // the two ways to satisfy it.
+  //
+  // Turborepo hashes a package's own directory, its dependency tasks' hashes,
+  // and globalDependencies. A read of a sibling's committed file that is covered
+  // by none of those is not a slow build — it is a cache HIT over an input that
+  // changed, reported as a pass. This was live for one commit: @satsuma/viz and
+  // @satsuma/viz-backend read satsuma-cli/test/fixtures/ in their coverage-parity
+  // suites, and editing a fixture left both suites cached and green.
+  //
+  // Verified before being trusted: with the fixtures absent from
+  // globalDependencies, appending a line to
+  // tooling/satsuma-cli/test/fixtures/ambiguous-scope.stm left
+  // `turbo run test --filter=@satsuma/viz` reporting 6/6 cached.
+  for (const pkg of packages.values()) {
+    it(`${pkg.name} reads no sibling's committed files that Turborepo does not hash`, () => {
+      const globalDependencies = readGlobalDependencies(join(REPO_ROOT, "turbo.json"));
+      const declared = declaredDependencies(pkg.manifest);
+      const scriptText = Object.values(pkg.manifest.scripts ?? {}).join("\n");
+
+      /** @type {Map<string, string>} unhashed path → where it was first read */
+      const unhashed = new Map();
+      const record = (paths, where) => {
+        for (const path of paths) {
+          // A declared dependency covers it: turbo folds that package's task
+          // hash — which is derived from its whole directory — into this one's.
+          const owner = [...packages.values()].find((p) =>
+            path.startsWith(`tooling/${p.dirName}/`),
+          );
+          if (owner && declared.has(owner.name)) continue;
+          if (coveredByGlobalDependencies(path, globalDependencies)) continue;
+          if (!unhashed.has(path)) unhashed.set(path, where);
+        }
+      };
+
+      record(committedSiblingPathsReadBy(scriptText, packages, pkg.name), "its npm scripts");
+      for (const file of codeFilesOf(pkg)) {
+        record(
+          committedSiblingPathsReadBy(readFileSync(file, "utf8"), packages, pkg.name),
+          relative(REPO_ROOT, file),
+        );
+      }
+
+      assert.deepEqual(
+        [...unhashed],
+        [],
+        `${pkg.name} reads ${[...unhashed]
+          .map(([path, where]) => `${path} (from ${where})`)
+          .join(", ")}, which Turborepo does not hash for this package. ` +
+          `Either declare the owning package as a dependency, or add the path to ` +
+          `globalDependencies in turbo.json — otherwise a change to it serves a ` +
+          `cache hit and this package's suite passes without re-running.`,
       );
     });
   }
