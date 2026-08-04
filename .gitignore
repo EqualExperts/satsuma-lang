@@ -4,6 +4,12 @@
 # Turborepo's local content-hash cache and per-task log files. Local only —
 # no remote cache is configured (ADR-049).
 .turbo/
+
+# JUnit XML that CI uploads as an artifact. Written inside the owning package
+# since feature 42's R5, so Turborepo can declare it as a task output — a path
+# at the repo root cannot be one, and an undeclared output means a cache hit
+# restores no XML for the upload step to find.
+test-results/
 .DS_Store
 log.html
 __pycache__/

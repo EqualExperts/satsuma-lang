@@ -8,9 +8,11 @@
  *
  * Two ways to gather the numbers, behind the same parsing logic:
  *   - default: spawn each package's own test command and parse its output.
- *   - `--from-logs <dir>`: read output already captured elsewhere. The
- *     pre-commit hook (scripts/run-repo-checks.sh) tees its own test run
- *     into per-package log files, so this mode adds no second test run.
+ *   - `--from-logs [dir]`: read output a caller already produced, adding no
+ *     second test run. Turborepo writes one log per `test` task it runs (and
+ *     replays it on a cache hit), which is where almost every count comes from;
+ *     the optional directory is for a caller with output of its own to
+ *     contribute, as scripts/run-repo-checks.sh has for the tree-sitter corpus.
  */
 
 import { execFileSync } from "node:child_process";
@@ -134,10 +136,33 @@ export const TRACKED_PACKAGES = [
 
 // ── Collection ──────────────────────────────────────────────────────────
 
-/** Returns a captured log's contents, or null if run-repo-checks.sh never teed that step (e.g. a package it doesn't exercise locally). */
+/**
+ * A package's already-captured test output, or null if nothing captured it.
+ *
+ * Two places are consulted, in order:
+ *
+ *   1. `<logDir>/<name>.log`, for a caller that captured the output itself.
+ *      scripts/run-repo-checks.sh uses this for the tree-sitter corpus, whose
+ *      step is bespoke: it runs `tree-sitter test --wasm` directly so it can
+ *      skip gracefully when the resolved binary lacks the wasm feature, and
+ *      that skip message is what the log has to carry.
+ *   2. `tooling/<name>/.turbo/turbo-test.log`, which Turborepo writes for every
+ *      `test` task it runs and replays on a cache hit. Since R4 this is where
+ *      almost every count comes from, and it is why neither the hook nor CI has
+ *      to run a package's suite a second time to count it.
+ *
+ * `logDir` is optional: a caller with nothing of its own to contribute passes
+ * nothing and gets Turborepo's logs alone.
+ */
 function readCapturedLogIfPresent(logDir, name) {
-  const logPath = path.join(logDir, `${name}.log`);
-  return fs.existsSync(logPath) ? fs.readFileSync(logPath, "utf8") : null;
+  const candidates = [
+    ...(logDir ? [path.join(logDir, `${name}.log`)] : []),
+    path.join(REPO_ROOT, "tooling", name, ".turbo", "turbo-test.log"),
+  ];
+  for (const logPath of candidates) {
+    if (fs.existsSync(logPath)) return fs.readFileSync(logPath, "utf8");
+  }
+  return null;
 }
 
 function runNpmScript(packageKey, npmScript) {
@@ -166,12 +191,12 @@ export function resolvePackageCountFromLog(output, previousCount, key) {
   return parseNodeTestCount(output);
 }
 
-function collectPackageCounts(fromLogsDir, previousStats) {
+function collectPackageCounts(capture, previousStats) {
   const packages = {};
   for (const { key, npmScript } of TRACKED_PACKAGES) {
-    packages[key] = fromLogsDir
+    packages[key] = capture.fromLogs
       ? resolvePackageCountFromLog(
-          readCapturedLogIfPresent(fromLogsDir, key),
+          readCapturedLogIfPresent(capture.logDir, key),
           previousStats?.packages?.[key],
           key,
         )
@@ -190,8 +215,8 @@ function collectPackageCounts(fromLogsDir, previousStats) {
  * Default (spawn) mode has no such gap — it always runs through the
  * project's own wasm-capable local binary — so it always parses for real.
  */
-function collectCorpusTestCount(fromLogsDir, previousStats) {
-  if (!fromLogsDir) {
+function collectCorpusTestCount(capture, previousStats) {
+  if (!capture.fromLogs) {
     // `npm run test`, not a bare `tree-sitter test --wasm`: the globally
     // resolved tree-sitter-cli binary may lack the wasm feature, but the
     // project's own devDependency (resolved by the npm script via
@@ -200,7 +225,7 @@ function collectCorpusTestCount(fromLogsDir, previousStats) {
     return parseCorpusTestCount(runNpmScript("tree-sitter-satsuma", "test"));
   }
 
-  const output = readCapturedLogIfPresent(fromLogsDir, "tree-sitter-satsuma");
+  const output = readCapturedLogIfPresent(capture.logDir, "tree-sitter-satsuma");
   if (output === null) {
     if (previousStats?.parserCorpusTests === undefined) {
       throw new Error(
@@ -232,16 +257,30 @@ function writeStats(stats) {
 
 // ── CLI entry point ─────────────────────────────────────────────────────
 
-function parseFromLogsArg(argv) {
+/**
+ * How this run gets its numbers.
+ *
+ * `--from-logs` selects captured mode, and its directory argument is optional:
+ * a caller that captured nothing of its own (CI, which lets Turborepo capture
+ * everything) passes the bare flag. Without the flag the run is authoritative
+ * and spawns each suite itself.
+ *
+ * The flag is deliberately explicit rather than inferred from whether Turborepo
+ * logs happen to exist. A turbo log is current for the inputs that produced it,
+ * but it survives a later source edit, so trusting one that no caller just
+ * refreshed could report a count for code that has since changed.
+ *
+ * @returns {{fromLogs: boolean, logDir: string|null}}
+ */
+function parseCaptureMode(argv) {
   const flagIndex = argv.indexOf("--from-logs");
   if (flagIndex === -1) {
-    return null;
+    return { fromLogs: false, logDir: null };
   }
-  const dir = argv[flagIndex + 1];
-  if (!dir) {
-    throw new Error("--from-logs requires a directory argument");
-  }
-  return dir;
+  const next = argv[flagIndex + 1];
+  // A following token is a directory unless it is itself a flag.
+  const logDir = next && !next.startsWith("--") ? next : null;
+  return { fromLogs: true, logDir };
 }
 
 /**
@@ -256,23 +295,23 @@ function parseFromLogsArg(argv) {
  * exactly as CI's failure message tells them to, would commit a cliCommands
  * count one short and be told by CI that their file is out of date.
  *
- * --from-logs mode does not need this: it reads output that a caller
- * (scripts/run-repo-checks.sh) already produced after its own build step.
+ * Captured mode does not need this: it reads output a caller already produced
+ * after its own build step.
  */
 function buildWorkspace() {
   execFileSync("npm", ["run", "build:all"], { cwd: REPO_ROOT, stdio: "inherit" });
 }
 
 function main() {
-  const fromLogsDir = parseFromLogsArg(process.argv.slice(2));
+  const capture = parseCaptureMode(process.argv.slice(2));
   const previousStats = readPreviousStats();
 
-  if (!fromLogsDir) {
+  if (!capture.fromLogs) {
     buildWorkspace();
   }
 
-  const packages = collectPackageCounts(fromLogsDir, previousStats);
-  const parserCorpusTests = collectCorpusTestCount(fromLogsDir, previousStats);
+  const packages = collectPackageCounts(capture, previousStats);
+  const parserCorpusTests = collectCorpusTestCount(capture, previousStats);
   const cliCommands = collectCliCommandCount();
 
   writeStats(buildStats({ cliCommands, parserCorpusTests, packages }));

@@ -96,9 +96,25 @@
       "dependsOn": ["build", "^build", "compile"]
     },
 
+    // ci.yml runs this rather than spelling a c8 invocation out inline, because a
+    // raw command cannot be cached and the CLI's suite was the pipeline's
+    // second-longest job at 135s — almost always re-running a suite whose inputs
+    // had not changed (feature 42, R5).
+    //
+    // `test-results/**` is here because satsuma-cli's flavour of this script also
+    // emits the JUnit XML that CI uploads. A separate `test:ci` task was tried
+    // first and rejected: two tasks in one package both claiming `coverage/**`
+    // is the same latent hazard mbt-oy6n exists for, where a cache restore
+    // silently decides which task's version of a shared directory survives. One
+    // task, one output set.
+    //
+    // Both outputs must live inside the package to be declarable at all. The
+    // JUnit file used to be written to the repo root's test-results/, which
+    // cannot be a package's output — a cache hit would have restored the coverage
+    // report and left no XML for the upload step to find.
     "test:coverage": {
       "dependsOn": ["build", "^build", "compile"],
-      "outputs": ["coverage/**"]
+      "outputs": ["coverage/**", "test-results/**"]
     },
 
     // ── Package-specific overrides ───────────────────────────────────────────
