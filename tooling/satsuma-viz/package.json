@@ -28,6 +28,6 @@
     "esbuild": "^0.28.1",
     "fast-check": "^4.9.0",
     "tree-sitter-satsuma": "*",
-    "typescript": "^5.9.3"
+    "typescript": "^6.0.3"
   }
 }

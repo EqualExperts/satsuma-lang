@@ -50,6 +50,6 @@
     "@types/node": "^22.0.0",
     "esbuild": "^0.28.1",
     "tree-sitter-satsuma": "*",
-    "typescript": "^5.9.3"
+    "typescript": "^6.0.3"
   }
 }

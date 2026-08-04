@@ -82,6 +82,6 @@
     "c8": "^11.0.0",
     "esbuild": "^0.28.1",
     "tree-sitter-satsuma": "*",
-    "typescript": "^6.0.2"
+    "typescript": "^6.0.3"
   }
 }
