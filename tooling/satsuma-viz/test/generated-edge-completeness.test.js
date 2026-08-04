@@ -30,9 +30,10 @@
  *    header as an arrow record and emits an edge for it. Whether that difference is
  *    right is a question for the R5 parity sweep (`sl-kwet`); it is a coherent
  *    convention, not a dropped edge, so it is permitted here.
- * 3. **Computed (sourceless) arrows** — see the `todo` property below. This one is
- *    a *bug*, `lgc-4bxl`, and is excluded from the main property rather than
- *    blessed by it.
+ * 3. **Computed (sourceless) arrows.** A computed target is covered, but there is
+ *    no source field from which a lineage line can originate. Its filled target
+ *    port distinguishes it from an unmapped field; the absence of a field edge
+ *    distinguishes it from an ordinary mapping (`lgc-4bxl`).
  *
  * `@satsuma/viz-backend` and `@satsuma/scenario-gen` are devDependencies for
  * exactly this. The runtime dependency still runs component → core, and nothing in
@@ -228,18 +229,10 @@ describe("the layout draws every declared arrow (sl-hi0z)", () => {
     );
   });
 
-  it("draws a computed arrow as a phantom line from a same-named source field (lgc-4bxl)", async () => {
-    // ⚠️ THIS TEST PINS A KNOWN DEFECT, for the reasons given on the multi-source
-    // test above. It goes **red when lgc-4bxl is fixed**; at that point assert that
-    // no edge has an empty `arrow.sourceFields`, which is the invariant that matters.
-    //
+  it("never invents a source edge for a computed arrow (lgc-4bxl)", async () => {
     // A computed arrow declares a target with no source. `addMappingEdges` falls back
-    // to `sourceField = targetField`, so it looks the target's own name up in the
-    // *source* schema: where a field of that name exists — the normal case, since
-    // matching names on both sides is the norm — the viz draws a line asserting
-    // lineage the Satsuma explicitly denies. Where it does not, the edge is silently
-    // dropped instead. A phantom lineage edge is worse than a missing one: it is a
-    // confident claim about where data came from.
+    // to no field edge: the target's coverage port still says it is populated,
+    // while inventing a same-named source would make a false lineage claim.
     const source = `
 schema s0 {
   a STRING
@@ -263,12 +256,11 @@ mapping m0 {
     indexFile(index, uri, tree);
     const layout = await viz.computeLayout(buildVizModel(uri, tree, index));
 
-    const phantom = layout.edges.filter((edge) => edge.arrow.sourceFields.length === 0);
-    assert.deepEqual(
-      phantom.map(drawnKey),
-      ["s0.stamp -> s1.stamp"],
-      `lgc-4bxl's phantom edge changed — read this test's comment before updating ` +
-        `the expectation:\n${source}`,
+    assert.equal(
+      layout.edges.filter((edge) => edge.arrow.sourceFields.length === 0).length,
+      0,
+      `a computed arrow must not manufacture a field-to-field edge:\n${source}`,
     );
+    assert.deepEqual(layout.edges.map(drawnKey), ["s0.a -> s1.a"], `the real edge must remain`);
   });
 });

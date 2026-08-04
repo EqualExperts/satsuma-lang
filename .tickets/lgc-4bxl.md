@@ -1,6 +1,6 @@
 ---
 id: lgc-4bxl
-status: open
+status: closed
 deps: []
 links: [sl-hi0z, sl-k7i4, lgc-fu7o]
 created: 2026-08-03T22:23:44Z
@@ -51,3 +51,7 @@ A computed arrow never produces an edge whose source is a field the arrow does n
 **2026-08-03T22:45:49Z**
 
 Feature 41 R3 pinned this defect in an executable test rather than skipping it. The test asserts the CURRENT (wrong) behaviour and will go RED when this ticket is fixed, with a comment naming the invariant to replace it with. `{ todo: ... }` is not usable in this repo: node's JUnit reporter puts a `failure=` attribute on a failing todo testcase, and dorny/test-reporter then fails CI's Test report check.
+
+**2026-08-04T09:31:15Z**
+
+Cause: The layout treated a sourceless computed arrow as if its target field were also a source field, so a same-named field on a source schema became a phantom lineage edge. Fix: Computed arrows now emit no field-to-field layout edge; their mapped target remains distinguishable through the existing coverage port, with generated and browser-harness regression coverage. (commit immediately after f775a972)
