@@ -74,3 +74,47 @@ Also carried forward for measurement: R4 changed no job structure, so the expect
 before/after here is still against the 4m37s full-pipeline figure recorded above.
 R4's own run (30937118776, 28 checks green after the build:all fix) is the new
 "before" for this ticket.
+
+**2026-08-04T18:58:28Z**
+
+Measured "before" for this ticket — a main run, like-for-like with the earlier
+figures.
+
+main @ c2d447b4 (run 30940705927, immediately after R4 merged), all 28 checks
+green: **4m18s** end to end (18:53:10 -> 18:57:28). Install job 61s.
+
+Progression: R1 baseline 4m35s -> post-R2/R3 4m37s -> post-R4 4m18s. R4's ~19s
+came from deleting the vscode job's four hand-ordered build steps, not from any
+caching, which R4 did not add to CI.
+
+Where the time actually goes (per-job, from run 30940255914 on main):
+
+| Job | Duration |
+|---|---|
+| Test stats freshness | 150s |
+| Satsuma CLI | 135s |
+| Satsuma-to-Excel skill | 74s |
+| Install dependencies | 61s |
+| Smoke tests (BDD) | 48s |
+| VS Code extension | 41s |
+| Lint | 41s |
+| Tree-sitter parser | 39s |
+| everything else | <=29s |
+
+The pipeline is install (61s) then the longest downstream job, so the number to
+move is `Test stats freshness` at 150s, with `Satsuma CLI` at 135s right behind.
+Both are pure re-execution: test-stats re-runs *every* package's suite from
+scratch purely to count tests, and the CLI job re-runs a suite whose inputs
+usually have not changed.
+
+Two consequences for how this ticket is done:
+
+1. **No job graph restructuring is required** — the ticket's own instruction.
+   Both poles are fixed by making each job's work cacheable and persisting
+   `.turbo`, not by moving work between jobs.
+2. **Cache keys must be per-job.** A local cache is not shared between jobs, so a
+   single repo-wide key would have jobs racing to save and each overwriting the
+   others' entries. Namespacing on the job (`turbo-<job>-<os>-<sha>` with a
+   `turbo-<job>-<os>-` restore-key) lets each job accumulate exactly the task
+   entries it runs and hit them on the next push. The cost is that the first run
+   after this lands is no faster, and build outputs are stored once per job.

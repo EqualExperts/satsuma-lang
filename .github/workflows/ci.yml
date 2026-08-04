@@ -40,6 +40,17 @@ jobs:
           path: ~/.cache/tree-sitter
           key: wasi-sdk-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
 
+      # Turborepo's content-hash cache for the build tasks. See the note on the
+      # matching step in the `test-stats` job for why the key is namespaced per
+      # job rather than shared. This is what makes a commit that changes one
+      # package stop rebuilding the other ten.
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        with:
+          path: .turbo
+          key: turbo-install-${{ runner.os }}-${{ github.sha }}
+          restore-keys: |
+            turbo-install-${{ runner.os }}-
+
       # One workspace-aware install, then one ordered build. Both orders used to
       # be spelled out step by step here, in a second copy of what the root
       # package.json already said (feature 42, R2 reduced that to one shell
@@ -147,23 +158,31 @@ jobs:
         working-directory: tooling/satsuma-scenario-gen
         run: npm test
 
-      # `npm run pretest` until R4 deleted that hook. What it added over
-      # test:typecheck was a build of this package and its siblings, and the
-      # `install` job — which this one `needs` — has already run one ordered
-      # build of the whole workspace and saved its output under this commit's
-      # SHA. The typecheck still needs its own step, because the c8 invocation
-      # below fires no npm script hook (sl-851u).
-      - name: Typecheck the CLI test sources
-        run: npm run test:typecheck
+      # Per-job Turborepo cache — see the note in the `test-stats` job for why the
+      # key is namespaced rather than shared.
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        with:
+          path: .turbo
+          key: turbo-cli-${{ runner.os }}-${{ github.sha }}
+          restore-keys: |
+            turbo-cli-${{ runner.os }}-
 
+      # A named task, so nothing can bypass it the way npm's implicit `pretest`
+      # hook was bypassed by any command that was not literally `npm test`
+      # (sl-851u).
+      - name: Typecheck the CLI test sources
+        working-directory: ${{ github.workspace }}
+        run: npx turbo run test:typecheck --filter=satsuma-cli
+
+      # A Turborepo task rather than the c8 invocation this step used to spell out
+      # inline: a raw command cannot be cached, and this job was the pipeline's
+      # second-longest at 135s, almost always re-running a suite whose inputs had
+      # not changed. Its declared outputs are the coverage report and the JUnit
+      # XML, both now inside the package, so a cache hit restores everything the
+      # upload steps below look for. --filter builds its dependencies first.
       - name: Run CLI tests with coverage
-        run: |
-          mkdir -p ../../test-results
-          npx c8 --reporter=text --reporter=lcov --reporter=json-summary \
-            node --import tsx/esm --import ./test/setup.ts --test \
-            --test-reporter=spec --test-reporter-destination=stdout \
-            --test-reporter=junit --test-reporter-destination=../../test-results/cli.xml \
-            'test/**/*.test.ts'
+        working-directory: ${{ github.workspace }}
+        run: npx turbo run test:coverage --filter=satsuma-cli
 
       - name: Post coverage summary
         if: always()
@@ -183,7 +202,7 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: test-results-cli
-          path: test-results/cli.xml
+          path: tooling/satsuma-cli/test-results/cli.xml
 
       - name: Upload coverage report
         if: always()
@@ -335,12 +354,45 @@ jobs:
           restore-keys: |
             workspace-
 
-      # Default mode (no --from-logs): this job spawns each tracked package's
-      # own test command itself, rather than reading logs the pre-commit hook
-      # captured locally — CI has no local-hook cost constraint to optimize
-      # for, so it can just recompute the numbers from a clean checkout.
+      # See the matching step in the `install` job. Needed here because the
+      # `turbo run test` below builds the grammar WASM as a dependency.
+      - name: Cache wasi-sdk toolchain
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        with:
+          path: ~/.cache/tree-sitter
+          key: wasi-sdk-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
+      # Turborepo's content-hash cache, namespaced to this job. A local cache is
+      # not shared between jobs (no remote cache — ADR-049), so a single repo-wide
+      # key would have every job racing to save and overwriting the others'
+      # entries. Per-job keys let this job accumulate exactly the task entries it
+      # runs and hit them on the next push; the restore-keys prefix is what
+      # carries them across commits.
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        with:
+          path: .turbo
+          key: turbo-test-stats-${{ runner.os }}-${{ github.sha }}
+          restore-keys: |
+            turbo-test-stats-${{ runner.os }}-
+
+      # This job was the pipeline's longest at 150s, and all of it was
+      # re-execution: it spawned every tracked package's suite from scratch purely
+      # to count tests. Turborepo already captures each `test` task's output at
+      # tooling/<package>/.turbo/turbo-test.log and replays it on a cache hit, and
+      # the generator reads those logs directly — so on a commit that changes one
+      # package, only that package's suite actually runs and the rest are replayed.
+      #
+      # @satsuma/viz-harness is excluded for the same reason `test:all` excludes
+      # it: its `test` is Playwright. tree-sitter-satsuma is *not* excluded here,
+      # unlike in `test:all`, because its corpus summary is where parserCorpusTests
+      # comes from and nothing else in this job would produce it.
+      - name: Build and test the workspace
+        run: |
+          npx turbo run build compile
+          npx turbo run test --filter='!@satsuma/viz-harness'
+
       - name: Regenerate test-stats.json
-        run: node scripts/generate-test-stats.mjs
+        run: node scripts/generate-test-stats.mjs --from-logs
 
       - name: Check test-stats.json is up to date
         run: |
@@ -390,6 +442,16 @@ jobs:
         with:
           path: ~/.cache/tree-sitter
           key: wasi-sdk-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
+      # Per-job Turborepo cache — see the note in the `test-stats` job. This job
+      # builds seven packages through the filter below, so an unchanged
+      # dependency chain is a cache hit rather than a rebuild.
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        with:
+          path: .turbo
+          key: turbo-vscode-${{ runner.os }}-${{ github.sha }}
+          restore-keys: |
+            turbo-vscode-${{ runner.os }}-
 
       # Four separate steps until R4 — build the grammar WASM, build the
       # extension, build satsuma-cli "(needed by LSP formatting provider)",

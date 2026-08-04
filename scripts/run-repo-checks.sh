@@ -33,31 +33,19 @@ run_parallel() {
 
 cd "$ROOT_DIR"
 
-# The "generate test-stats.json" step at the end reads each package's test
-# output out of a check that already ran, rather than running the suites a
-# second time just to source a number. Turborepo captures that output itself,
-# one file per task at tooling/<package>/.turbo/turbo-<task>.log, and replays it
-# on a cache hit — so this directory is filled by copying those logs in under
-# the names the generator expects (see collect_turbo_test_logs below) instead of
-# by teeing every step as it runs. Removed on exit so a failed hook run never
-# leaves a stale log around to be misread by a later invocation.
+# The "generate test-stats.json" step at the end reads each package's test output
+# out of a check that already ran, rather than running the suites a second time
+# just to source a number. Almost all of it comes from Turborepo, which writes one
+# log per `test` task at tooling/<package>/.turbo/turbo-test.log and replays it on
+# a cache hit — the generator reads those itself.
+#
+# This directory carries the one count Turborepo cannot supply here: the
+# tree-sitter corpus. That step is bespoke (see below) because it has to skip
+# gracefully when the resolved tree-sitter binary lacks the wasm feature, so its
+# output — skip message or real summary — is captured here instead. Removed on
+# exit so a failed hook run never leaves a stale log to be misread later.
 STATS_LOG_DIR="$(mktemp -d)"
 trap 'rm -rf "$STATS_LOG_DIR"' EXIT
-
-# scripts/generate-test-stats.mjs --from-logs expects <dir>/<package>.log, keyed
-# on the package's directory name under tooling/. Turborepo's own per-task log
-# is already exactly the output the generator parses, so this just renames.
-# A missing log is not an error: the generator keeps the previously committed
-# count for any package this run did not exercise, which is the correct answer
-# for the packages test:all deliberately excludes.
-collect_turbo_test_logs() {
-  for log in "$ROOT_DIR"/tooling/*/.turbo/turbo-test.log; do
-    [ -f "$log" ] || continue
-    local package_dir
-    package_dir="$(basename "$(dirname "$(dirname "$log")")")"
-    cp -f "$log" "$STATS_LOG_DIR/$package_dir.log"
-  done
-}
 
 # Verify Python lint tools are available before running any checks.
 # Install with: pip install yamllint ruff
@@ -110,7 +98,6 @@ run_step "scenario generator tests" npx turbo run test --filter=@satsuma/scenari
 # parallelism (two run_parallel groups), and the typecheck steps that npm's
 # implicit `pretest` hook would otherwise have decided for us.
 run_step "workspace tests" npm run test:all
-collect_turbo_test_logs
 
 # ADR-022: CLI accepts files, not directories. Check each example entry file.
 run_step "satsuma fmt --check examples" bash -c '
