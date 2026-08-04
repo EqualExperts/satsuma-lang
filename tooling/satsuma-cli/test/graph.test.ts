@@ -449,7 +449,7 @@ describe("satsuma graph (slices)", () => {
   it("extracts slices for metrics with slice declarations", async () => {
     const { stdout } = await run("graph", "--json", PLATFORM);
     const data = JSON.parse(stdout);
-    const mrr = data.nodes.find((n: any) => n.id === "monthly_recurring_revenue");
+    const mrr = data.nodes.find((n: any) => n.id === "::monthly_recurring_revenue");
     assert.ok(mrr, "should have monthly_recurring_revenue metric");
     assert.deepEqual(mrr.slices, ["customer_segment", "product_line", "region"]);
   });

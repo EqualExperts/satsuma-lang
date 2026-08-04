@@ -64,6 +64,8 @@ Flags: `--json` (full graph), `--compact` (schema-level adjacency list), `--sche
 
 The `schema_edges` array includes edges with roles: `source`, `target`, `metric_source`, and `nl_ref`. The `nl_ref` role marks schemas referenced in NL text but not declared in the mapping's source/target list — these represent data dependencies discovered through NL analysis. Fragments do not appear as graph nodes or edges — per ADR-008, fragments are macros whose fields are inlined into consuming schemas before analysis.
 
+**JSON output uses canonical entity IDs:** all `node.id` and edge endpoint (`from`/`to`/`mapping`) values use the canonical form with an explicit namespace prefix: `::raw` for file-scope entities, `ns::staged` for namespaced ones. This unambiguous spelling allows JSON consumers to join edges to nodes reliably, across all entity kinds, without guessing namespace scope.
+
 ### Agent Setup
 
 | Command           | Operation                                                                             | Example                   |

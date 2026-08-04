@@ -3699,10 +3699,10 @@ describe("satsuma graph: --schema-only derived-only edges (sl-w4hv)", () => {
     assert.equal(code, 0);
     const data = JSON.parse(stdout);
     assert.ok(data.edges.length > 0, "should have schema-level edges");
-    const edge = data.edges.find((e: any) => e.mapping === "enrich data");
+    const edge = data.edges.find((e: any) => e.mapping === "::enrich data");
     assert.ok(edge, "should have edge for 'enrich data' mapping");
-    assert.equal(edge.from, "raw_data");
-    assert.equal(edge.to, "enriched_data");
+    assert.equal(edge.from, "::raw_data");
+    assert.equal(edge.to, "::enriched_data");
   });
 });
 
@@ -3715,10 +3715,10 @@ describe("satsuma graph: schema_edges NL-referenced schemas (sl-n11t)", () => {
     const data = JSON.parse(stdout);
     const sourceEdges = data.schema_edges.filter((e: any) => e.role === "source");
     const sourceNames = sourceEdges.map((e: any) => e.from);
-    assert.ok(sourceNames.includes("crm_accounts"), "should have declared source");
-    assert.ok(sourceNames.includes("erp_customers"), "should have declared source");
+    assert.ok(sourceNames.includes("::crm_accounts"), "should have declared source");
+    assert.ok(sourceNames.includes("::erp_customers"), "should have declared source");
     assert.ok(
-      !sourceNames.includes("web_profiles"),
+      !sourceNames.includes("::web_profiles"),
       "should NOT include NL-referenced schema as source",
     );
   });
@@ -3729,8 +3729,8 @@ describe("satsuma graph: schema_edges NL-referenced schemas (sl-n11t)", () => {
     const data = JSON.parse(stdout);
     const nlRefEdges = data.schema_edges.filter((e: any) => e.role === "nl_ref");
     assert.equal(nlRefEdges.length, 1, "should have one nl_ref edge");
-    assert.equal(nlRefEdges[0].from, "web_profiles");
-    assert.equal(nlRefEdges[0].to, "build dim_customer");
+    assert.equal(nlRefEdges[0].from, "::web_profiles");
+    assert.equal(nlRefEdges[0].to, "::build dim_customer");
   });
 
   it("does not duplicate nl_ref edge for schemas already in source list", async () => {
@@ -4047,7 +4047,7 @@ describe("satsuma graph --json — fragment spread expansion (sl-t6lt)", () => {
     const { stdout, code } = await run("graph", "--json", SPREAD_FIXTURE);
     assert.equal(code, 0);
     const graph = JSON.parse(stdout);
-    const tgtNode = graph.nodes.find((n: any) => n.id === "tgt_customers");
+    const tgtNode = graph.nodes.find((n: any) => n.id === "::tgt_customers");
     assert.ok(tgtNode, "tgt_customers node should exist");
     const fieldNames = tgtNode.fields.map((f: any) => f.name);
     assert.ok(fieldNames.includes("created_at"), "should include created_at from audit fields");
