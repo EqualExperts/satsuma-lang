@@ -21,3 +21,9 @@ Add a root turbo.json defining per-package build, test, test:coverage, and lint 
 - .turbo local cache demonstrably skips a re-build/re-test of a package whose inputs are unchanged
 - All existing tests pass unchanged
 
+
+## Notes
+
+**2026-08-04T13:26:29Z**
+
+R1 handoff: Turborepo orders tasks only after npm install and therefore cannot itself prevent install-time prepare hooks from firing. Before R4 removes --ignore-scripts, move or neutralize the package build work currently run by prepare so the install succeeds independently and Turbo owns the subsequent build graph. See features/42-monorepo-build-tooling/R1-FINDINGS.md.

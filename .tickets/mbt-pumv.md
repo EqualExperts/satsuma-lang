@@ -22,3 +22,9 @@ Add "workspaces": ["tooling/*"] to the root package.json. Replace file:../X cros
 - All existing tests pass unchanged in every tooling/* package
 - Depends on R1's findings (no unresolved hoisting conflicts, ordering scripts accounted for)
 
+
+## Notes
+
+**2026-08-04T13:26:22Z**
+
+R1 handoff: see features/42-monorepo-build-tooling/R1-FINDINGS.md. R2 must preserve a transitional explicit build phase because a clean workspace install runs satsuma-cli prepare before the grammar WASM exists. A root-wide --ignore-scripts install also suppresses the tree-sitter-cli and esbuild binary installers, and the documented package-local web-tree-sitter/tree-sitter-cli paths fail after hoisting.
