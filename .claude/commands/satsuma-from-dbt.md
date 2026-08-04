@@ -1,0 +1,1 @@
+../../skills/satsuma-from-dbt/SKILL.md

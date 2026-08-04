@@ -1,0 +1,1 @@
+../../skills/satsuma-sample-data/SKILL.md
