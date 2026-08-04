@@ -1,6 +1,6 @@
 ---
 id: saf-xzkt
-status: open
+status: closed
 deps: []
 links: []
 created: 2026-08-04T20:51:43Z
@@ -18,3 +18,19 @@ site/_data/stats.json has drifted from the authoritative root test-stats.json: s
 
 site/_data/stats.json's packages object matches test-stats.json's packages object exactly, field for field, including adding integration-tests. Consider whether a build step should generate site/_data/stats.json from test-stats.json automatically to prevent future drift (note as a follow-up if out of scope for this ticket).
 
+
+## Notes
+
+**2026-08-04T21:14:17Z**
+
+## Notes
+
+**2026-08-04T00:00:00Z**
+
+Cause: site/_data/stats.json had drifted from the authoritative root
+test-stats.json across 5 package test counts and was missing the
+integration-tests package entirely.
+Fix: overwrote site/_data/stats.json's packages object to match
+test-stats.json exactly. No script yet regenerates this automatically --
+noted as a good follow-up (not scoped here) to stop future drift
+(commit immediately after 9a44adff).

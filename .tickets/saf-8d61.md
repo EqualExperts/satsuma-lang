@@ -1,6 +1,6 @@
 ---
 id: saf-8d61
-status: open
+status: closed
 deps: []
 links: []
 created: 2026-08-04T20:51:43Z
@@ -18,3 +18,20 @@ The #classification table documents five classifications (structural, nl, mixed,
 
 site/cli.njk's Transform Classification table shows only nl, none, and nl-derived, with descriptions matching tooling/satsuma-core/src/classify.ts's current behavior (presence check, not content analysis).
 
+
+## Notes
+
+**2026-08-04T21:14:17Z**
+
+## Notes
+
+**2026-08-04T00:00:00Z**
+
+Cause: the "Transform classification" table on site/cli.njk documented
+five classifications (structural, nl, mixed, none, nl-derived) when the
+codebase only emits three (nl, none, nl-derived) -- structural/mixed were
+removed before Feature 28. On review with the project owner, decided this
+detail is low-value CLI-internals content not worth keeping accurate on a
+marketing page, rather than worth fixing in place.
+Fix: removed the section entirely instead of correcting it
+(commit immediately after 9a44adff).
