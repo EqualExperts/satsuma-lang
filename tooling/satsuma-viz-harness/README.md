@@ -94,7 +94,9 @@ sentinel file:
 agent ──touch .run-tests──▶ watch-and-test.sh
                                 │
                                 ├── kills any stale server on :3333
-                                ├── runs `npm test` (pretest rebuild + Playwright)
+                                ├── runs `npm test` — its `pretest` is
+                                │   `turbo run build --filter=@satsuma/viz-harness`,
+                                │   which rebuilds this package and its deps
                                 ├── writes build and test output to .playwright-results.txt
                                 └── removes .run-tests on pickup
 ```
@@ -127,8 +129,9 @@ fresh harness and viz bundles.
 ### Run directly (developer, not agent)
 
 ```bash
-npm --prefix tooling/satsuma-viz-harness run test         # all projects
-npm --prefix tooling/satsuma-viz-harness run screenshots  # screenshot project only
+npm --prefix tooling/satsuma-viz-harness run test         # all projects; pretest rebuilds first
+npx turbo run build --filter=@satsuma/viz-harness \
+  && npm --prefix tooling/satsuma-viz-harness run screenshots   # screenshots have no pretest
 ```
 
 ---
@@ -196,9 +199,8 @@ and VLM review".
 Before pushing changes that touch the harness, viz, or viz-backend, run:
 
 ```bash
-npm --prefix tooling/satsuma-viz run test
-npm --prefix tooling/satsuma-viz-backend run test
-npm --prefix tooling/satsuma-viz-harness run build
+npx turbo run test --filter=@satsuma/viz --filter=@satsuma/viz-backend
+npx turbo run build --filter=@satsuma/viz-harness
 # Then trigger the watcher and read .playwright-results.txt
 ```
 

@@ -53,25 +53,28 @@ CONFLICTS.expected       Documented expected grammar conflicts (count = 3)
 
 ## Building
 
-Requires Node.js 20+, `tree-sitter-cli`, and a C toolchain (macOS: Command Line Tools or Xcode).
+Requires Node.js 20+. No C toolchain: there is no native build in this repository
+— the WASM migration removed it (ADR-002), and this package's `install` script
+deliberately skips node-gyp. `tree-sitter-cli` comes from the root install, which
+hoists it.
 
 ```bash
-cd tooling/tree-sitter-satsuma
+npm install                   # from the repo root — npm workspaces, one lockfile
 
-# Install dev dependencies (tree-sitter-cli)
-npm install
-
-# Generate parser.c from grammar.js, then compile the native binding
-npm run build
-# equivalent: tree-sitter generate && node-gyp build
+# Regenerate src/parser.c from grammar.js, then compile it to WASM
+npm --prefix tooling/tree-sitter-satsuma run build
+# equivalent: tree-sitter generate && tree-sitter build --wasm . -o tree-sitter-satsuma.wasm
 ```
+
+`generate` also rewrites `tooling/satsuma-core/src/generated/cst-types.ts`, the
+committed CST contract. CI checks both that file and `src/` are current.
 
 ## Running Tests
 
 ```bash
-# Run all corpus tests (requires compiled parser)
-npm test
-# equivalent: tree-sitter test
+# Generate, test the CST-contract generator, then run the corpus
+npm --prefix tooling/tree-sitter-satsuma test
+# the corpus step alone: npm run test:corpus  (tree-sitter test --wasm)
 
 # Smoke-test against examples/
 node scripts/smoke-check.js ../../examples/

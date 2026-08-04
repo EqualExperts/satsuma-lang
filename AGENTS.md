@@ -31,7 +31,7 @@ Current per-package test counts and the CLI command count are tracked in [`test-
 - `tooling/satsuma-viz-model/`: the VizModel protocol contract — the payload shape the LSP produces and the viz component consumes, defined once so neither can drift
 - `tooling/satsuma-viz-backend/`: workspace indexing and VizModel assembly shared by the LSP and browser hosts; also computes the field coverage the payload carries (ADR-042)
 - `tooling/satsuma-viz/`: the `satsuma-viz` Lit web component — overview graph and per-mapping detail view, embedded in the VS Code webview and the site playground
-- `tooling/satsuma-viz-harness/`: Playwright harness for the viz component (99 tests) — human-in-the-loop, see [Viz harness Playwright tests](#viz-harness-playwright-tests-human-in-the-loop-workflow)
+- `tooling/satsuma-viz-harness/`: Playwright harness for the viz component — human-in-the-loop, see [Viz harness Playwright tests](#viz-harness-playwright-tests-human-in-the-loop-workflow)
 - `tooling/vscode-satsuma/`: VS Code extension (LSP client, commands, webview panels) and TextMate grammar; delegates language intelligence to `satsuma-lsp`
 - `tooling/integration-tests/`: **test-only** cross-consumer parity sweeps (CLI vs. the VizModel both the webview and the LSP consume) — the one place both sides are reachable without either package taking on a dependency its own architecture forbids
 
@@ -121,9 +121,11 @@ results without shell access to the browser process:
    ./tooling/satsuma-viz-harness/watch-and-test.sh &
    ```
    The watcher polls for `.run-tests`, runs `npm test` when it appears, and therefore
-   rebuilds the core, backend, viz, and harness bundles through npm's `pretest` hook
-   before Playwright starts. Build and test output is written to
-   `.playwright-results.txt`, then the sentinel is removed.
+   rebuilds the harness and everything it depends on before Playwright starts — the
+   harness's `pretest` is `turbo run build --filter=@satsuma/viz-harness`. It is the
+   only surviving `pretest` in the repo; do not infer that other packages still have
+   build hooks (see [Building and testing](#building-and-testing)). Build and test
+   output is written to `.playwright-results.txt`, then the sentinel is removed.
 
 2. The agent triggers a run by creating the sentinel:
    ```bash
@@ -205,6 +207,52 @@ HOMEBREW_NO_AUTO_UPDATE=1 brew ...
 ```
 
 Prefer these forms over prompt-prone variants such as plain `cp`, `mv`, or `rm`.
+
+## Building and testing
+
+The eleven `tooling/*` packages are npm workspaces behind one root
+`package-lock.json`, and [`turbo.json`](turbo.json) defines the task graph. The
+cross-package build order is **derived from the dependency graph in the
+manifests** — it is not written down as a sequence anywhere, so changing it means
+editing a package's `dependencies`/`devDependencies`, nothing else (ADR-049).
+
+| What you want | Command |
+|---|---|
+| Install and build everything | `npm run install:all` |
+| Rebuild everything | `npm run build:all` |
+| Run every package's tests and typechecks | `npm run test:all` |
+| Work on one package | `turbo run test --filter=<package>` |
+| Coverage for every package that reports it | `npm run test:coverage` |
+| The repo-level scripts' own tests | `npm run test:scripts` |
+| Everything the pre-commit hook runs | `./scripts/run-repo-checks.sh` |
+
+`--filter` takes a package's **declared name**, not its directory:
+`@satsuma/core`, `@satsuma/lsp`, `satsuma-cli`, `tree-sitter-satsuma`. It pulls in
+that package's dependencies too, so from a completely unbuilt tree
+`turbo run test --filter=@satsuma/lsp` builds core, the VizModel contract, the
+viz-backend, the CLI and the grammar WASM, then runs the LSP's suite.
+
+**The one thing that changed and will catch you out:**
+`npm --prefix tooling/<package> test` **no longer builds that package's
+dependencies.** Every `prebuild`/`pretest` hook that used to shell out to
+`npm --prefix ../sibling run build` is gone — that duplication is exactly what
+Turborepo replaced. So a bare per-package `npm test` on a freshly installed or
+partly built workspace fails against missing or stale output. Either run
+`npm run build:all` first, or use `turbo run test --filter=<package>`, which
+cannot get it wrong.
+
+Two more consequences worth knowing:
+
+- **Turborepo caches by input hash, so a stale cache cannot give a wrong answer** —
+  identical inputs mean identical outputs. To force real work anyway (proving a
+  cold build, or debugging the cache itself), use `turbo run build --force`.
+  Deleting the cache is not the tool for this: from a linked worktree under
+  `.worktrees/`, turbo shares the *primary* worktree's cache and `clean:all`'s
+  `.turbo` entry is a no-op.
+- **Two suites are deliberately outside `test:all`.** `@satsuma/viz-harness`'s is
+  Playwright (see below), and `tree-sitter-satsuma`'s shells out to
+  `tree-sitter test --wasm`, which needs its own environment and graceful-skip
+  handling — `scripts/run-repo-checks.sh` runs it separately.
 
 ## Running Turborepo in the agent sandbox
 
@@ -305,7 +353,13 @@ customLanguages:
     expandoChar: _
 ```
 
-After building the dylib (`npm run build` in `tooling/tree-sitter-satsuma/`), `ast-grep run -l satsuma -p '...'` enables structural search over `.stm` files. This is also the foundation for a future Satsuma linter implemented as `ast-grep scan` rules.
+Note this needs a shared library, and there is no native build in this repository
+— the WASM migration removed it (ADR-002), so `npm run build` in that package
+produces `tree-sitter-satsuma.wasm`, not a dylib. Registering Satsuma as a custom
+`ast-grep` language therefore needs a native build step that does not exist yet;
+treat the snippet above as a sketch of the eventual setup rather than as
+instructions that work today. It is the foundation for a future Satsuma linter
+implemented as `ast-grep scan` rules.
 
 ## Issue Tracking
 
@@ -342,9 +396,10 @@ Expected workflow:
 - Use git worktrees in `.worktrees/` for feature isolation. Create one per feature
   branch so multiple agents can work in parallel without conflicts.
 - **After creating a new worktree**, run `npm run install:all` from the worktree
-  root to install all dependencies, build the WASM parser, and compile the LSP
-  server. Without this step, pre-commit hooks will fail on vscode-satsuma and
-  tree-sitter tests.
+  root. That is one root `npm install` against the single `package-lock.json`
+  (the eleven `tooling/*` packages are npm workspaces) followed by
+  `turbo run build compile`, which builds every package in dependency order.
+  Without it the pre-commit hook fails, because nothing else builds the workspace.
 - **Check the pre-commit hook is installed before your first commit** in any clone
   or worktree — see [Installing the pre-commit hook](#installing-the-pre-commit-hook).
   If it isn't installed, install it. Do not just note it in the PR body.

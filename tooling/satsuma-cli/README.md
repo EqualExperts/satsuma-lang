@@ -7,14 +7,16 @@ Command-line tool that uses the tree-sitter Satsuma v2 parser to index Satsuma w
 ## Requirements
 
 - Node.js 20+
-- `tree-sitter-satsuma` built (see `tooling/tree-sitter-satsuma/`)
+
+The grammar WASM this package loads is built for you: it is a declared dependency,
+so Turborepo builds `tree-sitter-satsuma` before this package.
 
 ## Installation (local dev)
 
 ```bash
-cd tooling/satsuma-cli
-npm install
-npm link          # makes `satsuma` available on PATH
+npm install                   # from the repo root — npm workspaces, one lockfile
+npm run build:all             # or: npx turbo run build --filter=satsuma-cli
+npm --prefix tooling/satsuma-cli link    # makes `satsuma` available on PATH
 ```
 
 ## Usage
@@ -110,6 +112,6 @@ src/
 # Run directly without linking
 node src/index.js summary ../../examples/
 
-# Run tests
-npm test
+# Run tests (from the repo root — builds dependencies first)
+npx turbo run test --filter=satsuma-cli
 ```

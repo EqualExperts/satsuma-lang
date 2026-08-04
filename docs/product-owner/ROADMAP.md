@@ -8,8 +8,8 @@ Feature specs live in `features/` while active and move to `archive/features/` o
 
 ## Active Feature Specs
 
-Features 36, 40, and 42 are active. Everything numbered 01–35 plus Features
-37, 38, 39, and 41 has shipped and is archived (see
+Features 36 and 40 are active. Everything numbered 01–35 plus Features
+37, 38, 39, 41, and 42 has shipped and is archived (see
 [Shipped Features](#shipped-features)).
 
 ### Feature 36 — Viz Coverage Overlay and Field Chain View (not started)
@@ -30,6 +30,7 @@ Delivered and moved to `archive/features/`. Recent work, most recent first:
 
 | Feature | Shipped | What landed |
 | --- | --- | --- |
+| 42 — Monorepo build tooling | 2026-08-04 | npm workspaces behind one root lockfile, a Turborepo task graph whose build order is derived from the manifests rather than written down, and a persisted content-hash cache (ADR-049). CI 4m35s → 1m56s warm; the eleven packages' `prebuild`/`pretest` sibling-build chains and `scripts/build-workspace.sh` are gone |
 | 39 — Correctness by default | 2026-08-04 | Generated CST contracts, opaque path/ref stages, generated coverage and formatter properties, an independent coverage oracle, enforced typecheck and type-aware lint gates, and structural `FieldDecl` variants |
 | 38 — Hierarchical field coverage | 2026-08-03 | Path-correct nested coverage, container tri-state, whole-subtree arrow semantics, leaf-only ratios, and parity across the CLI, LSP, VS Code, and viz consumers (ADR-035–041) |
 | 35 — Workspace coverage command | 2026-08-01 | `satsuma coverage` with per-mapping/per-schema/workspace rollups, a stable `--json` contract, and a `--fail-under` CI gate on exit code 3; `computeMappingCoverage` relocated into `@satsuma/core` |

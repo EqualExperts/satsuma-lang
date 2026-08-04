@@ -2,6 +2,12 @@
 
 The site is built with [Eleventy (11ty)](https://www.11ty.dev/) using Nunjucks templates.
 
+> The site is **deliberately not an npm workspace member**: the root
+> `package.json` globs `tooling/*` only, and `site/package-lock.json` is its own.
+> It is a separate deployable with its own toolchain, so its dependencies install
+> here rather than hoisting to the root — do not delete that lockfile or fold it
+> into the root one.
+
 ## Local Preview
 
 ```bash

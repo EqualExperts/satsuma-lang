@@ -6,12 +6,13 @@ The `satsuma` command-line tool is a deterministic structural extraction tool fo
 
 ## Installation
 
-The CLI lives in `tooling/satsuma-cli/`. To install it locally:
+The CLI lives in `tooling/satsuma-cli/`. It is an npm workspace member, so
+dependencies install once at the repo root and the build comes from Turborepo:
 
 ```bash
-cd tooling/satsuma-cli
-npm install
-npm link    # makes `satsuma` available globally
+npm install                   # from the repo root — one lockfile for all packages
+npm run build:all             # or: npx turbo run build --filter=satsuma-cli
+npm --prefix tooling/satsuma-cli link    # makes `satsuma` available globally
 ```
 
 ## Design Principle

@@ -2,6 +2,16 @@
 
 Last reviewed: 2026-04-07.
 
+> **Superseded in part.** This is a dated snapshot, kept as the review it was, so
+> its findings are not edited after the fact. One has since been addressed in
+> full: §9 "Monorepo Tooling Is Still Manual" and its recommendation **R9** were
+> delivered as Feature 42 on 2026-08-04. The repository now uses npm workspaces
+> behind a single root lockfile, a Turborepo task graph whose cross-package build
+> order is derived from the manifests, a persisted content-hash cache, and
+> `npm run test:all` as the root full-repo check (ADR-049). Read §9, R9, and the
+> "no build caching / no task runner" remarks in the closing section as history.
+> The package count has also grown from nine to eleven.
+
 ## What Is This Codebase?
 
 Satsuma is a domain-specific language (DSL) for describing source-to-target data mappings. Think of it as a replacement for the massive Excel spreadsheets and wiki pages that enterprises use to document how data moves between systems. The language has a parser, a parser-backed CLI command suite, a Language Server Protocol (LSP) implementation, a VS Code extension, and an interactive visualisation component — all in TypeScript, all under `tooling/`.

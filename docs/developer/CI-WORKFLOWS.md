@@ -29,20 +29,38 @@ gate — it is not merely a CI concern.
 
 The CI workflow verifies that the whole repository is correct: all tests pass,
 generated files are up to date, the CLI tarball installs cleanly, and no
-secrets are present. It uses a shared workspace cache so each test job avoids
-reinstalling dependencies.
+secrets are present.
+
+Two caches carry work between jobs and between runs:
+
+- a **workspace blob** keyed on the commit SHA, saved by `install` and restored by
+  every downstream job, so no job reinstalls dependencies;
+- **Turborepo's content-hash cache** (`.turbo`), persisted per job under
+  `turbo-<job>-<os>-<sha>` with a `turbo-<job>-<os>-` restore-key. It is what lets
+  a commit touching one package skip an unaffected package's suite. The keys are
+  namespaced per job because a local cache is not shared between jobs (there is no
+  remote cache — ADR-049), so a single key would have every job racing to save and
+  overwriting the others' entries.
+
+Warm, the pipeline is ~1m56s; cold (new cache keys) ~3m36s. It was 4m35s before
+Feature 42.
 
 ### Job graph
 
 ```mermaid
 flowchart TD
-    install["install\n(deps + build + cache)"]
+    install["install\n(npm ci + turbo run build compile)"]
 
-    install --> lint
-    install --> cli["satsuma-cli\n(tests + fmt check)"]
+    install --> lint["lint\n(turbo run lint · check:deps · test:scripts)"]
+    install --> cli["satsuma-cli\n(turbo test:typecheck + test:coverage · fmt check)"]
     install --> parser["parser\n(generate · corpus · pytest)"]
-    install --> vscode["vscode-extension\n(validate · tests · LSP)"]
+    install --> vscode["vscode-extension\n(turbo build+compile · extension + LSP tests)"]
     install --> pack["cli-pack-smoke-test\n(pack · global install · version check)"]
+    install --> integration["integration-tests\n(cross-consumer parity)"]
+    install --> stats["test-stats\n(turbo run test · test-stats.json freshness)"]
+    install --> smoke["smoke-tests\n(BDD, global CLI install)"]
+    install --> stmexcel["stm-to-excel-skill\n(pytest, global CLI install)"]
+    install --> modules["tooling-modules\n(matrix: core · viz-model · viz-backend · viz)"]
 
     excel["excel-skill\n(pytest, no cache needed)"]
 
@@ -51,6 +69,12 @@ flowchart TD
     vscode --> report
     excel --> report
     pack --> report
+    smoke --> report
+    stmexcel --> report
+
+    cli --> coverage["coverage-report\n(matrix, PRs only)"]
+    modules --> coverage
+    vscode --> coverage
 
     secrets["secrets\n(gitleaks — no cache needed)"]
 ```
@@ -59,12 +83,16 @@ flowchart TD
 
 #### `install`
 
-Installs all workspace dependencies, builds `satsuma-core`, compiles the WASM
-parser, runs the CLI `prebuild` (copies generated sources and WASM into
-`dist`), and builds the `satsuma-viz` bundle. Saves the full workspace —
-`node_modules`, `dist`, generated sources, and WASM artifacts — as a cache
-keyed on `github.sha`. All downstream jobs restore this cache rather than
-reinstalling.
+Runs `npm run ci:all` — `npm ci` against the single root lockfile, then
+`turbo run build compile` over all eleven workspace packages. The order comes
+from the dependency graph in the manifests; it is not written down here or
+anywhere else as a sequence (ADR-049). This job used to spell that sequence out
+step by step, which was one of three copies of it that had to be kept in sync.
+
+Saves the full workspace — `node_modules`, `dist`, generated sources, and WASM
+artifacts — as a cache keyed on `github.sha`, which all downstream jobs restore
+rather than reinstalling, plus its own `.turbo` cache so an unchanged package is
+not rebuilt on the next push.
 
 #### `lint`
 
@@ -80,9 +108,19 @@ the workspace cache.
 
 #### `satsuma-cli`
 
-Runs the full CLI test suite (~600+ tests) and verifies that all files in
-`examples/` are formatter-clean (`satsuma fmt --check`). Test results are
-uploaded as a JUnit XML artifact for the test report.
+Runs `@satsuma/scenario-gen`'s tests first (a broken generator would otherwise
+surface as dozens of unexplained property failures), then
+`turbo run test:typecheck` and `turbo run test:coverage` for `satsuma-cli`, then
+verifies that all files in `examples/` are formatter-clean
+(`satsuma fmt --check`).
+
+Both turbo invocations are cacheable, which is the point: this was the pipeline's
+second-longest job, almost always re-running a suite whose inputs had not changed.
+Its coverage report and JUnit XML are declared task outputs, so a cache hit
+restores both — which is why the XML is written to
+`tooling/satsuma-cli/test-results/` rather than the repo root, a path Turborepo
+cannot express as a package's output. Current count is in
+[`test-stats.json`](../../test-stats.json).
 
 #### `parser`
 
@@ -93,7 +131,8 @@ Runs four distinct checks:
    state (catches uncommitted grammar changes)
 3. **Conflict count check** — compares the grammar's conflict count against
    `CONFLICTS.expected`; fails if they diverge
-4. **Corpus tests** — `tree-sitter test` over all 480+ fixture tests
+4. **Corpus tests** — `npm run test:corpus` (`tree-sitter test --wasm`; there is
+   no native parser, ADR-002). Count in [`test-stats.json`](../../test-stats.json)
 5. **pytest suite** — fixture tests, CST consumer tests, and smoke tests over
    the full example corpus
 
@@ -101,17 +140,23 @@ Test results are uploaded as JUnit XML.
 
 #### `vscode-extension`
 
-Validates the extension manifest and TextMate grammar, runs the TextMate
-fixture and golden tests, builds the full client/server/webview bundle, and
-runs the LSP server test suite. The LSP tests require the WASM parser to be
-present, so the step rebuilds it from cache before running.
+Validates the extension manifest and TextMate grammar, runs the TextMate fixture
+and golden tests, then
+`npx turbo run build compile --filter=vscode-satsuma --filter=@satsuma/lsp`,
+then the LSP server's typecheck and test suite.
+
+That single turbo invocation replaced four hand-ordered steps — build the grammar
+WASM, build the extension, build `satsuma-cli` "(needed by LSP formatting
+provider)", then `npx tsc` in the LSP — which together were this job's own copy of
+the cross-package build order. `compile` is `@satsuma/lsp`'s `tsc` output, which
+its tests load; the package's `build` is the esbuild bundle it ships.
 
 Test results are uploaded as JUnit XML.
 
 #### `cli-pack-smoke-test`
 
 Verifies that the CLI tarball can be installed end-to-end. It runs `npm run
-pack` (which replaces the `@satsuma/core` `file:` symlink with a real copy
+pack` (which replaces the workspace symlink for `@satsuma/core` with a real copy
 before packing — see [below](#packaging-why-the-symlink-must-be-replaced)), installs
 the resulting `satsuma-cli.tgz` globally, and checks that `satsuma --version`
 succeeds. This job prevents tarball regressions from reaching the release
@@ -125,7 +170,9 @@ directly.
 
 #### `test-report`
 
-Aggregates JUnit XML artifacts from the four test jobs and publishes a
+Aggregates JUnit XML artifacts from every job that produces them — `satsuma-cli`,
+`parser`, `vscode-extension`, `excel-skill`, `stm-to-excel-skill`,
+`cli-pack-smoke-test` and `smoke-tests` — and publishes a
 consolidated check using `dorny/test-reporter`. Runs even if upstream jobs
 fail (`if: always()`).
 
@@ -257,8 +304,10 @@ These jobs are independent and run in parallel.
 #### `npm-audit`
 
 Installs all workspace dependencies and runs `npm audit --omit=dev
---audit-level=high` across every package (`satsuma-cli`, `tree-sitter-satsuma`,
-`vscode-satsuma`, `vscode-satsuma/server`). Known findings can be acknowledged
+--audit-level=high` over every tracked lockfile, discovered with
+`git ls-files '*package-lock.json'`. Since Feature 42 there are exactly two: the
+root one covering all eleven `tooling/*` packages, and `site/`'s, which is
+deliberately separate. Known findings can be acknowledged
 in `.security-allowlist.yml` — the `scripts/parse-security-allowlist.py` script
 extracts the allowlist before the audit runs.
 
@@ -346,9 +395,11 @@ flowchart LR
 
 ## Packaging: Why the Symlink Must Be Replaced
 
-`@satsuma/core` is declared as a `file:../satsuma-core` dependency. npm
-installs this as a symlink inside `node_modules/@satsuma/core` pointing to the
-sibling package directory. When `npm pack` bundles the dependencies
+`@satsuma/core` is declared as `"@satsuma/core": "*"` and resolved by npm
+workspaces, which links it as a symlink inside `node_modules/@satsuma/core`
+pointing at the sibling package directory. (It was a `file:../satsuma-core`
+spec before Feature 42; the symlink, and therefore this problem, is the same
+either way.) When `npm pack` bundles the dependencies
 (required for a self-contained distributable), it follows the symlink and
 produces tarball entries such as:
 

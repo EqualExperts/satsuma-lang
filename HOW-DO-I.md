@@ -169,6 +169,9 @@ Run `satsuma fmt pipeline.stm` or use Format Document in VS Code.
 **How do I get IDE support?**
 Install the [VS Code extension](tooling/vscode-satsuma/) — it provides syntax highlighting, diagnostics, go-to-definition, completions, hover, rename, and more.
 
+**How do I build and test the repo?**
+`npm run install:all` once, then `npm run build:all` and `npm run test:all` from the repo root — or `npx turbo run test --filter=<package>` to work on one package, which builds its dependencies for you. The task graph lives in [turbo.json](turbo.json) and the build order is derived from the packages' own manifests. Note a bare `npm --prefix tooling/<package> test` does **not** build dependencies. See [AGENTS.md § Building and testing](AGENTS.md#building-and-testing).
+
 **How do I understand the tooling architecture?**
 Read [ARCHITECTURE.md](docs/developer/ARCHITECTURE.md) — covers the package map, dependency graph, data flow (source text → parse → extraction → CLI/LSP), satsuma-core module structure, key type hierarchy, extension points, and test strategy. See [adrs/](adrs/) for the architectural decision records behind each design choice.
 

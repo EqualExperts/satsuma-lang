@@ -10,7 +10,10 @@ See `adrs/` for the architectural decision records that explain the choices made
 
 ## Package Map
 
-The `tooling/` directory contains nine npm packages:
+The `tooling/` directory contains eleven npm packages. They are **npm workspaces**
+behind a single root `package-lock.json`, and the cross-package build order is
+derived from the dependency declarations below rather than written down anywhere
+as a sequence — see [Build orchestration](#build-orchestration) and ADR-049.
 
 | Package | Role |
 |---------|------|
@@ -396,8 +399,12 @@ Browser-level viz harness tests use the sentinel watcher workflow documented in 
 
 "Typechecked" here means a dedicated `test:typecheck` script (`tsc --project
 tsconfig.type-tests.json` or equivalent) runs `tsc` over the package's test
-sources specifically, as a real build gate wired into `npm test`'s `pretest`
-hook, `scripts/run-repo-checks.sh`, and CI (Feature 39 R2/R6). Every package's
+sources specifically, as a real build gate. It is a first-class Turborepo task
+(`turbo run test:typecheck`), which is how `scripts/run-repo-checks.sh` and CI
+both reach it. It used to hang off npm's implicit `pretest` hook; that route was
+removed because `pretest` fires only before a script literally named `test`, so
+`test:coverage` silently skipped the typecheck and CI had to bolt it back on per
+job (sl-851u, Feature 39 R2/R6 and Feature 42 R4). Every package's
 test sources — typechecked or not — still get baseline ESLint, which reports
 syntax and rule violations but is not type-aware: it cannot catch a stale
 grammar symbol or a type mismatch the way `tsc` can. Do not read "typechecked"
@@ -412,19 +419,75 @@ alone for their test sources.
 
 ## Dependency Matrix
 
-| Package | tree-sitter | core | viz-model | viz-backend | cli | lsp | viz | vscode | viz-harness |
-|---|---|---|---|---|---|---|---|---|---|
-| `tree-sitter-satsuma` | - | - | - | - | - | - | - | - | - |
-| `satsuma-core` | yes | - | - | - | - | - | - | - | - |
-| `satsuma-viz-model` | - | - | - | - | - | - | - | - | - |
-| `satsuma-viz-backend` | yes | yes | yes | - | - | - | - | - | - |
-| `satsuma-cli` | yes | yes | - | - | - | - | - | - | - |
-| `satsuma-lsp` | yes | yes | yes | yes | - | - | - | - | - |
-| `satsuma-viz` | - | yes | yes | - | - | - | - | - | - |
-| `vscode-satsuma` | - | - | - | - | - | yes | yes | - | - |
-| `satsuma-viz-harness` | yes | yes | - | yes | - | - | yes | - | - |
+**This table is the build order.** Turborepo derives task ordering from exactly
+these declarations (`dependsOn: ["^build"]` in `turbo.json`), so a row here is not
+documentation of the build — it *is* the build. Adding a cell means changing the
+order; nothing else needs editing.
 
-The dependency graph is acyclic by construction. `satsuma-viz-backend` is the shared boundary between the LSP server and the viz harness.
+| Package | tree-sitter | core | scenario-gen | viz-model | viz-backend | cli | lsp | viz |
+|---|---|---|---|---|---|---|---|---|
+| `tree-sitter-satsuma` | - | - | - | - | - | - | - | - |
+| `satsuma-scenario-gen` | - | - | - | - | - | - | - | - |
+| `satsuma-core` | yes | - | yes | - | - | - | - | - |
+| `satsuma-viz-model` | - | yes | - | - | - | - | - | - |
+| `satsuma-viz-backend` | yes | yes | yes | yes | - | - | - | - |
+| `satsuma-cli` | yes | yes | yes | - | yes | - | - | - |
+| `satsuma-lsp` | yes | yes | - | yes | yes | yes | - | - |
+| `satsuma-viz` | yes | yes | yes | yes | yes | - | - | - |
+| `vscode-satsuma` | yes | yes | - | - | yes | - | yes | yes |
+| `satsuma-viz-harness` | yes | yes | - | yes | yes | - | - | yes |
+| `integration-tests` | yes | yes | yes | - | yes | yes | - | - |
+
+The dependency graph is acyclic by construction. `satsuma-viz-backend` is the
+shared boundary between the LSP server and the viz harness.
+
+Some cells look surprising and are load-bearing:
+
+- **`tree-sitter-satsuma` almost everywhere.** Nothing imports it; the packages
+  that declare it either load the grammar WASM it builds in their tests or copy
+  that file into their own output. Declaring it is what lets Turborepo order the
+  grammar build ahead of them instead of that ordering being special-cased.
+- **`satsuma-lsp` → `satsuma-cli`.** The LSP's formatting provider shells out to
+  the CLI, and its test suite runs the CLI's *built* entry point. Nothing ordered
+  that build until Feature 42 R4; CI compensated with a step named "Build
+  satsuma-cli (needed by LSP formatting provider)".
+- **`vscode-satsuma` → `satsuma-viz-backend`.** The extension's esbuild config
+  bundles that package's TypeScript *sources* into the language server it ships.
+
+`scripts/workspace-build-graph.test.mjs` is what keeps this honest. It fails if any
+package reaches into a sibling's build output without declaring it, or reads a
+sibling's committed files that Turborepo does not hash, or reintroduces a
+`npm --prefix ../sibling` script. It replaced a narrower guard that asserted the
+same property against the `prebuild` chains Feature 42 deleted (cbdr-xgy5).
+
+---
+
+## Build orchestration
+
+Two mechanisms, one for dependency resolution and one for task ordering:
+
+- **npm workspaces** own installation. The root `package.json` globs
+  `tooling/*`, so one `npm install` resolves every package against a single
+  `package-lock.json`, and cross-package dependencies are symlinks rather than
+  copies. (`site/` is deliberately *not* a member — it is a separate deployable
+  with its own lockfile.)
+- **Turborepo** owns task execution. [`turbo.json`](../../turbo.json) defines
+  `build`, `compile`, `test`, `test:typecheck`, `test:coverage` and a root
+  `lint`, wired with `dependsOn: ["^build"]` so ordering follows the dependency
+  matrix above. Results are cached by input hash in `.turbo`, locally only — no
+  remote cache (ADR-049).
+
+The practical consequence for anyone working here: **a package's own
+`npm test` no longer builds its dependencies.** Every `prebuild`/`pretest` hook
+that shelled out to `npm --prefix ../sibling run build` is gone, because that was
+the build order duplicated eleven times over. Use `npm run build:all` first, or
+`turbo run test --filter=<package>`, which builds what it needs.
+
+One task is deliberately uncached: `@satsuma/lsp#compile`. That package's `build`
+is an esbuild bundle while its tests load the plain `tsc` output of the same
+sources, and both write `dist/server.js` — so declaring `dist/**` as the task's
+output would let a cache restore decide which one survives. mbt-oy6n separates
+the two output trees.
 
 ---
 
