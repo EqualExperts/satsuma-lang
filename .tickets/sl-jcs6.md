@@ -1,6 +1,6 @@
 ---
 id: sl-jcs6
-status: open
+status: closed
 deps: []
 links: []
 created: 2026-07-31T13:13:41Z
@@ -24,3 +24,10 @@ Parity test uses a checked-in golden, not a live CLI call (doc review 2026-07-31
 
 Model type exported with doc-commented fields; backend builder unit-tested against minimal .stm snippets including an nl-derived hop; golden parity test asserts builder output matches the committed field-lineage --json fixture, with a documented regeneration script under scripts/; viz-backend has no dependency on satsuma-cli; viz-model and viz-backend suites pass locally.
 
+
+## Notes
+
+**2026-08-04T15:27:25Z**
+
+Cause: The viz protocol had no field-chain contract, and browser hosts had no adapter from their in-memory document workspace to core’s shared field-edge builder and traversal.
+Fix: Added a CLI-compatible, doc-commented FieldChainModel, a browser-portable in-memory backend builder with NL-derived hops and import scoping, plus a checked-in CLI golden and explicit regeneration script. (commit immediately after c4bc1709)

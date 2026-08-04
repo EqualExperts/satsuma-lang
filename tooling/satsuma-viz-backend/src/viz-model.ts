@@ -11,7 +11,6 @@ import { child, children, labelText, stringText } from "./parser-utils";
 import { attachMappingCoverage } from "./coverage";
 import type { DefinitionEntry, FieldInfo, WorkspaceIndex } from "./workspace-index";
 import { findReferences, resolveDefinition } from "./workspace-index";
-import type { DefinitionLookup } from "@satsuma/core";
 import {
   extractAtRefs,
   classifyRef,
@@ -27,6 +26,7 @@ import {
   renderFieldDeclType,
 } from "@satsuma/core";
 import type { MetaEntry, FieldDecl, SpreadEntity } from "@satsuma/core";
+import { createWorkspaceDefinitionLookup, fieldInfoToDecl } from "./workspace-definition-lookup";
 
 // ---------- VizModel protocol types ----------
 
@@ -345,17 +345,6 @@ function definitionToSpreadEntity(def: DefinitionEntry): SpreadEntity {
     hasSpreads: (def.spreads?.length ?? 0) > 0,
     spreads: def.spreads ?? [],
   };
-}
-
-/** Convert an indexed FieldInfo to core's FieldDecl for spread expansion input. */
-function fieldInfoToDecl(fi: FieldInfo): FieldDecl {
-  return fieldDeclFromRenderedType({
-    name: fi.name,
-    type: fi.type ?? "",
-    startRow: fi.range.start.line,
-    children: fi.children.map(fieldInfoToDecl),
-    ...(fi.spreads ? { spreads: fi.spreads } : {}),
-  });
 }
 
 /** Convert a SchemaCard to core's SpreadEntity interface for spread expansion. */
@@ -779,47 +768,6 @@ function extractConstraintsFromMeta(entries: MetaEntry[]): string[] {
 
 // ---------- Mapping extraction ----------
 
-/** Build a DefinitionLookup from the LSP WorkspaceIndex for NL @-ref resolution. */
-function makeVizLookup(wsIndex: WorkspaceIndex): DefinitionLookup {
-  return {
-    hasSchema: (key) => wsIndex.definitions.get(key)?.some((d) => d.kind === "schema") ?? false,
-    getSchema: (key) => {
-      const def = wsIndex.definitions.get(key)?.find((d) => d.kind === "schema");
-      if (!def) return null;
-      return {
-        fields: def.fields.map(fieldInfoToDecl),
-        hasSpreads: false,
-      };
-    },
-    hasFragment: (key) => wsIndex.definitions.get(key)?.some((d) => d.kind === "fragment") ?? false,
-    getFragment: (key) => {
-      const def = wsIndex.definitions.get(key)?.find((d) => d.kind === "fragment");
-      if (!def) return null;
-      return {
-        fields: def.fields.map(fieldInfoToDecl),
-        hasSpreads: false,
-      };
-    },
-    hasTransform: (key) =>
-      wsIndex.definitions.get(key)?.some((d) => d.kind === "transform") ?? false,
-    getMapping: () => null,
-    iterateSchemas: function* () {
-      for (const [key, defs] of wsIndex.definitions) {
-        const schemaDef = defs.find((d) => d.kind === "schema");
-        if (schemaDef) {
-          yield [
-            key,
-            {
-              fields: schemaDef.fields.map(fieldInfoToDecl),
-              hasSpreads: false,
-            },
-          ];
-        }
-      }
-    },
-  };
-}
-
 /** Resolve NL @-refs in a transform against the workspace index. */
 function resolveTransformAtRefs(
   transform: ReturnType<typeof extractTransform>,
@@ -829,7 +777,7 @@ function resolveTransformAtRefs(
   wsIndex: WorkspaceIndex,
 ): ResolvedAtRef[] {
   if (!transform.text) return [];
-  const lookup = makeVizLookup(wsIndex);
+  const lookup = createWorkspaceDefinitionLookup(wsIndex);
   const ctx = { sources, targets, namespace };
   return extractAtRefs(transform.text).map((br) => {
     // br.raw keeps backtick quoting so literal names with "." / "::"

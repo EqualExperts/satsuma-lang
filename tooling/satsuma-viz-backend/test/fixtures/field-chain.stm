@@ -1,0 +1,37 @@
+schema raw {
+  id string
+  audit_code string
+}
+
+schema staged {
+  id string
+}
+
+schema curated {
+  id string
+}
+
+schema published {
+  id string
+}
+
+mapping stage_records {
+  source { raw }
+  target { staged }
+
+  id -> id
+}
+
+mapping curate_records {
+  source { staged, raw }
+  target { curated }
+
+  staged.id -> id { "validate against @raw.audit_code" }
+}
+
+mapping publish_records {
+  source { curated }
+  target { published }
+
+  id -> id
+}

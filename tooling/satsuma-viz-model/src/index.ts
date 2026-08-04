@@ -19,17 +19,52 @@
  * core's, verbatim, so a consumer reading them cannot be reading a re-derivation.
  */
 
-import type { MappingCoverageResult } from "@satsuma/core";
+import type { CanonicalFieldEndpoint, Classification, MappingCoverageResult } from "@satsuma/core";
 
 // Coverage types are part of this contract, so a consumer needs no second
 // import to read the payload it just received.
 export type {
+  AggregateCoverage,
+  AggregateSchemaCoverage,
+  CoverageTotals,
   MappingCoverageResult,
   SchemaCoverageResult,
   FieldCoverageEntry,
   FieldCoverageState,
   CoverageTier,
 } from "@satsuma/core";
+
+// ---------- Field chain traversal ----------
+
+/**
+ * One field reached while tracing away from a focus field.
+ *
+ * This is deliberately byte-compatible with `satsuma field-lineage --json`.
+ * `field` is a canonical `[namespace]::schema.path` endpoint, so it carries its
+ * owning schema without adding a second serialized name that could drift; use
+ * core's `fieldEndpointSchema()` when a renderer needs that owner separately.
+ */
+export interface FieldChainHop {
+  /** Canonical field reference, including the schema that owns the field. */
+  field: CanonicalFieldEndpoint;
+  /** Canonical mapping reference through which this field was reached. */
+  via_mapping: string;
+  /** Whether the connection is direct, transformed NL, or inferred from an NL `@ref`. */
+  classification: Classification;
+}
+
+/**
+ * Browser-ready field traversal: ordered ancestors, the focus field, then
+ * ordered descendants. Both hop arrays use core's stable breadth-first order.
+ */
+export interface FieldChainModel {
+  /** Canonical field at the centre of the traversal. */
+  field: CanonicalFieldEndpoint;
+  /** Upstream fields, nearest first, with cycles and depth limits guarded by core. */
+  upstream: FieldChainHop[];
+  /** Downstream fields, nearest first, with cycles and depth limits guarded by core. */
+  downstream: FieldChainHop[];
+}
 
 // ---------- Top-level document model ----------
 
