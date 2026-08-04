@@ -62,11 +62,11 @@ schema weekly_sales_dashboard (
   owner "analytics-team",
   note "Executive weekly sales overview — filters default to current quarter"
 ) {
-  total_revenue     DECIMAL(14,2) (note "Sum of fact_orders.net_amount for the period")
-  units_sold        INTEGER        (note "Count of fact_orders.quantity")
-  avg_order_value   DECIMAL(10,2) (note "total_revenue / number of distinct orders")
+  total_revenue     DECIMAL(14,2) (note "Sum of @fact_orders.net_amount for the period")
+  units_sold        INTEGER        (note "Count of @fact_orders.quantity")
+  avg_order_value   DECIMAL(10,2) (note "@total_revenue / number of distinct orders")
   top_product       VARCHAR(200) (note "Product with highest revenue in the period")
-  region            VARCHAR(50) (note "Dimension slicer from dim_product.region")
+  region            VARCHAR(50) (note "Dimension slicer from @dim_product.region")
   week_ending_date  DATE           (note "Last day of the reporting week")
 }
 
@@ -89,9 +89,9 @@ schema churn_predictor (
   refresh schedule "Sunday 02:00 UTC",
   note "Binary classifier predicting 90-day churn. Retrained weekly; promoted to production only if AUC > 0.82."
 ) {
-  customer_tenure_days   INTEGER (note "Days since dim_customer.signup_date")
-  order_count_30d        INTEGER (note "Orders in the last 30 days from fact_orders")
-  avg_order_value        DECIMAL(10,2) (note "Mean net_amount over customer lifetime")
+  customer_tenure_days   INTEGER (note "Days since @dim_customer.signup_date")
+  order_count_30d        INTEGER (note "Orders in the last 30 days from @fact_orders")
+  avg_order_value        DECIMAL(10,2) (note "Mean @net_amount over customer lifetime")
   days_since_last_order  INTEGER (note "Recency signal — days since most recent order")
   churn_probability      DECIMAL(5,4) (
     note "Model output: probability of churn in next 90 days"
@@ -122,7 +122,7 @@ schema customer_risk_report (
   customer_id        UUID           (required)
   customer_name      VARCHAR(200)   (pii)
   churn_probability  DECIMAL(5,4)   (note "From churn_predictor model output")
-  lifetime_revenue   DECIMAL(14,2) (note "Sum of all historical orders from fact_orders")
+  lifetime_revenue   DECIMAL(14,2) (note "Sum of all historical orders from @fact_orders")
   risk_tier          VARCHAR(20) (
     note "High / Medium / Low based on churn probability and LTV"
   )
