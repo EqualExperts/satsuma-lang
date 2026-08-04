@@ -179,8 +179,10 @@
     "package": "npm run build && npx @vscode/vsce package --no-dependencies -o vscode-satsuma.vsix"
   },
   "dependencies": {
-    "@satsuma/core": "file:../satsuma-core",
-    "@satsuma/lsp": "file:../satsuma-lsp",
+    "@satsuma/core": "*",
+    "@satsuma/lsp": "*",
+    "@satsuma/viz": "*",
+    "elkjs": "^0.12.0",
     "vscode-languageclient": "^10.1.0"
   },
   "devDependencies": {

@@ -53,6 +53,13 @@ done
 run_step "repo lint" npm run lint
 run_step "release tooling tests" npm run test:release
 
+# Hoisting can satisfy a package's declared range with the wrong version and say
+# nothing: npm hoisted katex's commander@8 to the root and left satsuma-cli's
+# ^15.0.0 unsatisfied, and the CLI ran anyway because the two APIs happened to
+# overlap (feature 42, R2). `npm ls` is the only thing that reports it, so make
+# an invalid tree a failed check rather than a silent mis-resolution.
+run_step "workspace dependency tree is valid" npm run check:deps
+
 # The scenario generator runs first and alone: core's property suites depend on
 # it, so a broken generator would otherwise surface as a wall of unexplained
 # property failures rather than as its own named failure.
@@ -148,7 +155,10 @@ if command -v satsuma &>/dev/null; then
   run_step "smoke tests (BDD)" \
     python3 -m pytest "$ROOT_DIR/smoke-tests/" -v --tb=short
 else
-  printf '\n[smoke tests] SKIP — satsuma not on PATH. Install it first (e.g. npm install -g tooling/satsuma-cli/).\n'
+  # Install from the packed tarball, not the package directory: the CLI's runtime
+  # dependencies are hoisted to the workspace root, so only the tarball produced
+  # by `npm run pack` carries a complete, self-contained closure (feature 42, R2).
+  printf '\n[smoke tests] SKIP — satsuma not on PATH. Install it first: npm --prefix tooling/satsuma-cli run pack && npm install -g tooling/satsuma-cli/satsuma-cli.tgz\n'
 fi
 
 # Last step, and only reached once every check above has passed: refresh

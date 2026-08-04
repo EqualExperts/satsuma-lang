@@ -19,71 +19,44 @@ jobs:
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
           node-version: "22"
+          # The ten tooling packages are npm workspaces behind one root lockfile
+          # (ADR-049), so setup-node's built-in npm cache is keyed on that single
+          # file's hash — with restore-keys fallback — and a commit that changes
+          # no dependency now downloads nothing. The workspace blob saved at the
+          # end of this job stays keyed on the SHA instead, because it carries
+          # build outputs that a lockfile hash says nothing about.
+          cache: npm
+          cache-dependency-path: package-lock.json
 
-      - name: Install all packages
-        run: npm run ci:all
-
-      - name: Build satsuma-core
-        working-directory: tooling/satsuma-core
-        run: npm run build
-
-      - name: Build satsuma-viz-backend
-        working-directory: tooling/satsuma-viz-backend
-        run: npm run build
-
-      # tree-sitter build --wasm downloads a ~119MB wasi-sdk toolchain into
-      # ~/.cache/tree-sitter on every invocation unless it's already present.
-      # Keyed on the lockfile that pins tree-sitter-cli (which hardcodes the
-      # wasi-sdk version it fetches), so a version bump there — and only
-      # that — invalidates the cache (sl-wz2h).
+      # tree-sitter build --wasm (invoked by `ci:all` below) downloads a ~119MB
+      # wasi-sdk toolchain into ~/.cache/tree-sitter on every invocation unless
+      # it's already present. Keyed on the lockfile that pins tree-sitter-cli
+      # (which hardcodes the wasi-sdk version it fetches), so a version bump
+      # there — and only that — invalidates the cache (sl-wz2h). Restored before
+      # the install, since the install is now what triggers the download.
       - name: Cache wasi-sdk toolchain
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
           path: ~/.cache/tree-sitter
-          key: wasi-sdk-${{ runner.os }}-${{ hashFiles('tooling/tree-sitter-satsuma/package-lock.json') }}
+          key: wasi-sdk-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
 
-      - name: Build tree-sitter WASM (needed by CLI and VS Code)
-        working-directory: tooling/tree-sitter-satsuma
-        run: node_modules/.bin/tree-sitter build --wasm . -o tree-sitter-satsuma.wasm
-
-      - name: Copy WASM into CLI dist (prebuild ran before WASM existed)
-        working-directory: tooling/satsuma-cli
-        run: npm run prebuild && tsc
-
-      - name: Build satsuma-viz (needed by VS Code extension webview)
-        working-directory: tooling/satsuma-viz
-        run: npm run build
-
-      # Depends on satsuma-cli's dist above (its ./testing export), so it
-      # installs after — but only test-stats and the integration-tests job
-      # itself need it cached; no other job's own build depends on it.
-      - name: Install integration-tests dependencies
-        working-directory: tooling/integration-tests
-        run: npm ci
+      # One workspace-aware install, then one ordered build. Both the install
+      # order and the build order used to be spelled out step by step here, in a
+      # second copy of what the root package.json already said; the build order
+      # now lives only in scripts/build-workspace.sh (feature 42, R2).
+      - name: Install and build all workspace packages
+        run: npm run ci:all
 
       - name: Cache workspace
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
           path: |
             node_modules
-            tooling/satsuma-cli/node_modules
+            tooling/*/node_modules
+            tooling/*/dist
             tooling/satsuma-cli/src/generated
-            tooling/satsuma-cli/dist
-            tooling/satsuma-core/node_modules
-            tooling/satsuma-scenario-gen/node_modules
-            tooling/satsuma-core/dist
-            tooling/satsuma-viz-backend/node_modules
-            tooling/satsuma-viz-backend/dist
-            tooling/satsuma-viz-model/node_modules
-            tooling/satsuma-viz-model/dist
-            tooling/satsuma-viz/node_modules
-            tooling/satsuma-viz/dist
-            tooling/tree-sitter-satsuma/node_modules
             tooling/tree-sitter-satsuma/build
             tooling/tree-sitter-satsuma/tree-sitter-satsuma.wasm
-            tooling/vscode-satsuma/node_modules
-            tooling/satsuma-lsp/node_modules
-            tooling/integration-tests/node_modules
           key: workspace-${{ github.sha }}
 
   lint:
@@ -101,23 +74,11 @@ jobs:
         with:
           path: |
             node_modules
-            tooling/satsuma-cli/node_modules
+            tooling/*/node_modules
+            tooling/*/dist
             tooling/satsuma-cli/src/generated
-            tooling/satsuma-cli/dist
-            tooling/satsuma-core/node_modules
-            tooling/satsuma-scenario-gen/node_modules
-            tooling/satsuma-core/dist
-            tooling/satsuma-viz-backend/node_modules
-            tooling/satsuma-viz-backend/dist
-            tooling/satsuma-viz-model/node_modules
-            tooling/satsuma-viz-model/dist
-            tooling/satsuma-viz/node_modules
-            tooling/satsuma-viz/dist
-            tooling/tree-sitter-satsuma/node_modules
             tooling/tree-sitter-satsuma/build
             tooling/tree-sitter-satsuma/tree-sitter-satsuma.wasm
-            tooling/vscode-satsuma/node_modules
-            tooling/satsuma-lsp/node_modules
           key: workspace-${{ github.sha }}
           restore-keys: |
             workspace-
@@ -132,6 +93,11 @@ jobs:
         run: pip install -r requirements-dev.txt
 
       - run: npm run lint
+
+      # Hoisting can satisfy a declared range with the wrong version silently —
+      # see the matching step in scripts/run-repo-checks.sh (feature 42, R2).
+      - name: Check workspace dependency tree is valid
+        run: npm run check:deps
 
       - name: Test release tooling
         run: npm run test:release
@@ -154,23 +120,11 @@ jobs:
         with:
           path: |
             node_modules
-            tooling/satsuma-cli/node_modules
+            tooling/*/node_modules
+            tooling/*/dist
             tooling/satsuma-cli/src/generated
-            tooling/satsuma-cli/dist
-            tooling/satsuma-core/node_modules
-            tooling/satsuma-scenario-gen/node_modules
-            tooling/satsuma-core/dist
-            tooling/satsuma-viz-backend/node_modules
-            tooling/satsuma-viz-backend/dist
-            tooling/satsuma-viz-model/node_modules
-            tooling/satsuma-viz-model/dist
-            tooling/satsuma-viz/node_modules
-            tooling/satsuma-viz/dist
-            tooling/tree-sitter-satsuma/node_modules
             tooling/tree-sitter-satsuma/build
             tooling/tree-sitter-satsuma/tree-sitter-satsuma.wasm
-            tooling/vscode-satsuma/node_modules
-            tooling/satsuma-lsp/node_modules
           key: workspace-${{ github.sha }}
           restore-keys: |
             workspace-
@@ -241,24 +195,11 @@ jobs:
         with:
           path: |
             node_modules
-            tooling/satsuma-cli/node_modules
+            tooling/*/node_modules
+            tooling/*/dist
             tooling/satsuma-cli/src/generated
-            tooling/satsuma-cli/dist
-            tooling/satsuma-core/node_modules
-            tooling/satsuma-scenario-gen/node_modules
-            tooling/satsuma-core/dist
-            tooling/satsuma-viz-backend/node_modules
-            tooling/satsuma-viz-backend/dist
-            tooling/satsuma-viz-model/node_modules
-            tooling/satsuma-viz-model/dist
-            tooling/satsuma-viz/node_modules
-            tooling/satsuma-viz/dist
-            tooling/tree-sitter-satsuma/node_modules
             tooling/tree-sitter-satsuma/build
             tooling/tree-sitter-satsuma/tree-sitter-satsuma.wasm
-            tooling/vscode-satsuma/node_modules
-            tooling/satsuma-lsp/node_modules
-            tooling/integration-tests/node_modules
           key: workspace-${{ github.sha }}
           restore-keys: |
             workspace-
@@ -288,23 +229,11 @@ jobs:
         with:
           path: |
             node_modules
-            tooling/satsuma-cli/node_modules
+            tooling/*/node_modules
+            tooling/*/dist
             tooling/satsuma-cli/src/generated
-            tooling/satsuma-cli/dist
-            tooling/satsuma-core/node_modules
-            tooling/satsuma-scenario-gen/node_modules
-            tooling/satsuma-core/dist
-            tooling/satsuma-viz-backend/node_modules
-            tooling/satsuma-viz-backend/dist
-            tooling/satsuma-viz-model/node_modules
-            tooling/satsuma-viz-model/dist
-            tooling/satsuma-viz/node_modules
-            tooling/satsuma-viz/dist
-            tooling/tree-sitter-satsuma/node_modules
             tooling/tree-sitter-satsuma/build
             tooling/tree-sitter-satsuma/tree-sitter-satsuma.wasm
-            tooling/vscode-satsuma/node_modules
-            tooling/satsuma-lsp/node_modules
           key: workspace-${{ github.sha }}
           restore-keys: |
             workspace-
@@ -337,10 +266,12 @@ jobs:
           fi
 
       - name: Run corpus tests
-        # --wasm is the repo-wide convention (AGENTS.md): there is no native
-        # build here, so the corpus must be exercised through the same WASM
-        # parser every consumer loads (sl-cysb).
-        run: node_modules/.bin/tree-sitter test --wasm
+        # `test:corpus` is `tree-sitter test --wasm`, which is the repo-wide
+        # convention (AGENTS.md): there is no native build here, so the corpus
+        # must be exercised through the same WASM parser every consumer loads
+        # (sl-cysb). Invoked as an npm script rather than by path, so it finds
+        # tree-sitter-cli wherever npm workspaces hoisted it.
+        run: npm run test:corpus
 
       - name: Install pytest
         run: pip install pytest
@@ -370,24 +301,11 @@ jobs:
         with:
           path: |
             node_modules
-            tooling/satsuma-cli/node_modules
+            tooling/*/node_modules
+            tooling/*/dist
             tooling/satsuma-cli/src/generated
-            tooling/satsuma-cli/dist
-            tooling/satsuma-core/node_modules
-            tooling/satsuma-scenario-gen/node_modules
-            tooling/satsuma-core/dist
-            tooling/satsuma-viz-backend/node_modules
-            tooling/satsuma-viz-backend/dist
-            tooling/satsuma-viz-model/node_modules
-            tooling/satsuma-viz-model/dist
-            tooling/satsuma-viz/node_modules
-            tooling/satsuma-viz/dist
-            tooling/tree-sitter-satsuma/node_modules
             tooling/tree-sitter-satsuma/build
             tooling/tree-sitter-satsuma/tree-sitter-satsuma.wasm
-            tooling/vscode-satsuma/node_modules
-            tooling/satsuma-lsp/node_modules
-            tooling/integration-tests/node_modules
           key: workspace-${{ github.sha }}
           restore-keys: |
             workspace-
@@ -425,23 +343,11 @@ jobs:
         with:
           path: |
             node_modules
-            tooling/satsuma-cli/node_modules
+            tooling/*/node_modules
+            tooling/*/dist
             tooling/satsuma-cli/src/generated
-            tooling/satsuma-cli/dist
-            tooling/satsuma-core/node_modules
-            tooling/satsuma-scenario-gen/node_modules
-            tooling/satsuma-core/dist
-            tooling/satsuma-viz-backend/node_modules
-            tooling/satsuma-viz-backend/dist
-            tooling/satsuma-viz-model/node_modules
-            tooling/satsuma-viz-model/dist
-            tooling/satsuma-viz/node_modules
-            tooling/satsuma-viz/dist
-            tooling/tree-sitter-satsuma/node_modules
             tooling/tree-sitter-satsuma/build
             tooling/tree-sitter-satsuma/tree-sitter-satsuma.wasm
-            tooling/vscode-satsuma/node_modules
-            tooling/satsuma-lsp/node_modules
           key: workspace-${{ github.sha }}
           restore-keys: |
             workspace-
@@ -452,24 +358,28 @@ jobs:
       - name: Run fixture and golden tests
         run: npm test
 
-      - name: Build extension (client + server + webview)
-        run: npm run build
-
-      - name: Build satsuma-cli (needed by LSP formatting provider)
-        working-directory: tooling/satsuma-cli
-        run: npm run build
-
       # See the matching step in the `install` job — same rationale for
       # caching the wasi-sdk toolchain instead of re-downloading it here.
       - name: Cache wasi-sdk toolchain
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
           path: ~/.cache/tree-sitter
-          key: wasi-sdk-${{ runner.os }}-${{ hashFiles('tooling/tree-sitter-satsuma/package-lock.json') }}
+          key: wasi-sdk-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
 
-      - name: Build tree-sitter WASM for LSP tests
+      # Ahead of the extension build below, which copies this WASM into the
+      # bundled server's dist/ and now fails loudly rather than silently if it is
+      # absent. Building it here means this job's correctness no longer depends
+      # on the restored cache happening to carry a grammar.
+      - name: Build tree-sitter WASM (bundled into the extension, and for LSP tests)
         working-directory: tooling/tree-sitter-satsuma
-        run: node_modules/.bin/tree-sitter build --wasm . -o tree-sitter-satsuma.wasm
+        run: npm run build:wasm
+
+      - name: Build extension (client + server + webview)
+        run: npm run build
+
+      - name: Build satsuma-cli (needed by LSP formatting provider)
+        working-directory: tooling/satsuma-cli
+        run: npm run build
 
       - name: Compile LSP server for tests
         working-directory: tooling/satsuma-lsp
@@ -538,23 +448,11 @@ jobs:
         with:
           path: |
             node_modules
-            tooling/satsuma-cli/node_modules
+            tooling/*/node_modules
+            tooling/*/dist
             tooling/satsuma-cli/src/generated
-            tooling/satsuma-cli/dist
-            tooling/satsuma-core/node_modules
-            tooling/satsuma-scenario-gen/node_modules
-            tooling/satsuma-core/dist
-            tooling/satsuma-viz-backend/node_modules
-            tooling/satsuma-viz-backend/dist
-            tooling/satsuma-viz-model/node_modules
-            tooling/satsuma-viz-model/dist
-            tooling/satsuma-viz/node_modules
-            tooling/satsuma-viz/dist
-            tooling/tree-sitter-satsuma/node_modules
             tooling/tree-sitter-satsuma/build
             tooling/tree-sitter-satsuma/tree-sitter-satsuma.wasm
-            tooling/vscode-satsuma/node_modules
-            tooling/satsuma-lsp/node_modules
           key: workspace-${{ github.sha }}
           restore-keys: |
             workspace-
@@ -583,23 +481,11 @@ jobs:
         with:
           path: |
             node_modules
-            tooling/satsuma-cli/node_modules
+            tooling/*/node_modules
+            tooling/*/dist
             tooling/satsuma-cli/src/generated
-            tooling/satsuma-cli/dist
-            tooling/satsuma-core/node_modules
-            tooling/satsuma-scenario-gen/node_modules
-            tooling/satsuma-core/dist
-            tooling/satsuma-viz-backend/node_modules
-            tooling/satsuma-viz-backend/dist
-            tooling/satsuma-viz-model/node_modules
-            tooling/satsuma-viz-model/dist
-            tooling/satsuma-viz/node_modules
-            tooling/satsuma-viz/dist
-            tooling/tree-sitter-satsuma/node_modules
             tooling/tree-sitter-satsuma/build
             tooling/tree-sitter-satsuma/tree-sitter-satsuma.wasm
-            tooling/vscode-satsuma/node_modules
-            tooling/satsuma-lsp/node_modules
           key: workspace-${{ github.sha }}
           restore-keys: |
             workspace-
@@ -676,23 +562,11 @@ jobs:
         with:
           path: |
             node_modules
-            tooling/satsuma-cli/node_modules
+            tooling/*/node_modules
+            tooling/*/dist
             tooling/satsuma-cli/src/generated
-            tooling/satsuma-cli/dist
-            tooling/satsuma-core/node_modules
-            tooling/satsuma-scenario-gen/node_modules
-            tooling/satsuma-core/dist
-            tooling/satsuma-viz-backend/node_modules
-            tooling/satsuma-viz-backend/dist
-            tooling/satsuma-viz-model/node_modules
-            tooling/satsuma-viz-model/dist
-            tooling/satsuma-viz/node_modules
-            tooling/satsuma-viz/dist
-            tooling/tree-sitter-satsuma/node_modules
             tooling/tree-sitter-satsuma/build
             tooling/tree-sitter-satsuma/tree-sitter-satsuma.wasm
-            tooling/vscode-satsuma/node_modules
-            tooling/satsuma-lsp/node_modules
           key: workspace-${{ github.sha }}
           restore-keys: |
             workspace-
@@ -754,23 +628,11 @@ jobs:
         with:
           path: |
             node_modules
-            tooling/satsuma-cli/node_modules
+            tooling/*/node_modules
+            tooling/*/dist
             tooling/satsuma-cli/src/generated
-            tooling/satsuma-cli/dist
-            tooling/satsuma-core/node_modules
-            tooling/satsuma-scenario-gen/node_modules
-            tooling/satsuma-core/dist
-            tooling/satsuma-viz-backend/node_modules
-            tooling/satsuma-viz-backend/dist
-            tooling/satsuma-viz-model/node_modules
-            tooling/satsuma-viz-model/dist
-            tooling/satsuma-viz/node_modules
-            tooling/satsuma-viz/dist
-            tooling/tree-sitter-satsuma/node_modules
             tooling/tree-sitter-satsuma/build
             tooling/tree-sitter-satsuma/tree-sitter-satsuma.wasm
-            tooling/vscode-satsuma/node_modules
-            tooling/satsuma-lsp/node_modules
           key: workspace-${{ github.sha }}
           restore-keys: |
             workspace-

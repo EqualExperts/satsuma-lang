@@ -18,6 +18,14 @@ export const RELEASE_PACKAGE_PATHS = [
 ];
 
 /**
+ * The one lockfile covering every `tooling/*` package (ADR-049). It records each
+ * workspace member's version under `packages["<workspace dir>"]`, so a release
+ * bump has to update it there — the per-package lockfiles that used to hold
+ * these versions no longer exist.
+ */
+export const ROOT_LOCKFILE_PATH = "package-lock.json";
+
+/**
  * Eleventy's global data file, and the only tracked source of the version the
  * public site advertises. Every download link on the site is built from it
  * (`site/cli.njk`, `site/vscode.njk`, `site/learn.njk`, `site/_includes/footer.njk`),
@@ -81,16 +89,19 @@ export function buildVersionBumpChanges(repoRoot, version, date) {
     const packageJson = readJson(packagePath);
     packageJson.version = version;
     changes.set(packagePath, formatJson(packageJson));
+  }
 
-    const lockPath = path.join(path.dirname(packagePath), "package-lock.json");
-    if (fs.existsSync(lockPath)) {
-      const lockJson = readJson(lockPath);
-      lockJson.version = version;
-      if (lockJson.packages?.[""]) {
-        lockJson.packages[""].version = version;
+  // One lockfile entry per releasable workspace member, edited in a single pass
+  // so the root lockfile is written once no matter how many packages ship.
+  const lockPath = path.join(repoRoot, ROOT_LOCKFILE_PATH);
+  if (fs.existsSync(lockPath)) {
+    const lockJson = readJson(lockPath);
+    for (const workspaceDir of RELEASE_PACKAGE_PATHS.map(path.dirname)) {
+      if (lockJson.packages?.[workspaceDir]) {
+        lockJson.packages[workspaceDir].version = version;
       }
-      changes.set(lockPath, formatJson(lockJson));
     }
+    changes.set(lockPath, formatJson(lockJson));
   }
 
   const changelogPath = path.join(repoRoot, "CHANGELOG.md");
@@ -134,6 +145,7 @@ export function validateReleaseMetadata(repoRoot, tag) {
     throw new Error(`Release tag ${tag} does not match VERSION (${canonicalVersion})`);
   }
 
+  const lockJson = readJson(path.join(repoRoot, ROOT_LOCKFILE_PATH));
   for (const relativePackagePath of RELEASE_PACKAGE_PATHS) {
     const packagePath = path.join(repoRoot, relativePackagePath);
     const packageVersion = readJson(packagePath).version;
@@ -141,11 +153,14 @@ export function validateReleaseMetadata(repoRoot, tag) {
       throw new Error(`${relativePackagePath} is ${packageVersion}, expected ${requestedVersion}`);
     }
 
-    const relativeLockPath = path.join(path.dirname(relativePackagePath), "package-lock.json");
-    const lockJson = readJson(path.join(repoRoot, relativeLockPath));
-    const lockVersions = [lockJson.version, lockJson.packages?.[""]?.version];
-    if (lockVersions.some((version) => version !== requestedVersion)) {
-      throw new Error(`${relativeLockPath} does not consistently report ${requestedVersion}`);
+    // The lockfile is what a fresh `npm ci` reifies from, so a member left
+    // behind there ships a tarball whose version disagrees with its manifest.
+    const workspaceDir = path.dirname(relativePackagePath);
+    const lockVersion = lockJson.packages?.[workspaceDir]?.version;
+    if (lockVersion !== requestedVersion) {
+      throw new Error(
+        `${ROOT_LOCKFILE_PATH} reports ${workspaceDir} as ${lockVersion}, expected ${requestedVersion}`,
+      );
     }
   }
 

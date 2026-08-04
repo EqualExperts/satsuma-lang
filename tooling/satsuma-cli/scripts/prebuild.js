@@ -9,6 +9,7 @@
  * Run automatically via `npm run prebuild` (called before `tsc`).
  */
 
+import { createRequire } from "module";
 import { readFileSync, writeFileSync, mkdirSync, copyFileSync, existsSync } from "fs";
 import { dirname, join } from "path";
 import { fileURLToPath } from "url";
@@ -16,6 +17,7 @@ import { fileURLToPath } from "url";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = join(__dirname, "..", "..", "..");
 const cliRoot = join(__dirname, "..");
+const require = createRequire(import.meta.url);
 
 // ── Step 1: Bake AI-AGENT-REFERENCE.md ──
 
@@ -48,8 +50,11 @@ const wasmFiles = [
     label: "tree-sitter-satsuma.wasm",
   },
   {
-    // web-tree-sitter 0.26+ renamed tree-sitter.wasm → web-tree-sitter.wasm
-    src: join(cliRoot, "node_modules", "web-tree-sitter", "web-tree-sitter.wasm"),
+    // web-tree-sitter 0.26+ renamed tree-sitter.wasm → web-tree-sitter.wasm, and
+    // exports it as a subpath, so Node's resolver can find it wherever npm chose
+    // to place the package. Under workspaces that is the hoisted root
+    // node_modules, not this package's own — never join the path by hand.
+    src: require.resolve("web-tree-sitter/web-tree-sitter.wasm"),
     dest: join(distDir, "web-tree-sitter.wasm"),
     label: "web-tree-sitter.wasm (runtime)",
   },

@@ -36,8 +36,10 @@ const assets = [
   {
     // web-tree-sitter 0.26+ renamed its runtime tree-sitter.wasm →
     // web-tree-sitter.wasm; server.ts still resolves the old name, so the
-    // copy renames it back.
-    src: path.join(lspRoot, "node_modules", "web-tree-sitter", "web-tree-sitter.wasm"),
+    // copy renames it back. Resolved through Node rather than joined onto this
+    // package's own node_modules: under npm workspaces the runtime hoists to
+    // the root node_modules (feature 42, R2).
+    src: require.resolve("web-tree-sitter/web-tree-sitter.wasm"),
     dest: path.join(distDir, "tree-sitter.wasm"),
     label: "web-tree-sitter.wasm (runtime) → tree-sitter.wasm",
   },

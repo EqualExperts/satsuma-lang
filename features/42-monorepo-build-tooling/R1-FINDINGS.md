@@ -150,6 +150,52 @@ npm selects the explicit `install` script instead of its implicit
 must retain this script unchanged, and R3/R5 should continue verifying the
 WASM-only build path.
 
+## Corrections found while implementing R2
+
+Two hoisting consequences this audit did not predict surfaced during the
+migration. Both are fixed in R2; they are recorded here because the audit above
+is the feature's shared reference and states neither.
+
+### The audit compared the ten tooling manifests to each other, but not to the root
+
+`commander` was reported as conflict-free because it appears in only one tooling
+manifest (`satsuma-cli`, `^15.0.0`). The competing range came from the *root*
+dependency graph instead: `markdownlint-cli2` → `markdownlint` →
+`micromark-extension-math` → `katex`, which pins `commander@^8.3.0`. npm hoisted
+8.3.0 to the workspace root and then failed to nest 15.0.0 for `satsuma-cli` —
+the lockfile recorded `tooling/satsuma-cli/node_modules/commander` at 15.0.0 but
+neither `npm install` nor `npm ci` created it.
+
+The failure was silent: `npm ls` reported the tree invalid, but the CLI ran
+normally because the two commander APIs overlap for the calls it makes, and the
+tarball would have shipped 8.3.0. R2 declares `commander` in the root
+`devDependencies` purely to win the hoist, and adds `npm run check:deps`
+(`npm ls --all`) to the pre-commit checks and the CI lint job so an invalid tree
+fails a check instead of resolving quietly to the wrong version.
+
+**Generalisation for R4 and for any future package:** a shared-dependency audit
+must compare tooling ranges against the root's *transitive* graph, not just
+against each other.
+
+### npm resolves pack-time ignore rules from the workspace root
+
+`npm pack` inside a workspace member applies the repository-root `.gitignore`.
+Three of its patterns — `**/*.wasm`, `**/*.js.map`, `**/generated` — silently
+stripped the CLI's own build output (both WASM assets, every sourcemap, and the
+baked `agent-reference` module) out of `satsuma-cli.tgz`.
+
+R2 addresses this in two places: `satsuma-cli` now declares an explicit `files`
+list, which takes precedence over every ignore file, and `scripts/pack.js` packs
+from a staging copy in a temp directory outside the repository. The staging copy
+also fixes a second problem — `bundleDependencies` are filled from the package's
+own `node_modules`, and hoisting empties it, so npm silently omitted every
+bundled dependency. `scripts/verify-pack.js` now asserts the full bundled
+closure (the CLI's `bundleDependencies` plus `@satsuma/core`'s own runtime
+dependencies, which ship nested beneath it) is present in the tarball.
+
+Verified by diffing the resulting tarball's entry list against one packed from
+`main` before the migration: identical.
+
 ## CI baseline
 
 Baseline source: successful `main` CI run

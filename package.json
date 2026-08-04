@@ -2,11 +2,16 @@
   "name": "satsuma-lang",
   "private": true,
   "license": "MIT",
+  "workspaces": [
+    "tooling/*"
+  ],
   "scripts": {
-    "clean:all": "rm -rf node_modules tooling/satsuma-cli/node_modules tooling/satsuma-core/node_modules tooling/satsuma-scenario-gen/node_modules tooling/satsuma-viz-model/node_modules tooling/satsuma-viz-backend/node_modules tooling/tree-sitter-satsuma/node_modules tooling/satsuma-viz/node_modules tooling/satsuma-viz-harness/node_modules tooling/satsuma-lsp/node_modules tooling/vscode-satsuma/node_modules tooling/integration-tests/node_modules tooling/satsuma-core/dist tooling/satsuma-viz-model/dist tooling/satsuma-viz-backend/dist tooling/satsuma-cli/dist tooling/satsuma-cli/src/generated tooling/satsuma-viz/dist tooling/satsuma-viz-harness/dist tooling/satsuma-lsp/dist tooling/vscode-satsuma/dist tooling/tree-sitter-satsuma/build tooling/tree-sitter-satsuma/tree-sitter-satsuma.wasm",
-    "install:all": "npm install && npm --prefix tooling/satsuma-scenario-gen install && npm --prefix tooling/satsuma-core install && npm --prefix tooling/satsuma-viz-model install && npm --prefix tooling/satsuma-viz-backend install && npm --prefix tooling/tree-sitter-satsuma install && cd tooling/tree-sitter-satsuma && tree-sitter build --wasm . -o tree-sitter-satsuma.wasm && cd ../.. && npm --prefix tooling/satsuma-cli install && npm --prefix tooling/satsuma-viz install && npm --prefix tooling/satsuma-viz run build && npm --prefix tooling/satsuma-viz-harness install && npm --prefix tooling/satsuma-lsp install && npm --prefix tooling/vscode-satsuma install && npm --prefix tooling/vscode-satsuma run build:server && npm --prefix tooling/integration-tests install",
-    "ci:all": "npm ci && npm ci --prefix tooling/satsuma-scenario-gen && npm ci --prefix tooling/satsuma-core && npm ci --prefix tooling/satsuma-viz-model && npm ci --prefix tooling/satsuma-viz-backend && npm ci --prefix tooling/tree-sitter-satsuma && npm ci --ignore-scripts --prefix tooling/satsuma-cli && npm ci --prefix tooling/satsuma-viz && npm ci --prefix tooling/satsuma-viz-harness && npm ci --prefix tooling/satsuma-lsp && npm ci --prefix tooling/vscode-satsuma",
+    "clean:all": "rm -rf node_modules tooling/*/node_modules tooling/*/dist tooling/satsuma-cli/src/generated tooling/tree-sitter-satsuma/build tooling/tree-sitter-satsuma/tree-sitter-satsuma.wasm",
+    "install:all": "npm install && npm run build:all",
+    "ci:all": "npm ci && npm run build:all",
+    "build:all": "./scripts/build-workspace.sh",
     "reinstall": "npm run clean:all && npm run install:all",
+    "check:deps": "npm ls --all >/dev/null",
     "lint": "npm run lint:js && npm run lint:md && npm run lint:yaml && npm run lint:python",
     "lint:js": "eslint . && prettier --check \"**/*.{ts,mts,cts,js,mjs,cjs}\"",
     "lint:md": "markdownlint-cli2",
@@ -19,8 +24,18 @@
   "overrides": {
     "smol-toml": "^1.6.1"
   },
+  "//devDependencies": [
+    "commander is not used by anything at the root. It is declared here purely to",
+    "control hoisting: katex (a transitive dependency of markdownlint-cli2) pins",
+    "commander@^8.3.0, and npm hoisted that to the root node_modules while failing",
+    "to nest the ^15.0.0 satsuma-cli requires — `npm ls` reported the tree invalid",
+    "and the CLI silently loaded v8. A root declaration makes npm hoist v15 and",
+    "nest v8 under katex instead. Remove it once katex no longer pins commander@8.",
+    "See feature 42 R2; `npm ls commander` must report no 'invalid' entry."
+  ],
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "commander": "^15.0.0",
     "eslint": "^10.8.0",
     "globals": "^17.8.0",
     "markdownlint-cli2": "^0.23.2",

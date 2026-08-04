@@ -54,3 +54,35 @@ for (const entry of requiredEntries) {
 }
 
 console.log("verify-pack: tarball contains bin, server bundle, WASM, and highlights.scm");
+
+// ── No unpublishable dependency may reach the tarball ──
+//
+// The @satsuma/* packages are private workspace members, so a tarball that
+// declares one as a runtime dependency cannot be installed anywhere but this
+// repo: `npm install -g satsuma-lsp.tgz` tries to fetch it from the registry and
+// fails with a 404. It is safe for them to be devDependencies (npm ignores those
+// when installing a package) — dist/server.js inlines their code at build time.
+//
+// This became reachable when the workspace migration replaced `file:../X` specs
+// with by-name ranges: npm silently skips an unresolvable *relative* file: spec,
+// so the misdeclaration used to be invisible (feature 42, R2).
+const manifest = JSON.parse(
+  execFileSync("tar", ["-xzOf", tarballPath, "package/package.json"], {
+    cwd: lspRoot,
+    encoding: "utf8",
+  }),
+);
+
+const unpublishable = Object.keys(manifest.dependencies ?? {}).filter((name) =>
+  name.startsWith("@satsuma/"),
+);
+
+if (unpublishable.length > 0) {
+  throw new Error(
+    `verify-pack: tarball declares private workspace package(s) as runtime ` +
+      `dependencies, which no registry can supply: ${unpublishable.join(", ")}. ` +
+      `dist/server.js bundles them, so move them to devDependencies.`,
+  );
+}
+
+console.log("verify-pack: tarball declares no unpublishable runtime dependencies");
