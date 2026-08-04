@@ -325,8 +325,14 @@ function traceDirection(
   maxDepth: number,
   direction: Exclude<FieldLineageDirection, "both">,
 ): FieldLineageHop[] {
-  // This first-visit-wins set deliberately preserves current CLI output.
-  // spr-w98t owns replacing it with depth-aware revisits in a later change.
+  // Marking a field visited on enqueue is depth-exact *because* the queue is
+  // FIFO and every field edge is one hop: fields therefore leave the queue in
+  // non-decreasing depth order, so a field's first visit is always along a
+  // shortest path and its subtree is expanded with the full remaining budget.
+  // No shallower revisit can exist, so nothing needs re-expanding here. The
+  // CLI's schema-level walk needs an explicit shallowest-visit map instead,
+  // because it recurses depth-first and weights mapping nodes at zero depth —
+  // there a first visit really can be deeper than the shortest path.
   const visited = new Set<CanonicalFieldEndpoint>([start]);
   const queue: Array<{ field: CanonicalFieldEndpoint; depth: number }> = [
     { field: start, depth: 0 },
@@ -358,6 +364,10 @@ function traceDirection(
  * The function performs no workspace access and mutates neither its edges nor
  * options. Cycles terminate at the first visited field, matching the published
  * CLI behavior; `depth` counts mapping hops from `start`.
+ *
+ * Each direction is depth-exact: it contains exactly the fields whose shortest
+ * path from `start` is at most `depth` hops, each listed once and reached via a
+ * shortest-path edge. Callers may rely on that (Feature 41 R4 asserts it).
  */
 export function traceFieldLineage(
   edges: Iterable<FieldLineageEdge>,

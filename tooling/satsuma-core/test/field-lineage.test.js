@@ -199,62 +199,117 @@ describe("traceFieldLineage", () => {
     });
   });
 
-  it("keeps the downstream subtree reachable through the shorter side of a diamond", () => {
-    // The longer branch is deliberately listed first. FIFO breadth-first
-    // traversal must still reach the leaf at depth two through the shortcut,
-    // and must report the shared join only once with its shortest-path edge.
-    const start = createCanonicalFieldEndpoint("::start.id");
-    const detour = createCanonicalFieldEndpoint("::detour.id");
-    const join = createCanonicalFieldEndpoint("::join.id");
-    const leaf = createCanonicalFieldEndpoint("::leaf.id");
-    const diamond = [
-      { from: start, to: detour, mapping: "start_to_detour", classification: "none" },
-      { from: detour, to: join, mapping: "detour_to_join", classification: "none" },
-      { from: join, to: leaf, mapping: "join_to_leaf", classification: "none" },
-      { from: start, to: join, mapping: "start_to_join", classification: "none" },
-    ];
+  // ── Depth exactness (spr-w98t) ────────────────────────────────────────────
+  //
+  // These fixtures pin the invariant that makes the traversal's mark-on-enqueue
+  // visited set safe: the result is exactly the fields whose *shortest* path is
+  // within the hop budget. The shape matters. A diamond whose two-path field is
+  // adjacent to the focus proves nothing — an adjacent field is enqueued at its
+  // shortest depth whatever order the walk expands in — so `hub` below sits two
+  // hops away, with `leaf`/`ancestor` one further hop out, exactly on the depth
+  // boundary. That boundary field is reachable within budget only if `hub` was
+  // claimed by its two-hop side; a walk that claims `hub` through the three-hop
+  // side loses the boundary field entirely and mislabels `hub`'s via_mapping.
+  // Authoring the short side first is deliberate: it is the order a depth-first
+  // (stack-based) walk gets wrong, so these cases fail if the queue stops being
+  // FIFO. Edge-order independence is asserted separately below.
 
-    const result = traceFieldLineage(diamond, start, {
-      depth: 2,
+  /** One direct field hop; classification is irrelevant to these topologies. */
+  const hop = (from, to, mapping) => ({ from, to, mapping, classification: "none" });
+
+  const start = createCanonicalFieldEndpoint("::start.id");
+  const sink = createCanonicalFieldEndpoint("::sink.id");
+  const near = createCanonicalFieldEndpoint("::near.id");
+  const detour = createCanonicalFieldEndpoint("::detour.id");
+  const relay = createCanonicalFieldEndpoint("::relay.id");
+  const hub = createCanonicalFieldEndpoint("::hub.id");
+  const leaf = createCanonicalFieldEndpoint("::leaf.id");
+  const ancestor = createCanonicalFieldEndpoint("::ancestor.id");
+
+  // start → near → hub → leaf              (hub at 2 hops, leaf at 3)
+  // start → detour → relay → hub           (hub at 3 hops the long way)
+  const downstreamDiamond = [
+    hop(start, near, "start_to_near"),
+    hop(near, hub, "near_to_hub"),
+    hop(start, detour, "start_to_detour"),
+    hop(detour, relay, "detour_to_relay"),
+    hop(relay, hub, "relay_to_hub"),
+    hop(hub, leaf, "hub_to_leaf"),
+  ];
+
+  it("reaches the field on the depth boundary below a two-path field downstream", () => {
+    // `leaf` is three hops away only through hub's two-hop side, so it appears
+    // if and only if hub was claimed at its shortest depth. Full ordered compare
+    // also pins breadth-first emission order and one hop per reached field.
+    const result = traceFieldLineage(downstreamDiamond, start, {
+      depth: 3,
       direction: "downstream",
     });
 
     assert.deepEqual(result.downstream, [
+      { field: "::near.id", via_mapping: "::start_to_near", classification: "none" },
       { field: "::detour.id", via_mapping: "::start_to_detour", classification: "none" },
-      { field: "::join.id", via_mapping: "::start_to_join", classification: "none" },
-      { field: "::leaf.id", via_mapping: "::join_to_leaf", classification: "none" },
+      { field: "::hub.id", via_mapping: "::near_to_hub", classification: "none" },
+      { field: "::relay.id", via_mapping: "::detour_to_relay", classification: "none" },
+      { field: "::leaf.id", via_mapping: "::hub_to_leaf", classification: "none" },
     ]);
-    assert.equal(new Set(result.downstream.map(({ field }) => field)).size, 3);
   });
 
-  it("keeps the upstream subtree reachable through the shorter side of a diamond", () => {
-    // Reversing the same topology exercises the upstream endpoint selection.
-    // The ancestor is exactly three hops away through the shortcut and the
-    // shared start field must not be duplicated through the longer branch.
-    const ancestor = createCanonicalFieldEndpoint("::ancestor.id");
-    const start = createCanonicalFieldEndpoint("::start.id");
-    const detour = createCanonicalFieldEndpoint("::detour.id");
-    const join = createCanonicalFieldEndpoint("::join.id");
-    const sink = createCanonicalFieldEndpoint("::sink.id");
-    const diamond = [
-      { from: ancestor, to: start, mapping: "ancestor_to_start", classification: "none" },
-      { from: start, to: detour, mapping: "start_to_detour", classification: "none" },
-      { from: detour, to: join, mapping: "detour_to_join", classification: "none" },
-      { from: start, to: join, mapping: "start_to_join", classification: "none" },
-      { from: join, to: sink, mapping: "join_to_sink", classification: "none" },
+  it("reaches the field on the depth boundary above a two-path field upstream", () => {
+    // The mirrored topology exercises the upstream endpoint selection: `ancestor`
+    // is three hops back only through hub's two-hop side.
+    const upstreamDiamond = [
+      hop(near, sink, "near_to_sink"),
+      hop(hub, near, "hub_to_near"),
+      hop(detour, sink, "detour_to_sink"),
+      hop(relay, detour, "relay_to_detour"),
+      hop(hub, relay, "hub_to_relay"),
+      hop(ancestor, hub, "ancestor_to_hub"),
     ];
 
-    const result = traceFieldLineage(diamond, sink, {
+    const result = traceFieldLineage(upstreamDiamond, sink, {
       depth: 3,
       direction: "upstream",
     });
 
     assert.deepEqual(result.upstream, [
-      { field: "::join.id", via_mapping: "::join_to_sink", classification: "none" },
-      { field: "::detour.id", via_mapping: "::detour_to_join", classification: "none" },
-      { field: "::start.id", via_mapping: "::start_to_join", classification: "none" },
-      { field: "::ancestor.id", via_mapping: "::ancestor_to_start", classification: "none" },
+      { field: "::near.id", via_mapping: "::near_to_sink", classification: "none" },
+      { field: "::detour.id", via_mapping: "::detour_to_sink", classification: "none" },
+      { field: "::hub.id", via_mapping: "::hub_to_near", classification: "none" },
+      { field: "::relay.id", via_mapping: "::relay_to_detour", classification: "none" },
+      { field: "::ancestor.id", via_mapping: "::ancestor_to_hub", classification: "none" },
     ]);
-    assert.equal(new Set(result.upstream.map(({ field }) => field)).size, 4);
+  });
+
+  it("claims a two-path field by its shortest side whichever side is authored first", () => {
+    // Depth exactness must not depend on edge-list order, which is an artifact of
+    // authoring order in the workspace. Emission order does vary with it, so this
+    // compares the reached fields and their via_mapping as an unordered map.
+    const longSideFirst = [
+      hop(start, detour, "start_to_detour"),
+      hop(detour, relay, "detour_to_relay"),
+      hop(relay, hub, "relay_to_hub"),
+      hop(start, near, "start_to_near"),
+      hop(near, hub, "near_to_hub"),
+      hop(hub, leaf, "hub_to_leaf"),
+    ];
+    const shortestPathEdges = (edges) =>
+      new Map(
+        traceFieldLineage(edges, start, { depth: 3, direction: "downstream" }).downstream.map(
+          ({ field, via_mapping }) => [field, via_mapping],
+        ),
+      );
+
+    assert.deepEqual(shortestPathEdges(longSideFirst), shortestPathEdges(downstreamDiamond));
+    assert.deepEqual(
+      shortestPathEdges(longSideFirst),
+      new Map([
+        ["::near.id", "::start_to_near"],
+        ["::detour.id", "::start_to_detour"],
+        ["::hub.id", "::near_to_hub"],
+        ["::relay.id", "::detour_to_relay"],
+        ["::leaf.id", "::hub_to_leaf"],
+      ]),
+    );
   });
 });
