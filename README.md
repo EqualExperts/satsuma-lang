@@ -360,17 +360,32 @@ If you are contributing tooling, start here:
 
 ### Setup
 
-Install all dependencies across every package, build the WASM parser, and
-compile all bundles in one step from the repo root:
+Install and build everything in one step from the repo root:
 
 ```bash
 npm run install:all
 ```
 
-This is the only setup step needed. It runs `npm install` in every package,
-builds `satsuma-core`, builds the WASM parser (`tree-sitter build --wasm`),
-runs the CLI prebuild to copy generated sources and WASM into `dist`, builds
-`satsuma-viz`, and compiles the VS Code LSP server.
+This is the only setup step needed. The eleven `tooling/*` packages are npm
+workspaces behind a single root `package-lock.json`, so it is one `npm install`
+followed by `turbo run build compile`. The build order is derived from the
+dependency graph in the packages' own manifests rather than written down as a
+sequence — see [`turbo.json`](turbo.json) and ADR-049.
+
+Everyday commands, all from the repo root:
+
+```bash
+npm run build:all                      # rebuild every package
+npm run test:all                       # every package's tests and typechecks
+npm run test:coverage                  # coverage for every package that reports it
+npx turbo run test --filter=satsuma-cli   # just one package, dependencies included
+./scripts/run-repo-checks.sh           # everything the pre-commit hook runs
+```
+
+Note that `npm --prefix tooling/<package> test` does **not** build that package's
+dependencies — the cross-package `prebuild`/`pretest` hooks that used to do so
+were removed when Turborepo took over the build order. Run `npm run build:all`
+first, or use `turbo run test --filter=<package>`.
 
 To start fresh, wipe all `node_modules` and `dist` directories and reinstall:
 
@@ -410,9 +425,8 @@ CI will fail if `src/` diverges from `grammar.js`.
 ### Satsuma CLI
 
 ```bash
-cd tooling/satsuma-cli
-npm test                  # full test suite
-npm link                  # symlink `satsuma` onto your PATH for local use
+npx turbo run test --filter=satsuma-cli   # full test suite, dependencies built first
+npm --prefix tooling/satsuma-cli link     # symlink `satsuma` onto your PATH
 ```
 
 Quick usage:
@@ -455,10 +469,13 @@ and install:
 To build from source or run the test suite:
 
 ```bash
-cd tooling/vscode-satsuma
-npm run check             # validate manifest/grammar + run all tests
-npm run build             # build client + server + webview bundles
+npx turbo run build --filter=vscode-satsuma   # client, bundled server and webviews
+npm --prefix tooling/vscode-satsuma run check # manifest/grammar + this package's tests
+npx turbo run test --filter=@satsuma/lsp      # the language server's own suite
 ```
+
+`check` covers this package's TextMate fixture and golden tests only; the
+language server is a separate package with its own suite.
 
 ### Viz harness (local Playwright tests)
 
@@ -502,14 +519,18 @@ In brief:
 
 - **CI** (`ci.yml`) runs on every push and pull request to `main`. It verifies
   linting, the tree-sitter parser (corpus tests, generated-source staleness,
-  conflict count), the CLI test suite, the VS Code extension tests and LSP
-  server, a CLI tarball pack-and-install smoke test, and the Excel skill tests.
+  conflict count), the CLI test suite, the shared-library modules, the
+  cross-consumer integration sweeps, the VS Code extension tests and LSP server,
+  a CLI tarball pack-and-install smoke test, the BDD smoke tests, the freshness
+  of [`test-stats.json`](test-stats.json), and both Excel skills' tests. Jobs run
+  their work through Turborepo with a persisted content-hash cache, so a commit
+  touching one package does not re-run an unaffected package's suite.
 - **Release** (`release.yml`) runs on every push to `main` to publish a rolling
   `latest` pre-release, and on manual dispatch to create a tagged release with
   changelog-sourced release notes.
 - **Security** (`security.yml`) runs on every push and PR, and is also called
-  as a gate by the release workflow. It covers `npm audit` across all packages
-  and Semgrep SAST.
+  as a gate by the release workflow. It covers `npm audit` over every tracked
+  lockfile and Semgrep SAST.
 
 Grammar conflict count is enforced in CI against
 `tooling/tree-sitter-satsuma/CONFLICTS.expected` — update that file when

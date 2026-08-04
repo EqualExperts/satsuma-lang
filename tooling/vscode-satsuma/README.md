@@ -18,13 +18,15 @@ Download `vscode-satsuma-latest.vsix` from the [latest release](https://github.c
 ### From Source
 
 ```bash
-cd tooling/vscode-satsuma
-npm install
-cd server && npm install && cd ..
-npm run build
-npx @vscode/vsce package --no-dependencies -o vscode-satsuma.vsix
-code --install-extension vscode-satsuma.vsix
+npm install                                     # repo root — npm workspaces, one lockfile
+npx turbo run build --filter=vscode-satsuma     # builds this package and everything it needs
+npm --prefix tooling/vscode-satsuma run package # produces vscode-satsuma.vsix
+code --install-extension tooling/vscode-satsuma/vscode-satsuma.vsix
 ```
+
+There is no `server/` package to install into: the language server is
+`tooling/satsuma-lsp`, a workspace package this one declares, and the build
+bundles it into `server/dist/`.
 
 ### Extension Development Host
 
@@ -159,20 +161,23 @@ Seven commands available via `Ctrl+Shift+P`:
 ## Running Tests
 
 ```bash
-cd tooling/vscode-satsuma
+# This package's tests: unit, plus TextMate fixture and golden checks
+npx turbo run test --filter=vscode-satsuma
 
-# All tests (TextMate + LSP)
-npm run check
+# The language server's own suite — a separate package
+npx turbo run test --filter=@satsuma/lsp
 
-# TextMate grammar tests only
-npm test
-
-# LSP server tests only (296 tests)
-npm run test:lsp
+# Manifest and grammar validation, plus this package's tests
+npm --prefix tooling/vscode-satsuma run check
 
 # Build .vsix locally
-npm run package
+npm --prefix tooling/vscode-satsuma run package
 ```
+
+`check` does **not** run the language server's tests. It used to, via a `test:lsp`
+script that did `cd ../satsuma-lsp && npm test`; reaching into a sibling package
+like that is what Turborepo replaced, so `turbo run test` now covers both in
+dependency order (feature 42).
 
 ## Architecture
 
@@ -184,21 +189,7 @@ tooling/vscode-satsuma/
     webview/graph/            Workspace graph webview (SVG + D3-free layout)
     webview/lineage/          Field lineage webview (horizontal chain)
   server/
-    src/
-      server.ts               LSP server: connection, capabilities, handlers
-      workspace-index.ts      Cross-file symbol table
-      definition.ts           Go-to-definition
-      references.ts           Find references
-      completion.ts           Context-aware completions
-      codelens.ts             Inline annotations
-      rename.ts               Workspace-wide rename
-      diagnostics.ts          Parse error diagnostics
-      validate-diagnostics.ts Semantic diagnostics (CLI integration)
-      symbols.ts              Document symbols / outline
-      folding.ts              Code folding
-      semantic-tokens.ts      Parser-backed semantic highlighting
-      hover.ts                Contextual hover information
-      parser-utils.ts         Tree-sitter helpers
+    dist/                     Bundled language server, built from ../satsuma-lsp
   syntaxes/
     satsuma.tmLanguage.json   TextMate grammar
 ```

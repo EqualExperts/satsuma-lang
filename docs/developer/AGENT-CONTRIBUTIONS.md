@@ -55,17 +55,22 @@ main working directory.
 
 ```bash
 cd .worktrees/satsuma-14x.8
-npm run install:all                         # install all deps + build WASM + LSP server
+npm run install:all                         # one root install, then turbo builds every package
 # ... do work, run tests, commit ...
 git push -u origin satsuma-14x.8
 gh pr create --title "..." --body "..."
 ```
 
 **Important:** after creating a worktree, run `npm run install:all` from the
-worktree root **before doing any work**. This installs all `node_modules`
-across every package, builds the tree-sitter WASM parser, and compiles the
-VS Code LSP server. Without this step, pre-commit hooks (`scripts/run-repo-checks.sh`)
-will fail on vscode-satsuma and tree-sitter tests.
+worktree root **before doing any work**. The eleven `tooling/*` packages are npm
+workspaces behind a single root `package-lock.json`, so this is one `npm install`
+followed by `turbo run build compile`, which builds every package in an order
+derived from the dependency graph (ADR-049). Without it the pre-commit hook
+(`scripts/run-repo-checks.sh`) fails, because nothing else builds the workspace.
+
+Agents working in the sandbox must also export two environment variables before
+running turbo — including before `git commit`, since the hook invokes it. See
+[AGENTS.md § Running Turborepo in the agent sandbox](../../AGENTS.md#running-turborepo-in-the-agent-sandbox).
 
 ### Cleaning up worktrees
 
@@ -165,12 +170,16 @@ Before starting work:
 - [ ] Verify dependencies are closed or merged
 - [ ] Create a worktree: `git worktree add .worktrees/<branch> -b <branch>`
 - [ ] `cd` into the worktree
-- [ ] Run `npm run install:all` to install deps, build WASM, and compile LSP server
+- [ ] Run `npm run install:all` — one root install, then a turbo build of every package
 - [ ] Configure blame to skip bulk reformats: `git config blame.ignoreRevsFile .git-blame-ignore-revs`
 
 Before opening a PR:
 
-- [ ] All tests pass (`npm test` in relevant packages)
+- [ ] All tests pass — `npm run test:all`, or `turbo run test --filter=<package>`
+      for one package. **Not** a bare `npm --prefix tooling/<package> test`: since
+      the cross-package `prebuild`/`pretest` hooks were removed, that no longer
+      builds the package's dependencies and can pass or fail against stale output.
+      See [AGENTS.md § Building and testing](../../AGENTS.md#building-and-testing).
 - [ ] Rebase onto latest `main`
 - [ ] Commits are focused and well-described
 - [ ] Push and create PR via `gh pr create`
