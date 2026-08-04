@@ -77,6 +77,11 @@ run_step "satsuma-cli test:typecheck" npm --prefix tooling/satsuma-cli run prete
 run_step "satsuma-cli tests" bash -c \
   "npm --prefix tooling/satsuma-cli test 2>&1 | tee '$STATS_LOG_DIR/satsuma-cli.log'"
 
+# Cross-consumer parity sweeps (CLI vs viz-backend's model). Runs after the CLI
+# step above, since it depends on satsuma-cli's built `dist/testing.js` export.
+run_step "integration-tests tests" bash -c \
+  "npm --prefix tooling/integration-tests test 2>&1 | tee '$STATS_LOG_DIR/integration-tests.log'"
+
 # ADR-022: CLI accepts files, not directories. Check each example entry file.
 run_step "satsuma fmt --check examples" bash -c '
   cli=tooling/satsuma-cli/dist/index.js

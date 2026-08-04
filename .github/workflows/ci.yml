@@ -54,6 +54,13 @@ jobs:
         working-directory: tooling/satsuma-viz
         run: npm run build
 
+      # Depends on satsuma-cli's dist above (its ./testing export), so it
+      # installs after — but only test-stats and the integration-tests job
+      # itself need it cached; no other job's own build depends on it.
+      - name: Install integration-tests dependencies
+        working-directory: tooling/integration-tests
+        run: npm install
+
       - name: Cache workspace
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
@@ -76,6 +83,7 @@ jobs:
             tooling/tree-sitter-satsuma/tree-sitter-satsuma.wasm
             tooling/vscode-satsuma/node_modules
             tooling/satsuma-lsp/node_modules
+            tooling/integration-tests/node_modules
           key: workspace-${{ github.sha }}
 
   lint:
@@ -211,6 +219,47 @@ jobs:
             tooling/satsuma-cli/coverage/lcov.info
             tooling/satsuma-cli/coverage/coverage-summary.json
 
+  integration-tests:
+    name: Cross-consumer integration tests
+    needs: install
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: tooling/integration-tests
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: "22"
+
+      - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        with:
+          path: |
+            node_modules
+            tooling/satsuma-cli/node_modules
+            tooling/satsuma-cli/src/generated
+            tooling/satsuma-cli/dist
+            tooling/satsuma-core/node_modules
+            tooling/satsuma-scenario-gen/node_modules
+            tooling/satsuma-core/dist
+            tooling/satsuma-viz-backend/node_modules
+            tooling/satsuma-viz-backend/dist
+            tooling/satsuma-viz-model/node_modules
+            tooling/satsuma-viz-model/dist
+            tooling/satsuma-viz/node_modules
+            tooling/satsuma-viz/dist
+            tooling/tree-sitter-satsuma/node_modules
+            tooling/tree-sitter-satsuma/build
+            tooling/tree-sitter-satsuma/tree-sitter-satsuma.wasm
+            tooling/vscode-satsuma/node_modules
+            tooling/satsuma-lsp/node_modules
+            tooling/integration-tests/node_modules
+          key: workspace-${{ github.sha }}
+
+      - name: Run cross-consumer parity sweeps
+        run: npm test
+
   parser:
     name: Tree-sitter parser
     needs: install
@@ -330,6 +379,7 @@ jobs:
             tooling/tree-sitter-satsuma/tree-sitter-satsuma.wasm
             tooling/vscode-satsuma/node_modules
             tooling/satsuma-lsp/node_modules
+            tooling/integration-tests/node_modules
           key: workspace-${{ github.sha }}
 
       # Default mode (no --from-logs): this job spawns each tracked package's

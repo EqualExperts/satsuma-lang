@@ -1,0 +1,24 @@
+{
+  "name": "@satsuma/integration-tests",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Cross-consumer parity sweeps: CLI, viz-backend and the LSP's shared model must agree about one workspace",
+  "type": "module",
+  "scripts": {
+    "pretest": "tsc --noEmit",
+    "test": "node --import tsx/esm --import ./test/setup.ts --test 'test/**/*.test.ts'",
+    "test:coverage": "c8 --reporter=text --reporter=lcov node --import tsx/esm --import ./test/setup.ts --test 'test/**/*.test.ts'",
+    "test:typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@satsuma/core": "file:../satsuma-core",
+    "@satsuma/scenario-gen": "file:../satsuma-scenario-gen",
+    "@satsuma/viz-backend": "file:../satsuma-viz-backend",
+    "@types/node": "^25.5.0",
+    "c8": "^11.0.0",
+    "fast-check": "^4.9.0",
+    "satsuma-cli": "file:../satsuma-cli",
+    "tsx": "^4.23.1",
+    "typescript": "^6.0.2"
+  }
+}

@@ -11,11 +11,17 @@
  * suite; this file is the sweep that would have caught both without anyone
  * knowing to look for them.
  *
- * This is the one place both consumer paths are reachable in one process, which
- * is why the sweep lives here: `@satsuma/viz-backend` assembles the model the
- * webview receives, `coverageForWorkspace` produces what the command prints, and
- * both are compared per mapping, schema and role — counts, denominators and
- * percentages alike.
+ * Lives in this package rather than either consumer's own test tree for the
+ * same reason both parity sweeps do: it is not a CLI test or a viz-backend
+ * test, it is a claim about the two of them agreeing, and needs both reachable
+ * in one process without inverting either package's real dependency graph
+ * (`@satsuma/viz-backend` is deliberately Node-independent and cannot depend on
+ * the CLI; the CLI must not carry test-only devDependencies that exist only to
+ * make it importable by something it doesn't otherwise need to know about).
+ * `@satsuma/viz-backend` assembles the model the webview receives,
+ * `coverageForWorkspace` (via `satsuma-cli`'s `./testing` export) produces what
+ * the command prints, and both are compared per mapping, schema and role —
+ * counts, denominators and percentages alike.
  *
  * **Scope differs by design and is accounted for, not ignored.** `coverage` reads
  * the whole workspace (entry file plus transitive imports); a VizModel is one
@@ -39,9 +45,7 @@ import {
   createScopedIndex,
 } from "@satsuma/viz-backend/workspace-index";
 import { buildVizModel } from "@satsuma/viz-backend/viz-model";
-import { loadWorkspace } from "#src/load-workspace.js";
-import { coverageForWorkspace } from "#src/coverage-workspace.js";
-import { resolveAllNLRefs } from "#src/nl-ref-extract.js";
+import { loadWorkspace, coverageForWorkspace, resolveAllNLRefs } from "satsuma-cli/testing";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const EXAMPLES = resolve(__dirname, "../../../examples");

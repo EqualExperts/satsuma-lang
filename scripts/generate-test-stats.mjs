@@ -124,6 +124,7 @@ export const TRACKED_PACKAGES = [
   { key: "satsuma-viz-model", npmScript: "test" },
   { key: "satsuma-viz-backend", npmScript: "test" },
   { key: "satsuma-viz", npmScript: "test" },
+  { key: "integration-tests", npmScript: "test" },
   // vscode-satsuma's "test" script also runs vscode-tmgrammar-test grammar
   // fixture/golden checks, which print no "tests N" summary of their own.
   // test:unit is the slice that does, and is the count this package has
