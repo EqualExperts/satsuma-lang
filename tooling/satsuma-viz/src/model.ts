@@ -26,6 +26,7 @@ export type {
   MetadataEntry,
   SourceBlockInfo,
   SourceLocation,
+  AggregateCoverage,
 } from "@satsuma/viz-model";
 
 export { CONSTRAINT_TAGS } from "@satsuma/viz-model";

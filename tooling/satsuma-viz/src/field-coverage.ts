@@ -40,6 +40,7 @@ import type {
   NestedArrowBlock,
   SchemaCard,
   VizModel,
+  AggregateCoverage,
 } from "./model.js";
 
 /**
@@ -326,13 +327,38 @@ export function mappingSchemaCoverage(
  * - **Otherwise** → the union of every referencing mapping's entries, seeded with
  *   that same all-uncovered list so the card's own field tree fixes the
  *   denominator and the row order.
+ *
+ * When `aggregate` is supplied by a host, its workspace-wide core verdicts are
+ * used instead of inspecting per-mapping payloads. Source and target entries
+ * for the same schema are unioned because an overview card represents the
+ * schema across both roles.
  */
-export function buildCoverageIndex(model: VizModel): Map<string, SchemaCoverage> {
+export function buildCoverageIndex(
+  model: VizModel,
+  aggregate: AggregateCoverage | null = null,
+): Map<string, SchemaCoverage> {
   const mappings = model.namespaces.flatMap((ns) => ns.mappings);
   const index = new Map<string, SchemaCoverage>();
 
   for (const ns of model.namespaces) {
     for (const schema of ns.schemas) {
+      const uncovered = uncoveredFieldCoverage(
+        toCoverageFields(schema.fields),
+        schema.location.uri,
+      );
+
+      // Browser and editor hosts may already have workspace-wide coverage from
+      // the backend. Prefer that serializable contract when supplied: it is the
+      // authoritative union and avoids asking the component to rediscover it
+      // from whichever mappings happen to be present in this render payload.
+      if (aggregate) {
+        const supplied = aggregate.schemas
+          .filter((entry) => entry.schemaId === schema.qualifiedId)
+          .map((entry) => entry.fields);
+        index.set(schema.qualifiedId, unionFieldCoverage([uncovered, ...supplied]));
+        continue;
+      }
+
       const referencing = mappings.filter((m) => referencesSchema(m, schema.qualifiedId));
 
       // Unknown beats partial: if anything that touches this schema could not be
@@ -343,7 +369,7 @@ export function buildCoverageIndex(model: VizModel): Map<string, SchemaCoverage>
         continue;
       }
 
-      const lists = [uncoveredFieldCoverage(toCoverageFields(schema.fields), schema.location.uri)];
+      const lists = [uncovered];
       for (const mapping of referencing) {
         for (const covered of mapping.coverage?.schemas ?? []) {
           if (covered.schemaId === schema.qualifiedId) lists.push(covered.fields);

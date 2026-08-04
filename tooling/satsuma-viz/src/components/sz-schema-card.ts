@@ -106,6 +106,8 @@ export class SzSchemaCard extends LitElement {
     }
 
     .header {
+      position: relative;
+      overflow: hidden;
       display: flex;
       align-items: center;
       gap: 8px;
@@ -119,6 +121,21 @@ export class SzSchemaCard extends LitElement {
       color: var(--sz-text-on-accent);
       cursor: pointer;
       user-select: none;
+    }
+
+    /* Coverage changes paint only this inset layer; the header's box model and
+       therefore every overview-layout coordinate remain untouched (sl-5m9x). */
+    .coverage-fill {
+      position: absolute;
+      inset: 0 auto 0 0;
+      width: var(--sz-coverage-percent, 0%);
+      background: var(--sz-coverage-fill);
+      pointer-events: none;
+    }
+
+    .header > :not(.coverage-fill) {
+      position: relative;
+      z-index: 1;
     }
 
     /* Without a namespace pill row the header is the top of the card and
@@ -151,6 +168,17 @@ export class SzSchemaCard extends LitElement {
     .header-count {
       font-size: 11px;
       opacity: 0.85;
+      flex-shrink: 0;
+    }
+
+    .coverage-badge {
+      padding: 1px 5px;
+      border-radius: var(--sz-badge-radius);
+      background: var(--sz-coverage-badge-bg);
+      color: var(--sz-text-on-accent);
+      font-size: 10px;
+      font-weight: 700;
+      line-height: 1.4;
       flex-shrink: 0;
     }
 
@@ -563,6 +591,10 @@ export class SzSchemaCard extends LitElement {
    *  Shows namespace::name in header when schema has a namespace (qualifiedId contains ::). */
   @property({ type: Boolean })
   compact = false;
+
+  /** Show aggregate coverage in a compact overview header. */
+  @property({ type: Boolean, attribute: "coverage-overlay", reflect: true })
+  coverageOverlay = false;
 
   @property({ type: String, attribute: "namespace-label" })
   namespaceLabel: string | null = null;
@@ -1029,11 +1061,27 @@ export class SzSchemaCard extends LitElement {
     const totalFields = this._leafCount(s);
     const metaPills = s.metadata.filter((m) => m.key !== "note");
     const isReport = this._isReport(s);
+    const coverage = this._coverage();
+    const coverageText = coverage
+      ? `${coverage.totals.covered}/${coverage.totals.total}`
+      : "Coverage unavailable";
+    const coverageTitle = coverage
+      ? this._coverageTitle(coverage.totals, coverage.containers)
+      : "Coverage not computed for this schema";
 
     return html`
       <div>
         ${this._renderNamespacePill()}
-        <div class="header ${isReport ? "report" : ""}" @click=${this._onHeaderClick}>
+        <div
+          class="header ${isReport ? "report" : ""}"
+          data-coverage-overlay=${this.coverageOverlay ? "on" : "off"}
+          data-coverage-percent=${coverage?.totals.pct ?? ""}
+          style=${
+            this.coverageOverlay && coverage ? `--sz-coverage-percent: ${coverage.totals.pct}%` : ""
+          }
+          @click=${this._onHeaderClick}
+        >
+          ${this.coverageOverlay && coverage ? html`<span class="coverage-fill"></span>` : ""}
           ${this._headerIcon(isReport)}
           <span class="header-name">${displayName}</span>
           <span
@@ -1042,7 +1090,22 @@ export class SzSchemaCard extends LitElement {
             @click=${this._onToggleClick}
             >&#9660;</span
           >
-          <span class="header-count">${totalFields} fields</span>
+          <span
+            class="header-count"
+            data-testid=${`${this.testIdPrefix}-header-count`}
+            data-coverage-available=${coverage !== null}
+            title=${this.coverageOverlay ? coverageTitle : `${totalFields} leaf fields`}
+            >${this.coverageOverlay ? coverageText : `${totalFields} fields`}</span
+          >
+          ${
+            this.coverageOverlay && coverage
+              ? html`<span
+                  class="coverage-badge"
+                  data-testid=${`${this.testIdPrefix}-coverage-percent`}
+                  >${coverage.totals.pct}%</span
+                >`
+              : ""
+          }
         </div>
         ${
           metaPills.length > 0

@@ -33,6 +33,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const WASM_PATH = resolve(__dirname, "../../tree-sitter-satsuma/tree-sitter-satsuma.wasm");
 /** Fixtures live in the CLI package because its suite asserts on them too. */
 const FIXTURES = resolve(__dirname, "../../satsuma-cli/test/fixtures");
+const VIZ_FIXTURES = resolve(__dirname, "fixtures");
 
 /** @type {typeof import("../dist/satsuma-viz.js")} */
 let viz;
@@ -88,6 +89,40 @@ function coverageOf(fixtureName, schemaId, role = "target") {
     containers: countContainerStates(entries),
   };
 }
+
+/** Aggregate overview totals from a local viz fixture's browser-built model. */
+function overviewCoverageOf(fixtureName, schemaId) {
+  const file = resolve(VIZ_FIXTURES, fixtureName);
+  const uri = `file://${file}`;
+  const tree = getParser().parse(readFileSync(file, "utf8"));
+  const index = createWorkspaceIndex();
+  indexFile(index, uri, tree);
+  const model = buildVizModel(uri, tree, index);
+  const fields = viz.buildCoverageIndex(model).get(schemaId);
+  return summarizeFieldCoverage(fields);
+}
+
+describe("coverage overlay fixture (sl-5m9x)", () => {
+  it("reports the CLI-compatible 100% and 50% aggregate figures", () => {
+    // This is the component's self-computed path: core coverage embedded by the
+    // browser-portable backend, then unioned by the overview selector. The two
+    // exact figures are the same values `satsuma coverage --json` reports.
+    assert.deepEqual(overviewCoverageOf("coverage-overlay.stm", "complete"), {
+      covered: 2,
+      coveredDeclared: 2,
+      coveredNl: 0,
+      total: 2,
+      pct: 100,
+    });
+    assert.deepEqual(overviewCoverageOf("coverage-overlay.stm", "halfway"), {
+      covered: 1,
+      coveredDeclared: 1,
+      coveredNl: 0,
+      total: 2,
+      pct: 50,
+    });
+  });
+});
 
 describe("viz coverage equals satsuma coverage (sl-5nsv)", () => {
   it("agrees leaf for leaf on a record body materialised by a fragment spread", () => {

@@ -7,6 +7,7 @@ import type {
   NamespaceGroup,
   MappingBlock,
   SchemaCard,
+  AggregateCoverage,
 } from "./model.js";
 import {
   computeLayout,
@@ -23,7 +24,7 @@ import type { SchemaCoverage } from "./field-coverage.js";
 import { metricAsSchemaCard } from "./metric-adapter.js";
 
 export { VizModel } from "./model.js";
-export type { NamespaceGroup } from "./model.js";
+export type { AggregateCoverage, NamespaceGroup } from "./model.js";
 
 import type { SzCompactToggledDetail } from "./components/sz-schema-card.js";
 
@@ -897,6 +898,19 @@ export class SatsumaViz extends LitElement {
   model: VizModel | null = null;
 
   /**
+   * Optional workspace-wide coverage supplied by a host. When present it is
+   * preferred to the per-mapping coverage embedded in {@link model}; both
+   * shapes are computed by `@satsuma/core`, so the component only selects and
+   * renders verdicts rather than deriving coverage semantics itself.
+   */
+  @property({ type: Object, attribute: false })
+  coverageModel: AggregateCoverage | null = null;
+
+  /** Whether overview cards display the coverage overlay. Defaults off. */
+  @property({ type: Boolean, attribute: "coverage-overlay", reflect: true })
+  coverageOverlay = false;
+
+  /**
    * Visual theme. Reflected to the `theme` attribute so the
    * `:host([theme="dark"])` overrides in tokens.css apply — this is the *only*
    * switching mechanism for the palette. Consumers (VS Code webview, harness)
@@ -1087,6 +1101,12 @@ export class SatsumaViz extends LitElement {
       void this._runLayout();
     }
 
+    // Coverage payload changes are presentation-only. Refreshing this index
+    // must not invoke ELK or replace its node coordinates (sl-5m9x).
+    if (changed.has("coverageModel") && this.model) {
+      this._refreshCoverageIndex();
+    }
+
     if (
       changed.has("_layout") ||
       changed.has("_overviewLayout") ||
@@ -1205,7 +1225,7 @@ export class SatsumaViz extends LitElement {
     const mergedModel = this._buildMergedModel();
 
     // Coverage index for card rendering, over the same model that is laid out.
-    this._coverageBySchema = buildCoverageIndex(mergedModel);
+    this._coverageBySchema = buildCoverageIndex(mergedModel, this.coverageModel);
 
     try {
       const [detail, overview] = await Promise.all([
@@ -1217,6 +1237,11 @@ export class SatsumaViz extends LitElement {
     } catch {
       this._layoutError = true;
     }
+  }
+
+  /** Rebuild card coverage without touching either layout result. */
+  private _refreshCoverageIndex(): void {
+    this._coverageBySchema = buildCoverageIndex(this._buildMergedModel(), this.coverageModel);
   }
 
   /** Merge the primary model with any expanded cross-file models. */
@@ -1476,6 +1501,21 @@ export class SatsumaViz extends LitElement {
         ${
           !inDetail
             ? html`<button
+                  class="toolbar-btn"
+                  data-testid="toolbar-toggle-coverage"
+                  ?data-active=${this.coverageOverlay}
+                  aria-pressed=${this.coverageOverlay ? "true" : "false"}
+                  @click=${this._toggleCoverageOverlay}
+                  title="Show or hide aggregate field coverage"
+                >
+                  Coverage
+                </button>
+                <div class="toolbar-sep"></div>`
+            : ""
+        }
+        ${
+          !inDetail
+            ? html`<button
                 class="toolbar-btn"
                 data-testid="toolbar-fit"
                 @click=${this._fit}
@@ -1559,6 +1599,11 @@ export class SatsumaViz extends LitElement {
     this._selectedMapping = null;
     this._selectedMappingKey = null;
     this._resetPanZoom();
+  }
+
+  /** Toggle the visual overlay without recomputing graph geometry. */
+  private _toggleCoverageOverlay(): void {
+    this.coverageOverlay = !this.coverageOverlay;
   }
 
   private _resetPanZoom() {
@@ -1786,6 +1831,8 @@ export class SatsumaViz extends LitElement {
                     data-testid=${`overview-schema-card-${sanitizeTestIdSegment(s.qualifiedId)}`}
                     .testIdPrefix=${`overview-schema-card-${sanitizeTestIdSegment(s.qualifiedId)}`}
                     .schema=${s}
+                    .coverage=${this._coverageBySchema.get(s.qualifiedId) ?? null}
+                    .coverageOverlay=${this.coverageOverlay}
                     .namespaceLabel=${ns.name}
                     .compactExpanded=${this._compactExpandedIds.has(s.qualifiedId)}
                     compact
