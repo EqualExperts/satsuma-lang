@@ -1,7 +1,7 @@
 ---
 id: sl-jsyn
 status: open
-deps: [sl-dqyu, sl-prlp]
+deps: [sl-dqyu, sl-prlp, spr-w98t]
 links: []
 created: 2026-08-03T16:23:59Z
 type: task
