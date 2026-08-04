@@ -36,6 +36,20 @@ describe("CONSTRAINT_TAGS", () => {
 });
 
 describe("VizModel fixture validation", () => {
+  it("accepts the CLI-compatible field chain contract", () => {
+    // The later Lit chain renderer and host-supplied LSP payload both depend on
+    // this exact field/via_mapping/classification shape staying serializable.
+    /** @type {import("@satsuma/viz-model").FieldChainModel} */
+    const chain = {
+      field: "::staged.id",
+      upstream: [{ field: "::raw.id", via_mapping: "::stage", classification: "none" }],
+      downstream: [{ field: "::curated.id", via_mapping: "::curate", classification: "nl" }],
+    };
+
+    assert.equal(chain.upstream[0].field, "::raw.id");
+    assert.equal(chain.downstream[0].via_mapping, "::curate");
+  });
+
   it("accepts a minimal VizModel shape with schema, fields, and comments", () => {
     // Validates the core VizModel → NamespaceGroup → SchemaCard → FieldEntry
     // chain. The renderer accesses namespaces[0].schemas[0].fields directly;

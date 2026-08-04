@@ -18,31 +18,17 @@
  * caller before use; it parses via the shared `getParser()` singleton.
  */
 
-import { getParser } from "@satsuma/core";
-import type { Tree } from "./parser-utils";
 import {
-  createWorkspaceIndex,
-  indexFile,
   getImportReachableUris,
   getUnresolvedImportPaths,
   createScopedIndex,
 } from "./workspace-index";
 import { buildVizModel, mergeVizModels } from "./viz-model";
 import type { VizModel } from "./viz-model";
+import { buildInMemoryWorkspace } from "./in-memory-workspace";
+import type { SourceDocument } from "./in-memory-workspace";
 
-/** One in-memory Satsuma document keyed by the URI under which it is indexed. */
-export interface SourceDocument {
-  /**
-   * The document's URI. Must be a `file:///` URI in the same form the import
-   * resolver produces, so cross-file `import`s between documents resolve and
-   * `WorkspaceIndex.indexedFiles.has(...)` matches (feature 33 §1a). The Node
-   * server derives this from the filesystem path; the browser derives it from
-   * the library entry's virtual path.
-   */
-  uri: string;
-  /** Raw Satsuma source text — the single source of truth for parse + index. */
-  source: string;
-}
+export type { SourceDocument } from "./in-memory-workspace";
 
 /** Options controlling how the entry document's model is assembled. */
 export interface BuildModelOptions {
@@ -96,20 +82,9 @@ export function buildModelResultFromSources(
   documents: SourceDocument[],
   options: BuildModelOptions = {},
 ): BuildModelResult {
-  const parser = getParser();
-  const index = createWorkspaceIndex();
-
-  // Parse once per document and keep the trees so the lineage merge below does
-  // not re-parse the same sources it already indexed.
-  const treesByUri = new Map<string, Tree>();
-  for (const doc of documents) {
-    const tree = parser.parse(doc.source);
-    // web-tree-sitter returns Tree | null; null only arises when parsing is
-    // halted via a callback, which we never do here.
-    if (!tree) continue;
-    treesByUri.set(doc.uri, tree);
-    indexFile(index, doc.uri, tree);
-  }
+  // Model and chain builders share one parse/index pipeline so their import
+  // scope and URI identity cannot diverge.
+  const { index, treesByUri } = buildInMemoryWorkspace(documents);
 
   const entryTree = treesByUri.get(entryUri);
   if (!entryTree) return { model: emptyModel(entryUri), unresolvedImports: [] };

@@ -1,6 +1,6 @@
 ---
 id: sl-5m9x
-status: open
+status: in_progress
 deps: [sl-gsxu, sl-4qvp]
 links: []
 created: 2026-07-31T13:13:41Z

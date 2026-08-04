@@ -1,0 +1,27 @@
+{
+  "field": "::curated.id",
+  "upstream": [
+    {
+      "field": "::staged.id",
+      "via_mapping": "::curate_records",
+      "classification": "nl"
+    },
+    {
+      "field": "::raw.audit_code",
+      "via_mapping": "::curate_records",
+      "classification": "nl-derived"
+    },
+    {
+      "field": "::raw.id",
+      "via_mapping": "::stage_records",
+      "classification": "none"
+    }
+  ],
+  "downstream": [
+    {
+      "field": "::published.id",
+      "via_mapping": "::publish_records",
+      "classification": "none"
+    }
+  ]
+}
