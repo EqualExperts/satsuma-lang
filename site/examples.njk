@@ -86,7 +86,9 @@ permalink: examples.html
   <span class="keyword">source</span> { <span class="field">`legacy_sqlserver`</span> }
   <span class="keyword">target</span> { <span class="field">`postgres_db`</span> }
 
-  CUST_ID <span class="operator">-></span> customer_id { <span class="function">uuid_v5</span>(<span class="string">"6ba7b810-..."</span>, CUST_ID) }
+  CUST_ID <span class="operator">-></span> customer_id {
+    <span class="note-text">"Generate UUID v5 using namespace 6ba7b810-9dad-11d1-80b4-00c04fd430c8 and CUST_ID as name"</span>
+  }
   CUST_ID <span class="operator">-></span> legacy_customer_id
 
   CUST_TYPE <span class="operator">-></span> customer_type {
@@ -140,8 +142,8 @@ permalink: examples.html
   Name <span class="operator">-></span> opportunity_name
 
   Amount <span class="operator">-></span> amount_usd {
-    <span class="string">"Multiply by rate from `fx_spot_rates` using CurrencyIsoCode"</span>
-    | <span class="function">round</span>(2)
+    <span class="note-text">"Multiply by rate from <span class="at-ref">@fx_spot_rates</span> lookup using CurrencyIsoCode"</span>
+    | <span class="function">round</span> 2
   }
 
   StageName <span class="operator">-></span> pipeline_stage {
@@ -295,7 +297,13 @@ permalink: examples.html
   }
 
   LineItems <span class="keyword">list_of record</span> {
-    ITEMQTY   <span class="type">NUMBER(15)</span>       <span class="warning">//! 4 implied decimal places</span>
+    LINENUM   <span class="type">NUMBER(6)</span>
+    ITEMNO    <span class="type">CHAR(35)</span>         <span class="comment">// product identifier</span>
+  }
+
+  Quantities <span class="keyword">list_of record</span> (<span class="constraint">filter QUANTQUAL == <span class="string">"12"</span></span>) {
+    QUANTQUAL <span class="type">CHAR(3)</span>
+    QUANTITY  <span class="type">NUMBER(15)</span>       <span class="warning">//! 4 implied decimal places</span>
   }
 }</code></pre>
               </div>
@@ -386,11 +394,11 @@ permalink: examples.html
   WAERS    <span class="type">STRING(3)</span>   (<span class="constraint">required</span>, <span class="constraint">note <span class="string">"Document currency"</span></span>)
 
   Items <span class="keyword">list_of record</span> {
-    EBELP    <span class="type">STRING(5)</span>   (<span class="constraint">pk</span>, <span class="constraint">required</span>, <span class="constraint">note <span class="string">"Item number"</span></span>)
-    MATNR    <span class="type">STRING(18)</span>  (<span class="constraint">note <span class="string">"Material number"</span></span>)
-    MENGE    <span class="type">DECIMAL(13,3)</span> (<span class="constraint">required</span>)
-    NETPR    <span class="type">DECIMAL(11,2)</span> (<span class="constraint">note <span class="string">"Net price"</span></span>)
-    MEINS    <span class="type">STRING(3)</span>   (<span class="constraint">required</span>, <span class="constraint">note <span class="string">"Unit of measure"</span></span>)
+    EBELP    <span class="type">STRING(5)</span>   (<span class="constraint">required</span>, <span class="constraint">note <span class="string">"PO line number"</span></span>)
+    MATNR    <span class="type">STRING(18)</span>  (<span class="constraint">required</span>, <span class="constraint">note <span class="string">"SAP material number"</span></span>)
+    MENGE    <span class="type">NUMBER(13,3)</span> (<span class="constraint">required</span>, <span class="constraint">note <span class="string">"Ordered quantity"</span></span>)
+    NETPR    <span class="type">NUMBER(13,4)</span> (<span class="constraint">required</span>, <span class="constraint">note <span class="string">"Net price"</span></span>)
+    MEINS    <span class="type">STRING(3)</span>   (<span class="constraint">required</span>, <span class="constraint">note <span class="string">"Base unit of measure"</span></span>)
     WERKS    <span class="type">STRING(4)</span>   (<span class="constraint">required</span>, <span class="constraint">note <span class="string">"Plant"</span></span>)
   }
 }</code></pre>
@@ -424,21 +432,24 @@ permalink: examples.html
             <div class="example-content">
               <div class="code-block rounded-none border-x-0 border-b-0">
                 <pre class="text-sm"><code class="stm"><span class="keyword">mapping</span> <span class="string">`payments to analytics`</span> {
-  <span class="keyword">source</span> { <span class="field">`payment_gateway`</span> }
+  <span class="keyword">source</span> {
+    <span class="field">`payment_gateway`</span>,
+    <span class="field">`crm_system`</span>
+  }
   <span class="keyword">target</span> { <span class="field">`analytics_db`</span> }
 
   amount <span class="operator">-></span> total_spent {
-    <span class="string">"Sum all transactions where status = 'completed',
-     grouped by customer_email.
-     Join to crm_system on email to resolve customer_id."</span>
+    <span class="note-text">"Sum all transactions where <span class="at-ref">@status</span> = completed,
+     grouped by <span class="at-ref">@customer_email</span>.
+     Join to <span class="at-ref">@crm_system</span> on <span class="at-ref">@email</span> to resolve <span class="at-ref">@customer_id</span>."</span>
   }
 
   <span class="operator">-></span> transaction_count {
-    <span class="string">"Count transactions where status = 'completed', per customer."</span>
+    <span class="note-text">"Count transactions where <span class="at-ref">@status</span> = completed, per customer."</span>
   }
 
   <span class="operator">-></span> last_transaction_date {
-    <span class="string">"Max transaction timestamp where status = 'completed',
+    <span class="note-text">"Max transaction timestamp where <span class="at-ref">@status</span> = completed,
      per customer."</span>
   }
 }</code></pre>
@@ -726,7 +737,7 @@ permalink: examples.html
   customer_id <span class="operator">-></span> customer_id
   full_name   <span class="operator">-></span> full_name   { <span class="function">trim</span> | <span class="function">title_case</span> }
   email       <span class="operator">-></span> email       { <span class="function">trim</span> | <span class="function">lowercase</span> }
-  <span class="operator">-></span> updated_at  { <span class="function">now_utc</span>() }
+  <span class="operator">-></span> updated_at  { <span class="function">now_utc</span> }
 }
 
 <span class="keyword">mapping</span> <span class="string">`purchase events`</span> (<span class="annotation">merge</span> append) {
@@ -737,7 +748,7 @@ permalink: examples.html
   customer_id      <span class="operator">-></span> customer_id
   sku              <span class="operator">-></span> sku
   quantity         <span class="operator">-></span> quantity
-  <span class="operator">-></span> ingested_at { <span class="function">now_utc</span>() }
+  <span class="operator">-></span> ingested_at { <span class="function">now_utc</span> }
 }</code></pre>
               </div>
             </div>
@@ -776,12 +787,21 @@ permalink: examples.html
   <span class="annotation">retention</span> <span class="string">"7y"</span>
 ) {
   customer_id  <span class="type">UUID</span>         (<span class="constraint">pk</span>, <span class="constraint">required</span>)
-  email        <span class="type">STRING(255)</span>  (<span class="constraint">pii</span>, <span class="annotation">classification</span> <span class="string">"RESTRICTED"</span>,
-    <span class="annotation">encrypt</span> AES-256-GCM, <span class="annotation">mask</span> partial_email,
-    <span class="annotation">retention</span> <span class="string">"3y"</span>)
+  email        <span class="type">STRING(255)</span> (
+    <span class="constraint">pii</span>,
+    <span class="annotation">classification</span> <span class="string">"RESTRICTED"</span>,
+    <span class="annotation">encrypt</span> AES-256-GCM,
+    <span class="annotation">mask</span> partial_email,
+    <span class="annotation">retention</span> <span class="string">"3y"</span>,
+    <span class="constraint">note</span> <span class="string">"Email has a 3-year retention override per GDPR Art. 17 right-to-erasure."</span>
+  )
   first_name   <span class="type">STRING(100)</span>  (<span class="constraint">pii</span>, <span class="annotation">classification</span> <span class="string">"CONFIDENTIAL"</span>, <span class="annotation">mask</span> redact)
-  phone        <span class="type">STRING(20)</span>   (<span class="constraint">pii</span>, <span class="annotation">classification</span> <span class="string">"RESTRICTED"</span>,
-    <span class="annotation">encrypt</span> AES-256-GCM, <span class="annotation">mask</span> last_four)
+  phone        <span class="type">STRING(20)</span> (
+    <span class="constraint">pii</span>,
+    <span class="annotation">classification</span> <span class="string">"RESTRICTED"</span>,
+    <span class="annotation">encrypt</span> AES-256-GCM,
+    <span class="annotation">mask</span> last_four
+  )
 }</code></pre>
               </div>
             </div>
