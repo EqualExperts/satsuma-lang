@@ -808,7 +808,7 @@ def create_overview_tab(ws: Worksheet, data: WorkbookData) -> None:
     row += 1
 
     for schema in data.schemas:
-        ws.cell(row=row, column=1, value=schema.name).font = FONT_DATA
+        ws.cell(row=row, column=1, value=_display_name(schema.name)).font = FONT_DATA
         ws.cell(row=row, column=2, value=schema.role.title()).font = FONT_DATA
         ws.cell(row=row, column=3, value=schema.note or "").font = FONT_DATA
         fill = _alt_fill(row)
@@ -826,8 +826,8 @@ def create_overview_tab(ws: Worksheet, data: WorkbookData) -> None:
     toc_entries: list[tuple[str, str]] = []
     toc_entries.append(("Issues", "Warnings and open questions"))
     for m in data.mappings:
-        src = ", ".join(m.sources) if m.sources else "?"
-        tgt = ", ".join(m.targets) if m.targets else "?"
+        src = ", ".join(_display_name(s) for s in m.sources) if m.sources else "?"
+        tgt = ", ".join(_display_name(t) for t in m.targets) if m.targets else "?"
         tab_name = _mapping_tab_name(m)
         toc_entries.append((tab_name, f"Mapping: {src} \u2192 {tgt}"))
 
@@ -912,14 +912,28 @@ def create_issues_tab(ws: Worksheet, data: WorkbookData) -> None:
     _apply_data_tab_formatting(ws, 1, len(data.issues) + 1, 4)
 
 
+def _display_name(name: str) -> str:
+    """Strip the canonical "::" global-namespace marker for human-facing output.
+
+    `satsuma graph --json` emits canonical entity ids ("::name" for global
+    entities, "ns::name" for namespaced ones) so JSON consumers can join
+    edges to nodes unambiguously (lgc-wtz1). That marker isn't valid in an
+    Excel sheet title (openpyxl rejects ":") and reads as noise in prose —
+    strip it here, mirroring the CLI's own displayKey() convention. Anything
+    that still needs to *look up* the entity (e.g. `satsuma fields <id>`)
+    keeps using the canonical form; this is only for what a reader sees.
+    """
+    return name.removeprefix("::")
+
+
 def _mapping_tab_name(m: MappingInfo) -> str:
     """Generate tab name for a mapping."""
     if m.sources and m.targets:
-        src = m.sources[0]
-        tgt = m.targets[0]
+        src = _display_name(m.sources[0])
+        tgt = _display_name(m.targets[0])
         name = f"Map - {src} to {tgt}"
     elif m.name:
-        name = f"Map - {m.name}"
+        name = f"Map - {_display_name(m.name)}"
     else:
         name = "Map"
     # Excel tab names limited to 31 chars
@@ -929,7 +943,7 @@ def _mapping_tab_name(m: MappingInfo) -> str:
 def _schema_tab_name(s: SchemaInfo) -> str:
     """Generate tab name for a schema."""
     prefix = "Tgt" if s.role == "target" else "Src"
-    name = f"{prefix} - {s.name}"
+    name = f"{prefix} - {_display_name(s.name)}"
     return name[:31]
 
 
