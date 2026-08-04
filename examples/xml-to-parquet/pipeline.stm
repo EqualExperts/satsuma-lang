@@ -144,7 +144,7 @@ mapping `order headers` {
   Order.Totals.TotalAmount -> total_amount
 
   -> discount_codes {
-    "Collect `DiscountCode` values from the order discount entries, preserving source order.
+    "Collect @DiscountCode values from the order discount entries, preserving source order.
      Emit as a JSON array string. If no discounts, emit []."
   }
 
