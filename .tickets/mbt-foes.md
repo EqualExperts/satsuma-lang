@@ -1,6 +1,6 @@
 ---
 id: mbt-foes
-status: open
+status: closed
 deps: []
 links: []
 created: 2026-08-04T11:08:17Z
@@ -20,3 +20,10 @@ Audit shared-dependency versions across all ten tooling/*/package.json files for
 - Baseline CI wall-clock timing (install job + full pipeline) recorded for comparison in R2 and R5
 - ADR-049 already covers the architectural decision (workspaces + Turborepo, local-only cache) -- no new ADR needed from this ticket unless the audit surfaces a blocker that changes that decision
 
+
+## Notes
+
+**2026-08-04T13:26:38Z**
+
+Cause: Ten independently installed tooling packages had split dependency majors, install-time prepare hooks, and package-local node_modules path assumptions whose behavior under workspace hoisting had not been measured; CI also lacked a recorded before-migration timing baseline.
+Fix: Added the R1 findings note with the complete version and lifecycle audit, isolated hoisting rehearsals, verified WASM-only native-build skip, R2/R4 handoff constraints, and CI baselines of 1m34s for install and 4m35s end-to-end. (commit immediately after 8ca5d5fc)
