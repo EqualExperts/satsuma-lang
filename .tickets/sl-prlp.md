@@ -1,6 +1,6 @@
 ---
 id: sl-prlp
-status: open
+status: closed
 deps: [sl-4871]
 links: []
 created: 2026-08-03T12:24:14Z
@@ -74,3 +74,7 @@ this plan: sl-y89y's DepthAwareTraversal fix reached commands/lineage.ts only, s
 field-lineage.ts still has the original first-visit-wins shape. It cannot be fixed inside
 this ticket (byte-identical output), and R4 (sl-jsyn) will fail on it, so it is sequenced
 between the two.
+
+**2026-08-04T11:24:13Z**
+
+Cause: Field-level edge construction was duplicated in graph-builder.ts and field-lineage.ts, while traversal was coupled to the CLI's ExtractedWorkspace, preventing browser consumers from reusing it. Fix: Added a browser-portable FieldEdgeSource-based builder and pure traversal to satsuma-core, delegated both CLI graph and field-lineage through one CLI adapter, preserved output and endpoint policy, and added unit and portability coverage plus architecture docs. (commit immediately after be81e734)
