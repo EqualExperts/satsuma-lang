@@ -99,14 +99,65 @@ function renderText(card) {
  * `null` — "not computed" — is the default, so a case that forgets to supply
  * verdicts cannot accidentally assert against zeroes.
  */
-async function makeCard(fields, coverage = null, { compact = false } = {}) {
+async function makeCard(
+  fields,
+  coverage = null,
+  { compact = false, coverageOverlay = false } = {},
+) {
   const mod = await import("../dist/satsuma-viz.js");
   const card = new mod.SzSchemaCard();
   card.schema = schemaCard(fields);
   card.coverage = coverage;
   card.compact = compact;
+  card.coverageOverlay = coverageOverlay;
   return card;
 }
+
+describe("sz-schema-card compact coverage overlay (sl-5m9x)", () => {
+  it("shows exact mapped counts and percentage with proportional header fill", async () => {
+    // A 1/2 result must expose the same 50% in text and paint width: text keeps
+    // the overlay accessible without colour, while the CSS variable changes
+    // paint only and cannot alter the card's measured geometry.
+    const card = await makeCard(
+      [leaf("mapped"), leaf("gap")],
+      entries(["mapped", "covered", "declared"], ["gap", "uncovered"]),
+      { compact: true, coverageOverlay: true },
+    );
+    const text = renderText(card);
+    assert.match(text, /header-count[^>]*>1\/2</);
+    assert.match(text, /coverage-badge[^>]*[\s\S]*50%/);
+    assert.match(text, /data-coverage-percent="?50/);
+    assert.match(text, /--sz-coverage-percent: 50%/);
+    assert.match(text, /class="coverage-fill"/);
+  });
+
+  it("renders complete coverage as exactly 100 percent", async () => {
+    // Exact completion must not be rounded from a near-complete value; core's
+    // percentage contract reserves 100 for genuinely complete coverage.
+    const card = await makeCard(
+      [leaf("a"), leaf("b")],
+      entries(["a", "covered", "declared"], ["b", "covered", "nl"]),
+      { compact: true, coverageOverlay: true },
+    );
+    const text = renderText(card);
+    assert.match(text, /header-count[^>]*>2\/2</);
+    assert.match(text, /coverage-badge[^>]*[\s\S]*100%/);
+  });
+
+  it("keeps the existing field count when the overlay is off", async () => {
+    // Off is the backward-compatible default: supplying coverage alone must
+    // not change overview card text or add the proportional fill layer.
+    const card = await makeCard(
+      [leaf("a"), leaf("b")],
+      entries(["a", "covered", "declared"], ["b", "uncovered"]),
+      { compact: true },
+    );
+    const text = renderText(card);
+    assert.match(text, /2 fields/);
+    assert.doesNotMatch(text, /coverage-badge/);
+    assert.doesNotMatch(text, /class="coverage-fill"/);
+  });
+});
 
 // The figure named in sl-hcan: one scalar beside a three-leaf record, with a
 // single leaf of that record covered.

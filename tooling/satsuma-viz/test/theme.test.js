@@ -71,6 +71,15 @@ describe("theme token parity", () => {
 
     assert.deepEqual(missing, [], `Missing dark token overrides: ${missing.join(", ")}`);
   });
+
+  it("defines a coverage fill for both light and dark palettes", () => {
+    // The overlay is a first-class themed surface, not a literal colour in the
+    // card component; each palette needs an explicit contrast-tuned value.
+    const { light, dark } = getTokensByBlock();
+    assert.ok(light.has("--sz-coverage-fill"));
+    assert.ok(dark.has("--sz-coverage-fill"));
+    assert.notEqual(light.get("--sz-coverage-fill"), dark.get("--sz-coverage-fill"));
+  });
 });
 
 describe("satsuma-viz theme property", () => {

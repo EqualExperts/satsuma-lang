@@ -452,4 +452,37 @@ describe("absent coverage stays unavailable, distinct from 0/N", () => {
       [["z", "uncovered"]],
     );
   });
+
+  it("prefers host-supplied aggregate coverage over an absent mapping result", () => {
+    // Browser and editor hosts can send core's aggregate payload separately
+    // from VizModel. That authoritative result must remain usable even when a
+    // compact model omits per-mapping coverage entirely.
+    const aggregate = {
+      schemas: [
+        {
+          schemaId: "s",
+          role: "source",
+          mappings: ["m"],
+          fields: [
+            { path: "a", uri: loc.uri, mapped: true, state: "covered", tier: "declared" },
+            { path: "b", uri: loc.uri, mapped: false, state: "uncovered" },
+          ],
+          totals: { covered: 1, coveredDeclared: 1, coveredNl: 0, total: 2, pct: 50 },
+        },
+      ],
+      namespaces: [],
+      workspace: {
+        source: { covered: 1, coveredDeclared: 1, coveredNl: 0, total: 2, pct: 50 },
+        target: { covered: 0, coveredDeclared: 0, coveredNl: 0, total: 0, pct: 0 },
+      },
+    };
+    const index = mod.buildCoverageIndex(modelWith([uncomputed()], [src]), aggregate);
+    assert.deepEqual(
+      index.get("s").map((entry) => [entry.path, entry.state]),
+      [
+        ["a", "covered"],
+        ["b", "uncovered"],
+      ],
+    );
+  });
 });

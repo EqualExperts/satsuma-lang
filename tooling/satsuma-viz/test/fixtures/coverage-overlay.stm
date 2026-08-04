@@ -1,0 +1,17 @@
+// Overlay fixture: target schemas with exact 100% and 50% aggregate coverage.
+schema raw { id STRING name STRING }
+schema complete { id STRING name STRING }
+schema halfway { id STRING name STRING }
+
+mapping load_complete {
+  source { raw }
+  target { complete }
+  id -> id
+  name -> name
+}
+
+mapping load_halfway {
+  source { raw }
+  target { halfway }
+  id -> id
+}

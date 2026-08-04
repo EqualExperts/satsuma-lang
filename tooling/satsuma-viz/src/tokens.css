@@ -14,6 +14,8 @@
   --sz-row-active-bg: rgba(45, 42, 38, 0.06);
   --sz-accent-wash: rgba(242, 145, 61, 0.12);
   --sz-green-wash: rgba(90, 158, 111, 0.12);
+  --sz-coverage-fill: rgba(29, 109, 67, 0.68);
+  --sz-coverage-badge-bg: #1D6D43;
   --sz-warning-border-soft: rgba(196, 93, 34, 0.2);
   --sz-warning-border-strong: rgba(196, 93, 34, 0.3);
   --sz-question-border-soft: rgba(124, 107, 174, 0.2);
@@ -89,6 +91,8 @@
   --sz-row-active-bg: rgba(255, 255, 255, 0.08);
   --sz-accent-wash: rgba(242, 168, 96, 0.16);
   --sz-green-wash: rgba(109, 191, 130, 0.16);
+  --sz-coverage-fill: rgba(37, 120, 76, 0.72);
+  --sz-coverage-badge-bg: #25784C;
   --sz-warning-border-soft: rgba(224, 112, 64, 0.28);
   --sz-warning-border-strong: rgba(224, 112, 64, 0.4);
   --sz-question-border-soft: rgba(160, 140, 200, 0.24);
