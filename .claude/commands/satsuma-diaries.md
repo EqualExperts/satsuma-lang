@@ -1,0 +1,1 @@
+../../skills/satsuma-diaries/SKILL.md
