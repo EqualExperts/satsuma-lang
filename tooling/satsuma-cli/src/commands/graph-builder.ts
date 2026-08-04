@@ -16,6 +16,7 @@ import type { FieldEdge as CoreFieldEdge } from "@satsuma/core";
 import { createFieldEdgeSource } from "../field-edge-source.js";
 import { expandEntityFields, expandNestedSpreads } from "../spread-expand.js";
 import { extractAtRefs, classifyRef, resolveRef } from "../nl-ref-extract.js";
+import { canonicalKey } from "../index-builder.js";
 import type { ExtractedWorkspace, FieldDecl } from "../types.js";
 import type { FullGraph } from "../schema-graph.js";
 
@@ -109,8 +110,9 @@ export function buildWorkspaceGraph(
     // Render them only once, as metric nodes (handled in the loop below).
     if (index.metrics.has(id)) continue;
     includedNodeIds.add(id);
+    const canonicalId = canonicalKey(id);
     const node: Record<string, unknown> = {
-      id,
+      id: canonicalId,
       kind: "schema",
       namespace: schema.namespace ?? null,
       file: schema.file,
@@ -132,27 +134,32 @@ export function buildWorkspaceGraph(
   for (const [id, mapping] of index.mappings) {
     if (nsFilter && mapping.namespace !== nsFilter) continue;
     includedNodeIds.add(id);
+    const canonicalId = canonicalKey(id);
+    const canonicalSources = mapping.sources.map(canonicalKey);
+    const canonicalTargets = mapping.targets.map(canonicalKey);
     nodes.push({
-      id,
+      id: canonicalId,
       kind: "mapping",
       namespace: mapping.namespace ?? null,
       file: mapping.file,
       line: mapping.row + 1,
-      sources: mapping.sources,
-      targets: mapping.targets,
+      sources: canonicalSources,
+      targets: canonicalTargets,
     });
   }
 
   for (const [id, metric] of index.metrics) {
     if (nsFilter && metric.namespace !== nsFilter) continue;
     includedNodeIds.add(id);
+    const canonicalId = canonicalKey(id);
+    const canonicalSources = metric.sources.map(canonicalKey);
     const metricNode: Record<string, unknown> = {
-      id,
+      id: canonicalId,
       kind: "metric",
       namespace: metric.namespace ?? null,
       file: metric.file,
       line: metric.row + 1,
-      sources: metric.sources,
+      sources: canonicalSources,
       grain: metric.grain ?? null,
       slices: metric.slices ?? [],
     };
@@ -172,8 +179,9 @@ export function buildWorkspaceGraph(
   for (const [id, transform] of index.transforms) {
     if (nsFilter && transform.namespace !== nsFilter) continue;
     includedNodeIds.add(id);
+    const canonicalId = canonicalKey(id);
     nodes.push({
-      id,
+      id: canonicalId,
       kind: "transform",
       namespace: transform.namespace ?? null,
       file: transform.file,
@@ -190,15 +198,24 @@ export function buildWorkspaceGraph(
   // Any endpoint not already in nodes is looked up and added here, so that every
   // edge endpoint is backed by a node entry and callers can rely on structural
   // consistency without further checks.
+  //
+  // Note: schema_edges use canonical form (e.g., "::raw"), but index lookup
+  // requires index-key form (e.g., "raw"). Convert by stripping the leading "::"
+  // for file-scope entities.
+  function toIndexKey(canonicalId: string): string {
+    return canonicalId.startsWith("::") ? canonicalId.slice(2) : canonicalId;
+  }
+
   if (nsFilter) {
     for (const edge of schemaEdges) {
-      for (const id of [edge.from, edge.to]) {
-        if (includedNodeIds.has(id)) continue;
-        const schema = index.schemas.get(id);
-        if (schema && !index.metrics.has(id)) {
-          includedNodeIds.add(id);
+      for (const canonicalId of [edge.from, edge.to]) {
+        const indexKey = toIndexKey(canonicalId);
+        if (includedNodeIds.has(indexKey)) continue;
+        const schema = index.schemas.get(indexKey);
+        if (schema && !index.metrics.has(indexKey)) {
+          includedNodeIds.add(indexKey);
           nodes.push({
-            id,
+            id: canonicalId,
             kind: "schema",
             namespace: schema.namespace ?? null,
             file: schema.file,
@@ -207,30 +224,33 @@ export function buildWorkspaceGraph(
           });
           continue;
         }
-        const mapping = index.mappings.get(id);
+        const mapping = index.mappings.get(indexKey);
         if (mapping) {
-          includedNodeIds.add(id);
+          includedNodeIds.add(indexKey);
+          const canonicalSources = mapping.sources.map(canonicalKey);
+          const canonicalTargets = mapping.targets.map(canonicalKey);
           nodes.push({
-            id,
+            id: canonicalId,
             kind: "mapping",
             namespace: mapping.namespace ?? null,
             file: mapping.file,
             line: mapping.row + 1,
-            sources: mapping.sources,
-            targets: mapping.targets,
+            sources: canonicalSources,
+            targets: canonicalTargets,
           });
           continue;
         }
-        const metric = index.metrics.get(id);
+        const metric = index.metrics.get(indexKey);
         if (metric) {
-          includedNodeIds.add(id);
+          includedNodeIds.add(indexKey);
+          const canonicalSources = metric.sources.map(canonicalKey);
           nodes.push({
-            id,
+            id: canonicalId,
             kind: "metric",
             namespace: metric.namespace ?? null,
             file: metric.file,
             line: metric.row + 1,
-            sources: metric.sources,
+            sources: canonicalSources,
             grain: metric.grain ?? null,
             slices: metric.slices ?? [],
           });
@@ -258,7 +278,10 @@ export function buildWorkspaceGraph(
 
   const fieldEdges: FieldEdge[] = schemaOnly
     ? aggregateFieldEdgesToSchemaLevel(result.edges, index, nsFilter)
-    : result.edges;
+    : result.edges.map((edge) => ({
+        ...edge,
+        mapping: canonicalKey(edge.mapping),
+      }));
   unresolvedNl.push(...result.unresolvedNl);
 
   // Count arrows (raw field arrows, not aggregated)
@@ -299,6 +322,7 @@ export function buildWorkspaceGraph(
 /**
  * Build schema-level edges from the directed graph.
  * Each edge has: from, to, role (source/target/metric_source/nl_ref).
+ * All IDs are in canonical form (e.g., "::raw", "ns::staged").
  */
 function buildSchemaEdges(
   index: ExtractedWorkspace,
@@ -319,14 +343,15 @@ function buildSchemaEdges(
       if (!touchesNs) continue;
     }
 
+    const canonicalMapping = canonicalKey(mappingName);
     for (const src of mapping.sources) {
       if (!nsFilter || includedNodeIds.has(src) || includedNodeIds.has(mappingName)) {
-        edges.push({ from: src, to: mappingName, role: "source" });
+        edges.push({ from: canonicalKey(src), to: canonicalMapping, role: "source" });
       }
     }
     for (const tgt of mapping.targets) {
       if (!nsFilter || includedNodeIds.has(tgt) || includedNodeIds.has(mappingName)) {
-        edges.push({ from: mappingName, to: tgt, role: "target" });
+        edges.push({ from: canonicalMapping, to: canonicalKey(tgt), role: "target" });
       }
     }
   }
@@ -336,9 +361,10 @@ function buildSchemaEdges(
     const metric = index.metrics.get(metricName);
     if (nsFilter && metric?.namespace !== nsFilter) continue;
 
+    const canonicalMetric = canonicalKey(metricName);
     for (const src of srcSchemas) {
       if (!nsFilter || includedNodeIds.has(src) || includedNodeIds.has(metricName)) {
-        edges.push({ from: src, to: metricName, role: "metric_source" });
+        edges.push({ from: canonicalKey(src), to: canonicalMetric, role: "metric_source" });
       }
     }
   }
@@ -365,12 +391,14 @@ function buildSchemaEdges(
         index,
       );
 
+      const canonicalMapping = canonicalKey(mappingKey);
       for (const schemaRef of backtickRefs) {
-        const key = `${schemaRef}|${mappingKey}|nl_ref`;
+        const canonicalSchemaRef = canonicalKey(schemaRef);
+        const key = `${canonicalSchemaRef}|${canonicalMapping}|nl_ref`;
         if (seen.has(key)) continue;
         seen.add(key);
         if (!nsFilter || includedNodeIds.has(schemaRef) || includedNodeIds.has(mappingKey)) {
-          edges.push({ from: schemaRef, to: mappingKey, role: "nl_ref" });
+          edges.push({ from: canonicalSchemaRef, to: canonicalMapping, role: "nl_ref" });
         }
       }
     }
@@ -467,6 +495,8 @@ function mappingIncludedInNamespace(
  * serialized endpoint here: this walk and the field-level walk must agree about
  * who owns an endpoint, and two independent derivations of that is how they stop
  * agreeing (`sl-jyee`).
+ *
+ * All IDs are in canonical form (e.g., "::raw", "ns::staged").
  */
 function aggregateFieldEdgesToSchemaLevel(
   fieldEdges: readonly CoreFieldEdge[],
@@ -480,13 +510,14 @@ function aggregateFieldEdgesToSchemaLevel(
     const fromSchema = edge.from ? fieldEndpointSchema(edge.from) : null;
     const toSchema = edge.to ? fieldEndpointSchema(edge.to) : null;
     if (fromSchema && toSchema) {
-      const key = `${fromSchema}->${toSchema}:${edge.mapping}`;
+      const canonicalMapping = canonicalKey(edge.mapping);
+      const key = `${fromSchema}->${toSchema}:${canonicalMapping}`;
       if (!seen.has(key)) {
         seen.add(key);
         aggregated.push({
           from: fromSchema,
           to: toSchema,
-          mapping: edge.mapping,
+          mapping: canonicalMapping,
           classification: edge.classification,
           file: edge.file,
           line: edge.line,
@@ -500,16 +531,19 @@ function aggregateFieldEdgesToSchemaLevel(
   const mappingsWithEdges = new Set(aggregated.map((e) => e.mapping));
   for (const [id, mapping] of index.mappings) {
     if (nsFilter && mapping.namespace !== nsFilter) continue;
-    if (id && mappingsWithEdges.has(id)) continue;
+    const canonicalId = canonicalKey(id);
+    if (mappingsWithEdges.has(canonicalId)) continue;
     for (const src of mapping.sources) {
       for (const tgt of mapping.targets) {
-        const key = `${src}->${tgt}:${id}`;
+        const canonicalSrc = canonicalKey(src);
+        const canonicalTgt = canonicalKey(tgt);
+        const key = `${canonicalSrc}->${canonicalTgt}:${canonicalId}`;
         if (!seen.has(key)) {
           seen.add(key);
           aggregated.push({
-            from: src,
-            to: tgt,
-            mapping: id,
+            from: canonicalSrc,
+            to: canonicalTgt,
+            mapping: canonicalId,
             classification: "none",
             file: mapping.file,
             line: mapping.row + 1,

@@ -29,13 +29,14 @@ describe("a namespaced mapping targeting a global schema (lgc-3f13)", () => {
   it("uses the declared global schema in every graph surface", async () => {
     // Nodes, schema edges, and field edges must agree on the existing `s1`
     // identity; `ns_a::s1` would be an endpoint with no declaration or node.
+    // All IDs in JSON output use canonical form.
     const { stdout, stderr, code } = await run("graph", "--json");
     assert.equal(code, 0, stderr);
     const graph = JSON.parse(stdout);
-    assert.ok(graph.nodes.some((node: { id: string }) => node.id === "s1"));
+    assert.ok(graph.nodes.some((node: { id: string }) => node.id === "::s1"));
     assert.ok(
       graph.schema_edges.some(
-        (edge: { from: string; to: string }) => edge.from === "ns_a::m0" && edge.to === "s1",
+        (edge: { from: string; to: string }) => edge.from === "ns_a::m0" && edge.to === "::s1",
       ),
     );
     assert.ok(
