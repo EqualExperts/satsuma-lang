@@ -29,14 +29,23 @@
     "tsconfig.type-tests.json",
     "type-tests"
   ],
+  "//scripts": [
+    "`build` and `compile` both write into dist/, and both emit a dist/server.js —",
+    "esbuild's self-contained bundle (what the tarball ships) and tsc's plain",
+    "compilation of src/server.ts (what the test suite's `require(\"../dist/...\")`",
+    "calls resolve against). They have always collided; whichever ran last won.",
+    "Turborepo makes that collision explicit rather than fixing it: see the",
+    "@satsuma/lsp#compile entry in turbo.json for why `compile` is left uncached,",
+    "and mbt-oy6n for the follow-up that separates the two output trees."
+  ],
   "scripts": {
-    "prebuild": "npm --prefix ../satsuma-core run build && npm --prefix ../satsuma-viz-backend run build && node scripts/copy-assets.js",
+    "prebuild": "node scripts/copy-assets.js",
     "build": "esbuild src/server.ts --bundle --platform=node --target=node20 --outfile=dist/server.js --sourcemap --banner:js='var __import_meta_url = require(\"url\").pathToFileURL(__filename).href;' --define:import.meta.url=__import_meta_url",
+    "compile": "tsc",
     "watch": "npm run build -- --watch",
     "pack": "node scripts/pack.js",
     "smoke": "node scripts/smoke-initialize.js",
     "test": "node --test test/**/*.test.js",
-    "pretest": "npm --prefix ../satsuma-core run build && npm --prefix ../satsuma-viz-backend run build && tsc && npm run test:typecheck",
     "test:typecheck": "tsc --project tsconfig.type-tests.json",
     "test:coverage": "c8 --reporter=text --reporter=lcov --reporter=json-summary --include='dist/**/*.js' --exclude='dist/**/*.d.ts' node --test test/**/*.test.js"
   },
@@ -55,13 +64,24 @@
     "vscode-languageserver-textdocument": "^1.0.12",
     "web-tree-sitter": "^0.26.7"
   },
+  "//devDependencies": [
+    "satsuma-cli is not imported. It is declared because test/validate-diagnostics",
+    "runs the CLI's *built* entry point (../../satsuma-cli/dist/index.js) — the",
+    "formatting provider shells out to it — and nothing ordered that build ahead of",
+    "these tests. CI compensated with an explicit 'Build satsuma-cli (needed by LSP",
+    "formatting provider)' step; declaring the dependency is what lets Turborepo",
+    "order it instead. tree-sitter-satsuma is declared for the same reason: this",
+    "package's prebuild copies the grammar WASM into dist/ (feature 42, R4)."
+  ],
   "devDependencies": {
     "@satsuma/core": "*",
     "@satsuma/viz-backend": "*",
     "@satsuma/viz-model": "*",
     "@types/node": "^25.5.0",
+    "satsuma-cli": "*",
     "c8": "^11.0.0",
     "esbuild": "^0.28.1",
+    "tree-sitter-satsuma": "*",
     "typescript": "^6.0.2"
   }
 }

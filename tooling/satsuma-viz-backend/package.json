@@ -30,11 +30,7 @@
     }
   },
   "scripts": {
-    "build:core": "npm --prefix ../satsuma-core run build",
-    "build:viz-model": "npm --prefix ../satsuma-viz-model run build",
-    "prebuild": "npm run build:core && npm run build:viz-model",
     "build": "tsc",
-    "pretest": "npm run prebuild && tsc && npm run test:typecheck",
     "test": "node --test test/**/*.test.js",
     "test:typecheck": "tsc --project tsconfig.type-tests.json",
     "test:coverage": "c8 --reporter=text --reporter=lcov --reporter=json-summary --include='dist/**/*.js' --exclude='dist/**/*.d.ts' node --test test/**/*.test.js"
@@ -48,6 +44,7 @@
     "@satsuma/scenario-gen": "*",
     "@types/node": "^25.5.0",
     "c8": "^11.0.0",
+    "tree-sitter-satsuma": "*",
     "typescript": "^5.9.3"
   }
 }

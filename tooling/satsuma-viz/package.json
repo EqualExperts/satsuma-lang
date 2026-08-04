@@ -10,7 +10,7 @@
     "build": "esbuild src/satsuma-viz.ts --bundle --format=esm --target=es2022 --outfile=dist/satsuma-viz.js --sourcemap --loader:.css=text --minify",
     "watch": "npm run build -- --watch",
     "test": "node --test test/**/*.test.js",
-    "pretest": "tsc --noEmit && npm run build",
+    "test:typecheck": "tsc --noEmit",
     "test:coverage": "c8 --reporter=text --reporter=lcov --reporter=json-summary --include='dist/**/*.js' --exclude='dist/**/*.d.ts' node --test test/**/*.test.js"
   },
   "dependencies": {
@@ -27,6 +27,7 @@
     "c8": "^11.0.0",
     "esbuild": "^0.28.1",
     "fast-check": "^4.9.0",
+    "tree-sitter-satsuma": "*",
     "typescript": "^5.9.3"
   }
 }

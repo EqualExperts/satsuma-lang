@@ -5,8 +5,18 @@
   "description": "Standalone browser harness for fixture-driven Satsuma mapping visualization",
   "type": "commonjs",
   "main": "dist/server.js",
+  "//scripts": [
+    "The `prebuild` that rebuilt @satsuma/core, @satsuma/viz-backend and",
+    "@satsuma/viz by hand is gone — Turborepo derives that order from this",
+    "package's dependencies (feature 42, R4).",
+    "",
+    "`pretest` stays, and stays a `pretest` hook, because the Playwright suite is",
+    "driven by a human running plain `npm test` through watch-and-test.sh",
+    "(AGENTS.md): the hook is what guarantees the bundles under test are current.",
+    "It now asks Turborepo for this package's build, which pulls its dependencies'",
+    "builds along with it and skips any whose inputs have not changed."
+  ],
   "scripts": {
-    "prebuild": "npm --prefix ../satsuma-core run build && npm --prefix ../satsuma-viz-backend run build && npm --prefix ../satsuma-viz run build",
     "build:server": "esbuild src/server.ts --bundle --platform=node --target=node20 --outfile=dist/server.js --sourcemap --banner:js='var __import_meta_url = require(\"url\").pathToFileURL(__filename).href;' --define:import.meta.url=__import_meta_url",
     "build:client": "esbuild src/client/app.ts --bundle --format=esm --target=es2022 --platform=browser --external:fs/promises --external:module --outfile=dist/client/app.js --sourcemap && cp src/client/index.html dist/client/index.html",
     "build:wasm": "node scripts/copy-wasm-assets.mjs",
@@ -20,7 +30,7 @@
     "test": "playwright test",
     "test:unit": "node --test scripts/*.test.mjs test/unit/*.test.mjs",
     "screenshots": "playwright test --project=screenshots",
-    "pretest": "npm run build"
+    "pretest": "turbo run build --filter=@satsuma/viz-harness"
   },
   "dependencies": {
     "@satsuma/core": "*",
@@ -28,10 +38,18 @@
     "@satsuma/viz-model": "*",
     "web-tree-sitter": "^0.26.7"
   },
+  "//devDependencies": [
+    "@satsuma/viz and tree-sitter-satsuma are not imported: this package's build",
+    "copies their built artifacts — the viz component bundle and the grammar WASM —",
+    "into its own dist/. Declaring them is what orders those builds ahead of this",
+    "one under Turborepo (feature 42, R4)."
+  ],
   "devDependencies": {
     "@playwright/test": "^1.62.1",
+    "@satsuma/viz": "*",
     "@types/node": "^22.0.0",
     "esbuild": "^0.28.1",
+    "tree-sitter-satsuma": "*",
     "typescript": "^5.9.3"
   }
 }

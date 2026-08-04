@@ -206,6 +206,35 @@ HOMEBREW_NO_AUTO_UPDATE=1 brew ...
 
 Prefer these forms over prompt-prone variants such as plain `cp`, `mv`, or `rm`.
 
+## Running Turborepo in the agent sandbox
+
+Builds and tests go through `turbo run` (see [`turbo.json`](turbo.json)). In the
+agent sandbox, turbo needs two environment variables set first or it dies before
+doing any work:
+
+```
+x Encountered an I/O error while attempting to read
+| /Users/<you>/Library/Application Support/com.vercel.cli/auth.json
+```
+
+That is not a turbo misconfiguration and not a missing Vercel login. The sandbox
+denies reads under `~/Library/Application Support`, and turbo probes two
+directories there at startup — its own config and the Vercel CLI's — treating an
+unreadable one as fatal rather than absent. Point both at your scratchpad:
+
+```bash
+export TURBO_CONFIG_DIR_PATH="$SCRATCHPAD/turbo-config"
+export VERCEL_CONFIG_DIR_PATH="$SCRATCHPAD/vercel-config"
+```
+
+Set them **before `git commit`**, not just before a manual `turbo run`: the
+pre-commit hook runs `scripts/run-repo-checks.sh`, which invokes turbo, and
+environment variables propagate into git hooks. A commit that fails on the
+`auth.json` read is this, not a broken check.
+
+Neither variable is needed outside the sandbox, and CI (Linux, where turbo reads
+`~/.config`) is unaffected.
+
 ## Running tree-sitter CLI
 
 **Always pass `--wasm`.** There is no native build in this repository: the

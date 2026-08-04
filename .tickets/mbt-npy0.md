@@ -1,6 +1,6 @@
 ---
 id: mbt-npy0
-status: open
+status: closed
 deps: [mbt-0f7t]
 links: []
 created: 2026-08-04T11:08:48Z
@@ -73,3 +73,27 @@ so `scripts/run-repo-checks.sh` must route through `turbo run` in the same chang
 — it currently invokes each package with `npm --prefix`.
 
 **Also add `.turbo` to .gitignore.**
+
+**2026-08-04T18:05:13Z**
+
+Cause: the cross-package build order was written down in three places at once — the root package.json chain (via scripts/build-workspace.sh), the install job in ci.yml, and a `prebuild`/`pretest` hook in almost every package that shelled out to `npm --prefix ../sibling run build` — with nothing enforcing that they agreed.
+Fix: added turbo.json and made the order derivable from the manifests instead of written anywhere. Deleted scripts/build-workspace.sh and every cross-package prebuild/pretest chain; declared the eight real-but-undeclared edges (tree-sitter-satsuma on the seven packages that load or copy the grammar WASM, @satsuma/viz on the harness that copies its bundle, @satsuma/viz-backend on the extension that bundles its sources, and satsuma-cli on the LSP, whose suite runs the CLI's built entry point); routed run-repo-checks.sh and ci.yml through `turbo run`; and replaced the CLI-local prebuild-wiring guard with scripts/workspace-build-graph.test.mjs, which asserts the same property against the new mechanism for every package. (commit immediately after 7c7fbd74)
+
+Measured, all in this worktree:
+- Cold build (`turbo run build --force`, every dist/ and the WASM deleted): 9 tasks, 6.4s, all artifacts present, no tracked file dirtied by the grammar's `generate`.
+- Re-build with no changes: 9/9 cached, 16ms.
+- Full test sweep (`npm run test:all` = test + test:typecheck over 9 packages): 58s cold; 23/24 cached and 670ms on a no-change re-run. The one always-uncached task is @satsuma/lsp#compile, by design.
+- Scoped invalidation: a comment appended to tooling/satsuma-viz/src/satsuma-viz.ts re-ran only @satsuma/viz's build/test/typecheck plus vscode-satsuma's build and test — a genuine dependent, since the extension bundles the viz component. 18/24 cached, 4.2s. The CLI's 1056 tests, core's 697 and the LSP's 300 were all skipped.
+- `./scripts/run-repo-checks.sh` end to end: green in 1m24s, and test-stats.json regenerated to the same numbers the tee-based collection produced (minus the one test deleted with prebuild-wiring.test.ts: 1057 -> 1056).
+
+Four things worth knowing for R5/R6:
+
+1. **The grammar had to enter the graph, and it belongs before core, not after.** build-workspace.sh built the WASM in tier 3, after viz-backend. It is now tier 0, because satsuma-core's parser-backed suites load the WASM *and* the grammar's `generate` step writes satsuma-core/src/generated/cst-types.ts. That write is also why the build-graph test carries one documented exemption: tree-sitter-satsuma reaches into @satsuma/core, but declaring it would invert an edge that already exists and turbo would reject the cycle.
+
+2. **The build-graph test found a real ordering gap, not just a mechanism change.** @satsuma/lsp's test suite runs `../../satsuma-cli/dist/index.js` and nothing ordered that build; ci.yml compensated with a step literally named "Build satsuma-cli (needed by LSP formatting provider)". Declaring the dependency removes the workaround. The test distinguishes reaching a sibling's *output* from reaching its committed source — three packages read satsuma-cli's test/fixtures/ for coverage parity and need nothing built, so a coarser rule would have demanded two cyclic declarations.
+
+3. **@satsuma/lsp#compile is `cache: false`, and that is a symptom.** `build` (esbuild bundle) and `compile` (tsc) both write dist/server.js, so the task cannot declare dist/** as an output without a cache restore silently choosing which server.js survives. It also had to be given `dependsOn: ["build"]` so the two never race — turbo would otherwise have run them concurrently. Raised mbt-oy6n to separate the output trees, after which it becomes a normal cached task.
+
+4. **Turborepo needs `packageManager` in the root manifest, and its cache is shared across git worktrees.** `devEngines.packageManager` was tried first and rejected: turbo refuses any range spanning more than one npm major, which a range covering both a contributor's npm and CI's Node image must. Separately, from a linked worktree turbo uses the *primary* worktree's .turbo ("using shared worktree cache"), so `clean:all`'s `.turbo` entry is a no-op there — `turbo run build --force` is how to prove a cold build. Both are documented in the root manifest's `//scripts` note.
+
+ci.yml scope note: R4 changed only what it had to. `npm run test:release` -> `test:scripts`, `npm run lint` -> `npx turbo run lint`, the CLI job's deleted `pretest` -> `test:typecheck`, the tooling-modules typecheck step's hardcoded shard list -> `--if-present` (R4 gave satsuma-viz a test:typecheck of its own, which the list would have skipped), and the vscode job's four hand-ordered build steps -> one `turbo run build compile --filter`. An earlier draft added `turbo run build` to four more jobs for robustness and was reverted: each would have rebuilt the grammar and re-downloaded the 119MB wasi-sdk, and those jobs already, correctly, trust the install job's SHA-keyed workspace blob. Persisting .turbo via actions/cache and the --filter wiring are R5's.

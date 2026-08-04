@@ -1,5 +1,9 @@
 .cache
 .tree-sitter
+
+# Turborepo's local content-hash cache and per-task log files. Local only —
+# no remote cache is configured (ADR-049).
+.turbo/
 .DS_Store
 log.html
 __pycache__/

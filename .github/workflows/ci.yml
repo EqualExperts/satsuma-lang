@@ -40,10 +40,12 @@ jobs:
           path: ~/.cache/tree-sitter
           key: wasi-sdk-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
 
-      # One workspace-aware install, then one ordered build. Both the install
-      # order and the build order used to be spelled out step by step here, in a
-      # second copy of what the root package.json already said; the build order
-      # now lives only in scripts/build-workspace.sh (feature 42, R2).
+      # One workspace-aware install, then one ordered build. Both orders used to
+      # be spelled out step by step here, in a second copy of what the root
+      # package.json already said (feature 42, R2 reduced that to one shell
+      # script). `ci:all` is now `npm ci && turbo run build`, and the order is no
+      # longer written down at all: Turborepo derives it from the dependency
+      # graph in the manifests (R4).
       - name: Install and build all workspace packages
         run: npm run ci:all
 
@@ -92,15 +94,22 @@ jobs:
       - name: Install Python lint tools
         run: pip install -r requirements-dev.txt
 
-      - run: npm run lint
+      # Through turbo, so this job and scripts/run-repo-checks.sh share one entry
+      # point into the same task. `lint` is a root task — the five linters are
+      # configured once at the root and sweep the whole repo — so this runs the
+      # root package.json's `lint` script, not a per-package one.
+      - name: Lint
+        run: npx turbo run lint
 
       # Hoisting can satisfy a declared range with the wrong version silently —
       # see the matching step in scripts/run-repo-checks.sh (feature 42, R2).
       - name: Check workspace dependency tree is valid
         run: npm run check:deps
 
-      - name: Test release tooling
-        run: npm run test:release
+      # Every scripts/*.test.mjs, which since R4 includes the suite asserting the
+      # workspace dependency graph Turborepo derives its build order from.
+      - name: Test repo tooling scripts
+        run: npm run test:scripts
 
   satsuma-cli:
     name: Satsuma CLI
@@ -138,10 +147,18 @@ jobs:
         working-directory: tooling/satsuma-scenario-gen
         run: npm test
 
+      # `npm run pretest` until R4 deleted that hook. What it added over
+      # test:typecheck was a build of this package and its siblings, and the
+      # `install` job — which this one `needs` — has already run one ordered
+      # build of the whole workspace and saved its output under this commit's
+      # SHA. The typecheck still needs its own step, because the c8 invocation
+      # below fires no npm script hook (sl-851u).
+      - name: Typecheck the CLI test sources
+        run: npm run test:typecheck
+
       - name: Run CLI tests with coverage
         run: |
           mkdir -p ../../test-results
-          npm run pretest
           npx c8 --reporter=text --reporter=lcov --reporter=json-summary \
             node --import tsx/esm --import ./test/setup.ts --test \
             --test-reporter=spec --test-reporter-destination=stdout \
@@ -366,28 +383,21 @@ jobs:
           path: ~/.cache/tree-sitter
           key: wasi-sdk-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
 
-      # Ahead of the extension build below, which copies this WASM into the
-      # bundled server's dist/ and now fails loudly rather than silently if it is
-      # absent. Building it here means this job's correctness no longer depends
-      # on the restored cache happening to carry a grammar.
-      - name: Build tree-sitter WASM (bundled into the extension, and for LSP tests)
-        working-directory: tooling/tree-sitter-satsuma
-        run: npm run build:wasm
+      # Four separate steps until R4 — build the grammar WASM, build the
+      # extension, build satsuma-cli "(needed by LSP formatting provider)",
+      # then `npx tsc` in the LSP — which between them were this job's own
+      # hand-written copy of the cross-package build order, maintained
+      # independently of the two other copies. Turborepo derives all of it from
+      # the manifests: `--filter` on these two packages pulls in satsuma-core,
+      # the VizModel contract, the viz-backend, the viz bundle, the grammar WASM
+      # and satsuma-cli, each in the right order, and skips any whose inputs are
+      # unchanged. `compile` is the LSP's tsc output, which its test suite's
+      # `require("../dist/…")` calls resolve against.
+      - name: Build the extension and compile the language server
+        run: npx turbo run build compile --filter=vscode-satsuma --filter=@satsuma/lsp
 
-      - name: Build extension (client + server + webview)
-        run: npm run build
-
-      - name: Build satsuma-cli (needed by LSP formatting provider)
-        working-directory: tooling/satsuma-cli
-        run: npm run build
-
-      - name: Compile LSP server for tests
-        working-directory: tooling/satsuma-lsp
-        run: npx tsc
-
-      # LSP tests run through a bare tsc + node --test here rather than
-      # `npm test`, so npm's implicit pretest hook (where test:typecheck lives)
-      # never fires. Run it explicitly so the CST-symbol compile-time
+      # The c8 invocation below runs node --test directly, so npm's script hooks
+      # never fire. Run the typecheck explicitly so the CST-symbol compile-time
       # regression (sl-851u) actually gates this job.
       - name: Run LSP test:typecheck
         working-directory: tooling/satsuma-lsp
@@ -637,15 +647,15 @@ jobs:
           restore-keys: |
             workspace-
 
-      # test:coverage bypasses each package's `pretest` (npm only auto-runs
-      # pretest before a script literally named `test`), so the CST-symbol
-      # compile-time regression (sl-851u) would silently not gate CI without
-      # this explicit step. Only satsuma-core and satsuma-viz-backend define
-      # test:typecheck; the other shards skip it.
+      # test:coverage runs c8 directly and so fires no npm script hook, which is
+      # why the typecheck needs its own step — without it the CST-symbol
+      # compile-time regression (sl-851u) would silently not gate CI. `--if-present`
+      # rather than an `if:` naming the shards that define the script: R4 gave
+      # satsuma-viz a test:typecheck of its own (it was previously buried in that
+      # package's `pretest`), and the hardcoded list would have quietly skipped it.
       - name: Run test:typecheck
-        if: matrix.module == 'satsuma-core' || matrix.module == 'satsuma-viz-backend'
         working-directory: tooling/${{ matrix.module }}
-        run: npm run test:typecheck
+        run: npm run test:typecheck --if-present
 
       - name: Run test:coverage
         working-directory: tooling/${{ matrix.module }}
