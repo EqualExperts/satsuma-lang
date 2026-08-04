@@ -24,7 +24,12 @@ const serverConfig = {
   outfile: "server/dist/server.js",
   format: "cjs",
   sourcemap: true,
-  nodePaths: [path.resolve(__dirname, "../satsuma-lsp/node_modules")],
+  // No `nodePaths` override: the server entry point lives under
+  // ../satsuma-lsp/, so esbuild's normal upward node_modules walk from there
+  // finds the LSP's dependencies wherever npm workspaces hoisted them. Pointing
+  // at ../satsuma-lsp/node_modules explicitly, as this once did, only worked
+  // while every package installed its own private copy (feature 42, R2).
+  //
   // The server is bundled from @satsuma/viz-backend's TypeScript *sources*, not
   // its dist, so the extension builds without that package having been compiled
   // first. esbuild's `alias` takes no wildcard, so every subpath the LSP imports
@@ -105,12 +110,6 @@ const webviewFieldLineageConfig = {
   outfile: "dist/webview/field-lineage/field-lineage.js",
   format: "iife",
   sourcemap: true,
-  alias: {
-    "elkjs/lib/elk.bundled.js": path.resolve(
-      __dirname,
-      "../satsuma-viz/node_modules/elkjs/lib/elk.bundled.js",
-    ),
-  },
 };
 
 /** @type {import("esbuild").BuildOptions} */
@@ -122,53 +121,61 @@ const webviewSchemaLineageConfig = {
   outfile: "dist/webview/schema-lineage/schema-lineage.js",
   format: "iife",
   sourcemap: true,
-  alias: {
-    "elkjs/lib/elk.bundled.js": path.resolve(
-      __dirname,
-      "../satsuma-viz/node_modules/elkjs/lib/elk.bundled.js",
-    ),
-  },
 };
 
 // Copy static assets to dist
 const { copyFileSync, mkdirSync, existsSync } = require("fs");
 
-function copyAssets() {
-  const pairs = [
-    ["src/webview/lineage/lineage.css", "dist/webview/lineage/lineage.css"],
-    ["src/webview/viz/viz.css", "dist/webview/viz/viz.css"],
-    ["src/webview/field-lineage/field-lineage.css", "dist/webview/field-lineage/field-lineage.css"],
-    [
-      "src/webview/schema-lineage/schema-lineage.css",
-      "dist/webview/schema-lineage/schema-lineage.css",
-    ],
-  ];
+// Webview stylesheets. Optional: a webview whose entry point does not exist yet
+// has no stylesheet either, and the build above already skips it.
+const optionalAssets = [
+  ["src/webview/lineage/lineage.css", "dist/webview/lineage/lineage.css"],
+  ["src/webview/viz/viz.css", "dist/webview/viz/viz.css"],
+  ["src/webview/field-lineage/field-lineage.css", "dist/webview/field-lineage/field-lineage.css"],
+  [
+    "src/webview/schema-lineage/schema-lineage.css",
+    "dist/webview/schema-lineage/schema-lineage.css",
+  ],
+];
 
-  // Copy WASM and highlights.scm into server/dist/ so the server can load them
-  // at runtime via __dirname.
+// Runtime assets the bundled server loads from __dirname at initialize time.
+// Required: without them the extension packages successfully and then fails to
+// start, which is exactly the class of breakage a silently-swallowed copy error
+// used to hide (feature 42, R2/R3).
+function requiredServerAssets() {
   const treeSitterDir = path.resolve(__dirname, "../tree-sitter-satsuma");
-  pairs.push(
+  return [
     [path.join(treeSitterDir, "tree-sitter-satsuma.wasm"), "server/dist/tree-sitter-satsuma.wasm"],
     [path.join(treeSitterDir, "queries/highlights.scm"), "server/dist/highlights.scm"],
-    // web-tree-sitter runtime WASM — loaded by the web-tree-sitter module at init
-    // web-tree-sitter 0.26+ renamed tree-sitter.wasm → web-tree-sitter.wasm.
-    // The WASM file lives in satsuma-lsp's node_modules since the server was
-    // extracted into its own package (ADR-021).
-    [
-      "../satsuma-lsp/node_modules/web-tree-sitter/web-tree-sitter.wasm",
-      "server/dist/tree-sitter.wasm",
-    ],
-  );
+    // The web-tree-sitter runtime, which 0.26+ renamed tree-sitter.wasm →
+    // web-tree-sitter.wasm; the server still asks for the old name, so the copy
+    // renames it back. Resolved through Node rather than joined onto
+    // ../satsuma-lsp/node_modules: under npm workspaces the runtime hoists to the
+    // root node_modules, so no package-local path can be assumed.
+    [require.resolve("web-tree-sitter/web-tree-sitter.wasm"), "server/dist/tree-sitter.wasm"],
+  ];
+}
 
-  for (const [src, dst] of pairs) {
-    try {
-      const dir = path.dirname(dst);
-      if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
-      copyFileSync(src, dst);
-    } catch {
-      // Asset may not exist yet (e.g. CSS or WASM not built)
-    }
+function copyAssets() {
+  for (const [src, dst] of optionalAssets) {
+    if (!existsSync(src)) continue;
+    copyInto(src, dst);
   }
+
+  for (const [src, dst] of requiredServerAssets()) {
+    if (!existsSync(src)) {
+      throw new Error(
+        `esbuild: required server asset not found at ${src}. ` +
+          "Run `npm run build:all` from the repo root to build the WASM grammar first.",
+      );
+    }
+    copyInto(src, dst);
+  }
+}
+
+function copyInto(src, dst) {
+  mkdirSync(path.dirname(dst), { recursive: true });
+  copyFileSync(src, dst);
 }
 
 async function build() {

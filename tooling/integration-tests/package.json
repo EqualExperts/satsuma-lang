@@ -11,13 +11,13 @@
     "test:typecheck": "tsc --noEmit"
   },
   "devDependencies": {
-    "@satsuma/core": "file:../satsuma-core",
-    "@satsuma/scenario-gen": "file:../satsuma-scenario-gen",
-    "@satsuma/viz-backend": "file:../satsuma-viz-backend",
+    "@satsuma/core": "*",
+    "@satsuma/scenario-gen": "*",
+    "@satsuma/viz-backend": "*",
     "@types/node": "^25.5.0",
     "c8": "^11.0.0",
     "fast-check": "^4.9.0",
-    "satsuma-cli": "file:../satsuma-cli",
+    "satsuma-cli": "*",
     "tsx": "^4.23.1",
     "typescript": "^6.0.2"
   }

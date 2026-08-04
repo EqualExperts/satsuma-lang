@@ -12,13 +12,10 @@ from collections import Counter
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from tree_sitter_bin import resolve_tree_sitter_bin
+
 ROOT = Path(__file__).resolve().parents[3]
-# Prefer the npm-local tree-sitter binary (always has --wasm support) over the
-# system one (e.g. Homebrew on macOS may not be compiled with the wasm feature).
-_LOCAL_BIN = (
-    Path(__file__).resolve().parents[1] / "node_modules" / ".bin" / "tree-sitter"
-)
-TREE_SITTER_BIN = str(_LOCAL_BIN) if _LOCAL_BIN.exists() else "tree-sitter"
+TREE_SITTER_BIN = resolve_tree_sitter_bin(ROOT, Path(__file__).resolve().parents[1])
 DEFAULT_GLOBS = (
     "examples/*.stm",
     "features/02-multi-schema/examples/**/*.stm",

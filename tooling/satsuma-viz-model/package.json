@@ -16,13 +16,12 @@
     "build:core": "npm --prefix ../satsuma-core run build",
     "prebuild": "npm run build:core",
     "build": "tsc",
-    "prepare": "tsc",
     "test": "node --test test/**/*.test.js",
     "pretest": "npm run build:core && tsc",
     "test:coverage": "c8 --reporter=text --reporter=lcov --reporter=json-summary --include='dist/**/*.js' --exclude='dist/**/*.d.ts' node --test test/**/*.test.js"
   },
   "dependencies": {
-    "@satsuma/core": "file:../satsuma-core"
+    "@satsuma/core": "*"
   },
   "devDependencies": {
     "@types/node": "^26.1.2",

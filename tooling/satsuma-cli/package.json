@@ -17,6 +17,25 @@
   "imports": {
     "#src/*": "./dist/*"
   },
+  "//files": [
+    "Declares the tarball contents explicitly, which `files` lets take precedence",
+    "over every ignore file. Necessary since the tooling packages became npm",
+    "workspaces (ADR-049): npm-packlist then resolves ignore rules from the",
+    "*workspace root*, so the repo-wide .gitignore ('**/*.wasm', '**/*.js.map',",
+    "'**/generated') silently stripped the CLI's own build output out of its",
+    "tarball. scripts/verify-pack.js is what caught it and what keeps it caught.",
+    "This list reproduces the pre-workspaces contents — narrowing it is a",
+    "separate, user-visible decision about the published artifact."
+  ],
+  "files": [
+    ".c8rc.json",
+    "dist",
+    "scripts",
+    "src",
+    "test",
+    "tsconfig.json",
+    "tsconfig.test.json"
+  ],
   "scripts": {
     "start": "node src/index.js",
     "build:core": "npm --prefix ../satsuma-core run build",
@@ -26,20 +45,19 @@
     "build": "tsc",
     "dev": "tsc --watch",
     "pretest": "npm run build && npm run test:typecheck",
-    "prepare": "npm run build",
-    "pack": "node scripts/pack.js",
+    "pack": "npm run build && node scripts/pack.js",
     "test": "node --import tsx/esm --import ./test/setup.ts --test 'test/**/*.test.ts'",
     "test:coverage": "c8 --reporter=text --reporter=lcov node --import tsx/esm --import ./test/setup.ts --test 'test/**/*.test.ts'",
     "test:typecheck": "tsc --project tsconfig.test.json"
   },
   "dependencies": {
-    "@satsuma/core": "file:../satsuma-core",
+    "@satsuma/core": "*",
     "commander": "^15.0.0",
     "web-tree-sitter": "^0.26.7"
   },
   "devDependencies": {
-    "@satsuma/scenario-gen": "file:../satsuma-scenario-gen",
-    "@satsuma/viz-backend": "file:../satsuma-viz-backend",
+    "@satsuma/scenario-gen": "*",
+    "@satsuma/viz-backend": "*",
     "@types/node": "^25.5.0",
     "c8": "^11.0.0",
     "fast-check": "^4.9.0",

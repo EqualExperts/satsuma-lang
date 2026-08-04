@@ -34,19 +34,18 @@
     "build:viz-model": "npm --prefix ../satsuma-viz-model run build",
     "prebuild": "npm run build:core && npm run build:viz-model",
     "build": "tsc",
-    "prepare": "npm run build",
     "pretest": "npm run prebuild && tsc && npm run test:typecheck",
     "test": "node --test test/**/*.test.js",
     "test:typecheck": "tsc --project tsconfig.type-tests.json",
     "test:coverage": "c8 --reporter=text --reporter=lcov --reporter=json-summary --include='dist/**/*.js' --exclude='dist/**/*.d.ts' node --test test/**/*.test.js"
   },
   "dependencies": {
-    "@satsuma/core": "file:../satsuma-core",
-    "@satsuma/viz-model": "file:../satsuma-viz-model",
+    "@satsuma/core": "*",
+    "@satsuma/viz-model": "*",
     "vscode-languageserver-types": "^3.18.0"
   },
   "devDependencies": {
-    "@satsuma/scenario-gen": "file:../satsuma-scenario-gen",
+    "@satsuma/scenario-gen": "*",
     "@types/node": "^25.5.0",
     "c8": "^11.0.0",
     "typescript": "^5.9.3"

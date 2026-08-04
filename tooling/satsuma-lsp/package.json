@@ -8,6 +8,27 @@
   "bin": {
     "satsuma-lsp": "bin/satsuma-lsp.js"
   },
+  "//files": [
+    "Declares the tarball contents explicitly, which `files` lets take precedence",
+    "over every ignore file. Necessary since the tooling packages became npm",
+    "workspaces (ADR-049): npm-packlist then resolves ignore rules from the",
+    "*workspace root*, so the repo-wide .gitignore's '**/*.wasm' stripped both WASM",
+    "assets out of the tarball — reintroducing exactly the sl-vwpr breakage (a",
+    "tarball that installs cleanly and then fails every initialize request).",
+    "scripts/verify-pack.js is what caught it and what keeps it caught.",
+    "This list reproduces the pre-workspaces contents."
+  ],
+  "files": [
+    ".c8rc.json",
+    "bin",
+    "dist",
+    "scripts",
+    "src",
+    "test",
+    "tsconfig.json",
+    "tsconfig.type-tests.json",
+    "type-tests"
+  ],
   "scripts": {
     "prebuild": "npm --prefix ../satsuma-core run build && npm --prefix ../satsuma-viz-backend run build && node scripts/copy-assets.js",
     "build": "esbuild src/server.ts --bundle --platform=node --target=node20 --outfile=dist/server.js --sourcemap --banner:js='var __import_meta_url = require(\"url\").pathToFileURL(__filename).href;' --define:import.meta.url=__import_meta_url",
@@ -19,15 +40,25 @@
     "test:typecheck": "tsc --project tsconfig.type-tests.json",
     "test:coverage": "c8 --reporter=text --reporter=lcov --reporter=json-summary --include='dist/**/*.js' --exclude='dist/**/*.d.ts' node --test test/**/*.test.js"
   },
+  "//dependencies": [
+    "The @satsuma/* workspace packages are devDependencies, not dependencies:",
+    "dist/server.js is a self-contained esbuild bundle that inlines them, so they",
+    "are build inputs and the published tarball needs nothing from them at runtime.",
+    "They are also private and unpublishable, so declaring them as dependencies",
+    "makes `npm install -g satsuma-lsp.tgz` try to fetch @satsuma/core from the",
+    "registry and fail with a 404 (feature 42, R2 — the old `file:../` specs hid",
+    "this because npm skips an unresolvable relative file: spec). verify-pack.js",
+    "now asserts no unpublishable dependency reaches the tarball."
+  ],
   "dependencies": {
-    "@satsuma/core": "file:../satsuma-core",
-    "@satsuma/viz-backend": "file:../satsuma-viz-backend",
-    "@satsuma/viz-model": "file:../satsuma-viz-model",
     "vscode-languageserver": "^10.1.0",
     "vscode-languageserver-textdocument": "^1.0.12",
     "web-tree-sitter": "^0.26.7"
   },
   "devDependencies": {
+    "@satsuma/core": "*",
+    "@satsuma/viz-backend": "*",
+    "@satsuma/viz-model": "*",
     "@types/node": "^25.5.0",
     "c8": "^11.0.0",
     "esbuild": "^0.28.1",

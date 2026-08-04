@@ -9,8 +9,10 @@
     "generate": "tree-sitter generate && node scripts/generate-cst-symbols.mjs",
     "generate:cst-symbols": "node scripts/generate-cst-symbols.mjs",
     "check:cst-symbols": "node scripts/generate-cst-symbols.mjs --check",
-    "build": "npm run generate && tree-sitter build --wasm . -o tree-sitter-satsuma.wasm",
-    "test": "npm run generate && npm run test:generator && tree-sitter test --wasm",
+    "build:wasm": "tree-sitter build --wasm . -o tree-sitter-satsuma.wasm",
+    "build": "npm run generate && npm run build:wasm",
+    "test:corpus": "tree-sitter test --wasm",
+    "test": "npm run generate && npm run test:generator && npm run test:corpus",
     "test:generator": "node --test scripts/generate-cst-symbols.test.mjs",
     "smoke": "node scripts/smoke-check.js"
   },

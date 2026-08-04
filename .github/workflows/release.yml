@@ -43,22 +43,22 @@ jobs:
         with:
           node-version: "22"
 
-      - name: Install all dependencies
-        run: npm run ci:all
-
       # tree-sitter build --wasm downloads a ~119MB wasi-sdk toolchain into
       # ~/.cache/tree-sitter on every invocation unless it's already present.
-      # Keyed on the lockfile that pins tree-sitter-cli (which hardcodes the
-      # wasi-sdk version it fetches), so a version bump there — and only
-      # that — invalidates the cache (sl-wz2h).
+      # Keyed on the root lockfile that pins tree-sitter-cli (which hardcodes the
+      # wasi-sdk version it fetches), so a version bump there — and only that —
+      # invalidates the cache (sl-wz2h). Restored before the install below, which
+      # is what triggers the download now that `ci:all` also builds the grammar.
       - name: Cache wasi-sdk toolchain
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
           path: ~/.cache/tree-sitter
-          key: wasi-sdk-${{ runner.os }}-${{ hashFiles('tooling/tree-sitter-satsuma/package-lock.json') }}
+          key: wasi-sdk-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
 
-      - name: Build WASM parser
-        run: cd tooling/tree-sitter-satsuma && node_modules/.bin/tree-sitter build --wasm . -o tree-sitter-satsuma.wasm
+      # Installs the workspace and builds every package in dependency order,
+      # including the WASM grammar the artifacts below bundle (feature 42, R2).
+      - name: Install and build all workspace packages
+        run: npm run ci:all
 
       - name: Build distributable artifacts
         run: ./scripts/build-artifacts.sh

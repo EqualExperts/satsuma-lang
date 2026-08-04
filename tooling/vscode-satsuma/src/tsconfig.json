@@ -3,6 +3,14 @@
     "module": "commonjs",
     "moduleResolution": "bundler",
     "target": "es2022",
+    // @satsuma/viz publishes its TypeScript sources as its types, so resolving
+    // it normally would type-check a sibling package's Lit components under this
+    // package's compiler options. See webview/viz/satsuma-viz.d.ts.
+    // No `baseUrl` (deprecated in TypeScript 6): `paths` entries resolve relative
+    // to this file.
+    "paths": {
+      "@satsuma/viz": ["./webview/viz/satsuma-viz.d.ts"]
+    },
     "strict": true,
     "types": ["node"],
     "outDir": "../dist/client",

@@ -17,6 +17,13 @@
 > output, no test assertions, and no published package's runtime behavior.
 > It does not adopt a remote/hosted cache (see Non-goals) and does not
 > replace npm with pnpm or yarn.
+>
+> **Package count, as implemented.** This document says "ten `tooling/*`
+> packages" and "11 lockfiles" throughout, which was accurate when it was
+> written. `tooling/integration-tests` landed afterwards (ADR-050), making it
+> eleven packages and twelve lockfiles. R2 migrates all eleven — the
+> `"workspaces": ["tooling/*"]` glob is what enumerates them, so a new package
+> needs no change here, in `ci.yml`, or in `dependabot.yml`.
 
 ## Goal
 
