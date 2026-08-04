@@ -109,7 +109,7 @@ function chainWorkspace(length, namespaces = []) {
     mappings.push(
       mappingDecl({
         name: mappingName(hop),
-        namespace: mappingNamespace(nsOf(hop), nsOf(hop + 1)),
+        namespace: nsOf(hop),
         sources: [ref(hop)],
         targets: [ref(hop + 1)],
         arrows: leaves().map((leaf) =>
@@ -119,28 +119,6 @@ function chainWorkspace(length, namespaces = []) {
     );
   }
   return { schemas, mappings, ref };
-}
-
-/**
- * Which namespace a hop's mapping is declared in, given its two schemas'.
- *
- * A mapping sits in its source schema's namespace — *unless* either schema is at
- * file scope, in which case it is declared at file scope too.
- *
- * That exception is a deliberate hole in the generated domain, and it is working
- * around **`lgc-3f13`**: a namespaced mapping whose target is a global schema has
- * that target pre-qualified during extraction (`extract.ts:490-497`), so the whole
- * toolchain then reports `ns::name` for a schema nothing declares — an invented
- * endpoint in `graph`, in `lineage`, and a spurious `undefined-ref` from
- * `validate`. Generating the shape would leave every property in this feature red
- * for a defect it did not cause and does not own.
- *
- * Cross-*namespace* hops are unaffected and are still generated: those targets are
- * written `ns::name` by the author, so there is nothing to pre-qualify. Remove this
- * function when `lgc-3f13` is fixed.
- */
-function mappingNamespace(sourceNamespace, targetNamespace) {
-  return sourceNamespace !== null && targetNamespace !== null ? sourceNamespace : null;
 }
 
 /** Wrap declarations into a single-file workspace whose entry file holds them all. */

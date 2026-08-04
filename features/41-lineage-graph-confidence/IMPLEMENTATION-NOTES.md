@@ -56,14 +56,10 @@ Ranked by what I would pick up next.
    *not* in this PR because `sl-hi0z` says to record such findings against their own
    ticket rather than fix them here, and because changing what the viz draws deserves
    the Playwright harness and a look at the picture.
-2. **Fix `lgc-3f13`** (P1, core). Bigger blast radius: it changes what
-   `ExtractedMapping.targets` contains, so every consumer of that field needs
-   checking. It also unblocks the generator's namespaced-chain arbitrary generating
-   the shape again, which widens R3's domain for free.
-3. **R4 and R5**, once Feature 40's `sl-prlp` lands — see below. R4's oracle is
+2. **R4 and R5**, once Feature 40's `sl-prlp` lands — see below. R4's oracle is
    already shipped, but R4 also waits on `spr-w98t` (see the
    [addendum](#addendum-2026-08-04--one-bug-now-sits-between-sl-prlp-and-r4)).
-4. **`lgc-wtz1`** (P2, cosmetic but corrosive): one spelling per entity across
+3. **`lgc-wtz1`** (P2, cosmetic but corrosive): one spelling per entity across
    `nodes`, `edges`, `schema_edges` and `field-lineage`. Landing it deletes the two
    normalisation shims in R3's properties and the same shims R5 would otherwise need.
 
@@ -280,8 +276,13 @@ namespace ns_a {
 edges point at `ns_a::s1.field_0`; and `lineage --from ns_a::s0` reports the data
 flowing into a schema that does not exist. This is the *schema-level* twin of
 `r0-7w76`, and it is exactly what R3's endpoint-existence property is for. The
-generator avoids the shape for now (`mappingNamespace`, with the ticket referenced)
-so R3 is not red for a defect it did not cause.
+generator initially avoided the shape so R3 was not red for a defect it did not
+cause.
+
+**Resolved 2026-08-04 (`lgc-3f13`).** `ExtractedMapping.sources` and `targets` now
+both retain their authored spelling; index-aware consumers resolve both sides with
+the mapping namespace. The generator workaround is gone, so namespaced chains can
+again target file-scope schemas and all R2/R3 properties cover the shape.
 
 **`lgc-wtz1` (P2) — `graph --json` spells the same entity two ways.** `nodes[].id`
 and `schema_edges[]` use the index-key form (`raw`), while `edges[]` uses the

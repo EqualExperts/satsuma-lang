@@ -444,7 +444,15 @@ export function extractMetrics(rootNode: SyntaxNode): ExtractedMetric[] {
 export interface ExtractedMapping {
   name: string | null;
   namespace: string | null;
+  /** Entity references exactly as authored in the `source` block. */
   sources: string[];
+  /**
+   * Entity references exactly as authored in the `target` block.
+   *
+   * Extraction has no workspace index, so a bare name cannot yet be identified
+   * as namespace-local or global. Consumers must resolve it relative to
+   * {@link namespace}, using current-namespace-then-global lookup.
+   */
   targets: string[];
   arrowCount: number;
   /** 0-indexed row from CST startPosition. */
@@ -487,20 +495,11 @@ export function extractMappings(rootNode: SyntaxNode): ExtractedMapping[] {
         allDescendants(body, "nested_arrow").length;
     }
 
-    // Targets are namespace-qualified here; sources are intentionally left as
-    // authored. Extraction has no workspace knowledge to decide whether a bare
-    // source name is namespace-local or global, so resolution-time consumers
-    // qualify them against the index instead (core resolveRef's
-    // contextSchemaKey, the CLI's resolveScopedEntityRef — sl-98cz).
-    const qualifiedTargets = targets.map((t) =>
-      namespace && !t.includes("::") ? `${namespace}::${t}` : t,
-    );
-
     return {
       name,
       namespace,
       sources,
-      targets: qualifiedTargets,
+      targets,
       arrowCount,
       row: node.startPosition.row,
       startColumn: node.startPosition.column,

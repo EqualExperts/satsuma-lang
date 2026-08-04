@@ -1,0 +1,15 @@
+schema s1 {
+  field_0 STRING
+}
+
+namespace ns_a {
+  schema s0 {
+    field_0 STRING
+  }
+
+  mapping m0 {
+    source { s0 }
+    target { s1 }
+    field_0 -> field_0
+  }
+}

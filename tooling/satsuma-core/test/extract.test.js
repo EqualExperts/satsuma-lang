@@ -1034,10 +1034,10 @@ describe("extractSchemas — namespace propagation (sl-cvs2)", () => {
 // ── extractMappings with namespaces ─────────────────────────────────────────
 
 describe("extractMappings — namespaced mapping with qualified ref (sl-cvs2)", () => {
-  it("preserves a fully-qualified source ref and qualifies the bare target ref", () => {
-    // Validates the namespace-resolution rule: an explicit ns::name source ref keeps its
-    // qualifier verbatim, while an unqualified target inside a namespaced mapping
-    // is auto-qualified with the enclosing namespace.
+  it("preserves source and target refs exactly as authored", () => {
+    // Extraction has no workspace index, so it cannot know whether a bare target
+    // is namespace-local or global. Both sides must retain that authored spelling
+    // for resolution-time consumers to apply current-namespace-then-global lookup.
     const qualName = n("qualified_name", [ident("pos"), ident("stores")], "pos::stores");
     const srcEntry = sourceRef(qualName);
     const tgtEntry = sourceRef(ident("hub_store"));
@@ -1048,7 +1048,7 @@ describe("extractMappings — namespaced mapping with qualified ref (sl-cvs2)", 
     const result = extractMappings(root);
     assert.equal(result[0].namespace, "vault");
     assert.deepEqual(result[0].sources, ["pos::stores"]);
-    assert.deepEqual(result[0].targets, ["vault::hub_store"]);
+    assert.deepEqual(result[0].targets, ["hub_store"]);
   });
 });
 

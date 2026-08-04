@@ -1,6 +1,6 @@
 ---
 id: lgc-3f13
-status: open
+status: closed
 deps: []
 links: [sl-dqyu, sl-hi0z]
 created: 2026-08-03T22:08:38Z
@@ -41,3 +41,9 @@ This is the schema-level twin of r0-7w76: an endpoint emitted for a name nothing
 
 The repro above validates clean and reports the global 's1' as the target in graph nodes, graph schema_edges, graph edges and lineage. Targets are resolved the same way sources are — against the index, honouring current-namespace-then-global — rather than pre-qualified during extraction. ExtractedMapping's contract states which spelling targets carry, and every consumer of mapping.targets is checked against the change (graph-builder, field-lineage, lineage, schema-graph, viz-backend, LSP). Feature 41's generator drops its avoidance of the shape and the namespaced chain arbitrary generates it again.
 
+
+## Notes
+
+**2026-08-04T10:12:52Z**
+
+Cause: extractMappings pre-qualified bare target references with their enclosing namespace even though extraction has no workspace index, erasing the distinction needed for current-namespace-then-global resolution. Fix: preserve target references exactly as authored, restore namespaced-to-global cases in the scenario generator, and add validate, graph, lineage, core extraction, and NL-ref regressions (commit immediately after 8e69721c).
