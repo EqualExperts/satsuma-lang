@@ -1,6 +1,6 @@
 ---
 id: mbt-45v2
-status: open
+status: closed
 deps: [mbt-npy0]
 links: []
 created: 2026-08-04T11:08:48Z
@@ -118,3 +118,59 @@ Two consequences for how this ticket is done:
    `turbo-<job>-<os>-` restore-key) lets each job accumulate exactly the task
    entries it runs and hit them on the next push. The cost is that the first run
    after this lands is no faster, and build outputs are stored once per job.
+
+**2026-08-04T19:14:15Z**
+
+Measured "after". All five acceptance criteria met; closing.
+
+**Wall clock, all like-for-like full pipelines:**
+
+| | Total | Install | Test stats | Satsuma CLI |
+|---|---|---|---|---|
+| R1 baseline | 4m35s | 1m34s | — | — |
+| post-R2/R3 | 4m37s | 58s | — | — |
+| post-R4 (main c2d447b4) | 4m18s | 61s | 150s | 135s |
+| R5 cold cache (run 30941702833) | **3m36s** | 41s | 110s | 148s |
+| R5 warm cache (run 30942106375) | **1m56s** | <=31s | 39s | 32s |
+
+**55% off the post-R4 baseline, 58% off the R1 baseline.**
+
+Cold is already 42s faster, before any cache exists: `turbo run test` parallelises
+what generate-test-stats.mjs used to spawn sequentially (150s -> 110s), and the
+install job dropped 61s -> 41s. The CLI job is the one that got *slower* cold
+(135s -> 148s), as expected — it now builds its dependency chain through
+`--filter` and pays turbo's overhead, and its win only appears warm.
+
+**Scoped-change evidence** (the criterion asking that an unaffected package's
+suite not re-run). Commit 44d0ee9b appended a comment to one @satsuma/viz source
+file and nothing else. satsuma-cli does not depend on @satsuma/viz, and its job
+reported:
+
+```
+##[group]satsuma-cli:test:coverage
+ℹ tests 1061
+ Tasks:    6 successful, 6 total
+Cached:    6 cached, 6 total
+  Time:    571ms >>> FULL TURBO
+```
+
+All 1061 tests reported from a replayed log, none executed, in 571ms against
+59.8s of real work. `satsuma-cli:test:typecheck` was likewise 6/6 cached in 89ms.
+That probe commit was reverted in the commit immediately after 44d0ee9b; it exists
+in history only as the evidence above.
+
+**All 28 checks green on both runs**, so nothing was weakened to get the number.
+
+Two things deliberately left, neither on the critical path:
+
+- The new longest job is `Satsuma-to-Excel skill` at 70s. It installs the CLI
+  globally from a packed tarball and runs pytest, so Turborepo cannot cache it —
+  a different kind of work, not a caching gap.
+- `tooling-modules` (12-36s per shard) and the LSP's coverage run inside the
+  vscode job are still raw commands. Converting them means giving each a
+  package-local output path as satsuma-cli's JUnit XML got; worth doing only when
+  one of them is the pole, which it is not.
+
+Also settled here: the `restore-keys: workspace-` fallback concern raised from
+R4's review. It stays, because it is now much less load-bearing — the jobs that
+matter verify their own inputs through turbo rather than trusting the blob.
