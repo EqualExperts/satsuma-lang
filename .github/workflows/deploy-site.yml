@@ -45,6 +45,9 @@ jobs:
           TAG="${{ steps.version.outputs.tag }}"
           echo "{\"version\":\"$TAG\",\"version_tag\":\"$TAG\"}" > site/_data/site.json
 
+      - name: Copy test stats for Eleventy
+        run: cp test-stats.json site/_data/stats.json
+
       - name: Copy diary entries and generate manifest
         run: |
           mkdir -p site/satsuma-diaries/content
