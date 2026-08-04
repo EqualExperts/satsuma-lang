@@ -178,6 +178,26 @@ describe("resolveIndexKey", () => {
     const result = resolveIndexKey("nonexistent", map);
     assert.equal(result, null);
   });
+
+  // `graph --json` emits canonical "::name" for global entities (lgc-wtz1), and
+  // downstream consumers (e.g. the satsuma-to-excel skill) feed those ids
+  // straight into commands like `satsuma fields`. Without this case, every
+  // canonical global ref would 404 against the bare-keyed index — the
+  // canonical spelling was write-only.
+  it("resolves the canonical :: global marker to its bare-keyed entry", () => {
+    const result = resolveIndexKey("::customers", map);
+    assert.ok(result);
+    assert.equal(result.key, "customers");
+    assert.equal(result.entry.id, 1);
+  });
+
+  it("returns null for a canonical :: global marker with no bare entry", () => {
+    // "::orders" must not fall through to the ambiguous "crm::orders" /
+    // "billing::orders" suffix match — "::" is an explicit "no namespace"
+    // marker, not a wildcard.
+    const result = resolveIndexKey("::orders", map);
+    assert.equal(result, null);
+  });
 });
 
 // ── distinctArrowRecords ─────────────────────────────────────────────────────

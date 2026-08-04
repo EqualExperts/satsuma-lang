@@ -464,6 +464,12 @@ export function buildIndex(parsedFiles: (ParsedFile | FileData)[]): ExtractedWor
 
 /**
  * Resolve a user-provided entity name against an index map.
+ *
+ * Accepts the internal index key verbatim (bare for global entities, `ns::name`
+ * for namespaced ones) as well as the canonical `::name` global marker that
+ * `--json` output and lgc-wtz1 made the standard round-trippable spelling for
+ * global entities — a canonical ref never appears as an index key itself, so
+ * without this it would always report "not found".
  */
 export function resolveIndexKey<T>(
   name: string,
@@ -472,6 +478,12 @@ export function resolveIndexKey<T>(
   if (entityMap.has(name)) {
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- Safe: .has() check on line above
     return { key: name, entry: entityMap.get(name)! };
+  }
+  if (name.startsWith("::")) {
+    const bare = resolveCanonicalKey(name);
+    if (!entityMap.has(bare)) return null;
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- Safe: .has() check on line above
+    return { key: bare, entry: entityMap.get(bare)! };
   }
   if (name.includes("::")) return null;
   for (const [key, entry] of entityMap) {
