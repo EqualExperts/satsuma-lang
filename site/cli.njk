@@ -20,10 +20,10 @@ permalink: cli.html
             The agent's <span class="text-orange">toolkit</span> for Satsuma
           </h1>
           <p class="text-lg text-warm-gray leading-relaxed mb-4">
-            The Satsuma CLI is built for AI agents. {{ stats.cliCommands }} parser-backed commands let your agent slice workspaces, trace lineage, extract metadata, and pull NL intent &mdash; all from the parse tree, with 100% deterministic results.
+            The Satsuma CLI exists mainly so an AI agent doesn't have to load a whole workspace into its context window and guess. It answers precise structural questions &mdash; one field's lineage, every PII tag, the fields still unmapped &mdash; with small, deterministic JSON slices instead of raw files, so your agent spends its tokens reasoning, not re-parsing.
           </p>
           <p class="text-warm-gray leading-relaxed mb-4">
-            Humans use it too &mdash; <code class="font-mono text-sm text-orange-dark bg-orange/10 px-1.5 py-0.5 rounded">validate</code>, <code class="font-mono text-sm text-orange-dark bg-orange/10 px-1.5 py-0.5 rounded">fmt</code>, and <code class="font-mono text-sm text-orange-dark bg-orange/10 px-1.5 py-0.5 rounded">lint</code> are your day-to-day workflow commands. But the CLI's real power is as the structural backbone your agent reasons on top of.
+            Humans use it too &mdash; <code class="font-mono text-sm text-orange-dark bg-orange/10 px-1.5 py-0.5 rounded">validate</code>, <code class="font-mono text-sm text-orange-dark bg-orange/10 px-1.5 py-0.5 rounded">fmt</code>, and <code class="font-mono text-sm text-orange-dark bg-orange/10 px-1.5 py-0.5 rounded">lint</code> are your day-to-day workflow commands. But most of the {{ stats.cliCommands }} commands exist for the agent, not for you.
           </p>
           <p class="text-warm-gray leading-relaxed mb-8">
             <strong>The CLI extracts facts. The agent interprets them.</strong> It also powers the VS Code extension's diagnostics, lineage views, and code intelligence.
@@ -583,177 +583,44 @@ permalink: cli.html
     </div>
   </section>
 
-  <!-- Command Reference -->
+  <!-- Full Reference Pointer -->
   <section id="command-reference" class="py-16 lg:py-24">
     <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-      <div class="text-center mb-12 reveal">
-        <h2 class="text-3xl font-bold text-charcoal mb-3">All {{ stats.cliCommands }} commands</h2>
-        <p class="text-warm-gray max-w-2xl mx-auto">Complete reference for every command in the CLI. See the <a href="https://github.com/EqualExperts/satsuma-lang/blob/main/SATSUMA-CLI.md" target="_blank" class="text-orange hover:underline">full reference on GitHub</a> for detailed usage and examples.</p>
-      </div>
-
-      <!-- Workspace Extractors -->
-      <div class="mb-12">
-        <div class="mb-6 reveal">
-          <div class="inline-flex items-center gap-2 px-3 py-1.5 bg-orange/10 text-orange-dark text-sm font-medium rounded-full mb-2">
-            Workspace Extractors
-          </div>
-          <p class="text-sm text-warm-gray">Block-level extraction &mdash; retrieve whole blocks or workspace-level summaries.</p>
+      <div class="grid lg:grid-cols-2 gap-12 items-center reveal">
+        <div>
+          <h2 class="text-3xl font-bold text-charcoal mb-3">That's the shape of it &mdash; not the whole list</h2>
+          <p class="text-warm-gray mb-4">
+            This page shows you how an agent strings commands together, not a catalogue of all {{ stats.cliCommands }}. They fall into a few families &mdash; block extractors like <code class="font-mono text-xs bg-code-bg px-1 rounded">summary</code> and <code class="font-mono text-xs bg-code-bg px-1 rounded">schema</code>, fine-grained primitives like <code class="font-mono text-xs bg-code-bg px-1 rounded">arrows</code> and <code class="font-mono text-xs bg-code-bg px-1 rounded">meta</code>, the one-shot <code class="font-mono text-xs bg-code-bg px-1 rounded">graph</code> export, and the human-facing analysis trio above &mdash; but the fastest way to get the exhaustive, always-current list is to ask the CLI itself.
+          </p>
+          <p class="text-warm-gray">
+            <code class="font-mono text-sm text-orange-dark bg-orange/10 px-1.5 py-0.5 rounded">satsuma agent-reference</code> gives your agent this same list with usage patterns baked in, so it rarely needs <code class="font-mono text-xs bg-code-bg px-1 rounded">--help</code> at all.
+          </p>
         </div>
+        <div class="terminal shadow-xl text-xs">
+          <div class="terminal-header">
+            <div class="terminal-dot red"></div>
+            <div class="terminal-dot yellow"></div>
+            <div class="terminal-dot green"></div>
+            <span class="text-xs text-gray-400 ml-2 font-mono">satsuma --help</span>
+          </div>
+          <pre>
+<span class="prompt">$</span> satsuma <span class="flag">--help</span>
 
-        <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-4 reveal">
-          <div class="bg-white rounded-xl p-4 border border-charcoal/5">
-            <h4 class="font-bold text-charcoal mb-1 font-mono text-sm">summary</h4>
-            <p class="text-xs text-warm-gray">Workspace overview &mdash; schemas, mappings, metrics, and counts.</p>
-          </div>
-          <div class="bg-white rounded-xl p-4 border border-charcoal/5">
-            <h4 class="font-bold text-charcoal mb-1 font-mono text-sm">schema</h4>
-            <p class="text-xs text-warm-gray">Full schema definition from the parse tree.</p>
-          </div>
-          <div class="bg-white rounded-xl p-4 border border-charcoal/5">
-            <h4 class="font-bold text-charcoal mb-1 font-mono text-sm">metric</h4>
-            <p class="text-xs text-warm-gray">Full definition of a schema decorated with <code>metric</code> metadata — grain, slice, filter, and measure fields.</p>
-          </div>
-          <div class="bg-white rounded-xl p-4 border border-charcoal/5">
-            <h4 class="font-bold text-charcoal mb-1 font-mono text-sm">mapping</h4>
-            <p class="text-xs text-warm-gray">Full mapping with all arrows and transforms.</p>
-          </div>
-          <div class="bg-white rounded-xl p-4 border border-charcoal/5">
-            <h4 class="font-bold text-charcoal mb-1 font-mono text-sm">find --tag</h4>
-            <p class="text-xs text-warm-gray">Find all fields carrying a metadata tag (pii, encrypt, etc.).</p>
-          </div>
-          <div class="bg-white rounded-xl p-4 border border-charcoal/5">
-            <h4 class="font-bold text-charcoal mb-1 font-mono text-sm">lineage</h4>
-            <p class="text-xs text-warm-gray">Schema-level graph traversal, forward or backward.</p>
-          </div>
-          <div class="bg-white rounded-xl p-4 border border-charcoal/5">
-            <h4 class="font-bold text-charcoal mb-1 font-mono text-sm">field-lineage</h4>
-            <p class="text-xs text-warm-gray">Full upstream and downstream lineage of a single field.</p>
-          </div>
-          <div class="bg-white rounded-xl p-4 border border-charcoal/5">
-            <h4 class="font-bold text-charcoal mb-1 font-mono text-sm">where-used</h4>
-            <p class="text-xs text-warm-gray">All references to a schema, fragment, or transform.</p>
-          </div>
-          <div class="bg-white rounded-xl p-4 border border-charcoal/5">
-            <h4 class="font-bold text-charcoal mb-1 font-mono text-sm">warnings</h4>
-            <p class="text-xs text-warm-gray">All <code class="font-mono text-xs">//!</code> and <code class="font-mono text-xs">//? </code> comments across the workspace.</p>
-          </div>
-          <div class="bg-white rounded-xl p-4 border border-charcoal/5">
-            <h4 class="font-bold text-charcoal mb-1 font-mono text-sm">context</h4>
-            <p class="text-xs text-warm-gray">Keyword-ranked block extraction (heuristic fuzzy search).</p>
-          </div>
+<span class="output">satsuma &lt;command&gt; [options]</span>
+
+<span class="highlight">Workspace extractors</span>    <span class="output">summary, schema, mapping, metric, lineage, ...</span>
+<span class="highlight">Structural primitives</span>  <span class="output">arrows, nl, meta, fields, coverage, ...</span>
+<span class="highlight">Graph export</span>           <span class="output">graph --json | --compact | --schema-only</span>
+<span class="highlight">Analysis</span>               <span class="output">fmt, validate, lint, diff</span>
+<span class="highlight">Agent setup</span>            <span class="output">agent-reference</span>
+
+<span class="output"># {{ stats.cliCommands }} commands total — run --help on any of them for full usage</span></pre>
         </div>
       </div>
-
-      <!-- Structural Primitives -->
-      <div class="mb-12">
-        <div class="mb-6 reveal">
-          <div class="inline-flex items-center gap-2 px-3 py-1.5 bg-green/10 text-green-dark text-sm font-medium rounded-full mb-2">
-            Structural Primitives
-          </div>
-          <p class="text-sm text-warm-gray">Fine-grained extraction &mdash; slice below block level for arrows, NL, metadata, and fields.</p>
-        </div>
-
-        <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-4 reveal">
-          <div class="bg-cream rounded-xl p-4 border border-charcoal/5">
-            <h4 class="font-bold text-charcoal mb-1 font-mono text-sm">arrows</h4>
-            <p class="text-xs text-warm-gray">All arrows for a field, with transform classification.</p>
-          </div>
-          <div class="bg-cream rounded-xl p-4 border border-charcoal/5">
-            <h4 class="font-bold text-charcoal mb-1 font-mono text-sm">nl</h4>
-            <p class="text-xs text-warm-gray">NL content &mdash; notes, transforms, comments &mdash; extracted verbatim.</p>
-          </div>
-          <div class="bg-cream rounded-xl p-4 border border-charcoal/5">
-            <h4 class="font-bold text-charcoal mb-1 font-mono text-sm">nl-refs</h4>
-            <p class="text-xs text-warm-gray">All <code class="font-mono text-xs">@ref</code> references inside NL transform bodies.</p>
-          </div>
-          <div class="bg-cream rounded-xl p-4 border border-charcoal/5">
-            <h4 class="font-bold text-charcoal mb-1 font-mono text-sm">meta</h4>
-            <p class="text-xs text-warm-gray">Metadata entries &mdash; tags, constraints, annotations.</p>
-          </div>
-          <div class="bg-cream rounded-xl p-4 border border-charcoal/5">
-            <h4 class="font-bold text-charcoal mb-1 font-mono text-sm">fields</h4>
-            <p class="text-xs text-warm-gray">Field list with types. Supports <code class="font-mono text-xs">--unmapped-by</code>.</p>
-          </div>
-          <div class="bg-cream rounded-xl p-4 border border-charcoal/5">
-            <h4 class="font-bold text-charcoal mb-1 font-mono text-sm">coverage</h4>
-            <p class="text-xs text-warm-gray">How much of each schema a mapping touches, counted in leaf fields. Gate CI with <code class="font-mono text-xs">--fail-under</code>.</p>
-          </div>
-          <div class="bg-cream rounded-xl p-4 border border-charcoal/5">
-            <h4 class="font-bold text-charcoal mb-1 font-mono text-sm">match-fields</h4>
-            <p class="text-xs text-warm-gray">Normalized name comparison between source and target schemas.</p>
-          </div>
-        </div>
-      </div>
-
-      <!-- Graph -->
-      <div class="mb-12">
-        <div class="mb-6 reveal">
-          <div class="inline-flex items-center gap-2 px-3 py-1.5 bg-charcoal/10 text-charcoal text-sm font-medium rounded-full mb-2">
-            Workspace Graph
-          </div>
-          <p class="text-sm text-warm-gray">Full semantic graph export in a single call.</p>
-        </div>
-
-        <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-4 reveal">
-          <div class="bg-white rounded-xl p-4 border border-charcoal/5">
-            <h4 class="font-bold text-charcoal mb-1 font-mono text-sm">graph --json</h4>
-            <p class="text-xs text-warm-gray">Complete graph with nodes, edges, and field-level data flow.</p>
-          </div>
-          <div class="bg-white rounded-xl p-4 border border-charcoal/5">
-            <h4 class="font-bold text-charcoal mb-1 font-mono text-sm">graph --compact</h4>
-            <p class="text-xs text-warm-gray">Schema-level adjacency list (minimal payload).</p>
-          </div>
-          <div class="bg-white rounded-xl p-4 border border-charcoal/5">
-            <h4 class="font-bold text-charcoal mb-1 font-mono text-sm">graph --schema-only</h4>
-            <p class="text-xs text-warm-gray">Topology only, omit field-level edges.</p>
-          </div>
-        </div>
-      </div>
-
-      <!-- Analysis -->
-      <div class="mb-12">
-        <div class="mb-6 reveal">
-          <div class="inline-flex items-center gap-2 px-3 py-1.5 bg-orange/10 text-orange-dark text-sm font-medium rounded-full mb-2">
-            Analysis
-          </div>
-          <p class="text-sm text-warm-gray">Formatting, validation, linting, and structural comparison.</p>
-        </div>
-
-        <div class="grid md:grid-cols-2 lg:grid-cols-4 gap-4 reveal">
-          <div class="bg-white rounded-xl p-4 border border-charcoal/5">
-            <h4 class="font-bold text-charcoal mb-1 font-mono text-sm">fmt</h4>
-            <p class="text-xs text-warm-gray">Opinionated, zero-config formatter. <code class="font-mono text-xs">--check</code> for CI.</p>
-          </div>
-          <div class="bg-white rounded-xl p-4 border border-charcoal/5">
-            <h4 class="font-bold text-charcoal mb-1 font-mono text-sm">validate</h4>
-            <p class="text-xs text-warm-gray">Parse errors and semantic reference checks.</p>
-          </div>
-          <div class="bg-white rounded-xl p-4 border border-charcoal/5">
-            <h4 class="font-bold text-charcoal mb-1 font-mono text-sm">lint</h4>
-            <p class="text-xs text-warm-gray">Policy checks with <code class="font-mono text-xs">--fix</code> autofix.</p>
-          </div>
-          <div class="bg-white rounded-xl p-4 border border-charcoal/5">
-            <h4 class="font-bold text-charcoal mb-1 font-mono text-sm">diff</h4>
-            <p class="text-xs text-warm-gray">Structural comparison of two workspace snapshots.</p>
-          </div>
-        </div>
-      </div>
-
-      <!-- Agent Setup -->
-      <div>
-        <div class="mb-6 reveal">
-          <div class="inline-flex items-center gap-2 px-3 py-1.5 bg-charcoal/10 text-charcoal text-sm font-medium rounded-full mb-2">
-            Agent Setup
-          </div>
-          <p class="text-sm text-warm-gray">Bootstrap your AI agent.</p>
-        </div>
-
-        <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-4 reveal">
-          <div class="bg-white rounded-xl p-4 border border-charcoal/5">
-            <h4 class="font-bold text-charcoal mb-1 font-mono text-sm">agent-reference</h4>
-            <p class="text-xs text-warm-gray">Print the AI Agent Reference for embedding in agent instructions.</p>
-          </div>
-        </div>
+      <div class="mt-8 text-center reveal">
+        <a href="https://github.com/EqualExperts/satsuma-lang/blob/main/SATSUMA-CLI.md" target="_blank" rel="noopener" class="text-orange font-semibold hover:underline">
+          Full command reference with usage and examples on GitHub &rarr;
+        </a>
       </div>
     </div>
   </section>

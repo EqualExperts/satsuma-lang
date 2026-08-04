@@ -23,7 +23,7 @@ permalink: vscode.html
           <span class="text-transparent bg-clip-text bg-gradient-to-r from-green to-green-dark">Extension</span>
         </h1>
         <p class="text-lg text-warm-gray leading-relaxed mb-8 max-w-xl">
-          Full language support for Satsuma: syntax highlighting, an LSP server with navigation and completions, real-time diagnostics, and interactive workspace visualization. All parser-backed.
+          Turns a plain-text <code class="font-mono text-base bg-code-bg px-1.5 py-0.5 rounded">.stm</code> file into something your whole team can work with directly: reviewable like a document, navigable like code, and visual wherever a diagram says more than an arrow &mdash; without giving up the Git-friendly plain text that makes Satsuma worth using in the first place.
         </p>
         <div class="flex flex-wrap gap-4">
           <a href="https://github.com/EqualExperts/satsuma-lang/releases/tag/{{ site.version_tag }}" target="_blank" rel="noopener"
@@ -48,7 +48,7 @@ permalink: vscode.html
   <!-- Stats Bar -->
   <section class="py-8 bg-white border-b border-charcoal/5">
     <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-      <div class="grid grid-cols-2 sm:grid-cols-4 gap-6 text-center">
+      <div class="grid grid-cols-3 gap-6 text-center">
         <div class="stat-item">
           <div class="text-2xl font-bold text-green">{{ stats.packages['satsuma-lsp'] }}</div>
           <div class="text-sm text-warm-gray">LSP Tests</div>
@@ -58,129 +58,144 @@ permalink: vscode.html
           <div class="text-sm text-warm-gray">Commands</div>
         </div>
         <div class="stat-item">
-          <div class="text-2xl font-bold text-green">11</div>
-          <div class="text-sm text-warm-gray">LSP Capabilities</div>
-        </div>
-        <div class="stat-item">
           <div class="text-2xl font-bold text-green">3</div>
-          <div class="text-sm text-warm-gray">Webview Panels</div>
+          <div class="text-sm text-warm-gray">Visual Views</div>
         </div>
       </div>
     </div>
   </section>
 
-  <!-- Core LSP Features -->
+  <!-- What Changes -->
   <section class="py-20 lg:py-28">
     <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
       <div class="text-center mb-16 reveal">
-        <h2 class="text-3xl sm:text-4xl font-bold text-charcoal mb-4">Full LSP, zero compromise</h2>
-        <p class="text-warm-gray text-lg max-w-2xl mx-auto">Every feature is backed by the tree-sitter parser. No regex heuristics, no guesswork &mdash; deterministic, correct results as you type.</p>
+        <h2 class="text-3xl sm:text-4xl font-bold text-charcoal mb-4">Everything a spreadsheet review used to need a screen-share for</h2>
+        <p class="text-warm-gray text-lg max-w-2xl mx-auto">Satsuma files are plain text by design &mdash; version them, diff them, review them in a pull request. The extension is what makes that plain text feel as approachable as a spreadsheet, and considerably more powerful.</p>
       </div>
 
-      <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-6 reveal">
-
-        <!-- Syntax Highlighting -->
-        <div class="feature-card bg-white rounded-2xl p-6 border border-charcoal/5">
-          <div class="w-12 h-12 bg-green/10 rounded-xl flex items-center justify-center mb-4">
-            <svg class="w-6 h-6 text-green" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01"/></svg>
-          </div>
-          <h3 class="text-lg font-bold text-charcoal mb-2">Syntax Highlighting</h3>
-          <p class="text-warm-gray text-sm leading-relaxed mb-3">TextMate grammar for immediate highlighting of all Satsuma constructs &mdash; keywords, types, metadata, strings, comments, and operators.</p>
-          <p class="text-warm-gray text-sm leading-relaxed">Semantic tokens from the LSP override TextMate scopes for context-sensitive constructs: <code class="font-mono text-xs bg-code-bg px-1.5 py-0.5 rounded">source</code>/<code class="font-mono text-xs bg-code-bg px-1.5 py-0.5 rounded">target</code> as keyword vs. field name, vocabulary tokens, and more.</p>
-        </div>
-
-        <!-- Diagnostics -->
-        <div class="feature-card bg-white rounded-2xl p-6 border border-charcoal/5">
-          <div class="w-12 h-12 bg-orange/10 rounded-xl flex items-center justify-center mb-4">
-            <svg class="w-6 h-6 text-orange" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
-          </div>
-          <h3 class="text-lg font-bold text-charcoal mb-2">Real-time Diagnostics</h3>
-          <p class="text-warm-gray text-sm leading-relaxed mb-3"><strong class="text-charcoal">Parse errors</strong> &mdash; red squiggles as you type, powered by tree-sitter ERROR and MISSING nodes.</p>
-          <p class="text-warm-gray text-sm leading-relaxed mb-3"><strong class="text-charcoal">Semantic warnings</strong> &mdash; yellow squiggles on save via <code class="font-mono text-xs bg-code-bg px-1.5 py-0.5 rounded">satsuma validate</code>: undefined schemas, duplicate names, broken imports.</p>
-          <p class="text-warm-gray text-sm leading-relaxed"><strong class="text-charcoal">Marker comments</strong> &mdash; <code class="font-mono text-xs bg-code-bg px-1.5 py-0.5 rounded">//!</code> warnings and <code class="font-mono text-xs bg-code-bg px-1.5 py-0.5 rounded">//?</code> questions surface in the Problems panel.</p>
-        </div>
-
-        <!-- Navigation -->
-        <div class="feature-card bg-white rounded-2xl p-6 border border-charcoal/5">
-          <div class="w-12 h-12 bg-green/10 rounded-xl flex items-center justify-center mb-4">
-            <svg class="w-6 h-6 text-green" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/></svg>
-          </div>
-          <h3 class="text-lg font-bold text-charcoal mb-2">Navigation</h3>
-          <p class="text-warm-gray text-sm leading-relaxed mb-3"><strong class="text-charcoal">Go-to-Definition</strong> (Ctrl+Click / F12) &mdash; jump to schema definitions, fragment blocks, imported definitions, and import file paths.</p>
-          <p class="text-warm-gray text-sm leading-relaxed mb-3"><strong class="text-charcoal">Find References</strong> (Shift+F12) &mdash; locate all usages of a schema, fragment, or transform across the workspace.</p>
-          <p class="text-warm-gray text-sm leading-relaxed"><strong class="text-charcoal">Rename Symbol</strong> (F2) &mdash; rename across all files with duplicate detection. Handles namespace-qualified references.</p>
-        </div>
-
-        <!-- IntelliSense -->
-        <div class="feature-card bg-white rounded-2xl p-6 border border-charcoal/5">
-          <div class="w-12 h-12 bg-orange/10 rounded-xl flex items-center justify-center mb-4">
-            <svg class="w-6 h-6 text-orange" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
-          </div>
-          <h3 class="text-lg font-bold text-charcoal mb-2">IntelliSense</h3>
-          <p class="text-warm-gray text-sm leading-relaxed">Context-aware completions for every position:</p>
-          <ul class="mt-2 space-y-1.5 text-sm text-warm-gray">
-            <li class="flex items-start gap-2"><span class="text-orange mt-0.5">&#x2022;</span> Schema names in <code class="font-mono text-xs bg-code-bg px-1 py-0.5 rounded">source</code> / <code class="font-mono text-xs bg-code-bg px-1 py-0.5 rounded">target</code> blocks</li>
-            <li class="flex items-start gap-2"><span class="text-orange mt-0.5">&#x2022;</span> Fragment and transform names after <code class="font-mono text-xs bg-code-bg px-1 py-0.5 rounded">...</code></li>
-            <li class="flex items-start gap-2"><span class="text-orange mt-0.5">&#x2022;</span> Field names from source/target schemas in arrow paths</li>
-            <li class="flex items-start gap-2"><span class="text-orange mt-0.5">&#x2022;</span> Metadata tokens: <code class="font-mono text-xs bg-code-bg px-1 py-0.5 rounded">pk</code>, <code class="font-mono text-xs bg-code-bg px-1 py-0.5 rounded">pii</code>, <code class="font-mono text-xs bg-code-bg px-1 py-0.5 rounded">scd</code>, <code class="font-mono text-xs bg-code-bg px-1 py-0.5 rounded">required</code>, etc.</li>
-            <li class="flex items-start gap-2"><span class="text-orange mt-0.5">&#x2022;</span> Pipeline functions: <code class="font-mono text-xs bg-code-bg px-1 py-0.5 rounded">trim</code>, <code class="font-mono text-xs bg-code-bg px-1 py-0.5 rounded">lowercase</code>, <code class="font-mono text-xs bg-code-bg px-1 py-0.5 rounded">coalesce</code>, etc.</li>
-            <li class="flex items-start gap-2"><span class="text-orange mt-0.5">&#x2022;</span> Block names in <code class="font-mono text-xs bg-code-bg px-1 py-0.5 rounded">import { }</code> declarations</li>
+      <!-- Read it like a document -->
+      <div class="grid lg:grid-cols-2 gap-8 items-center mb-20 reveal">
+        <div>
+          <h3 class="text-2xl font-bold text-charcoal mb-3">Read it like a document, not a grammar</h3>
+          <p class="text-warm-gray mb-4">Syntax highlighting, hover tooltips, and an outline panel turn a mapping into something a product owner can scan without knowing the syntax. Inline CodeLens goes further &mdash; usage counts appear right above each block, so "is this field used anywhere?" is answered before you've clicked a thing.</p>
+          <ul class="space-y-2 text-sm text-warm-gray">
+            <li class="flex items-start gap-2">
+              <svg class="w-4 h-4 text-green flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+              <span>CodeLens above every block: field counts, "used in N mappings," spread counts</span>
+            </li>
+            <li class="flex items-start gap-2">
+              <svg class="w-4 h-4 text-green flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+              <span>Go-to-Definition and Find References (Ctrl+Click, Shift+F12) &mdash; jump straight to where something is defined or used</span>
+            </li>
+            <li class="flex items-start gap-2">
+              <svg class="w-4 h-4 text-green flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+              <span>Rename Symbol (F2) across every file, with duplicate detection</span>
+            </li>
+            <li class="flex items-start gap-2">
+              <svg class="w-4 h-4 text-green flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+              <span>Format on save &mdash; one canonical style, same formatter as <code class="font-mono text-xs bg-code-bg px-1 rounded">satsuma fmt</code></span>
+            </li>
           </ul>
         </div>
-
-        <!-- Document Structure -->
-        <div class="feature-card bg-white rounded-2xl p-6 border border-charcoal/5">
-          <div class="w-12 h-12 bg-green/10 rounded-xl flex items-center justify-center mb-4">
-            <svg class="w-6 h-6 text-green" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"/></svg>
+        <div class="rounded-2xl overflow-hidden shadow-xl border border-charcoal/10">
+          <div class="bg-charcoal/5 px-5 py-3 flex items-center gap-2 border-b border-charcoal/10">
+            <span class="w-3 h-3 rounded-full bg-red-400/60"></span>
+            <span class="w-3 h-3 rounded-full bg-yellow-400/60"></span>
+            <span class="w-3 h-3 rounded-full bg-green/60"></span>
+            <span class="ml-3 text-xs text-warm-gray font-mono">CodeLens usage counts, a PII hint, and Find All References</span>
           </div>
-          <h3 class="text-lg font-bold text-charcoal mb-2">Document Structure</h3>
-          <p class="text-warm-gray text-sm leading-relaxed mb-3"><strong class="text-charcoal">Outline Panel</strong> &mdash; schemas, mappings, fragments, transforms, metrics, namespaces, and notes with nested fields.</p>
-          <p class="text-warm-gray text-sm leading-relaxed mb-3"><strong class="text-charcoal">Breadcrumbs</strong> &mdash; automatic navigation breadcrumbs from document symbols.</p>
-          <p class="text-warm-gray text-sm leading-relaxed mb-3"><strong class="text-charcoal">Code Folding</strong> &mdash; fold any block type: schema, mapping, fragment, transform, metric, note, namespace, each, flatten, map literal, metadata, nested arrow.</p>
-          <p class="text-warm-gray text-sm leading-relaxed"><strong class="text-charcoal">Hover</strong> &mdash; contextual info for blocks, fields, tags, spreads, arrow paths, and pipeline functions.</p>
+          <img
+            src="img/vscode-src-example.webp"
+            alt="Satsuma VS Code extension showing syntax highlighting, CodeLens usage counts above a schema, a PII hint, and a Find All References panel"
+            class="w-full h-auto block"
+            width="1200"
+            height="893"
+            loading="lazy"
+          >
         </div>
+      </div>
 
-        <!-- Format Document -->
-        <div class="feature-card bg-white rounded-2xl p-6 border border-charcoal/5">
-          <div class="w-12 h-12 bg-green/10 rounded-xl flex items-center justify-center mb-4">
-            <svg class="w-6 h-6 text-green" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h8m-8 6h16"/></svg>
-          </div>
-          <h3 class="text-lg font-bold text-charcoal mb-2">Format Document</h3>
-          <p class="text-warm-gray text-sm leading-relaxed mb-3">Opinionated, zero-config formatting. One canonical style for all Satsuma files &mdash; field column alignment, consistent spacing, normalised blank lines.</p>
-          <p class="text-warm-gray text-sm leading-relaxed">Trigger with <kbd class="font-mono text-xs bg-code-bg px-1.5 py-0.5 rounded border border-charcoal/10">Shift+Alt+F</kbd> or enable format-on-save. Same formatter as <code class="font-mono text-xs bg-code-bg px-1.5 py-0.5 rounded">satsuma fmt</code> in the CLI.</p>
+      <!-- See the whole workspace -->
+      <div class="mb-20 reveal">
+        <div class="max-w-3xl mx-auto text-center mb-8">
+          <h3 class="text-2xl font-bold text-charcoal mb-3">See the whole workspace, then drill into any mapping</h3>
+          <p class="text-warm-gray">The Workspace Graph lays out every schema, mapping, metric, and fragment as an interactive SVG &mdash; click any node to jump to its definition, filter by namespace, and it auto-refreshes on save. Click into a mapping and it opens the Mapping Detail view: source and target schemas side by side, with every field-level arrow and transform between them.</p>
         </div>
-
-        <!-- CodeLens -->
-        <div class="feature-card bg-white rounded-2xl p-6 border border-charcoal/5">
-          <div class="w-12 h-12 bg-orange/10 rounded-xl flex items-center justify-center mb-4">
-            <svg class="w-6 h-6 text-orange" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+        <div class="space-y-8">
+          <div class="rounded-2xl overflow-hidden shadow-xl border border-charcoal/10">
+            <div class="bg-charcoal/5 px-5 py-3 flex items-center gap-2 border-b border-charcoal/10">
+              <span class="w-3 h-3 rounded-full bg-red-400/60"></span>
+              <span class="w-3 h-3 rounded-full bg-yellow-400/60"></span>
+              <span class="w-3 h-3 rounded-full bg-green/60"></span>
+              <span class="ml-3 text-xs text-warm-gray font-mono">Workspace Overview — schemas, mappings, and data flow at a glance</span>
+            </div>
+            <img
+              src="img/vscode-extension-overview.webp"
+              alt="Satsuma VS Code extension workspace overview showing schema nodes connected by mapping arrows with namespace grouping"
+              class="w-full h-auto block"
+              width="1400"
+              height="598"
+              loading="lazy"
+            >
           </div>
-          <h3 class="text-lg font-bold text-charcoal mb-2">CodeLens</h3>
-          <p class="text-warm-gray text-sm leading-relaxed mb-3">Inline annotations above every block, giving you at-a-glance structural insight:</p>
-          <div class="space-y-2 text-sm">
-            <div class="flex items-center gap-2">
-              <code class="font-mono text-xs bg-code-bg px-2 py-1 rounded text-charcoal">schema</code>
-              <span class="text-warm-gray">N fields | used in M mappings</span>
+
+          <div class="rounded-2xl overflow-hidden shadow-xl border border-charcoal/10">
+            <div class="bg-charcoal/5 px-5 py-3 flex items-center gap-2 border-b border-charcoal/10">
+              <span class="w-3 h-3 rounded-full bg-red-400/60"></span>
+              <span class="w-3 h-3 rounded-full bg-yellow-400/60"></span>
+              <span class="w-3 h-3 rounded-full bg-green/60"></span>
+              <span class="ml-3 text-xs text-warm-gray font-mono">Mapping Detail — field-level arrows between source and target schemas</span>
             </div>
-            <div class="flex items-center gap-2">
-              <code class="font-mono text-xs bg-code-bg px-2 py-1 rounded text-charcoal">mapping</code>
-              <span class="text-warm-gray">source &rarr; target | N arrows</span>
-            </div>
-            <div class="flex items-center gap-2">
-              <code class="font-mono text-xs bg-code-bg px-2 py-1 rounded text-charcoal">fragment</code>
-              <span class="text-warm-gray">spread in N places</span>
-            </div>
-            <div class="flex items-center gap-2">
-              <code class="font-mono text-xs bg-code-bg px-2 py-1 rounded text-charcoal">transform</code>
-              <span class="text-warm-gray">used in N places</span>
-            </div>
-            <div class="flex items-center gap-2">
-              <code class="font-mono text-xs bg-code-bg px-2 py-1 rounded text-charcoal">metric</code>
-              <span class="text-warm-gray">sources: schema1, schema2</span>
-            </div>
+            <img
+              src="img/vscode-mapping-view-extension.webp"
+              alt="Satsuma VS Code extension mapping detail view showing source and target schema cards with field-level arrow connections"
+              class="w-full h-auto block"
+              width="1400"
+              height="603"
+              loading="lazy"
+            >
           </div>
         </div>
+      </div>
 
+      <!-- Remaining workflows: no screenshot yet -->
+      <div class="reveal">
+        <h3 class="text-2xl font-bold text-charcoal mb-8 text-center">And when you need to check something specific</h3>
+        <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
+
+          <div class="feature-card bg-white rounded-2xl p-6 border border-charcoal/5">
+            <div class="w-12 h-12 bg-orange/10 rounded-xl flex items-center justify-center mb-4">
+              <svg class="w-6 h-6 text-orange" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+            </div>
+            <h4 class="text-base font-bold text-charcoal mb-2">Catch mistakes before they reach a PR</h4>
+            <p class="text-warm-gray text-sm leading-relaxed">Red squiggles for parse errors as you type; yellow squiggles on save for undefined schemas, duplicate names, and broken imports. <code class="font-mono text-xs bg-code-bg px-1 rounded">//!</code> and <code class="font-mono text-xs bg-code-bg px-1 rounded">//?</code> marker comments surface in the Problems panel too.</p>
+          </div>
+
+          <div class="feature-card bg-white rounded-2xl p-6 border border-charcoal/5">
+            <div class="w-12 h-12 bg-green/10 rounded-xl flex items-center justify-center mb-4">
+              <svg class="w-6 h-6 text-green" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg>
+            </div>
+            <h4 class="text-base font-bold text-charcoal mb-2">Trace a schema's lineage before you touch it</h4>
+            <p class="text-warm-gray text-sm leading-relaxed">"Show Lineage From..." picks a schema and renders its full forward or backward flow through the workspace &mdash; know what breaks before you change something.</p>
+          </div>
+
+          <div class="feature-card bg-white rounded-2xl p-6 border border-charcoal/5">
+            <div class="w-12 h-12 bg-orange/10 rounded-xl flex items-center justify-center mb-4">
+              <svg class="w-6 h-6 text-orange" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l5.447 2.724A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"/></svg>
+            </div>
+            <h4 class="text-base font-bold text-charcoal mb-2">Trace one field through the entire pipeline</h4>
+            <p class="text-warm-gray text-sm leading-relaxed">Field-Level Lineage renders a horizontal, multi-hop chain &mdash; source.field &rarr; [transform] &rarr; target.field &mdash; with NL transforms styled distinctly, so you can see exactly where a value comes from.</p>
+          </div>
+
+          <div class="feature-card bg-white rounded-2xl p-6 border border-charcoal/5">
+            <div class="w-12 h-12 bg-green/10 rounded-xl flex items-center justify-center mb-4">
+              <svg class="w-6 h-6 text-green" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
+            </div>
+            <h4 class="text-base font-bold text-charcoal mb-2">Know what's mapped without reading the arrows</h4>
+            <p class="text-warm-gray text-sm leading-relaxed">Green and red gutter markers plus a status-bar percentage show mapped vs. unmapped target fields for the mapping under your cursor &mdash; no CLI, no counting by hand.</p>
+          </div>
+
+        </div>
       </div>
     </div>
   </section>
@@ -189,8 +204,8 @@ permalink: vscode.html
   <section class="py-20 lg:py-28 bg-white">
     <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
       <div class="text-center mb-16 reveal">
-        <h2 class="text-3xl sm:text-4xl font-bold text-charcoal mb-4">8 commands at your fingertips</h2>
-        <p class="text-warm-gray text-lg max-w-2xl mx-auto">Access every command from the Command Palette (<kbd class="font-mono text-xs bg-code-bg px-1.5 py-0.5 rounded border border-charcoal/10">Ctrl+Shift+P</kbd>). Each one integrates directly with the Satsuma CLI.</p>
+        <h2 class="text-3xl sm:text-4xl font-bold text-charcoal mb-4">Every workflow above, one keystroke away</h2>
+        <p class="text-warm-gray text-lg max-w-2xl mx-auto">Open the Command Palette (<kbd class="font-mono text-xs bg-code-bg px-1.5 py-0.5 rounded border border-charcoal/10">Ctrl+Shift+P</kbd>) and type "Satsuma" for all 8 commands. Each one runs the CLI for you and renders the result.</p>
       </div>
 
       <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 reveal">
@@ -274,139 +289,6 @@ permalink: vscode.html
           <p class="text-warm-gray text-xs leading-relaxed">Removes the gutter markers and status bar item added by <em>Show Mapping Coverage</em>.</p>
         </div>
       </div>
-    </div>
-  </section>
-
-  <!-- Interactive Webviews -->
-  <section class="py-20 lg:py-28">
-    <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-      <div class="text-center mb-16 reveal">
-        <h2 class="text-3xl sm:text-4xl font-bold text-charcoal mb-4">Interactive visualization</h2>
-        <p class="text-warm-gray text-lg max-w-2xl mx-auto">Three dedicated webview panels bring your mapping workspace to life, right inside VS Code.</p>
-      </div>
-
-      <div class="grid lg:grid-cols-3 gap-8 reveal">
-
-        <!-- Workspace Graph -->
-        <div class="feature-card bg-white rounded-2xl p-8 border border-charcoal/5">
-          <div class="w-14 h-14 gradient-green rounded-2xl flex items-center justify-center mb-6">
-            <svg class="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zm0 8a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zm12 0a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z"/></svg>
-          </div>
-          <h3 class="text-xl font-bold text-charcoal mb-3">Workspace Graph</h3>
-          <p class="text-warm-gray text-sm leading-relaxed mb-4">An interactive SVG diagram of your entire workspace, laid out by block type.</p>
-          <ul class="space-y-2 text-sm text-warm-gray">
-            <li class="flex items-start gap-2">
-              <svg class="w-4 h-4 text-green flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
-              <span>Schemas, mappings, metrics, and fragments as distinct node shapes</span>
-            </li>
-            <li class="flex items-start gap-2">
-              <svg class="w-4 h-4 text-green flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
-              <span>Click any node to jump to its definition</span>
-            </li>
-            <li class="flex items-start gap-2">
-              <svg class="w-4 h-4 text-green flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
-              <span>Namespace filter dropdown to focus on a single namespace</span>
-            </li>
-            <li class="flex items-start gap-2">
-              <svg class="w-4 h-4 text-green flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
-              <span>Auto-refreshes on file save</span>
-            </li>
-          </ul>
-        </div>
-
-        <!-- Field-Level Lineage -->
-        <div class="feature-card bg-white rounded-2xl p-8 border border-charcoal/5">
-          <div class="w-14 h-14 gradient-orange rounded-2xl flex items-center justify-center mb-6">
-            <svg class="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l5.447 2.724A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"/></svg>
-          </div>
-          <h3 class="text-xl font-bold text-charcoal mb-3">Field-Level Lineage</h3>
-          <p class="text-warm-gray text-sm leading-relaxed mb-4">Trace a single field through the entire data pipeline with multi-hop chain visualization.</p>
-          <ul class="space-y-2 text-sm text-warm-gray">
-            <li class="flex items-start gap-2">
-              <svg class="w-4 h-4 text-orange flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
-              <span>Horizontal flow: source.field &rarr; [transform] &rarr; target.field</span>
-            </li>
-            <li class="flex items-start gap-2">
-              <svg class="w-4 h-4 text-orange flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
-              <span>NL transforms displayed with distinct styling</span>
-            </li>
-            <li class="flex items-start gap-2">
-              <svg class="w-4 h-4 text-orange flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
-              <span>Click any node to navigate to the definition</span>
-            </li>
-            <li class="flex items-start gap-2">
-              <svg class="w-4 h-4 text-orange flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
-              <span>Multi-hop chain tracing via <code class="font-mono text-xs bg-code-bg px-1 py-0.5 rounded">satsuma arrows</code></span>
-            </li>
-          </ul>
-        </div>
-
-        <!-- Mapping Coverage -->
-        <div class="feature-card bg-white rounded-2xl p-8 border border-charcoal/5">
-          <div class="w-14 h-14 gradient-green rounded-2xl flex items-center justify-center mb-6">
-            <svg class="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
-          </div>
-          <h3 class="text-xl font-bold text-charcoal mb-3">Mapping Coverage</h3>
-          <p class="text-warm-gray text-sm leading-relaxed mb-4">See at a glance which target fields are mapped and which are missing.</p>
-          <ul class="space-y-2 text-sm text-warm-gray">
-            <li class="flex items-start gap-2">
-              <svg class="w-4 h-4 text-green flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
-              <span>Green gutter markers for mapped fields</span>
-            </li>
-            <li class="flex items-start gap-2">
-              <svg class="w-4 h-4 text-green flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
-              <span>Red gutter markers for unmapped fields</span>
-            </li>
-            <li class="flex items-start gap-2">
-              <svg class="w-4 h-4 text-green flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
-              <span>Status bar shows coverage percentage</span>
-            </li>
-            <li class="flex items-start gap-2">
-              <svg class="w-4 h-4 text-green flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
-              <span>Works from cursor position inside any mapping block</span>
-            </li>
-          </ul>
-        </div>
-
-      </div>
-
-      <!-- Screenshots -->
-      <div class="mt-16 space-y-8 reveal">
-        <div class="rounded-2xl overflow-hidden shadow-xl border border-charcoal/10">
-          <div class="bg-charcoal/5 px-5 py-3 flex items-center gap-2 border-b border-charcoal/10">
-            <span class="w-3 h-3 rounded-full bg-red-400/60"></span>
-            <span class="w-3 h-3 rounded-full bg-yellow-400/60"></span>
-            <span class="w-3 h-3 rounded-full bg-green/60"></span>
-            <span class="ml-3 text-xs text-warm-gray font-mono">Workspace Overview — schemas, mappings, and data flow at a glance</span>
-          </div>
-          <img
-            src="img/vscode-extension-overview.webp"
-            alt="Satsuma VS Code extension workspace overview showing schema nodes connected by mapping arrows with namespace grouping"
-            class="w-full h-auto block"
-            width="1400"
-            height="598"
-            loading="lazy"
-          >
-        </div>
-
-        <div class="rounded-2xl overflow-hidden shadow-xl border border-charcoal/10">
-          <div class="bg-charcoal/5 px-5 py-3 flex items-center gap-2 border-b border-charcoal/10">
-            <span class="w-3 h-3 rounded-full bg-red-400/60"></span>
-            <span class="w-3 h-3 rounded-full bg-yellow-400/60"></span>
-            <span class="w-3 h-3 rounded-full bg-green/60"></span>
-            <span class="ml-3 text-xs text-warm-gray font-mono">Mapping Detail — field-level arrows between source and target schemas</span>
-          </div>
-          <img
-            src="img/vscode-mapping-view-extension.webp"
-            alt="Satsuma VS Code extension mapping detail view showing source and target schema cards with field-level arrow connections"
-            class="w-full h-auto block"
-            width="1400"
-            height="603"
-            loading="lazy"
-          >
-        </div>
-      </div>
-
     </div>
   </section>
 
