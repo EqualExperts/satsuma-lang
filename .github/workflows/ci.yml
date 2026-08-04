@@ -298,6 +298,55 @@ jobs:
           name: test-results-parser
           path: test-results/parser.xml
 
+  test-stats:
+    name: Test stats freshness
+    needs: install
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: "22"
+
+      - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        with:
+          path: |
+            node_modules
+            tooling/satsuma-cli/node_modules
+            tooling/satsuma-cli/src/generated
+            tooling/satsuma-cli/dist
+            tooling/satsuma-core/node_modules
+            tooling/satsuma-scenario-gen/node_modules
+            tooling/satsuma-core/dist
+            tooling/satsuma-viz-backend/node_modules
+            tooling/satsuma-viz-backend/dist
+            tooling/satsuma-viz-model/node_modules
+            tooling/satsuma-viz-model/dist
+            tooling/satsuma-viz/node_modules
+            tooling/satsuma-viz/dist
+            tooling/tree-sitter-satsuma/node_modules
+            tooling/tree-sitter-satsuma/build
+            tooling/tree-sitter-satsuma/tree-sitter-satsuma.wasm
+            tooling/vscode-satsuma/node_modules
+            tooling/satsuma-lsp/node_modules
+          key: workspace-${{ github.sha }}
+
+      # Default mode (no --from-logs): this job spawns each tracked package's
+      # own test command itself, rather than reading logs the pre-commit hook
+      # captured locally — CI has no local-hook cost constraint to optimize
+      # for, so it can just recompute the numbers from a clean checkout.
+      - name: Regenerate test-stats.json
+        run: node scripts/generate-test-stats.mjs
+
+      - name: Check test-stats.json is up to date
+        run: |
+          if ! git diff --exit-code test-stats.json; then
+            echo "::error::test-stats.json is out of date. Run 'node scripts/generate-test-stats.mjs' and commit the result."
+            echo "If this keeps happening, check 'git config core.hooksPath' prints '.githooks'."
+            exit 1
+          fi
+
   vscode-extension:
     name: VS Code extension
     needs: install
