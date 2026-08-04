@@ -1,6 +1,6 @@
 ---
 id: lgc-wtz1
-status: open
+status: closed
 deps: []
 links: [sl-hi0z]
 created: 2026-08-03T22:03:32Z
@@ -51,3 +51,26 @@ Whichever spelling the fix chooses must therefore be applied across commands, no
 just within `graph --json`. Feature 41's R3 properties normalise mapping keys with
 a documented shim that references this ticket; the R5 parity sweep (sl-kwet) will
 need the same shim until this is fixed.
+
+**2026-08-04T16:54:12Z**
+
+**2026-08-04T17:54:12Z**
+
+Cause: buildSchemaEdges used index-key form; aggregateFieldEdgesToSchemaLevel
+and field-lineage --json used canonical form; node IDs also used index-key form.
+Result: JSON consumers couldn't reliably join edges to nodes for file-scope
+entities, and graph --json didn't match field-lineage --json mapping spelling.
+
+Fix: canonicalKey() applied throughout buildWorkspaceGraph:
+- All node IDs converted to canonical form (nodes array)
+- buildSchemaEdges endpoints converted to canonical form (schema_edges array)
+- aggregateFieldEdgesToSchemaLevel mapping and endpoint IDs converted
+- Field edge mappings converted to canonical form (edges array)
+- Also applies to node sources/targets and schema sources
+
+Tests updated to expect canonical form everywhere. Documentation updated in
+SATSUMA-CLI.md to document the canonical form contract.
+
+Feature 41 R3 endpoint-has-a-node property can now drop its normalisation shim.
+
+(commit 08fba821)
