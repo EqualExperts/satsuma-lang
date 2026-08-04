@@ -5,10 +5,16 @@
  * summary view and the compact adjacency list. JSON output is handled
  * directly by the command via JSON.stringify — it does not need a formatter.
  *
+ * `WorkspaceGraph` node ids and schema-edge endpoints are in canonical form
+ * (`::name` / `ns::name`), which is the contract `--json` consumers need. That
+ * `::` prefix is machine spelling, not prose — see `displayKey`'s doc comment
+ * — so both formatters here strip it back off before printing.
+ *
  * Does NOT own graph construction (graph-builder.ts) or CLI registration
  * (graph.ts).
  */
 
+import { displayKey } from "../index-builder.js";
 import type { WorkspaceGraph } from "./graph-builder.js";
 
 // ── Formatters ───────────────────────────────────────────────────────────────
@@ -58,9 +64,11 @@ export function printDefault(graph: WorkspaceGraph): void {
     console.log("Schema topology:");
     const adj = new Map<string, string[]>();
     for (const e of graph.schema_edges) {
-      if (!adj.has(e.from)) adj.set(e.from, []);
+      const from = displayKey(e.from);
+      const to = displayKey(e.to);
+      if (!adj.has(from)) adj.set(from, []);
       // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- Safe: key initialized on previous line
-      adj.get(e.from)!.push(`${e.to} [${e.role}]`);
+      adj.get(from)!.push(`${to} [${e.role}]`);
     }
     for (const [src, targets] of adj) {
       console.log(`  ${src} -> ${targets.join(", ")}`);
@@ -76,6 +84,6 @@ export function printDefault(graph: WorkspaceGraph): void {
  */
 export function printCompact(graph: WorkspaceGraph): void {
   for (const e of graph.schema_edges) {
-    console.log(`${e.from} -> ${e.to}  [${e.role}]`);
+    console.log(`${displayKey(e.from)} -> ${displayKey(e.to)}  [${e.role}]`);
   }
 }
