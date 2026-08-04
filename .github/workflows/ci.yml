@@ -31,6 +31,17 @@ jobs:
         working-directory: tooling/satsuma-viz-backend
         run: npm run build
 
+      # tree-sitter build --wasm downloads a ~119MB wasi-sdk toolchain into
+      # ~/.cache/tree-sitter on every invocation unless it's already present.
+      # Keyed on the lockfile that pins tree-sitter-cli (which hardcodes the
+      # wasi-sdk version it fetches), so a version bump there — and only
+      # that — invalidates the cache (sl-wz2h).
+      - name: Cache wasi-sdk toolchain
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        with:
+          path: ~/.cache/tree-sitter
+          key: wasi-sdk-${{ runner.os }}-${{ hashFiles('tooling/tree-sitter-satsuma/package-lock.json') }}
+
       - name: Build tree-sitter WASM (needed by CLI and VS Code)
         working-directory: tooling/tree-sitter-satsuma
         run: node_modules/.bin/tree-sitter build --wasm . -o tree-sitter-satsuma.wasm
@@ -336,6 +347,14 @@ jobs:
       - name: Build satsuma-cli (needed by LSP formatting provider)
         working-directory: tooling/satsuma-cli
         run: npm run build
+
+      # See the matching step in the `install` job — same rationale for
+      # caching the wasi-sdk toolchain instead of re-downloading it here.
+      - name: Cache wasi-sdk toolchain
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        with:
+          path: ~/.cache/tree-sitter
+          key: wasi-sdk-${{ runner.os }}-${{ hashFiles('tooling/tree-sitter-satsuma/package-lock.json') }}
 
       - name: Build tree-sitter WASM for LSP tests
         working-directory: tooling/tree-sitter-satsuma
