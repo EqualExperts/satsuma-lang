@@ -2766,6 +2766,3 @@ declare global {
     navigate: SzNavigateEvent;
   }
 }
-
-// Scoped-change probe for mbt-45v2. Reverted in the next commit — see that
-// commit message and the ticket note for the CI evidence it produced.
