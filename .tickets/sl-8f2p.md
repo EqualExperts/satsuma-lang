@@ -1,6 +1,6 @@
 ---
 id: sl-8f2p
-status: open
+status: closed
 deps: []
 links: []
 created: 2026-08-03T16:23:18Z
@@ -70,3 +70,41 @@ instead of guessing, and the guess now lives at one named CLI site
 
 Remaining: sl-jsyn (R4) and sl-kwet (R5) still blocked on Feature 40's sl-prlp
 (commit immediately after 2b124725).
+
+**2026-08-04T15:18:41Z**
+
+Cause: Two children remained open at last update — sl-jsyn (R4) and sl-kwet
+(R5) — both blocked on Feature 40's sl-prlp. sl-prlp closed since (PR #471,
+merged), and its own re-planning found spr-w98t (the depth-truncation defect
+R4 was sequenced behind) was never a real bug: field-lineage's traversal has
+always been FIFO BFS, which is depth-exact by construction, so no fix was
+needed before R4 could proceed.
+
+Fix: sl-jsyn delivered as generated-scenario properties aimed directly at
+core's traceFieldLineage (upstream/downstream depth-exactness, sg-pufq's
+diamond-branch completeness with a single-predecessor mutant demonstration,
+duality, cyclic termination, and the tie to graph --schema-only). sl-kwet
+delivered as a new tooling/integration-tests/ package (ADR-050) sweeping the
+CLI's field edges against the VizModel both the webview and LSP consume, over
+the full example corpus plus generated workspaces — zero disagreements found.
+
+All six children (sl-puky, sl-dqyu, sl-hi0z, sl-jyee, sl-jsyn, sl-kwet) are
+closed. No lineage or graph semantics changed — every deliverable was a test,
+a test-only generator/package, or a type, as the PRD promised. r0-7w76 remains
+deliberately undecided: sl-kwet's sweep uses the same arrowEndpoint policy on
+both sides specifically so it can't accidentally relitigate that question.
+ADR-049 (dropped, folded into docs) and ADR-050 (this epic's new package +
+narrow CLI test export) are the two architectural decisions this feature
+produced. PRD moved to archive/features/41-lineage-graph-confidence/, status
+updated to IMPLEMENTED, and item 7's deferred ArrowEntry.kind decision recorded
+as unrevisited (R5's trigger condition — a genuine kind disagreement — did not
+fire). (commit immediately after a8b10029)
+
+**2026-08-04T15:18:59Z**
+
+Correction to the note above: "ADR-049 (dropped, folded into docs)" refers to
+an earlier Feature 41 ADR draft that was assessed and rejected before ever
+being written to disk (recorded in this epic's 2026-08-04T00:00:00Z note). It
+is unrelated to the current adrs/adr-049-npm-workspaces-and-turborepo.md,
+which was assigned that number afterward for Feature 42 — a numbering
+coincidence, not the same decision.

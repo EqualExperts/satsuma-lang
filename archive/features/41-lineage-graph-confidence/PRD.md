@@ -1,5 +1,10 @@
 # Feature 41 — Generated-Input Confidence for Lineage and Graph
 
+> **Status: IMPLEMENTED** (2026-08-04) — all R1–R6 delivery work completed
+> under epic `sl-8f2p`; all six child tickets are closed with their relevant
+> automated checks recorded. Archived 2026-08-04. `r0-7w76` remains
+> deliberately undecided, as this feature always intended.
+>
 > **Status: PROPOSED** (raised 2026-08-03) — raised while assessing whether
 > Feature 39's generated-input machinery, which is deliberately scoped to
 > coverage, transfers to the rest of the toolchain.
@@ -419,6 +424,11 @@ container header onto a schema root should mean; that remains `r0-7w76`.
    The cheaper intermediate step, if the derivation risk needs cutting sooner, is
    to export a named predicate from core for the "does this header count as an
    arrow" decision and have the viz's walk call it — the shape of `sl-3yuz`.
+
+   **Outcome, 2026-08-04.** R5 ran (`field-edge-parity.test.ts`, over the full
+   example corpus and generated workspaces) and found zero disagreements once
+   the documented `each`/`flatten` header and `nl-derived` asymmetries were
+   excluded. The trigger did not fire: this deferral stands, unrevisited.
 
    Separately, `sl-k7i4` (a sourceless derived arrow renders an indistinguishable
    empty Source cell) is a real user-visible bug that does **not** depend on this
