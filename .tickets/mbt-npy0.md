@@ -97,3 +97,59 @@ Four things worth knowing for R5/R6:
 4. **Turborepo needs `packageManager` in the root manifest, and its cache is shared across git worktrees.** `devEngines.packageManager` was tried first and rejected: turbo refuses any range spanning more than one npm major, which a range covering both a contributor's npm and CI's Node image must. Separately, from a linked worktree turbo uses the *primary* worktree's .turbo ("using shared worktree cache"), so `clean:all`'s `.turbo` entry is a no-op there — `turbo run build --force` is how to prove a cold build. Both are documented in the root manifest's `//scripts` note.
 
 ci.yml scope note: R4 changed only what it had to. `npm run test:release` -> `test:scripts`, `npm run lint` -> `npx turbo run lint`, the CLI job's deleted `pretest` -> `test:typecheck`, the tooling-modules typecheck step's hardcoded shard list -> `--if-present` (R4 gave satsuma-viz a test:typecheck of its own, which the list would have skipped), and the vscode job's four hand-ordered build steps -> one `turbo run build compile --filter`. An earlier draft added `turbo run build` to four more jobs for robustness and was reverted: each would have rebuilt the grammar and re-downloaded the 119MB wasi-sdk, and those jobs already, correctly, trust the install job's SHA-keyed workspace blob. Persisting .turbo via actions/cache and the --filter wiring are R5's.
+
+**2026-08-04T18:30:16Z**
+
+Post-merge-review addendum. An adversarial review of the R4 diff (5 independent
+lenses, each finding verified by a refutation pass; 17 findings, 7 confirmed, 10
+refuted) found four defects beyond the one CI caught. All are fixed in the commit
+immediately after b2cbae00.
+
+1. **A false cache hit — the worst class, and I reasoned my way into it.**
+   @satsuma/viz and @satsuma/viz-backend read satsuma-cli/test/fixtures/ in their
+   coverage-parity suites. I had correctly concluded that reading a sibling's
+   *committed* files implies no build ordering, and wrongly carried that
+   conclusion over to *hashing*: turbo hashes a package's own directory plus its
+   dependency tasks' hashes, and neither package declares satsuma-cli (viz has no
+   need to; viz-backend cannot, since satsuma-cli depends on it). Verified by
+   experiment: appending a line to tooling/satsuma-cli/test/fixtures/ambiguous-scope.stm
+   left `turbo run test --filter=@satsuma/viz` reporting 6/6 cached — a broken
+   parity fixture would have been green. Fixed by adding the fixtures to
+   globalDependencies; the same edit now makes that run 0/6 cached.
+
+   The guard test gained a third invariant for this: a reach into a sibling's
+   committed tree must be covered either by a declared dependency or by a
+   globalDependencies entry. Mutation-tested — removing the fixtures line fails
+   exactly the two exposed packages and not @satsuma/lsp, which reads the same
+   directory but does declare satsuma-cli. Reading globalDependencies needed a
+   small JSONC comment-stripper, since turbo.json carries `//` comments and a
+   naive strip would truncate the `$schema` URL.
+
+2. **The hook's `check:cst-symbols` gate could no longer fail.** The new
+   "workspace build" step runs the grammar's `generate`, which rewrites the very
+   file the check then compares against freshly generated output. Demonstrated:
+   with a deliberately stale cst-types.ts, the check fails before the build and
+   passes after it. Fixed by moving the step ahead of the build. Note it only
+   neuters when the grammar's build is a cache *miss* — i.e. exactly when
+   grammar.js changed and the contract is most likely to be stale.
+
+3. **integration-tests lost its typecheck in CI.** Its `pretest` was
+   `tsc --noEmit`, deleted with all the others, and this package has no shard in
+   the tooling-modules matrix, so no CI job named test:typecheck for it. The local
+   hook covered it via test:all; CI did not. Added an explicit step.
+
+4. **generate-test-stats.mjs measured build output nothing rebuilt.** In spawn
+   mode it execs the built CLI to count commands, and its own comment claimed
+   npm's pretest hook kept dist/ fresh — true until R4 deleted those hooks. A
+   developer running the script directly, as CI's failure message instructs, could
+   commit a stale cliCommands count. Its spawn mode now runs build:all first;
+   verified by deleting the CLI's dist entirely and getting the correct count back.
+
+Refuted and deliberately not acted on: seven "the guard could detect more forms"
+items with no live instance (raised as mbt-14vo), and the observation that
+downstream CI jobs trust the install job's SHA-keyed blob now that R4 removed
+their per-job builds — recorded on mbt-45v2, since persisting .turbo is what makes
+the honest fix cheap. One refuted finding named a real detection gap worth closing
+anyway: side-effect-only `import "@satsuma/viz";` was invisible to the specifier
+regex. Closed and mutation-tested against vscode-satsuma's webview, which uses
+exactly that form.

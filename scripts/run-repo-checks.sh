@@ -81,6 +81,14 @@ run_step "root script tests" npm run test:scripts
 # an invalid tree a failed check rather than a silent mis-resolution.
 run_step "workspace dependency tree is valid" npm run check:deps
 
+# Ahead of the build, and it has to stay ahead of it. This check regenerates
+# satsuma-core's src/generated/cst-types.ts to a temporary path and compares it
+# against the tracked copy — but `turbo run build` below runs the grammar's
+# `generate`, which rewrites that tracked copy in place. Run after the build, the
+# check compares a freshly written file against itself and can never fail.
+run_step "generated CST contract is current" \
+  npm --prefix tooling/tree-sitter-satsuma run check:cst-symbols
+
 # One ordered build of the whole workspace, and the reason every step below can
 # assume built output without rebuilding it. Before R4 each package's `prebuild`
 # and `pretest` hooks rebuilt their siblings by hand, so this script inherited
@@ -133,8 +141,6 @@ run_step "satsuma fmt --check examples" bash -c '
 # the workspace sweep above.
 run_step "vscode-satsuma validate" npm --prefix tooling/vscode-satsuma run validate
 
-run_step "generated CST contract is current" \
-  npm --prefix tooling/tree-sitter-satsuma run check:cst-symbols
 run_step "CST contract generator tests" \
   npm --prefix tooling/tree-sitter-satsuma run test:generator
 run_step "tree-sitter generate" npm --prefix tooling/tree-sitter-satsuma run generate

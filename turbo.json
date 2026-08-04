@@ -36,6 +36,16 @@
     "AI-AGENT-REFERENCE.md",
     // Asserted against by the CLI's command-reference tests.
     "SATSUMA-CLI.md",
+    // A shared corpus despite living inside one package: @satsuma/viz's and
+    // @satsuma/viz-backend's coverage-parity suites read these .stm files to
+    // assert they agree with the CLI on the same input. Neither package declares
+    // satsuma-cli — viz has no need to for ordering, and viz-backend cannot,
+    // since satsuma-cli depends on *it* — so neither inherits satsuma-cli's task
+    // hash, and without this line a broken parity fixture is a cache hit and a
+    // green run. @satsuma/lsp reads the same directory but does declare
+    // satsuma-cli, so it was already covered. The third invariant in
+    // scripts/workspace-build-graph.test.mjs is what keeps this list honest.
+    "tooling/satsuma-cli/test/fixtures/**",
     // Copied into the viz harness's client bundle by its `build:logo` step.
     "site/img/satsuma-logo.png"
   ],

@@ -47,3 +47,30 @@ exactly the gap R4's content-hash cache and this ticket's `--filter` wiring are
 meant to close, so the number to move here is the 4m 37s, not the 58s.
 
 Compare like-for-like main runs when measuring, not a PR run against a main run.
+
+**2026-08-04T18:25:37Z**
+
+From R4's adversarial review (PR #482) — one finding lands squarely in this
+ticket's scope rather than R4's.
+
+**Downstream jobs trust the install job's blob, and R4 removed the per-job builds
+that used to hedge against it.** ci.yml restores `workspace-${{ github.sha }}` with
+`restore-keys: workspace-`. The exact-SHA key hits whenever the install job saved
+successfully, and that blob is a complete ordered build, so this is correct by
+design. But if the save fails or is evicted, the fallback silently supplies
+*another commit's* dist/, and jobs like `satsuma-cli` (which R4 reduced to
+`npm run test:typecheck`) would then check a different commit's output and pass.
+
+R4 deliberately left this alone: adding `turbo run build` to those jobs would have
+made four of them rebuild the grammar and re-download the 119MB wasi-sdk, which is
+the opposite of this feature's goal. Persisting `.turbo` via actions/cache — this
+ticket's own acceptance criterion — is what makes the honest fix cheap: with the
+content-hash cache available, each job can run `turbo run <task> --filter=...` and
+either hit the cache or rebuild exactly what is stale, instead of trusting a blob
+it cannot verify. Consider dropping the `restore-keys: workspace-` fallback at the
+same time, so a miss is loud rather than silently stale.
+
+Also carried forward for measurement: R4 changed no job structure, so the expected
+before/after here is still against the 4m37s full-pipeline figure recorded above.
+R4's own run (30937118776, 28 checks green after the build:all fix) is the new
+"before" for this ticket.

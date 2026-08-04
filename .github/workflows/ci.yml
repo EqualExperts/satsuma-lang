@@ -221,6 +221,14 @@ jobs:
           restore-keys: |
             workspace-
 
+      # This package's `pretest` was `tsc --noEmit`, and R4 deleted it along with
+      # every other pretest hook. Its test:typecheck script survives but no CI job
+      # named it — this package has no shard in the tooling-modules matrix — so
+      # the typecheck would have silently stopped gating. The local hook covers it
+      # via `turbo run test test:typecheck`; this is CI's half.
+      - name: Typecheck the parity sweeps
+        run: npm run test:typecheck
+
       - name: Run cross-consumer parity sweeps
         run: npm test
 
