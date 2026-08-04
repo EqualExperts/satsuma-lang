@@ -18,8 +18,8 @@ Current per-package test counts and the CLI command count are tracked in [`test-
 - `docs/product-owner/ROADMAP.md`: deferred work items, ideas, and convention docs still to write
 - `examples/`: canonical `.stm` examples and fixtures (v2 syntax)
 - `archive/v1/`: archived v1 specification and examples — for historical reference only, not for new work
-- `archive/features/`: completed feature specs (30 feature directories) — for historical reference only
-- `features/`: active feature plans (features 30–37; 35–37 are proposed and not yet started)
+- `archive/features/`: delivered feature specs — for historical reference only. A spec moves here once its feature ships
+- `features/`: active feature plans. See [ROADMAP.md](docs/product-owner/ROADMAP.md) for which are active and which have shipped — that page is the cross-feature view, and a spec's own `Status:` line is authoritative for its own feature
 - `useful-prompts/`: self-contained system prompts for web LLMs (Excel-to-Satsuma, Satsuma-to-Excel)
 - `skills/`: Agent Skills following the [agentskills.io](https://agentskills.io) standard (Excel-to-Satsuma conversion skill, Satsuma-to-Excel export skill)
 - `scripts/`: utility scripts used during development
