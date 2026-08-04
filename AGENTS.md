@@ -33,6 +33,7 @@ Current per-package test counts and the CLI command count are tracked in [`test-
 - `tooling/satsuma-viz/`: the `satsuma-viz` Lit web component — overview graph and per-mapping detail view, embedded in the VS Code webview and the site playground
 - `tooling/satsuma-viz-harness/`: Playwright harness for the viz component (99 tests) — human-in-the-loop, see [Viz harness Playwright tests](#viz-harness-playwright-tests-human-in-the-loop-workflow)
 - `tooling/vscode-satsuma/`: VS Code extension (LSP client, commands, webview panels) and TextMate grammar; delegates language intelligence to `satsuma-lsp`
+- `tooling/integration-tests/`: **test-only** cross-consumer parity sweeps (CLI vs. the VizModel both the webview and the LSP consume) — the one place both sides are reachable without either package taking on a dependency its own architecture forbids
 
 ## Platform Lineage Entry Point
 

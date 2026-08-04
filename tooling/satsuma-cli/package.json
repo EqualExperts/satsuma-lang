@@ -8,6 +8,12 @@
   "bin": {
     "satsuma": "./dist/index.js"
   },
+  "exports": {
+    "./testing": {
+      "types": "./dist/testing.d.ts",
+      "default": "./dist/testing.js"
+    }
+  },
   "imports": {
     "#src/*": "./dist/*"
   },

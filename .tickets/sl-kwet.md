@@ -1,6 +1,6 @@
 ---
 id: sl-kwet
-status: open
+status: closed
 deps: [sl-hi0z, sl-prlp]
 links: []
 created: 2026-08-03T16:24:15Z
@@ -44,3 +44,41 @@ the arrow's declaration kind.
 disagreement between the consumers, say so explicitly in the ticket notes rather
 than only fixing the symptom — that finding is the trigger to revisit the protocol
 decision, and it identifies which side was wrong.
+
+**2026-08-04T14:56:37Z**
+
+Cause: field-coverage.ts's arrow walk states in its own doc-comment that it
+"mirrors core's extractArrowRecords", and nothing tested that claim for edges
+(coverage's own version of this drift was already fixed by ADR-042). "The edges
+the viz layout would draw" was rescoped mid-implementation after review: viz's
+ELK layout engine is rendering-layer code bundled with Lit, with no unbundled
+build output, so reaching it from anywhere would mean adding a real Lit/elkjs
+dependency to a test that doesn't need either. Comparing against the VizModel
+the LSP and webview both actually consume (via satsuma-viz-backend, already
+portable) tests the same P4 claim without that cost. The ELK/port-resolution
+layer itself is already covered against generated workspaces by satsuma-viz's
+own generated-edge-completeness.test.js (sl-hi0z); extending that to the real
+corpus is a separate follow-up, not this ticket's job.
+
+Fix: Created tooling/integration-tests/ (a dedicated home for cross-consumer
+parity sweeps, since neither CLI nor viz-backend can host a test needing both
+without inverting one package's real architecture) and relocated
+coverage-viz-parity.test.ts there from satsuma-cli/test/. Added a narrow
+satsuma-cli/testing export surface (loadWorkspace, createFieldEdgeSource,
+distinctArrowRecords, arrowEndpoint, coverageForWorkspace, resolveAllNLRefs) so
+cross-package tests can build the CLI's real answer in-process rather than
+re-deriving or subprocess-shelling it. field-edge-parity.test.ts feeds both the
+CLI's index and a VizModel through the *same* core buildFieldEdges via a new
+viz-field-edges.ts adapter (a deliberate, small re-port of
+field-coverage.ts's forEachMappingArrow container-scope algorithm, using only
+the portable qualifyChildArrowPath primitive), using the same arrowEndpoint
+resolution policy on both sides — so any disagreement is an extraction bug,
+never a re-litigated r0-7w76 guess. Excludes two documented, permitted
+asymmetries (nl-derived edges; each/flatten container headers, which the viz
+walk structurally never turns into an edge) rather than weakening the
+assertion. Verified the sweep isn't vacuous by temporarily dropping a
+qualifyChildArrowPath call and confirming it failed immediately, then reverted.
+Swept the full example corpus plus generated workspaces; zero disagreements
+found — no bug ticket needed. Wired into install:all/ci:all,
+run-repo-checks.sh, generate-test-stats.mjs, AGENTS.md and CI.
+(commit immediately after 0edcaed2)

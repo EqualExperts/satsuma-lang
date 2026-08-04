@@ -1,0 +1,22 @@
+{
+  "compilerOptions": {
+    "module": "node16",
+    "moduleResolution": "node16",
+    "target": "es2022",
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noEmit": true,
+    "esModuleInterop": true,
+    "types": ["node"],
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    // `@satsuma/scenario-gen` is a test-only package of plain ESM `.js` carrying
+    // JSDoc types, with deliberately no build step (sl-puky) and so no `.d.ts`.
+    // These two options are what let this typecheck read those types: `allowJs`
+    // to consider `.js` at all, and `maxNodeModuleJsDepth: 1` because TypeScript
+    // otherwise ignores JavaScript reached through `node_modules`.
+    "allowJs": true,
+    "maxNodeModuleJsDepth": 1
+  },
+  "include": ["test/**/*"]
+}
