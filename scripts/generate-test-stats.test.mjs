@@ -14,6 +14,8 @@ import {
   parseCliCommandCount,
   parseCorpusTestCount,
   parseNodeTestCount,
+  resolveCorpusTestCountFromLog,
+  resolvePackageCountFromLog,
 } from "./generate-test-stats.mjs";
 
 test("reads the node --test summary line printed by the default spec reporter", () => {
@@ -71,6 +73,46 @@ test("throws when --help output has no Commands section", () => {
     () => parseCliCommandCount("Usage: satsuma\n\nOptions:\n  -h, --help\n"),
     /Commands:/,
   );
+});
+
+test("falls back to the previous count when run-repo-checks.sh's corpus step was skipped (no wasm feature)", () => {
+  // run-repo-checks.sh treats a wasm-feature-less tree-sitter-cli as a
+  // deliberate skip, not a failure — a skip must not be read as "0 tests".
+  const skippedOutput = "[tree-sitter corpus] SKIP — tree-sitter-cli built without wasm feature\n";
+  const previousStats = { cliCommands: 23, parserCorpusTests: 318, packages: {} };
+  assert.equal(resolveCorpusTestCountFromLog(skippedOutput, previousStats), 318);
+});
+
+test("prefers a fresh count over the previous one when the corpus step actually ran", () => {
+  const output = "Total parses: 320; successful parses: 320; failed parses: 0;\n";
+  const previousStats = { cliCommands: 23, parserCorpusTests: 318, packages: {} };
+  assert.equal(resolveCorpusTestCountFromLog(output, previousStats), 320);
+});
+
+test("throws on a skipped corpus step with no previous test-stats.json to fall back to", () => {
+  // Otherwise a skip on the very first run would silently write parserCorpusTests: undefined.
+  assert.throws(
+    () => resolveCorpusTestCountFromLog("SKIP\n", null),
+    /no previous test-stats\.json/,
+  );
+});
+
+test("falls back to a package's previous count when run-repo-checks.sh doesn't exercise it locally", () => {
+  // The local hook is a fast gate, not the full CI matrix — some tracked
+  // packages (e.g. satsuma-viz-backend) have no captured log at all.
+  assert.equal(resolvePackageCountFromLog(null, 182, "satsuma-viz-backend"), 182);
+});
+
+test("throws when a package has neither a captured log nor a previous count", () => {
+  assert.throws(
+    () => resolvePackageCountFromLog(null, undefined, "satsuma-viz-backend"),
+    /No captured log for satsuma-viz-backend/,
+  );
+});
+
+test("parses a package's real captured log instead of falling back, when one exists", () => {
+  const output = "ℹ tests 1049\n";
+  assert.equal(resolvePackageCountFromLog(output, 1031, "satsuma-cli"), 1049);
 });
 
 test("assembles test-stats.json with no volatile fields, so an unchanged rerun is byte-identical", () => {

@@ -33,6 +33,14 @@ run_parallel() {
 
 cd "$ROOT_DIR"
 
+# Every package's test output below is teed into this directory as it runs,
+# so the "generate test-stats.json" step at the end can read the real counts
+# straight out of a check that already ran — no second test run just to
+# source a number for test-stats.json. Removed on exit so a failed hook run
+# never leaves a stale log around to be misread by a later invocation.
+STATS_LOG_DIR="$(mktemp -d)"
+trap 'rm -rf "$STATS_LOG_DIR"' EXIT
+
 # Verify Python lint tools are available before running any checks.
 # Install with: pip install yamllint ruff
 for tool in yamllint ruff; do
@@ -55,9 +63,9 @@ run_step "scenario generator tests" npm --prefix tooling/satsuma-scenario-gen te
 # the ones defending against a mapping that silently renders no lines at all —
 # would only have failed after a push.
 run_parallel "satsuma-core + satsuma-viz-model + satsuma-viz tests" \
-  "npm --prefix tooling/satsuma-core test" \
-  "npm --prefix tooling/satsuma-viz-model test" \
-  "npm --prefix tooling/satsuma-viz test"
+  "npm --prefix tooling/satsuma-core test 2>&1 | tee '$STATS_LOG_DIR/satsuma-core.log'" \
+  "npm --prefix tooling/satsuma-viz-model test 2>&1 | tee '$STATS_LOG_DIR/satsuma-viz-model.log'" \
+  "npm --prefix tooling/satsuma-viz test 2>&1 | tee '$STATS_LOG_DIR/satsuma-viz.log'"
 
 # `npm --prefix tooling/satsuma-cli test` below already runs test:typecheck via
 # npm's implicit pretest hook, but make it an explicit, separately labelled
@@ -66,7 +74,8 @@ run_parallel "satsuma-core + satsuma-viz-model + satsuma-viz tests" \
 # resolves several test files' imports against `dist/` (the built output),
 # which only `pretest`'s build steps guarantee are present and current.
 run_step "satsuma-cli test:typecheck" npm --prefix tooling/satsuma-cli run pretest
-run_step "satsuma-cli tests" npm --prefix tooling/satsuma-cli test
+run_step "satsuma-cli tests" bash -c \
+  "npm --prefix tooling/satsuma-cli test 2>&1 | tee '$STATS_LOG_DIR/satsuma-cli.log'"
 
 # ADR-022: CLI accepts files, not directories. Check each example entry file.
 run_step "satsuma fmt --check examples" bash -c '
@@ -93,8 +102,8 @@ run_step "satsuma fmt --check examples" bash -c '
 
 run_step "vscode-satsuma validate" npm --prefix tooling/vscode-satsuma run validate
 run_parallel "vscode-satsuma tests + LSP" \
-  "npm --prefix tooling/vscode-satsuma test" \
-  "npm --prefix tooling/satsuma-lsp test"
+  "npm --prefix tooling/vscode-satsuma test 2>&1 | tee '$STATS_LOG_DIR/vscode-satsuma.log'" \
+  "npm --prefix tooling/satsuma-lsp test 2>&1 | tee '$STATS_LOG_DIR/satsuma-lsp.log'"
 
 run_step "generated CST contract is current" \
   npm --prefix tooling/tree-sitter-satsuma run check:cst-symbols
@@ -105,6 +114,10 @@ run_step "tree-sitter generate" npm --prefix tooling/tree-sitter-satsuma run gen
 # Gracefully skip if unavailable; JS integration tests cover the corpus via the
 # WASM parser already built by the previous generate step.
 _wasm_test_output="$(cd "$ROOT_DIR/tooling/tree-sitter-satsuma" && tree-sitter test --wasm 2>&1)" || _wasm_test_exit=$?
+# Captured as-is, skip message or real "Total parses: N" summary alike — the
+# stats generator below knows how to fall back on a skip (see
+# resolveCorpusTestCountFromLog in generate-test-stats.mjs).
+printf '%s\n' "$_wasm_test_output" >"$STATS_LOG_DIR/tree-sitter-satsuma.log"
 if echo "$_wasm_test_output" | grep -q "does not include the wasm feature"; then
   printf '[tree-sitter corpus] SKIP — tree-sitter-cli built without wasm feature (JS tests cover corpus)\n'
 elif [ "${_wasm_test_exit:-0}" -ne 0 ]; then
@@ -132,3 +145,10 @@ if command -v satsuma &>/dev/null; then
 else
   printf '\n[smoke tests] SKIP — satsuma not on PATH. Install it first (e.g. npm install -g tooling/satsuma-cli/).\n'
 fi
+
+# Last step, and only reached once every check above has passed: refresh
+# test-stats.json from the logs just captured (no second test run) and stage
+# it so the regenerated file rides along in the commit being made — the same
+# way a formatter's re-staged output would.
+run_step "generate test-stats.json" node scripts/generate-test-stats.mjs --from-logs "$STATS_LOG_DIR"
+git add test-stats.json
