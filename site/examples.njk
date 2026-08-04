@@ -1,9 +1,9 @@
 ---
 layout: default.njk
 title: "Examples — Satsuma"
-description: "Explore 16 canonical Satsuma examples covering database migration, legacy modernization, enterprise integration, platform modelling, and governance."
+description: "Explore 21 canonical Satsuma examples covering database migration, legacy modernisation, enterprise integration, platform modelling, conventions, and governance."
 og_title: "Examples — Satsuma"
-og_description: "Explore 16 canonical Satsuma examples covering database migration, legacy modernization, enterprise integration, platform modelling, and governance."
+og_description: "Explore 21 canonical Satsuma examples covering database migration, legacy modernisation, enterprise integration, platform modelling, conventions, and governance."
 nav_id: examples
 permalink: examples.html
 ---
@@ -16,12 +16,12 @@ permalink: examples.html
           <span class="text-transparent bg-clip-text bg-gradient-to-r from-orange to-orange-dark">Gallery</span>
         </h1>
         <p class="text-lg text-warm-gray leading-relaxed max-w-2xl mx-auto mb-8">
-          20 canonical examples covering real-world data mapping scenarios. From legacy mainframe migrations to modern platform architectures, each example is a complete, parser-validated <code class="font-mono text-sm bg-white/60 px-1.5 py-0.5 rounded">.stm</code> file you can use as a starting point.
+          21 canonical examples covering real-world data mapping scenarios. From legacy mainframe migrations to modern platform architectures, each example is a complete, parser-validated <code class="font-mono text-sm bg-white/60 px-1.5 py-0.5 rounded">.stm</code> file you can use as a starting point.
         </p>
         <div class="flex items-center justify-center gap-6 text-sm text-warm-gray">
           <span class="flex items-center gap-2">
             <svg class="w-4 h-4 text-orange" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-            20 examples
+            21 examples
           </span>
           <span class="flex items-center gap-2">
             <svg class="w-4 h-4 text-green" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A2 2 0 013 12V7a4 4 0 014-4z"/></svg>
@@ -902,6 +902,60 @@ permalink: examples.html
   avg_order_value        <span class="type">DECIMAL(10,2)</span>
   days_since_last_order  <span class="type">INTEGER</span>
   churn_probability      <span class="type">DECIMAL(5,4)</span>
+}</code></pre>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- kimball-star-schema.stm -->
+        <div class="example-item reveal" data-category="convention">
+          <div class="border border-charcoal/10 rounded-xl overflow-hidden hover:border-orange-light/50 transition-colors bg-cream/50">
+            <div class="p-6">
+              <div class="flex items-start justify-between mb-3">
+                <h3 class="text-lg font-bold text-charcoal">Kimball Star Schema (SCD Type 2)</h3>
+                <a href="https://github.com/EqualExperts/satsuma-lang/blob/main/docs/data-modelling/kimball/dim-customer.stm" target="_blank" rel="noopener"
+                   class="text-warm-gray hover:text-orange transition-colors flex-shrink-0 ml-3" title="View full file on GitHub">
+                  <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+                </a>
+              </div>
+              <p class="text-sm text-warm-gray mb-4">A conformed customer dimension fed by two source systems, using the free-form <code class="font-mono text-xs bg-white/60 px-1 py-0.5 rounded">dimension</code> / <code class="font-mono text-xs bg-white/60 px-1 py-0.5 rounded">scd 2</code> / <code class="font-mono text-xs bg-white/60 px-1 py-0.5 rounded">track</code> metadata convention that tells an LLM which fields to version on change. Part of a full RetailCo Kimball model &mdash; see the <a href="https://github.com/EqualExperts/satsuma-lang/tree/main/docs/data-modelling/kimball" target="_blank" rel="noopener" class="text-orange hover:underline">Kimball Dimensional Modelling</a> guide for the complete star schema (facts, other dimensions, and the LLM interpretation rules).</p>
+              <div class="flex flex-wrap gap-2 mb-4">
+                <span class="px-2.5 py-0.5 text-xs font-medium rounded-full bg-peach text-orange-dark">Kimball</span>
+                <span class="px-2.5 py-0.5 text-xs font-medium rounded-full bg-peach text-orange-dark">SCD Type 2</span>
+                <span class="px-2.5 py-0.5 text-xs font-medium rounded-full bg-peach text-orange-dark">conformed dimension</span>
+              </div>
+              <button class="example-toggle inline-flex items-center gap-1.5 text-sm font-medium text-orange hover:text-orange-dark transition-colors">
+                View snippet
+                <svg class="w-4 h-4 arrow transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+              </button>
+            </div>
+            <div class="example-content">
+              <div class="code-block rounded-none border-x-0 border-b-0">
+                <pre class="text-sm"><code class="stm"><span class="keyword">schema</span> <span class="field">dim_customer</span> (
+  <span class="annotation">dimension</span>,
+  <span class="annotation">conformed</span>,
+  <span class="annotation">scd</span> 2,
+  <span class="annotation">natural_key</span> customer_id,
+  <span class="annotation">track</span> {email, phone, loyalty_tier, preferred_store_id, first_name, last_name},
+  <span class="annotation">ignore</span> {last_login_channel, lifetime_order_count, lifetime_spend}
+) {
+  customer_id   <span class="type">VARCHAR(50)</span>   (<span class="constraint">required</span>)  <span class="comment">// Durable business key: SFDC ContactId</span>
+  first_name    <span class="type">VARCHAR(100)</span>
+  last_name     <span class="type">VARCHAR(100)</span>
+  email         <span class="type">VARCHAR(255)</span>  (<span class="constraint">pii</span>)
+  loyalty_tier  <span class="type">VARCHAR(20)</span>   (<span class="constraint">enum {bronze, silver, gold, platinum, diamond}</span>)
+  customer_segment <span class="type">VARCHAR(30)</span>
+}
+
+<span class="keyword">mapping</span> <span class="string">`sfdc to dim_customer`</span> {
+  <span class="keyword">source</span> { <span class="field">`loyalty_sfdc`</span> }
+  <span class="keyword">target</span> { <span class="field">`dim_customer`</span> }
+
+  ContactId <span class="operator">-></span> customer_id
+  FirstName <span class="operator">-></span> first_name { <span class="function">trim</span> | <span class="function">title_case</span> }
+  Email <span class="operator">-></span> email { <span class="function">trim</span> | <span class="function">lowercase</span> | <span class="function">validate_email</span> | <span class="function">null_if_invalid</span> }
+  LoyaltyTier <span class="operator">-></span> loyalty_tier { <span class="function">lowercase</span> }
 }</code></pre>
               </div>
             </div>

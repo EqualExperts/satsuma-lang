@@ -538,55 +538,6 @@ permalink: cli.html
     </div>
   </section>
 
-  <!-- Transform Classification -->
-  <section id="classification" class="py-16 lg:py-24">
-    <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-      <div class="max-w-3xl mx-auto reveal">
-        <h2 class="text-3xl font-bold text-charcoal mb-3">Transform classification</h2>
-        <p class="text-warm-gray mb-8">Every arrow the CLI returns carries a classification derived from CST node types. This tells the agent whether it needs to interpret the transform or can trust the syntax.</p>
-
-        <div class="bg-white rounded-2xl border border-charcoal/5 overflow-hidden">
-          <table class="w-full text-sm">
-            <thead>
-              <tr class="border-b border-charcoal/5 bg-peach/50">
-                <th class="text-left px-6 py-3 font-semibold text-charcoal">Classification</th>
-                <th class="text-left px-6 py-3 font-semibold text-charcoal">Meaning</th>
-                <th class="text-left px-6 py-3 font-semibold text-charcoal">Agent action</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr class="border-b border-charcoal/5">
-                <td class="px-6 py-3"><code class="font-mono text-sm text-green-dark bg-green/10 px-2 py-0.5 rounded">structural</code></td>
-                <td class="px-6 py-3 text-warm-gray">Deterministic pipeline</td>
-                <td class="px-6 py-3 text-warm-gray">None &mdash; fully specified</td>
-              </tr>
-              <tr class="border-b border-charcoal/5">
-                <td class="px-6 py-3"><code class="font-mono text-sm text-orange-dark bg-orange/10 px-2 py-0.5 rounded">nl</code></td>
-                <td class="px-6 py-3 text-warm-gray">Natural-language string</td>
-                <td class="px-6 py-3 text-warm-gray">Read and interpret intent</td>
-              </tr>
-              <tr class="border-b border-charcoal/5">
-                <td class="px-6 py-3"><code class="font-mono text-sm text-charcoal bg-charcoal/10 px-2 py-0.5 rounded">mixed</code></td>
-                <td class="px-6 py-3 text-warm-gray">Pipeline steps + NL strings</td>
-                <td class="px-6 py-3 text-warm-gray">Review the NL portion</td>
-              </tr>
-              <tr class="border-b border-charcoal/5">
-                <td class="px-6 py-3"><code class="font-mono text-sm text-warm-gray bg-charcoal/5 px-2 py-0.5 rounded">none</code></td>
-                <td class="px-6 py-3 text-warm-gray">Bare <code class="font-mono text-xs">src -&gt; tgt</code></td>
-                <td class="px-6 py-3 text-warm-gray">None</td>
-              </tr>
-              <tr>
-                <td class="px-6 py-3"><code class="font-mono text-sm text-purple-700 bg-purple-50 px-2 py-0.5 rounded">nl-derived</code></td>
-                <td class="px-6 py-3 text-warm-gray">Implicit from <code class="font-mono text-xs">@ref</code></td>
-                <td class="px-6 py-3 text-warm-gray">Verify referenced field exists</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-  </section>
-
   <!-- Installation -->
   <section id="install" class="py-16 lg:py-24 bg-white">
     <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 reveal">
