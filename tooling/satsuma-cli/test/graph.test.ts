@@ -13,6 +13,11 @@ const CLI = resolve(__dirname, "../dist/index.js");
 const EXAMPLES = resolve(__dirname, "../../../examples");
 const PLATFORM = resolve(__dirname, "fixtures/platform.stm");
 const FIXTURES = resolve(__dirname, "fixtures");
+// A self-contained, import-free, namespace-free fixture: unlike PLATFORM (which
+// pulls in namespaced entities transitively through its imports), every entity
+// here is genuinely global, making it the fixture that would show canonical
+// "::" noise on every single line if the human-output formatters leaked it.
+const NO_NAMESPACE_FIXTURE = resolve(EXAMPLES, "merge-strategies/pipeline.stm");
 
 const run = (...args: string[]) => _run(CLI, ...args);
 
@@ -35,6 +40,17 @@ describe("satsuma graph (text)", () => {
     const { stdout, code } = await run("graph", PLATFORM);
     assert.ok(code === 0 || code === 2, `expected exit 0 or 2, got ${code}`);
     assert.match(stdout, /nl:/);
+  });
+
+  // `--json` needs the canonical "::name" spelling so consumers can join
+  // edges to nodes unambiguously (lgc-wtz1), but that leading "::" is not
+  // valid Satsuma syntax and reads as noise in prose meant for a human.
+  it("does not leak the canonical :: prefix into schema topology for a non-namespaced workspace", async () => {
+    const { stdout, code } = await run("graph", NO_NAMESPACE_FIXTURE);
+    assert.ok(code === 0 || code === 2, `expected exit 0 or 2, got ${code}`);
+    const topologySection = stdout.slice(stdout.indexOf("Schema topology:"));
+    assert.ok(topologySection.length > 0, "should have a schema topology section");
+    assert.doesNotMatch(topologySection, /::/);
   });
 });
 
@@ -352,6 +368,24 @@ describe("satsuma graph --compact", () => {
     assert.match(stdout, /->/);
     assert.match(stdout, /\[source\]/);
     assert.match(stdout, /\[target\]/);
+  });
+
+  // --json needs the canonical "::name" spelling (lgc-wtz1), but --compact is
+  // "minimal tokens for agents" prose, not a machine-parsed join key — the
+  // prefix must not survive into it.
+  it("does not leak the canonical :: prefix for a non-namespaced workspace", async () => {
+    const { stdout, code } = await run("graph", "--compact", NO_NAMESPACE_FIXTURE);
+    assert.ok(code === 0 || code === 2, `expected exit 0 or 2, got ${code}`);
+    assert.doesNotMatch(stdout, /::/);
+  });
+
+  // Namespaced entities' displayed form is identical to their canonical form
+  // (ns::name either way), so --compact must keep showing the namespace
+  // prefix for them even while stripping the bare "::" global marker above.
+  it("keeps the ns:: prefix for namespaced entities", async () => {
+    const { stdout, code } = await run("graph", "--compact", resolve(FIXTURES, "namespaces.stm"));
+    assert.ok(code === 0 || code === 2, `expected exit 0 or 2, got ${code}`);
+    assert.match(stdout, /pos::stores/);
   });
 });
 
