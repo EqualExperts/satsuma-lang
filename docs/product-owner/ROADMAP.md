@@ -8,7 +8,10 @@ Feature specs live in `features/` while active and move to `archive/features/` o
 
 ## Active Feature Specs
 
-The three specs currently in `features/`. Everything numbered 01–35 and Feature 38 has shipped and is archived (see [Shipped Features](#shipped-features)).
+Features 36, 40, and 41 are active. Feature 37 is complete and remains in
+`features/` pending its own archival closeout. Everything numbered 01–35 plus
+Features 38 and 39 has shipped and is archived (see
+[Shipped Features](#shipped-features)).
 
 ### Feature 36 — Viz Coverage Overlay and Field Chain View (not started)
 
@@ -34,26 +37,13 @@ Two warning-severity lint rules — `type-mismatch-direct-arrow` (bare arrows be
 
 **Source:** `features/37-lint-structural-rules/PRD.md`
 
-### Feature 39 — Correctness by Default (proposed, no tickets yet)
-
-Moves the invariants this toolchain documents in prose into the build: node-kind types generated from `node-types.json` so a grammar rename cannot silently change behaviour, branded path and ref types so `sl-joeq`'s name-for-path confusion is unrepresentable, generated-input properties for the ADR-034–041 coverage rules, a naive reference model to differentially test against, and type-aware linting across the four packages that currently have none.
-
-**Why it matters:** the recent defect clusters were *specification* defects — `sl-joeq`, `sl-qead` (which forced ADR-041 to amend ADR-035), ADR-038 constraining ADR-037 — where the code correctly implemented a rule that was wrong or absent, and a green suite said so. Feature 38 decided those rules; this feature makes them machine-checked so they cannot quietly stop holding.
-
-**Ready now:** R1 (generated node-kind types) is small, mechanical, blocks two other requirements, and touches nothing Feature 38 is changing. R5 and the R6 lint rollout follow.
-
-**Newly unblocked by Feature 38:** R2, R3 and R4 can now build on the settled coverage semantics, and the R7 rule-consistency and R8 denotational-spec spikes can begin now that epic `sl-j6g9` is closed.
-
-**Source:** `features/39-correctness-by-default/PRD.md`
-
----
-
 ## Shipped Features
 
 Delivered and moved to `archive/features/`. Recent work, most recent first:
 
 | Feature | Shipped | What landed |
 | --- | --- | --- |
+| 39 — Correctness by default | 2026-08-04 | Generated CST contracts, opaque path/ref stages, generated coverage and formatter properties, an independent coverage oracle, enforced typecheck and type-aware lint gates, and structural `FieldDecl` variants |
 | 38 — Hierarchical field coverage | 2026-08-03 | Path-correct nested coverage, container tri-state, whole-subtree arrow semantics, leaf-only ratios, and parity across the CLI, LSP, VS Code, and viz consumers (ADR-035–041) |
 | 35 — Workspace coverage command | 2026-08-01 | `satsuma coverage` with per-mapping/per-schema/workspace rollups, a stable `--json` contract, and a `--fail-under` CI gate on exit code 3; `computeMappingCoverage` relocated into `@satsuma/core` |
 | 34 — Live editor UX polish | 2026-06-10 | All eight R1–R8 fixes to the public playground chrome and edit-loop behaviour (ADR-029, ADR-030) |
@@ -67,6 +57,25 @@ Two open tickets are follow-ups to archived features rather than outstanding sco
 ---
 
 ## Concrete Deferred Work
+
+### Correctness Research Follow-ons (Feature 39)
+
+Feature 39 deliberately left two research spikes outside its delivery gate:
+
+- **Bounded consistency model:** time-box an Alloy or Z3 model of the settled
+  ADR-034–041 coverage rules and report either a small counterexample or no
+  counterexample within the stated bound.
+- **Compositional semantics proposal:** propose a semantic domain and
+  interpretation for multi-source joins, filtering, `each`, and `flatten`, then
+  assess whether ADR-037, ADR-038, and ADR-041 can be derived from it.
+
+**Why deferred:** Both investigations may improve confidence in the language's
+semantic foundations, but neither is required for the compiler- and
+test-enforced contracts Feature 39 delivered. They are intentionally
+time-boxed research, not unfinished implementation.
+
+**Source:** `archive/features/39-correctness-by-default/PRD.md` (Follow-on
+Investigations)
 
 ### Excel-to-Satsuma Full Skill (Feature 04, Phases 1-5)
 
