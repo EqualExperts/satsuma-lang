@@ -1,6 +1,6 @@
 ---
 id: spr-w98t
-status: open
+status: closed
 deps: [sl-prlp]
 links: []
 created: 2026-08-04T09:28:15Z
@@ -28,3 +28,9 @@ Sequencing: this cannot be fixed inside sl-prlp, whose acceptance criteria requi
 - Cyclic workspaces still terminate.
 - Feature 41 R4's depth-exactness property (sl-jsyn) passes against the field traversal with no weakened assertion.
 
+
+## Notes
+
+**2026-08-04T12:26:54Z**
+
+Cause: The ticket inferred a depth-limit defect from a first-visit set, but field-lineage has always used FIFO breadth-first traversal, so every field is necessarily discovered at a shortest depth before any longer path can reach it. Fix: Added explicit downstream and upstream diamond contract tests proving shortest-path expansion, boundary-subtree inclusion, and unique output; no production change or shared traversal abstraction is required. (commit immediately after ec45cfba)
