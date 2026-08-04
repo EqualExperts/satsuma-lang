@@ -177,6 +177,50 @@ class TestParseMapBlock:
         assert '(other) = "unknown"' in inline
 
 
+class TestDisplayName:
+    """Test _display_name strips the canonical :: global-namespace marker.
+
+    `graph --json` emits canonical entity ids ("::name" for global entities,
+    lgc-wtz1) which are not valid characters in an Excel sheet title. A
+    regression here would resurface the openpyxl ValueError that broke the
+    sfdc-to-snowflake integration tests (invalid character ":" in title).
+    """
+
+    def test_strips_global_marker(self):
+        assert stm_to_excel._display_name("::sfdc_opportunity") == "sfdc_opportunity"
+
+    def test_preserves_namespaced_name(self):
+        assert stm_to_excel._display_name("crm::customers") == "crm::customers"
+
+    def test_preserves_bare_name(self):
+        assert stm_to_excel._display_name("customers") == "customers"
+
+
+class TestTabNames:
+    """Test tab-name generation never leaks the canonical :: marker.
+
+    Sheet titles come straight from graph --json ids, so a non-namespaced
+    workspace (every real-world entity name in these cases) would crash
+    workbook generation if the marker weren't stripped.
+    """
+
+    def test_mapping_tab_name_from_sources_and_targets(self):
+        m = stm_to_excel.MappingInfo(
+            name="::load opportunities",
+            sources=["::sfdc_opportunity"],
+            targets=["::snowflake_opps"],
+        )
+        assert stm_to_excel._mapping_tab_name(m) == "Map - sfdc_opportunity to snowf"
+
+    def test_mapping_tab_name_falls_back_to_mapping_name(self):
+        m = stm_to_excel.MappingInfo(name="::enrich data", sources=[], targets=[])
+        assert stm_to_excel._mapping_tab_name(m) == "Map - enrich data"
+
+    def test_schema_tab_name(self):
+        s = stm_to_excel.SchemaInfo(name="::sfdc_opportunity", role="source")
+        assert stm_to_excel._schema_tab_name(s) == "Src - sfdc_opportunity"
+
+
 class TestTranslateTransform:
     """Test translate_transform for full pipeline expressions."""
 
@@ -408,6 +452,14 @@ class TestIntegrationSfdc:
     def test_tab_count(self):
         # Overview + Issues + 1 mapping + 3 schemas + lookups
         assert len(self.wb.sheetnames) >= 5
+
+    def test_sheet_names_have_no_canonical_marker(self):
+        # This fixture is entirely non-namespaced, so every entity id from
+        # graph --json carries the canonical "::" global marker (lgc-wtz1).
+        # openpyxl rejects ":" in a sheet title outright — this is the exact
+        # scenario that crashed workbook generation before _display_name.
+        for name in self.wb.sheetnames:
+            assert "::" not in name, f"sheet title {name!r} leaked the :: marker"
 
     def test_multi_source(self):
         """Mapping with multiple sources should still work."""
