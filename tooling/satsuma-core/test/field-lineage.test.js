@@ -198,4 +198,63 @@ describe("traceFieldLineage", () => {
       downstream: [],
     });
   });
+
+  it("keeps the downstream subtree reachable through the shorter side of a diamond", () => {
+    // The longer branch is deliberately listed first. FIFO breadth-first
+    // traversal must still reach the leaf at depth two through the shortcut,
+    // and must report the shared join only once with its shortest-path edge.
+    const start = createCanonicalFieldEndpoint("::start.id");
+    const detour = createCanonicalFieldEndpoint("::detour.id");
+    const join = createCanonicalFieldEndpoint("::join.id");
+    const leaf = createCanonicalFieldEndpoint("::leaf.id");
+    const diamond = [
+      { from: start, to: detour, mapping: "start_to_detour", classification: "none" },
+      { from: detour, to: join, mapping: "detour_to_join", classification: "none" },
+      { from: join, to: leaf, mapping: "join_to_leaf", classification: "none" },
+      { from: start, to: join, mapping: "start_to_join", classification: "none" },
+    ];
+
+    const result = traceFieldLineage(diamond, start, {
+      depth: 2,
+      direction: "downstream",
+    });
+
+    assert.deepEqual(result.downstream, [
+      { field: "::detour.id", via_mapping: "::start_to_detour", classification: "none" },
+      { field: "::join.id", via_mapping: "::start_to_join", classification: "none" },
+      { field: "::leaf.id", via_mapping: "::join_to_leaf", classification: "none" },
+    ]);
+    assert.equal(new Set(result.downstream.map(({ field }) => field)).size, 3);
+  });
+
+  it("keeps the upstream subtree reachable through the shorter side of a diamond", () => {
+    // Reversing the same topology exercises the upstream endpoint selection.
+    // The ancestor is exactly three hops away through the shortcut and the
+    // shared start field must not be duplicated through the longer branch.
+    const ancestor = createCanonicalFieldEndpoint("::ancestor.id");
+    const start = createCanonicalFieldEndpoint("::start.id");
+    const detour = createCanonicalFieldEndpoint("::detour.id");
+    const join = createCanonicalFieldEndpoint("::join.id");
+    const sink = createCanonicalFieldEndpoint("::sink.id");
+    const diamond = [
+      { from: ancestor, to: start, mapping: "ancestor_to_start", classification: "none" },
+      { from: start, to: detour, mapping: "start_to_detour", classification: "none" },
+      { from: detour, to: join, mapping: "detour_to_join", classification: "none" },
+      { from: start, to: join, mapping: "start_to_join", classification: "none" },
+      { from: join, to: sink, mapping: "join_to_sink", classification: "none" },
+    ];
+
+    const result = traceFieldLineage(diamond, sink, {
+      depth: 3,
+      direction: "upstream",
+    });
+
+    assert.deepEqual(result.upstream, [
+      { field: "::join.id", via_mapping: "::join_to_sink", classification: "none" },
+      { field: "::detour.id", via_mapping: "::detour_to_join", classification: "none" },
+      { field: "::start.id", via_mapping: "::start_to_join", classification: "none" },
+      { field: "::ancestor.id", via_mapping: "::ancestor_to_start", classification: "none" },
+    ]);
+    assert.equal(new Set(result.upstream.map(({ field }) => field)).size, 4);
+  });
 });
