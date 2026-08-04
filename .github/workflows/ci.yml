@@ -59,7 +59,7 @@ jobs:
       # itself need it cached; no other job's own build depends on it.
       - name: Install integration-tests dependencies
         working-directory: tooling/integration-tests
-        run: npm install
+        run: npm ci
 
       - name: Cache workspace
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
