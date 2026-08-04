@@ -212,12 +212,12 @@ export class SzEdgeLayer extends LitElement {
   private _isEdgeHighlighted(edge: LayoutEdge): boolean {
     if (!this.highlightSchema || !this.highlightField) return false;
 
-    // Check if this edge connects to the highlighted field
+    // A multi-source ArrowEntry backs several physical LayoutEdges. Match the
+    // concrete resolved endpoint so hovering one source highlights only its line.
     const matchesSource =
-      edge.sourceNode === this.highlightSchema &&
-      edge.arrow.sourceFields.includes(this.highlightField);
+      edge.sourceNode === this.highlightSchema && edge.sourceField === this.highlightField;
     const matchesTarget =
-      edge.targetNode === this.highlightSchema && edge.arrow.targetField === this.highlightField;
+      edge.targetNode === this.highlightSchema && edge.targetField === this.highlightField;
 
     return matchesSource || matchesTarget;
   }

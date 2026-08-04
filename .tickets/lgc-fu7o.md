@@ -1,6 +1,6 @@
 ---
 id: lgc-fu7o
-status: in_progress
+status: closed
 deps: []
 links: [sl-hi0z, lgc-4bxl]
 created: 2026-08-03T22:25:37Z
@@ -49,3 +49,8 @@ A multi-source arrow produces one drawn edge per source field, each attached to 
 **2026-08-03T22:45:49Z**
 
 Feature 41 R3 pinned this defect in an executable test rather than skipping it. The test asserts the CURRENT (wrong) behaviour and will go RED when this ticket is fixed, with a comment naming the invariant to replace it with. `{ todo: ... }` is not usable in this repo: node's JUnit reporter puts a `failure=` attribute on a failing todo testcase, and dorny/test-reporter then fails CI's Test report check.
+
+**2026-08-04T09:42:31Z**
+
+Cause: The layout collapsed every ArrowEntry to sourceFields[0], while hover tested the shared authored source list, so later sources had no line and could highlight a sibling line from the wrong card.
+Fix: The layout now emits and independently resolves one edge per source, records schema-local concrete endpoints, and highlights against those endpoints; generated, unit, and browser tests cover the invariant. (commit immediately after c625ff3e)
