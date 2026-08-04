@@ -246,10 +246,12 @@ How we'll know Satsuma is working:
 
 ### What exists today
 
+Current parser/CLI/LSP test counts and CLI command count are tracked in [`test-stats.json`](../../test-stats.json).
+
 - Formal language specification ([SATSUMA-V2-SPEC.md](../developer/SATSUMA-V2-SPEC.md))
 - Canonical example library covering major integration patterns (16 `.stm` files)
 - AI-oriented quick reference and compact grammar for prompts ([AI-AGENT-REFERENCE.md](../../AI-AGENT-REFERENCE.md))
-- Tree-sitter parser (318 corpus tests)
+- Tree-sitter parser
 - TypeScript CLI (`satsuma`) with commands for structural extraction, analysis, validation, formatting, and diff — see [SATSUMA-CLI.md](../../SATSUMA-CLI.md)
 - `satsuma fmt` — opinionated, zero-config formatter (CLI + VS Code Format Document)
 - `satsuma lint` with 3 policy rules and `--fix` support

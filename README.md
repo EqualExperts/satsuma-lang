@@ -284,11 +284,13 @@ Start with Lesson 01 or jump to a [suggested reading path](lessons/README.md#sug
 
 ## Current Status
 
+Current parser/CLI/LSP test counts and CLI command count are tracked in [`test-stats.json`](test-stats.json).
+
 What exists today:
 
 - the Satsuma v2 language specification
 - a canonical example corpus (25 `.stm` files covering major integration patterns)
-- a tree-sitter parser (318 corpus tests, all examples parse clean)
+- a tree-sitter parser (all examples parse clean)
 - a TypeScript CLI (`satsuma`) with commands for structural extraction, analysis, validation, formatting, and diff — see [SATSUMA-CLI.md](SATSUMA-CLI.md)
 - `satsuma fmt` — opinionated, zero-config formatter (CLI + VS Code Format Document)
 - a VS Code extension with an LSP server (go-to-definition, find-references, completions, hover, rename, code lens, semantic tokens, diagnostics, folding, document symbols, formatting) and TextMate grammar

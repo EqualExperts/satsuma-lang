@@ -1,6 +1,6 @@
 ---
 id: sl-if0c
-status: open
+status: closed
 deps: [sl-k7po]
 links: []
 created: 2026-08-04T09:54:30Z
@@ -17,3 +17,14 @@ Three living docs hardcode the same kind of numbers and will drift the same way:
 
 README.md, AGENTS.md (this repo's CLAUDE.md), and docs/product-owner/PROJECT-OVERVIEW.md contain no hardcoded parser/CLI/LSP/per-package test count and no hardcoded CLI command count; each links to test-stats.json instead. npm run lint:md passes.
 
+
+## Notes
+
+**2026-08-04T10:42:16Z**
+
+## Notes
+
+**2026-08-04T12:00:00Z**
+
+Cause: README.md, AGENTS.md, and docs/product-owner/PROJECT-OVERVIEW.md each hand-typed the same parser/CLI/per-package test counts, which drifted independently of the real numbers and of each other.
+Fix: Removed the hardcoded counts from those three docs' bullets and added one link per doc to the generated test-stats.json (satsuma-viz-harness's manual-Playwright count left untouched, as it is not covered by the generator). (commit immediately after 20e63bb9)
