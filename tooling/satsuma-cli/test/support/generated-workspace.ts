@@ -25,8 +25,10 @@ import { loadWorkspace } from "#src/load-workspace.js";
 import { collectSemanticWarnings } from "#src/semantic-warnings.js";
 import { buildWorkspaceGraph } from "#src/commands/graph-builder.js";
 import { buildFullGraph } from "#src/schema-graph.js";
+import { createFieldEdgeSource } from "#src/field-edge-source.js";
 import type { WorkspaceGraph, GraphBuildOpts } from "#src/commands/graph-builder.js";
 import type { ExtractedWorkspace } from "#src/types.js";
+import { buildFieldEdges } from "@satsuma/core";
 
 /** A generated workspace materialised on disk and loaded by the CLI's own loader. */
 export interface LoadedGeneratedWorkspace {
@@ -118,4 +120,19 @@ export function graphFor(
     ...opts,
   };
   return buildWorkspaceGraph(loaded.index, buildFullGraph(loaded.index), loaded.root, options);
+}
+
+/**
+ * Build the portable field-edge list for a loaded generated workspace.
+ *
+ * The same edge list `field-lineage` traces over, via the same adapter
+ * (`createFieldEdgeSource`) the command itself uses — no namespace filter, since
+ * field-lineage traverses the full index. This is R4's (`sl-jsyn`) entry point
+ * into core's `traceFieldLineage`: properties call it directly rather than
+ * through the CLI command, per the ticket's design ("aim every property at the
+ * single portable traversal extracted by `sl-prlp`, not at the CLI-internal
+ * function").
+ */
+export function fieldEdgesFor(loaded: LoadedGeneratedWorkspace) {
+  return buildFieldEdges(createFieldEdgeSource(loaded.index)).edges;
 }
