@@ -15,8 +15,8 @@ plan while executing it.
 | R1 promote the generator to `satsuma-scenario-gen` | `sl-puky` | done |
 | R2 workspace-shaped scenario model and ground truth | `sl-dqyu` | done |
 | R3 structural edge invariants | `sl-hi0z` | done |
-| R4 reachability properties | `sl-jsyn` | blocked — see [Feature 40 dependency](#the-feature-40-dependency-r4-and-r5) |
-| R5 cross-consumer parity sweep | `sl-kwet` | blocked — same |
+| R4 reachability properties | `sl-jsyn` | blocked on `sl-prlp` then `spr-w98t` — see [Feature 40 dependency](#the-feature-40-dependency-r4-and-r5) |
+| R5 cross-consumer parity sweep | `sl-kwet` | blocked on `sl-prlp` — same |
 | R6 branded lineage endpoints | `sl-jyee` | done |
 
 ## No ADR for the generator package — dropped on review, 2026-08-04
@@ -61,7 +61,8 @@ Ranked by what I would pick up next.
    checking. It also unblocks the generator's namespaced-chain arbitrary generating
    the shape again, which widens R3's domain for free.
 3. **R4 and R5**, once Feature 40's `sl-prlp` lands — see below. R4's oracle is
-   already shipped.
+   already shipped, but R4 also waits on `spr-w98t` (see the
+   [addendum](#addendum-2026-08-04--one-bug-now-sits-between-sl-prlp-and-r4)).
 4. **`lgc-wtz1`** (P2, cosmetic but corrosive): one spelling per entity across
    `nodes`, `edges`, `schema_edges` and `field-lineage`. Landing it deletes the two
    normalisation shims in R3's properties and the same shims R5 would otherwise need.
@@ -94,6 +95,25 @@ What was done instead, to make the follow-up as small as possible:
   `scenarioDescendantsWithin` are already in the generator package with their
   properties' invariants documented, so R4 becomes a test file that calls a
   traversal, not a design exercise.
+
+### Addendum, 2026-08-04 — one bug now sits between `sl-prlp` and R4
+
+Re-planning `sl-prlp` against the spike surfaced `spr-w98t` (P1): `sl-y89y`'s
+`DepthAwareTraversal` fix — shallowest-visit-wins, re-expanding on strictly shallower
+revisits — landed only in `commands/lineage.ts`, the *schema-level* walk.
+`field-lineage.ts`'s `traceUpstream`/`traceDownstream` still use the original
+first-visit-wins visited set, so a field reached first by a long path is never
+re-expanded when a shorter one reaches it with budget left.
+
+That matters here because **R4's depth-exactness property is written to catch exactly
+this** ("the result at depth *n* is exactly the nodes whose shortest path is ≤ *n*",
+chosen over monotonicity precisely because the buggy version satisfies monotonicity).
+So R4 is red against the traversal `sl-prlp` extracts, and the fix cannot ride inside
+`sl-prlp`, whose acceptance criteria require byte-identical output. The chain is now
+`sl-prlp` → `spr-w98t` → `sl-jsyn`, recorded as a dependency.
+
+The spike's claim that "every logged traversal defect lives in the traversal half"
+holds — it just understated it: one of the two is still live.
 
 ## Findings that correct the PRD
 

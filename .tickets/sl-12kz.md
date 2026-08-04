@@ -49,3 +49,24 @@ Not viz-backend, because it is a devDependency of satsuma-cli: putting lineage
 there would make the published CLI bundle carry the VizModel assembly. Core also
 already holds qualifyField, resolveScopedEntityRef and schemaLocalFieldPath, and
 has a typecheck gate keeping Node built-ins off its import path.
+
+**2026-08-04T09:28:51Z**
+
+sl-prlp re-planned against the sl-4871 spike and Feature 41 R6 (ticket text only, no code).
+
+Settled: the traversal goes to satsuma-core, in two steps — a pure
+traceFieldLineage(edges, start, opts), then the edge builder behind a narrow
+FieldEdgeSource interface so no workspace index type enters core. Step 2 is what
+deletes the graph-builder.ts / field-lineage.ts duplication and is not optional.
+
+New since the spike: R6 (sl-jyee) put endpoint resolution behind arrowEndpoint in
+satsuma-cli/src/field-endpoints.ts, which holds the *undecided* r0-7w76 reading that
+core deliberately refuses to make. So that module stays in the CLI and the core
+builder takes endpoint resolution as an injected function. sl-prlp must not decide
+r0-7w76; its pinned tests go red if it does.
+
+Also raised spr-w98t (P1 bug): sl-y89y's DepthAwareTraversal fix reached
+commands/lineage.ts only, so the field traversal still has the first-visit-wins shape
+that truncates subtrees reachable within depth via a shorter path. It cannot ride in
+sl-prlp (byte-identical output) and Feature 41 R4 asserts depth exactness, so the
+chain is now sl-prlp -> spr-w98t -> sl-jsyn.
