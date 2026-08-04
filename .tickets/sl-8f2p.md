@@ -50,3 +50,23 @@ Two PRD corrections worth carrying: Feature 39 R4 shipped after the PRD was writ
 (the coverage oracle is on main), and acceptance test 6 is not runnable as written —
 qualifyField has no guard to revert, so the pinned r0-7w76 test is the executable
 form of that claim.
+
+**2026-08-04T00:00:00Z**
+
+Two corrections applied on review of PR #459:
+
+1. ADR-049 dropped — not warranted. Its two rules now live in
+   docs/developer/ARCHITECTURE.md and satsuma-scenario-gen's module comments.
+2. **sl-jyee (R6) delivered.** It was recorded as blocked on Feature 39 R5 "which
+   has no ticket"; R5 had in fact shipped as cbdr-e6ft + cbdr-5r4d (ADR-044) one
+   commit after the c93b1130 the PRD was checked against. Feature 39 R4
+   (cbdr-da0j) likewise. The PRD's asset table, R6 section, ticket map and
+   sequencing decision 6 are corrected.
+
+R6 is the only production change in this feature and the output is byte-identical:
+qualifyField is replaced by resolveFieldEndpoint, which reports the r0-7w76 fork
+instead of guessing, and the guess now lives at one named CLI site
+(field-endpoints.ts, arrowEndpoint) pinned by a test. r0-7w76 remains undecided.
+
+Remaining: sl-jsyn (R4) and sl-kwet (R5) still blocked on Feature 40's sl-prlp
+(commit immediately after 2b124725).
