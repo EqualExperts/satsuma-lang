@@ -33,13 +33,31 @@ run_parallel() {
 
 cd "$ROOT_DIR"
 
-# Every package's test output below is teed into this directory as it runs,
-# so the "generate test-stats.json" step at the end can read the real counts
-# straight out of a check that already ran — no second test run just to
-# source a number for test-stats.json. Removed on exit so a failed hook run
-# never leaves a stale log around to be misread by a later invocation.
+# The "generate test-stats.json" step at the end reads each package's test
+# output out of a check that already ran, rather than running the suites a
+# second time just to source a number. Turborepo captures that output itself,
+# one file per task at tooling/<package>/.turbo/turbo-<task>.log, and replays it
+# on a cache hit — so this directory is filled by copying those logs in under
+# the names the generator expects (see collect_turbo_test_logs below) instead of
+# by teeing every step as it runs. Removed on exit so a failed hook run never
+# leaves a stale log around to be misread by a later invocation.
 STATS_LOG_DIR="$(mktemp -d)"
 trap 'rm -rf "$STATS_LOG_DIR"' EXIT
+
+# scripts/generate-test-stats.mjs --from-logs expects <dir>/<package>.log, keyed
+# on the package's directory name under tooling/. Turborepo's own per-task log
+# is already exactly the output the generator parses, so this just renames.
+# A missing log is not an error: the generator keeps the previously committed
+# count for any package this run did not exercise, which is the correct answer
+# for the packages test:all deliberately excludes.
+collect_turbo_test_logs() {
+  for log in "$ROOT_DIR"/tooling/*/.turbo/turbo-test.log; do
+    [ -f "$log" ] || continue
+    local package_dir
+    package_dir="$(basename "$(dirname "$(dirname "$log")")")"
+    cp -f "$log" "$STATS_LOG_DIR/$package_dir.log"
+  done
+}
 
 # Verify Python lint tools are available before running any checks.
 # Install with: pip install yamllint ruff
@@ -50,8 +68,11 @@ for tool in yamllint ruff; do
   fi
 done
 
-run_step "repo lint" npm run lint
-run_step "release tooling tests" npm run test:release
+run_step "repo lint" npx turbo run lint
+
+# Every *.test.mjs under scripts/, which since R4 includes the suite asserting
+# the workspace dependency graph Turborepo derives its build order from.
+run_step "root script tests" npm run test:scripts
 
 # Hoisting can satisfy a package's declared range with the wrong version and say
 # nothing: npm hoisted katex's commander@8 to the root and left satsuma-cli's
@@ -60,34 +81,28 @@ run_step "release tooling tests" npm run test:release
 # an invalid tree a failed check rather than a silent mis-resolution.
 run_step "workspace dependency tree is valid" npm run check:deps
 
+# One ordered build of the whole workspace, and the reason every step below can
+# assume built output without rebuilding it. Before R4 each package's `prebuild`
+# and `pretest` hooks rebuilt their siblings by hand, so this script inherited
+# the build order implicitly — and paid for it repeatedly, since three packages
+# each rebuilt @satsuma/core. Turborepo derives the order from the manifests and
+# skips anything whose inputs are unchanged.
+run_step "workspace build" npm run build:all
+
 # The scenario generator runs first and alone: core's property suites depend on
 # it, so a broken generator would otherwise surface as a wall of unexplained
-# property failures rather than as its own named failure.
-run_step "scenario generator tests" npm --prefix tooling/satsuma-scenario-gen test
+# property failures rather than as its own named failure. It is in the sweep
+# below too, where it will be a cache hit costing nothing.
+run_step "scenario generator tests" npx turbo run test --filter=@satsuma/scenario-gen
 
-# satsuma-viz joins these (sl-hi0z): CI has always run it via the tooling-modules
-# matrix, but the local hook did not, so the viz's edge-completeness properties —
-# the ones defending against a mapping that silently renders no lines at all —
-# would only have failed after a push.
-run_parallel "satsuma-core + satsuma-viz-model + satsuma-viz tests" \
-  "npm --prefix tooling/satsuma-core test 2>&1 | tee '$STATS_LOG_DIR/satsuma-core.log'" \
-  "npm --prefix tooling/satsuma-viz-model test 2>&1 | tee '$STATS_LOG_DIR/satsuma-viz-model.log'" \
-  "npm --prefix tooling/satsuma-viz test 2>&1 | tee '$STATS_LOG_DIR/satsuma-viz.log'"
-
-# `npm --prefix tooling/satsuma-cli test` below already runs test:typecheck via
-# npm's implicit pretest hook, but make it an explicit, separately labelled
-# step (matching R2/sl-851u) rather than relying on that hook alone (fixes P4).
-# `pretest`, not a bare `test:typecheck`, because test:typecheck's tsconfig
-# resolves several test files' imports against `dist/` (the built output),
-# which only `pretest`'s build steps guarantee are present and current.
-run_step "satsuma-cli test:typecheck" npm --prefix tooling/satsuma-cli run pretest
-run_step "satsuma-cli tests" bash -c \
-  "npm --prefix tooling/satsuma-cli test 2>&1 | tee '$STATS_LOG_DIR/satsuma-cli.log'"
-
-# Cross-consumer parity sweeps (CLI vs viz-backend's model). Runs after the CLI
-# step above, since it depends on satsuma-cli's built `dist/testing.js` export.
-run_step "integration-tests tests" bash -c \
-  "npm --prefix tooling/integration-tests test 2>&1 | tee '$STATS_LOG_DIR/integration-tests.log'"
+# Every package's `test` and `test:typecheck`, in dependency order, in parallel,
+# skipping any package whose inputs have not changed. This replaces six separate
+# invocations that between them hand-managed the ordering (integration-tests
+# after the CLI, because it imports the CLI's built dist/testing.js), the
+# parallelism (two run_parallel groups), and the typecheck steps that npm's
+# implicit `pretest` hook would otherwise have decided for us.
+run_step "workspace tests" npm run test:all
+collect_turbo_test_logs
 
 # ADR-022: CLI accepts files, not directories. Check each example entry file.
 run_step "satsuma fmt --check examples" bash -c '
@@ -112,10 +127,11 @@ run_step "satsuma fmt --check examples" bash -c '
   exit $fail
 '
 
+# Not a turbo task: `validate` only re-parses this package's own manifest and
+# TextMate grammar as JSON, needs nothing built, and reads nothing a content
+# hash would help with. The extension's and the LSP's test suites both ran in
+# the workspace sweep above.
 run_step "vscode-satsuma validate" npm --prefix tooling/vscode-satsuma run validate
-run_parallel "vscode-satsuma tests + LSP" \
-  "npm --prefix tooling/vscode-satsuma test 2>&1 | tee '$STATS_LOG_DIR/vscode-satsuma.log'" \
-  "npm --prefix tooling/satsuma-lsp test 2>&1 | tee '$STATS_LOG_DIR/satsuma-lsp.log'"
 
 run_step "generated CST contract is current" \
   npm --prefix tooling/tree-sitter-satsuma run check:cst-symbols

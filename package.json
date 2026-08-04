@@ -5,11 +5,50 @@
   "workspaces": [
     "tooling/*"
   ],
+  "//packageManager": [
+    "Present because Turborepo refuses to resolve the workspace without being",
+    "told which package manager owns it. It is not a version gate: corepack is",
+    "not enabled anywhere in this repo or its CI, so npm itself ignores the",
+    "field, and Turborepo reads only the name from it. The version records the",
+    "npm this repo is developed against. The modern `devEngines.packageManager`",
+    "alternative was tried first and rejected — Turborepo rejects any range",
+    "spanning more than one npm major, which a range wide enough to cover both",
+    "a contributor's npm and the one bundled with CI's Node image must."
+  ],
+  "packageManager": "npm@11.15.0",
+  "//scripts": [
+    "build:all and test:all are thin aliases over `turbo run`. They exist so the",
+    "pre-commit hook, CI and a developer all reach the same task graph, and so the",
+    "two --filter exclusions on test:all are stated once rather than remembered.",
+    "",
+    "Both exclusions are about *where* a suite can run, not what it covers:",
+    "@satsuma/viz-harness's `test` is Playwright, which needs a browser the agent",
+    "sandbox cannot start and which CI does not run either (AGENTS.md), and",
+    "tree-sitter-satsuma's `test` shells out to `tree-sitter test --wasm`, which",
+    "needs a writable compiler cache and is invoked with its own environment and",
+    "graceful-skip handling by scripts/run-repo-checks.sh.",
+    "",
+    "test:scripts replaces the old test:release, which named",
+    "scripts/release-metadata.test.mjs alone while two sibling suites sat beside it",
+    "unrun — scripts/generate-test-stats.test.mjs, and the workspace-build-graph",
+    "suite R4 added. A glob means the next root-level test file is run by virtue of",
+    "existing rather than by someone remembering to name it here.",
+    "",
+    "clean:all removes two Turborepo paths. `tooling/*/.turbo` holds the per-task",
+    "logs, which are always worktree-local. `.turbo` is the content-hash cache, and",
+    "that entry only bites in the primary worktree: from a linked one under",
+    ".worktrees/, turbo shares the primary worktree's cache ('using shared worktree",
+    "cache') and this removes nothing. That is not a gap to work around — the cache",
+    "is keyed on input hashes, so a restored output is byte-identical to a rebuilt",
+    "one and a stale entry cannot produce a wrong answer. To prove a genuinely cold",
+    "build, use `turbo run build --force` rather than trying to delete the cache."
+  ],
   "scripts": {
-    "clean:all": "rm -rf node_modules tooling/*/node_modules tooling/*/dist tooling/satsuma-cli/src/generated tooling/tree-sitter-satsuma/build tooling/tree-sitter-satsuma/tree-sitter-satsuma.wasm",
+    "clean:all": "rm -rf node_modules tooling/*/node_modules tooling/*/dist tooling/satsuma-cli/src/generated tooling/tree-sitter-satsuma/build tooling/tree-sitter-satsuma/tree-sitter-satsuma.wasm .turbo tooling/*/.turbo",
     "install:all": "npm install && npm run build:all",
     "ci:all": "npm ci && npm run build:all",
-    "build:all": "./scripts/build-workspace.sh",
+    "build:all": "turbo run build",
+    "test:all": "turbo run test test:typecheck --filter=!@satsuma/viz-harness --filter=!tree-sitter-satsuma",
     "reinstall": "npm run clean:all && npm run install:all",
     "check:deps": "npm ls --all >/dev/null",
     "lint": "npm run lint:js && npm run lint:md && npm run lint:yaml && npm run lint:python",
@@ -18,8 +57,8 @@
     "lint:yaml": "yamllint .github/workflows/",
     "lint:python": "ruff check scripts/ tooling/tree-sitter-satsuma/scripts/ skills/ smoke-tests/ && ruff format --check scripts/ tooling/tree-sitter-satsuma/scripts/ skills/ smoke-tests/",
     "format": "prettier --write \"**/*.{ts,mts,cts,js,mjs,cjs}\" && ruff format scripts/ tooling/tree-sitter-satsuma/scripts/ skills/ smoke-tests/",
-    "test:release": "node --test scripts/release-metadata.test.mjs",
-    "test:coverage": "npm --prefix tooling/satsuma-core run test:coverage && npm --prefix tooling/satsuma-viz-model run test:coverage && npm --prefix tooling/satsuma-viz-backend run test:coverage && npm --prefix tooling/satsuma-viz run test:coverage && npm --prefix tooling/satsuma-lsp run test:coverage && npm --prefix tooling/satsuma-cli run test:coverage"
+    "test:scripts": "node --test scripts/*.test.mjs",
+    "test:coverage": "turbo run test:coverage"
   },
   "overrides": {
     "smol-toml": "^1.6.1"
@@ -40,6 +79,7 @@
     "globals": "^17.8.0",
     "markdownlint-cli2": "^0.23.2",
     "prettier": "^3.9.6",
+    "turbo": "2.10.8",
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.65.0"
   }

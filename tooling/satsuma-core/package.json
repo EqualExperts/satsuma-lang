@@ -86,7 +86,6 @@
   "types": "./dist/index.d.ts",
   "scripts": {
     "build": "tsc",
-    "pretest": "tsc && npm run test:typecheck",
     "test": "node --test test/**/*.test.js",
     "test:typecheck": "tsc --project tsconfig.type-tests.json",
     "test:coverage": "c8 --reporter=text --reporter=lcov --reporter=json-summary --include='dist/**/*.js' --exclude='dist/**/*.d.ts' node --test test/**/*.test.js"
@@ -95,11 +94,20 @@
     "web-tree-sitter": "^0.26.11",
     "yaml": "^2.9.0"
   },
+  "//devDependencies": [
+    "tree-sitter-satsuma is not imported anywhere in this package. It is declared",
+    "because every parser-backed test suite here loads the grammar WASM it builds,",
+    "and because that package's `generate` step writes this package's",
+    "src/generated/cst-types.ts. Declaring the edge is what lets Turborepo derive",
+    "the build order from the manifests instead of it being special-cased in",
+    "turbo.json (feature 42, R4)."
+  ],
   "devDependencies": {
     "@satsuma/scenario-gen": "*",
     "@types/node": "^26.1.2",
     "c8": "^12.0.0",
     "fast-check": "^4.9.0",
+    "tree-sitter-satsuma": "*",
     "typescript": "^6.0.3"
   }
 }

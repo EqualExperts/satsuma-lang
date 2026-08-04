@@ -1,0 +1,166 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+
+  // turbo.json — the single definition of how the tooling packages build and test.
+  //
+  // What this file owns: the *order* in which the eleven `tooling/*` workspace
+  // packages build, and which of their outputs may be restored from cache
+  // instead of recomputed. Before feature 42 that order was written out by hand
+  // in three places — the root package.json script chain, the `install` job in
+  // .github/workflows/ci.yml, and a `prebuild`/`pretest` hook inside almost
+  // every package that shelled out to `npm --prefix ../sibling run build`. All
+  // three are deleted; the order is now derived from the dependency graph the
+  // manifests already declare (ADR-049).
+  //
+  // What this file does not own: what each task actually does. That stays in
+  // each package's own `scripts`. Turborepo only decides when to run them, in
+  // what order, and whether the answer is already known.
+  //
+  // Reading the graph: `dependsOn: ["^build"]` means "every package I depend on
+  // must finish its own build first" — the `^` is what makes it topological
+  // rather than same-package. Adding a cross-package dependency to a
+  // package.json is therefore the only edit needed to change the build order.
+
+  // Files outside any single package that nonetheless feed its build or tests.
+  // A change to one of these invalidates every task's cache, because turbo
+  // hashes only a package's own directory by default and would otherwise serve
+  // a stale result — the failure mode being a green test run against a corpus
+  // or a baked-in document that has since changed.
+  "globalDependencies": [
+    // The canonical example corpus. Read directly by satsuma-core's,
+    // satsuma-cli's, satsuma-viz's, the LSP's and the integration suite's
+    // tests as golden fixtures, and by the viz harness's examples manifest.
+    "examples/**",
+    // Baked into a TypeScript module by satsuma-cli's prebuild step, so it is
+    // a build input to the CLI even though it lives at the repo root.
+    "AI-AGENT-REFERENCE.md",
+    // Asserted against by the CLI's command-reference tests.
+    "SATSUMA-CLI.md",
+    // Copied into the viz harness's client bundle by its `build:logo` step.
+    "site/img/satsuma-logo.png"
+  ],
+
+  "tasks": {
+    // ── build ────────────────────────────────────────────────────────────────
+    // The one task whose ordering matters. `^build` is the whole of the former
+    // hand-sequenced chain: core → viz-model → viz-backend → grammar WASM →
+    // cli/viz/lsp/harness/extension falls out of the manifests, in that order,
+    // without being written down anywhere as a sequence.
+    "build": {
+      "dependsOn": ["^build"],
+      "outputs": ["dist/**"]
+    },
+
+    // A second compilation of a package that already has a `build`. Only
+    // @satsuma/lsp defines it, and only because its `build` is an esbuild bundle
+    // while its test suite requires the plain tsc output of the same sources; see
+    // that package's `//scripts` note. Declared as a generic task rather than
+    // three `@satsuma/lsp#…` overrides so the three test tasks below can name it
+    // once. In every other package it is a no-op the graph simply skips.
+    "compile": {
+      "dependsOn": ["^build"]
+    },
+
+    // ── test ─────────────────────────────────────────────────────────────────
+    // `build` and `^build` are both named. The second is not redundant defence:
+    // two packages (@satsuma/integration-tests and @satsuma/scenario-gen) have
+    // no `build` script at all, so for them the `build` edge resolves to an
+    // empty node, and the dependency builds their tests genuinely need —
+    // satsuma-cli's `dist/testing.js`, for one — would be reachable only
+    // through whatever that empty node happens to keep in the graph. Saying
+    // `^build` states the requirement directly instead of relying on it.
+    //
+    // No `outputs`: a test run produces no artifact worth restoring. Turborepo
+    // still caches the exit code and the captured log, which is what lets an
+    // unchanged package's suite be skipped and replayed.
+    "test": {
+      "dependsOn": ["build", "^build", "compile"]
+    },
+
+    // Type-only checks, split out as a first-class task rather than smuggled in
+    // through npm's implicit `pretest` hook. `pretest` fires before a script
+    // literally named `test` and nothing else, so under the old arrangement
+    // `test:coverage` silently skipped the typecheck and ci.yml had to bolt it
+    // back on per job (sl-851u). A named task cannot be bypassed that way.
+    "test:typecheck": {
+      "dependsOn": ["build", "^build", "compile"]
+    },
+
+    "test:coverage": {
+      "dependsOn": ["build", "^build", "compile"],
+      "outputs": ["coverage/**"]
+    },
+
+    // ── Package-specific overrides ───────────────────────────────────────────
+    // A `package#task` entry replaces the generic definition outright rather
+    // than merging with it, so each one below repeats the `dependsOn` wiring it
+    // still wants.
+
+    // The grammar's build emits a WASM module at the package root and a
+    // wasi-sdk work tree under build/, not a dist/. It also rewrites the
+    // committed generated parser sources under src/ and satsuma-core's
+    // src/generated/cst-types.ts; those are deliberately *not* declared as
+    // outputs. They are tracked files that git already restores, and a
+    // cross-package output is not expressible here anyway. CI's existing
+    // `npm run generate` + `git diff --exit-code src/` step remains what proves
+    // the committed copies match grammar.js.
+    "tree-sitter-satsuma#build": {
+      "dependsOn": ["^build"],
+      "outputs": ["tree-sitter-satsuma.wasm", "build/**"]
+    },
+
+    // The CLI's prebuild bakes AI-AGENT-REFERENCE.md into src/generated/ (a
+    // gitignored file, so it must be cached to be restorable) alongside the
+    // usual dist/ output.
+    "satsuma-cli#build": {
+      "dependsOn": ["^build"],
+      "outputs": ["dist/**", "src/generated/**"]
+    },
+
+    // The extension bundles the language server into server/dist/ next to its
+    // own client bundle in dist/.
+    "vscode-satsuma#build": {
+      "dependsOn": ["^build"],
+      "outputs": ["dist/**", "server/dist/**"]
+    },
+
+    // @satsuma/lsp#build and #compile both write into dist/, and both emit a
+    // dist/server.js — the esbuild bundle and tsc's compilation of the same
+    // entry point. Two consequences, both handled here:
+    //
+    //   `dependsOn` names this package's own `build`, so the two never race and
+    //   the winner is always tsc. That is the order the pre-Turborepo hooks
+    //   happened to produce (install:all bundled, then `pretest` ran tsc) and
+    //   the one the test suite needs, since it loads per-module files from
+    //   dist/ and never the bundle.
+    //
+    //   `cache: false`, because declaring dist/** as an output would let a cache
+    //   restore decide which of the two server.js files wins — and the wrong
+    //   answer is silent: a tarball shipping a tsc module instead of a
+    //   self-contained bundle, or a test suite finding a bundle where it expects
+    //   per-module files. Running tsc unconditionally costs a few seconds, which
+    //   is what the `pretest` hook cost.
+    //
+    // mbt-oy6n separates the two output trees, after which this can become a
+    // normal cached task.
+    "@satsuma/lsp#compile": {
+      "dependsOn": ["build", "^build"],
+      "cache": false
+    },
+
+    // ── Repo-wide lint ───────────────────────────────────────────────────────
+    // A root task (`//#`) rather than a per-package one: eslint, prettier,
+    // markdownlint, yamllint and ruff are all configured once at the root and
+    // sweep the whole repository, including files no workspace package owns.
+    //
+    // No `inputs`, deliberately. Naming them would mean restating every path
+    // five linters read, and the cost of getting that list even slightly wrong
+    // is the worst failure a cache can have: a hit that reports a clean lint
+    // over code nobody checked. Turborepo's default for a root task is to hash
+    // every non-ignored file in the repository, which errs the safe way — it
+    // over-invalidates. Verified: appending a newline to an unrelated markdown
+    // file misses the cache, and an eslint error introduced in a package source
+    // both misses and fails. A no-change re-run is 12ms against 9s.
+    "//#lint": {}
+  }
+}

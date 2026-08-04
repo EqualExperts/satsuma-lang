@@ -38,13 +38,10 @@
   ],
   "scripts": {
     "start": "node src/index.js",
-    "build:core": "npm --prefix ../satsuma-core run build",
-    "build:viz-backend": "npm --prefix ../satsuma-viz-backend run build",
-    "prebuild": "npm run build:core && npm run build:viz-backend && node scripts/prebuild.js",
+    "prebuild": "node scripts/prebuild.js",
     "postbuild": "node scripts/postbuild.js",
     "build": "tsc",
     "dev": "tsc --watch",
-    "pretest": "npm run build && npm run test:typecheck",
     "pack": "npm run build && node scripts/pack.js",
     "test": "node --import tsx/esm --import ./test/setup.ts --test 'test/**/*.test.ts'",
     "test:coverage": "c8 --reporter=text --reporter=lcov node --import tsx/esm --import ./test/setup.ts --test 'test/**/*.test.ts'",
@@ -61,6 +58,7 @@
     "@types/node": "^25.5.0",
     "c8": "^11.0.0",
     "fast-check": "^4.9.0",
+    "tree-sitter-satsuma": "*",
     "tsx": "^4.23.1",
     "typescript": "^6.0.2"
   },
