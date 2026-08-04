@@ -1,22 +1,29 @@
 # Feature 39 — Correctness by Default
 
-> **Status: IN PROGRESS** (started 2026-08-03 with R1, `gcsc-ejb2`) — raised
-> after reviewing the mechanism behind recent defect clusters. The recurring
-> problem is broader
-> than either “bad specification” or “bad implementation”: important rules have
-> lived in prose, string conventions, or examples, so the build could confirm
-> that code matched its tests without confirming that the rule was complete,
-> internally consistent, or expressed at the right abstraction boundary.
+> **Status: IMPLEMENTED** (2026-08-04) — all R1–R8 delivery work completed
+> under epic `gcsc-qka8`; all 19 child tickets are closed with their relevant
+> automated checks recorded. Archived 2026-08-04. The optional I1 bounded-model
+> and I2 compositional-semantics investigations remain deliberately deferred in
+> `docs/product-owner/ROADMAP.md`; they are research follow-ons, not unfinished
+> Feature 39 scope.
+>
+> The feature was raised after reviewing the mechanism behind recent defect
+> clusters. The recurring problem is broader than either “bad specification” or
+> “bad implementation”: important rules had lived in prose, string conventions,
+> or examples, so the build could confirm that code matched its tests without
+> confirming that the rule was complete, internally consistent, or expressed at
+> the right abstraction boundary.
 >
 > **State this revision was checked against:** `main` at `c53619b1`. The CST
 > comparison counts below were originally measured at `4d17c505`; the two later
 > commits only added and amended this PRD, so those counts are unchanged.
 >
-> **Recommendation.** Proceed, but as a sequence of independently valuable
+> **Outcome.** The feature landed as a sequence of independently valuable
 > hardening tasks rather than one all-or-nothing programme. Generated CST types,
-> generated-input coverage checks, domain-specific path/ref types, and build-gate
-> repairs are the delivery scope. Formal modelling and a compositional semantic
-> account are useful follow-on investigations; they do not gate completion.
+> generated-input coverage checks, domain-specific path/ref types, build-gate
+> repairs, type-aware linting, and `FieldDecl` variants formed the delivered
+> scope. Formal modelling and a compositional semantic account remain useful
+> follow-on investigations; they do not gate completion.
 >
 > **What this feature is not.** It changes no Satsuma syntax or runtime protocol,
 > and proposes no rewrite or verified-code extraction. Those approaches target a
@@ -437,8 +444,9 @@ ADR-041. Prose is sufficient; mechanised proof is out of scope.
 
 ## Ticket Map
 
-Feature epic: `gcsc-qka8`. R1 through R6 and R8 now have concrete tickets; the
-remaining rows retain the agreed ticket shape until scheduled.
+Feature epic: `gcsc-qka8`. Every R1–R8 delivery ticket is closed. I1 and I2 were
+never completion gates and remain unscheduled research follow-ons in the product
+roadmap.
 
 | Work | Ticket shape | Depends on |
 |---|---|---|
@@ -464,7 +472,7 @@ remaining rows retain the agreed ticket shape until scheduled.
 | I1 bounded consistency model | optional spike | Feature 38 epic closed |
 | I2 compositional semantics proposal | optional spike | Feature 38 epic closed |
 
-The best first slice is **R1 + the core portion of R2**: it is mechanical,
-independent of coverage semantics, and turns a grammar rename or typo into a
-compiler error. In parallel scheduling, R6 and the R3 semantic generator can
-start immediately because they touch different surfaces.
+**Historical delivery sequence.** The first slice was R1 plus the core portion
+of R2: it was mechanical, independent of coverage semantics, and turned a
+grammar rename or typo into a compiler error. R6 and the R3 semantic generator
+then proceeded independently because they touched different surfaces.
