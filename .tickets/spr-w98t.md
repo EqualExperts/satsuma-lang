@@ -34,3 +34,7 @@ Sequencing: this cannot be fixed inside sl-prlp, whose acceptance criteria requi
 **2026-08-04T12:26:54Z**
 
 Cause: The ticket inferred a depth-limit defect from a first-visit set, but field-lineage has always used FIFO breadth-first traversal, so every field is necessarily discovered at a shortest depth before any longer path can reach it. Fix: Added explicit downstream and upstream diamond contract tests proving shortest-path expansion, boundary-subtree inclusion, and unique output; no production change or shared traversal abstraction is required. (commit immediately after ec45cfba)
+
+**2026-08-04T13:20:00Z**
+
+Cause (review follow-up): the first diamond fixtures were too shallow to discriminate — mutating `queue.shift()` to `queue.pop()`, which reproduces exactly the depth-inexactness this ticket alleged, left them green, because a two-path field adjacent to the focus is enqueued at its shortest depth under any expansion order. Fix: rebuilt the fixtures as five-node diamonds whose boundary field is lost unless the two-path field is claimed by its two-hop side (all three cases now fail under the LIFO mutant), added an edge-order-independence case, and replaced the in-code comment that still named this ticket as pending work with the FIFO shortest-path invariant and why the CLI's schema walk needs its own shallowest-visit map. (commit immediately after fe26b465)
