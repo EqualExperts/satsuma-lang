@@ -54,10 +54,15 @@ export interface LayoutNode {
 }
 
 export interface LayoutEdge {
+  /** Stable identity for one physical line; multi-source arrows have one per source. */
   id: string;
+  /** Card that owns this line's resolved source endpoint. */
   sourceNode: string;
+  /** Card that owns this line's resolved target endpoint. */
   targetNode: string;
+  /** Schema-local dotted field path on sourceNode, never an authored qualified ref. */
   sourceField: string;
+  /** Schema-local dotted field path on targetNode, never an authored qualified ref. */
   targetField: string;
   /** Array of {x,y} points forming the routed edge path */
   points: Array<{ x: number; y: number }>;
@@ -678,6 +683,14 @@ interface PortRef {
   side: "src" | "tgt";
 }
 
+/** A concrete port together with the schema-local field path it represents. */
+interface ResolvedPort {
+  /** ELK port identity used when routing the physical line. */
+  id: string;
+  /** Schema-local dotted path used by hover and other field-level consumers. */
+  fieldPath: string;
+}
+
 /**
  * Per-invocation bookkeeping for one buildElkGraph call. Previously this
  * lived in module-level mutable maps, which (a) were cleared once per
@@ -707,13 +720,13 @@ function addMappingEdges(mappings: MappingBlock[], edges: ElkEdge[], ctx: GraphC
     fieldRef: string,
     side: "src" | "tgt",
     scopeRefs: string[],
-  ): string | null => {
+  ): ResolvedPort | null => {
     const card = ctx.cardsByNode.get(nodeId);
     if (!card) return null;
     const localPath = resolveSchemaLocalFieldPath(fieldRef, card, scopeRefs);
     if (!localPath) return null;
     const pair = ctx.portsByNode.get(nodeId)?.get(localPath);
-    return pair ? pair[side] : null;
+    return pair ? { id: pair[side], fieldPath: localPath } : null;
   };
 
   for (const m of mappings) {
@@ -726,53 +739,63 @@ function addMappingEdges(mappings: MappingBlock[], edges: ElkEdge[], ctx: GraphC
       for (let i = 0; i < arrows.length; i++) {
         const a = arrows[i];
         if (!a) continue;
-        const authoredSource = a.sourceFields[0];
         // A computed arrow (`-> target`) covers its target but declares no
         // source endpoint. It therefore has no field-to-field line to draw:
         // using the target path as a fallback manufactured lineage from a
         // same-named source field (lgc-4bxl). The target card's filled coverage
         // port distinguishes computed from unmapped without inventing a source.
-        if (!authoredSource) continue;
+        if (a.sourceFields.length === 0) continue;
         // Ports are keyed by declared field path, so an arrow authored
         // element-relative inside a container (`.line1 -> .line1`) has to be
         // qualified against that container before findPort can match it. Until
         // 3cdd-yavi every such arrow resolved to no port and its edge was
         // silently skipped, so nested-iteration mappings drew no lines at all.
         const targetField = qualifyChildArrowPath(a.targetField, container.target);
-        const sourceField = qualifyChildArrowPath(authoredSource, container.source);
-        const edgeId = `${prefix}:${i}`;
-
-        // Attach the edge to the first source ref whose card actually
-        // declares the referenced field (a prefixed ref like "b.id" belongs
-        // to source schema b, not blindly to sourceRefs[0]).
-        let sourceNode: string | null = null;
-        let srcPort: string | null = null;
-        for (const ref of m.sourceRefs) {
-          srcPort = findPort(ref, sourceField, "src", m.sourceRefs);
-          if (srcPort) {
-            sourceNode = ref;
-            break;
-          }
-        }
         const tgtPort = findPort(m.targetRef, targetField, "tgt", [m.targetRef]);
+        if (!tgtPort) continue;
 
-        // Skip edges with missing ports — ELK throws if a port doesn't exist
-        if (!sourceNode || !srcPort || !tgtPort) continue;
+        // Language rule (spec §4.2): a multi-source arrow is one physical
+        // edge per source, all terminating at the same target. Resolve every
+        // source independently because qualified refs can belong to different
+        // source cards even though the lines share one ArrowEntry.
+        for (let sourceIndex = 0; sourceIndex < a.sourceFields.length; sourceIndex++) {
+          const authoredSource = a.sourceFields[sourceIndex];
+          if (!authoredSource) continue;
+          const sourceField = qualifyChildArrowPath(authoredSource, container.source);
 
-        edges.push({
-          id: edgeId,
-          sources: [srcPort],
-          targets: [tgtPort],
-        });
+          // Attach this line to the first source ref whose card actually
+          // declares its field ("b.id" belongs to b, not sourceRefs[0]).
+          let sourceNode: string | null = null;
+          let srcPort: ResolvedPort | null = null;
+          for (const ref of m.sourceRefs) {
+            srcPort = findPort(ref, sourceField, "src", m.sourceRefs);
+            if (srcPort) {
+              sourceNode = ref;
+              break;
+            }
+          }
 
-        ctx.edgeMeta.set(edgeId, {
-          sourceNode,
-          targetNode: m.targetRef,
-          sourceField,
-          targetField,
-          arrow: a,
-          scope,
-        });
+          // ELK throws if an edge names a port that does not exist. Preserve
+          // the historical first-line id and suffix only additional sources.
+          if (!sourceNode || !srcPort) continue;
+          const baseEdgeId = `${prefix}:${i}`;
+          const edgeId = sourceIndex === 0 ? baseEdgeId : `${baseEdgeId}:source:${sourceIndex}`;
+
+          edges.push({
+            id: edgeId,
+            sources: [srcPort.id],
+            targets: [tgtPort.id],
+          });
+
+          ctx.edgeMeta.set(edgeId, {
+            sourceNode,
+            targetNode: m.targetRef,
+            sourceField: srcPort.fieldPath,
+            targetField: tgtPort.fieldPath,
+            arrow: a,
+            scope,
+          });
+        }
       }
     };
 

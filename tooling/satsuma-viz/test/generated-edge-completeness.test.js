@@ -171,34 +171,25 @@ describe("the layout draws every declared arrow (sl-hi0z)", () => {
     );
   });
 
-  it("draws only the first source of a multi-source arrow (lgc-fu7o)", async () => {
-    // ⚠️ THIS TEST PINS A KNOWN DEFECT — see the note at the head of the r0-7w76
-    // test in satsuma-cli/test/generated-edge-invariants.test.ts for why a pinned
-    // divergence is used here rather than `{ todo: … }`. It asserts what the layout
-    // does *today* and goes **red when lgc-fu7o is fixed**, at which point replace
-    // it with `assertEdgesMatch`, which already states the correct invariant.
-    //
-    // Spec §4.2: `a, b -> t` is one edge *per source*, all to the same target.
-    // `addMappingEdges` reads `a.sourceFields[0]` and nothing else, so the viz draws
-    // one line and omits the rest of the arrow's provenance. The hover path does not
-    // share the omission — `sz-edge-layer.ts:218` highlights on the whole authored
-    // `arrow.sourceFields` — so hovering the *second* source highlights the single
-    // drawn edge, which runs to the *first* source's card. Pointing at the wrong
-    // schema is worse than drawing nothing.
+  it("draws one edge from each source of a multi-source arrow (lgc-fu7o)", async () => {
+    // Spec §4.2 defines `a, b -> t` as one edge per source, all to the same
+    // target. The layout must therefore preserve every source independently and
+    // record the schema-local field path used by the concrete source card.
     await fc.assert(
       fc.asyncProperty(multiSourceWorkspaceArbitrary, async ({ workspace, expectedSources }) => {
         const { model, sources } = modelFor(workspace);
         const layout = await viz.computeLayout(model);
-        assert.equal(
-          layout.edges.length,
-          1,
-          `expected lgc-fu7o's single edge for ${expectedSources.length} sources:\n${sources}`,
+        assert.deepEqual(
+          layout.edges.map(drawnKey).sort(),
+          expectedDrawnEdges(workspace),
+          `multi-source arrow lost or invented a drawn edge:\n${sources}`,
         );
-        // The drawn edge belongs to the *first* declared source, and its recorded
-        // `sourceField` keeps the authored schema prefix — the second half of
-        // lgc-fu7o, latent today because nothing matches on that field.
-        assert.equal(layout.edges[0].sourceNode, "s0", `edge left the first source's card`);
-        assert.equal(layout.edges[0].sourceField, "s0.field_0", `sourceField form changed`);
+        assert.equal(layout.edges.length, expectedSources.length);
+        assert.deepEqual(layout.edges.map((edge) => edge.sourceNode).sort(), ["s0", "s1"]);
+        assert.deepEqual(
+          layout.edges.map((edge) => edge.sourceField),
+          ["field_0", "field_0"],
+        );
       }),
       GENERATED_PROPERTY_PARAMETERS,
     );
