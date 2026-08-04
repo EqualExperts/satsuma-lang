@@ -198,22 +198,22 @@ sweep spec size — 1, 3, 10 and 25 mappings — not just measure one size.
 ### But the overhead is a *variable*, not a constant — so it is a factor
 
 The fixed cost above assumes the whole reference is resident in context, which is
-how it is used today. It need not be. Measured section sizes of
-`AI-AGENT-REFERENCE.md`:
+how it is used today. It need not be. Section sizes of `AI-AGENT-REFERENCE.md`,
+measured with code fences handled correctly (naive measurement is fooled by the
+`##` headings *inside* the fenced conventions block):
 
-| Section | Bytes | ≈ tokens | Needed for |
-|---|---|---|---|
-| `## Satsuma CLI — Agent Tooling` | 11,418 | ~2.9k | **Reading/analysis only** |
-| `## Portable Grammar & Conventions` (+ subsections) | ~8,900 | ~2.2k | **Writing only** |
-| Common mistakes + worked examples | 3,494 | ~0.9k | Writing |
-| `## Agent Workflow` | 2,988 | ~0.7k | Both |
+| Section | Bytes | ≈ tokens | Share | Needed for |
+|---|---|---|---|---|
+| `## Portable Grammar & Conventions` | 12,964 | ~3,240 | 47% | **Writing only** (except the `@ref` and path-syntax rules) |
+| `## Satsuma CLI — Agent Tooling` | 11,418 | ~2,850 | 42% | **Reading/analysis only** |
+| `## Agent Workflow` | 2,988 | ~750 | 11% | Both — but splits cleanly into generate/read halves |
 
-The CLI reference is **41% of the file**, and a task that only *reads* Satsuma
-needs none of the grammar — every CLI command has `--json`, so the agent
-consumes structured facts and never sees Satsuma syntax at all. Conversely a
-codegen task needs the grammar and not the command reference. Today every task
-pays for both, so the flat ~7k figure charged above is a **worst case that
-understates Satsuma**.
+The CLI reference is **42% of the file**, and a task that only *reads* Satsuma
+needs almost none of the grammar — every CLI command has `--json`, so the agent
+consumes structured facts and barely sees Satsuma syntax. Conversely a codegen
+task needs the grammar and not the command reference. Today every task pays for
+both, so the flat ~7k figure charged above is a **worst case that understates
+Satsuma**: a task-appropriate slice is roughly half that.
 
 Candidate delivery mechanisms, ranked by expected resident cost:
 
@@ -236,17 +236,32 @@ Two measurements, chosen to be nearly free:
 1. **Static baseline cost per mechanism** (no model spend at all) — count what
    actually lands in context for each mechanism at each task type. This alone
    answers "is there a more token-efficient way", and it is the number that
-   picks the mechanism for the behavioural arms.
+   picks the mechanism for the behavioural arms. **This measurement is owned by
+   Feature 45, not by this feature** (see below); this feature consumes its
+   output.
 2. **One cheap behavioural check** — best static mechanism vs. status quo, one
    model, T1 (writing, needs grammar) + T4 (reading, needs CLI), n=3. It is
    looking for exactly one thing: does the agent reliably *load* what it needs,
    and if it doesn't, does the repair loop cost more than the tokens saved?
+   This stays here, because it costs model spend and is a measurement, not a
+   design decision.
 
-Restructuring the reference into progressive disclosure is a **product
-improvement that stands on its own merits**, independent of this eval, and
-should be raised as its own ticket rather than smuggled in as eval scaffolding.
-This feature's job is only to produce the number that says whether it is worth
-doing.
+**Agreed sequencing (2026-08-04).** Restructuring the reference is a product
+improvement that stands on its own merits, and it happens **first**, as
+`features/45-agent-reference-progressive-disclosure/PRD.md`. The static baseline
+measurement moves into that feature, because it is the evidence for which
+mechanism to build and it should inform the restructure rather than post-date it.
+
+This feature then measures the *restructured* reference. Two consequences:
+
+- The Satsuma arms use the shipped `--profile write` / `--profile read` slices,
+  not the monolithic document, so the overhead charged to Satsuma is the real
+  one rather than a soon-to-be-obsolete worst case.
+- **Feature 45 must ship and be released before this protocol is hashed.** If the
+  reference changed after pre-registration, the registered artifact would not be
+  the measured one. This is also the Goodhart control: the split is derived from
+  task-need analysis before any episode runs, and is not retuned against eval
+  outcomes.
 
 ## Tasks and how each is graded
 
@@ -544,10 +559,10 @@ disliking the answer, and quietly keeping the old number.
       per-spec-size numbers for arms S/X/Y/C — including the
       `AI-AGENT-REFERENCE.md` overhead charged to the Satsuma arm — with no
       model spend.
-- [ ] **Reference-delivery baselines measured with no model spend**: resident
-      context cost per mechanism (full file, task-sliced, skill-style
-      progressive disclosure, MCP tool schemas) per task type, with the winner
-      selected on evidence and recorded.
+- [ ] **Reference-delivery baselines consumed from Feature 45** (which owns that
+      measurement): the Satsuma arms use the shipped task-appropriate profile,
+      and the resident overhead charged to them is Feature 45's measured figure,
+      not a bytes/4 estimate.
 - [ ] Reference-delivery behavioural check run, reporting whether lazy loading
       changes task success — specifically whether the agent reliably loads what
       it needs, and what a failure-to-load costs in repair-loop tokens.
@@ -586,16 +601,12 @@ disliking the answer, and quietly keeping the old number.
 3. **Hand-authored scenario count.** More realism costs authoring effort and
    risks our own bias in what we write; fewer means the marquee codegen task
    runs mostly on synthetic scenarios.
-4. **Whether restructuring `AI-AGENT-REFERENCE.md` waits for the eval.** The
-   static baselines will very likely show that task-slicing the reference —
-   grammar for writing, CLI reference for reading — roughly halves the resident
-   overhead, and that skill-style progressive disclosure cuts it by around 20×.
-   That is a product improvement worth making on its own merits, and it needs no
-   eval result to justify it. The argument for waiting is that changing the
-   reference mid-design moves the thing being measured; the argument against is
-   that shipping a cheaper reference is straightforwardly good and the eval
-   should measure whatever is current. Recommend raising it as its own ticket
-   now and letting the eval measure the improved version.
+4. ~~**Whether restructuring `AI-AGENT-REFERENCE.md` waits for the eval.**~~
+   **Settled 2026-08-04: it goes first**, as Feature 45
+   (`features/45-agent-reference-progressive-disclosure/PRD.md`). The static
+   baseline measurement moves there; this feature measures the restructured
+   reference and must not hash its protocol until Feature 45 is released. See
+   [But the overhead is a *variable*](#but-the-overhead-is-a-variable-not-a-constant--so-it-is-a-factor).
 5. **Whether the `>90% valid Satsuma` claim gets measured here or just pulled.**
    Measuring it is a different experiment (generation validity, not
    comprehension cost) and would need its own arms. Recommend pulling it from
