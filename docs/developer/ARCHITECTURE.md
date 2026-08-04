@@ -23,7 +23,7 @@ The `tooling/` directory contains nine npm packages:
 | `satsuma-viz` | Lit web component that renders VizModel as an interactive diagram; consumes satsuma-viz-model and small shared helpers from satsuma-core |
 | `vscode-satsuma` | VS Code extension shell; consumer of satsuma-lsp and satsuma-viz |
 | `satsuma-viz-harness` | Standalone HTTP harness for fixture-driven browser testing of satsuma-viz; Playwright tests |
-| `satsuma-scenario-gen` | **Test-only.** Builds semantic Satsuma scenarios as plain data, renders them to source, and states the ground truth that follows by construction. Depended on *by* other packages' test suites and depends on none of them — see ADR-049 |
+| `satsuma-scenario-gen` | **Test-only.** Builds semantic Satsuma scenarios as plain data, renders them to source, and states the ground truth that follows by construction. Depended on *by* other packages' test suites and depends on none of them |
 
 ### Package Dependency Diagram
 
@@ -67,7 +67,7 @@ The dependency arrows above describe runtime and compile-time package dependenci
 
 `satsuma-core` never imports from `satsuma-cli`, `satsuma-lsp`, `vscode-satsuma`, or the viz harness. The LSP never imports from the CLI. The CLI never imports from the LSP. `satsuma-viz-backend` is shared by the LSP server and the viz harness — neither imports from the other.
 
-`satsuma-scenario-gen` sits below everything, including core: core's own test suites depend on it, so a dependency back on core would be a build cycle. It is also the one package with no dependency on the toolchain at all, which is what makes it usable as a test oracle — see ADR-049.
+`satsuma-scenario-gen` sits below everything, including core: core's own test suites depend on it, so a dependency back on core would be a build cycle. It is also the one package with no dependency on the toolchain at all, which is what makes it usable as a test oracle — a generated scenario states its own ground truth by construction, so a property that consulted core to decide the expected answer would be asking the code under test to grade itself.
 
 ### 2. Parsing never fails
 

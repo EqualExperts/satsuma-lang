@@ -71,7 +71,7 @@ traversal with CLI plumbing. Its imports:
 | `../index-builder.js` (`resolveIndexKey`, `canonicalKey`, `distinctArrowRecords`) | CLI-internal index representation |
 | `../nl-ref-extract.js` (`resolveAllNLRefs`) | CLI-internal |
 | `../spread-expand.js` (`expandEntityFields`) | CLI-internal |
-| `@satsuma/core` (`collectFieldNames`, `findFieldByPath`, `qualifyField`) | already portable |
+| `@satsuma/core` (`collectFieldNames`, `findFieldByPath`, `resolveFieldEndpoint`) | already portable |
 | `../types.js` (`ExtractedWorkspace`) | CLI-internal workspace shape |
 
 The harness client cannot call any of this. It is deliberately server-free: the

@@ -83,9 +83,11 @@ function fragmentsOf(workspace) {
  * Every qualified path the workspace declares, as `[ns]::schema.path`, sorted.
  *
  * This is the set an emitted edge endpoint must belong to. An endpoint outside it
- * names a field nobody declared, which is `r0-7w76`'s failure: `qualifyField`
- * cannot see the declared field set and so cannot tell a bare field name from a
- * container header naming the schema root.
+ * names a field nobody declared, which is `r0-7w76`'s failure: endpoint
+ * resolution cannot see the declared field set, so a bare token that names both a
+ * field and a schema root has two readings and core reports rather than picks —
+ * leaving the choice to the caller (`arrowEndpoint`), which still reads it as a
+ * field.
  */
 export function scenarioDeclaredFieldPaths(workspace) {
   const fragments = fragmentsOf(workspace);

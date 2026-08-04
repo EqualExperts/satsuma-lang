@@ -17,23 +17,32 @@ plan while executing it.
 | R3 structural edge invariants | `sl-hi0z` | done |
 | R4 reachability properties | `sl-jsyn` | blocked — see [Feature 40 dependency](#the-feature-40-dependency-r4-and-r5) |
 | R5 cross-consumer parity sweep | `sl-kwet` | blocked — same |
-| R6 branded lineage endpoints | `sl-jyee` | blocked on Feature 39 R5, which has no ticket |
+| R6 branded lineage endpoints | `sl-jyee` | done |
 
-## ADR-049 is drafted and needs your sign-off
+## No ADR for the generator package — dropped on review, 2026-08-04
 
-`adrs/adr-049-generated-scenarios-are-the-ground-truth.md`, **Status: Proposed.**
+An ADR-049 (*a generated scenario is its own ground truth, in a package that cannot
+reach the toolchain*) was drafted with Status: Proposed and flagged for sign-off. The
+answer was no, and it has been removed from the branch.
 
-`AGENTS.md` says to check with you before drafting an ADR. I could not, so I drafted
-it and flagged it here instead — which matches what happened with ADR-027/028. It is
-warranted on the skill's own criteria: a new shared package is a new abstraction
-boundary, and the rules it sets (no dependency on core; adapters live with their
-pipeline; ground truth is derived from the scenario, never restated) are exactly the
-kind a future contributor would reasonably reverse — someone *will* want to import
-core into the generator.
+The two rules it would have recorded are stated where they are enforced instead:
+`docs/developer/ARCHITECTURE.md` gives the package's position below core and why the
+absence of a toolchain dependency is what makes it usable as an oracle, and
+`satsuma-scenario-gen`'s own module comments carry the no-core-dependency rule at the
+place a contributor would break it. Nothing referenced the ADR.
 
-**Drop it from the PR if you disagree**; nothing else depends on it. Number 049 was
-checked against `main` and all four in-flight branches, the highest of which is at
-048.
+## Feature 39 R5 had shipped — R6 was never actually blocked
+
+The PRD's Feature 39 asset table recorded R5 (opaque path/ref stages) as "not
+ticketed", and `sl-jyee`'s body repeats that. Both were wrong by the time this branch
+started: R5 landed on `main` as `cbdr-e6ft` (the five opaque types, their validating
+constructors and the named transitions) and `cbdr-5r4d` (enforcement at the coverage
+boundaries), recorded in **ADR-044**. The PRD was checked against `c93b1130`, one
+commit before `fd409931`/`b97ecec9` put R5 on `main`.
+
+R6 was therefore ready, not blocked, and is delivered on this branch. See
+[R6](#r6--branded-lineage-and-graph-endpoints-sl-jyee) below. The PRD's asset table and
+ticket map are corrected in the same commit.
 
 ## What I did not do
 
@@ -316,8 +325,13 @@ before touching the expectation.
   which is precisely the original symptom: *no lines at all*. Acceptance test 7. ✅
 - **Acceptance test 6 is not runnable as written.** It says "reverting
   `qualifyField`'s guard" makes the endpoint property fail; there is no guard to
-  revert — the function has always guessed. The `todo` property is the executable
+  revert — the function has always guessed. The pinned property is the executable
   form of the same claim: it fails *now*, on the shape `r0-7w76` owns.
+
+  **R6 gives the mutation a home.** The guess now lives at one named site,
+  `arrowEndpoint` in `satsuma-cli/src/field-endpoints.ts`, so the mutation the
+  acceptance test wanted is a one-line change there. The PRD text has been
+  corrected to describe it that way.
 
 ### Three permitted omissions on the viz side, enumerated rather than shrugged at
 
@@ -367,3 +381,70 @@ CI has always run it through the `tooling-modules` matrix, but
 against a mapping that renders no lines at all, would only have failed after a push.
 Added to the existing parallel step. **Revert this if commit time matters more**; the
 cost is `satsuma-viz`'s `pretest` (a `tsc --noEmit` plus an esbuild bundle).
+
+## R6 — branded lineage and graph endpoints (`sl-jyee`)
+
+The only production change in this feature. No command output moved: all 1046 CLI
+tests, including `graph.test.ts`, `field-lineage.test.ts`, R3's generated edge
+invariants and the coverage parity sweep, pass unchanged.
+
+### `qualifyField` is gone, replaced by a resolution that reports the fork
+
+`qualifyField(field, schemas) -> string` collapsed three different situations into
+one string, and its last line — `` `${schemas[0]}.${field}` `` — emitted a guess
+that read as a fact. It is replaced by:
+
+```ts
+resolveFieldEndpoint(authored: AuthoredFieldRef, schemas: readonly string[])
+  : FieldEndpointResolution
+```
+
+with three variants a caller has to acknowledge:
+
+| Variant | Means |
+|---|---|
+| `field` | the owning schema was determined; carries the `CanonicalFieldEndpoint` |
+| `schema-root-or-field` | the token is a bare name that *also* names a declared schema on this side, so it reads as that schema's root **or** as a same-named field; carries both readings |
+| `unqualifiable` | the mapping declares no schema on this side, so there is no owner to attach to |
+
+The middle variant is `r0-7w76` made typed. Core no longer chooses.
+
+### One new stage, and the guess moved to one named site
+
+`CanonicalFieldEndpoint` joins Feature 39 R5's vocabulary (ADR-044) as the last
+stage in the field family: a `CanonicalEntityRef` for the owning schema plus an
+optional path into it. `reference-stages.ts` owns that spelling in **both**
+directions — `fieldEndpointOf` composes, `fieldEndpointSchema` /
+`fieldEndpointPath` decompose — which is what let `graph-builder.ts:622`'s
+`edge.from.split(".")[0]` go away.
+
+The remaining decision lives in `satsuma-cli/src/field-endpoints.ts`
+(`arrowEndpoint`), called by all three emitters: `graph-builder.ts`,
+`field-lineage.ts` and `nl-ref-extract.ts`. It reads `schema-root-or-field` as a
+field, exactly as today, behind a labelled rule comment. `resolution.schemaRoot`
+is the other answer, sitting unused one line away, so deciding `r0-7w76` is a
+one-line change at one site rather than an archaeology exercise across three.
+
+`test/field-endpoints.test.ts` pins that choice with the same ⚠️ banner R3 uses,
+so the fix turns it red and the comment says what to replace it with.
+
+### Aggregation carries the schema instead of re-deriving it
+
+`buildFieldEdges` now returns a `ResolvedFieldEdge` — the serialized `FieldEdge`
+plus the branded endpoints it was built from — so `--schema-only` aggregation
+projects onto the schema *core determined*. Previously the field-level walk and
+the schema-level walk derived the owning schema independently, which is how two
+walks over one graph stop agreeing. The protocol shape is untouched: `FieldEdge`,
+`WorkspaceGraph`, VizModel and the LSP payloads are all still plain strings.
+
+### What R6 deliberately did not do
+
+- **It does not decide `r0-7w76`.** The emitted string is byte-identical.
+- **It does not touch `viz-backend`'s `stripped.split(".")[0]`**
+  (`workspace-index.ts:964`). That reads the first segment of *authored* NL-ref
+  text to find a schema name — a different question from unbranding an endpoint,
+  and outside this ticket's "graph and lineage code".
+- **It leaves the CLI's `canonicalKey` alone.** Core's endpoint constructors state
+  the same `[ns]::name` rule but reject an empty name, and `canonicalKey` is used
+  for display keys where the empty case is reachable (`record.mapping ?? ""`).
+  Rerouting it would turn that into a throw.

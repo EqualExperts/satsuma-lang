@@ -10,8 +10,8 @@
  *
  * **1. Endpoints name their schema explicitly.** An arrow endpoint is
  * `{ schema, path }`, never a bare string. Production code has to *infer* the
- * owning schema of an authored ref — that inference is `qualifyField`, and it is
- * exactly what `r0-7w76` shows can guess wrong. A generator that recorded only
+ * owning schema of an authored ref — that inference is `resolveFieldEndpoint`,
+ * and `r0-7w76` is the one case it cannot decide. A generator that recorded only
  * the authored spelling would have to re-implement the same inference to state
  * its own ground truth, so the oracle would share the bug. Here the schema is
  * given and the *authored spelling is derived from it* by {@link renderWorkspace}.
@@ -174,7 +174,7 @@ export function flattenBlock(source, target, children) {
 /**
  * A mapping declaration. `sources` and `targets` are authored entity refs, in
  * the order they appear in the `source { }` / `target { }` lists — order matters,
- * because `qualifyField` attaches an unqualified path to the *first* schema.
+ * because `resolveFieldEndpoint` attaches an unqualified path to the *first* schema.
  *
  * @typedef {{
  *   name: string,

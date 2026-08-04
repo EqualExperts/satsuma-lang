@@ -18,14 +18,19 @@ export {
   createAuthoredEntityRef,
   createAuthoredFieldRef,
   createCanonicalEntityRef,
+  createCanonicalFieldEndpoint,
   createContainerQualifiedFieldRef,
   createSchemaLocalPath,
+  fieldEndpointOf,
+  fieldEndpointPath,
+  fieldEndpointSchema,
   qualifyContainerFieldRef,
 } from "./reference-stages.js";
 export type {
   AuthoredEntityRef,
   AuthoredFieldRef,
   CanonicalEntityRef,
+  CanonicalFieldEndpoint,
   ContainerQualifiedFieldRef,
   SchemaLocalPath,
 } from "./reference-stages.js";
@@ -160,9 +165,10 @@ export type {
 export {
   canonicalRef,
   canonicalEntityName,
-  qualifyField,
+  resolveFieldEndpoint,
   resolveScopedEntityRef,
 } from "./canonical-ref.js";
+export type { FieldEndpointResolution } from "./canonical-ref.js";
 export { extractMetadata } from "./meta-extract.js";
 export {
   extractFieldTree,

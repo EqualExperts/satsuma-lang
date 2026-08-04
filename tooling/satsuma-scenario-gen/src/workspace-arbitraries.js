@@ -13,7 +13,7 @@
  * | {@link diamondWorkspaceArbitrary} | two paths to one field | single-predecessor walks (`sg-pufq`) |
  * | {@link cyclicWorkspaceArbitrary} | a closed loop | non-termination, duplicate entries |
  * | {@link multiFileWorkspaceArbitrary} | files plus `import` | the LSP's cross-file model merge |
- * | {@link namespacedWorkspaceArbitrary} | namespaces | `qualifyField`'s namespace branch |
+ * | {@link namespacedWorkspaceArbitrary} | namespaces | endpoint resolution's namespace branch |
  * | {@link containerWorkspaceArbitrary} | `each` / `flatten` | dropped edges (`3cdd-yavi`, `sl-l7u0`) |
  * | {@link nlRefWorkspaceArbitrary} | NL `@ref` text | phantom source edges (`cbh-y5og`) |
  * | {@link computedArrowWorkspaceArbitrary} | sourceless arrows | `from: null` handling |
@@ -24,7 +24,7 @@
  *
  * **A container header whose target is the schema root** (`flatten orders ->
  * target_schema`). That is `r0-7w76`: core holds two readings of the same token,
- * and `qualifyField` invents `::target_schema.target_schema` for it. Generating it
+ * and the CLI still reads it as `::target_schema.target_schema`. Generating it
  * in the default domain would make every endpoint-existence property red for a
  * defect this feature explicitly does not decide.
  *
@@ -274,9 +274,9 @@ export const multiFileWorkspaceArbitrary = fc
 /**
  * A chain whose schemas are spread across file scope and two namespaces.
  *
- * `qualifyField` has a namespace-matching branch that strips a namespace from a
- * declared schema to compare its bare name against an authored prefix
- * (`canonical-ref.ts:68-72`). Nothing generated reached it before, and every
+ * `resolveFieldEndpoint` has a namespace-matching branch that strips a namespace
+ * from a declared schema to compare its bare name against an authored prefix
+ * (`canonical-ref.ts`). Nothing generated reached it before, and every
  * cross-namespace hop here does.
  *
  * **At least one schema is always namespaced.** An all-file-scope draw would not
@@ -521,7 +521,7 @@ export const spreadWorkspaceArbitrary = fc.constant(null).map(() => {
  * One mapping with two source schemas and an arrow drawing from both.
  *
  * A multi-source side forces every arrow path to be written `schema.path`, which
- * is the `qualifyField` branch that matches an authored prefix against the
+ * is the `resolveFieldEndpoint` branch that matches an authored prefix against the
  * declared schema list — and one arrow with two sources must appear as two edges
  * to the same target (spec §4.2).
  */

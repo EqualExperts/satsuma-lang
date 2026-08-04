@@ -13,8 +13,12 @@ import {
   createAuthoredEntityRef,
   createAuthoredFieldRef,
   createCanonicalEntityRef,
+  createCanonicalFieldEndpoint,
   createContainerQualifiedFieldRef,
   createSchemaLocalPath,
+  fieldEndpointOf,
+  fieldEndpointPath,
+  fieldEndpointSchema,
   qualifyContainerFieldRef,
 } from "@satsuma/core";
 
@@ -51,6 +55,57 @@ describe("reference-stage constructors", () => {
     // their empty namespace explicit as the leading `::`.
     assert.throws(() => createCanonicalEntityRef("customers"), TypeError);
     assert.throws(() => createCanonicalEntityRef("crm::"), TypeError);
+  });
+
+  it("rejects an endpoint whose owning schema is missing or unnamed", () => {
+    // An endpoint identifies a field *of a schema*. A bare path names no owner,
+    // and a spelling with nothing between the separators names no schema — both
+    // would serialize as an edge endpoint that resolves to nobody.
+    assert.throws(() => createCanonicalFieldEndpoint("customers.email"), TypeError);
+    assert.throws(() => createCanonicalFieldEndpoint("crm::"), TypeError);
+    assert.throws(() => createCanonicalFieldEndpoint("::.email"), TypeError);
+  });
+
+  it("accepts an endpoint that names a schema root with no field path", () => {
+    // Schema-root endpoints are a legal spelling — schema-level lineage emits
+    // them — so the constructor must not require a path. Whether any *authored*
+    // form should resolve to one is a separate open question (r0-7w76).
+    assert.equal(createCanonicalFieldEndpoint("::species_fact"), "::species_fact");
+  });
+});
+
+// ── Endpoint composition and decomposition ───────────────────────────────────
+
+describe("field endpoints", () => {
+  it("composes and decomposes a namespaced nested endpoint symmetrically", () => {
+    // Composition and decomposition are the same rule read in two directions;
+    // if they ever disagree, an owning schema derived from a serialized endpoint
+    // stops matching the schema the endpoint was built from.
+    const endpoint = fieldEndpointOf(
+      createCanonicalEntityRef("crm::customers"),
+      createSchemaLocalPath("address.city"),
+    );
+    assert.equal(endpoint, "crm::customers.address.city");
+    assert.equal(fieldEndpointSchema(endpoint), "crm::customers");
+    assert.equal(fieldEndpointPath(endpoint), "address.city");
+  });
+
+  it("does not mistake a global endpoint's empty namespace for a path", () => {
+    // `::orders.id` starts with the path separator's cousin. Decomposition must
+    // search for the path only after the namespace separator, or the owning
+    // schema comes back empty for every global entity.
+    const endpoint = createCanonicalFieldEndpoint("::orders.id");
+    assert.equal(fieldEndpointSchema(endpoint), "::orders");
+    assert.equal(fieldEndpointPath(endpoint), "id");
+  });
+
+  it("reports a null path for a schema-root endpoint", () => {
+    // A caller aggregating field edges onto schemas needs to distinguish "this
+    // endpoint is a schema" from "this endpoint is a field named after one".
+    const endpoint = fieldEndpointOf(createCanonicalEntityRef("::species_fact"), null);
+    assert.equal(endpoint, "::species_fact");
+    assert.equal(fieldEndpointSchema(endpoint), "::species_fact");
+    assert.equal(fieldEndpointPath(endpoint), null);
   });
 });
 

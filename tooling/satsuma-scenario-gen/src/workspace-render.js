@@ -32,10 +32,10 @@ const INDENT = "  ";
  * How an endpoint is written on one side of an arrow, given that side's schemas.
  *
  * A single-schema side may write the path bare, which is the common Satsuma form
- * and the one `qualifyField` has to attach to the mapping's first schema. A
- * multi-schema side must qualify, because a bare path would be ambiguous — and
- * that qualified spelling is the branch of `qualifyField` that matches a prefix
- * against the declared schema list.
+ * and the one `resolveFieldEndpoint` has to attach to the mapping's first schema.
+ * A multi-schema side must qualify, because a bare path would be ambiguous — and
+ * that qualified spelling is the branch of `resolveFieldEndpoint` that matches a
+ * prefix against the declared schema list.
  */
 function authoredEndpoint({ schema, path }, sideSchemas) {
   return sideSchemas.length === 1 && sideSchemas[0] === schema ? path : `${schema}.${path}`;

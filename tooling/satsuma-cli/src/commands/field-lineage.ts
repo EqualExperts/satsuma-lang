@@ -18,8 +18,9 @@ import { runCommand, CommandError, EXIT_NOT_FOUND, EXIT_PARSE_ERROR } from "../c
 import { parsePositiveInt } from "../option-parsers.js";
 import { resolveIndexKey, canonicalKey, distinctArrowRecords } from "../index-builder.js";
 import { resolveAllNLRefs } from "../nl-ref-extract.js";
+import { arrowEndpoint } from "../field-endpoints.js";
 import { expandEntityFields } from "../spread-expand.js";
-import { collectFieldNames, findFieldByPath, qualifyField } from "@satsuma/core";
+import { collectFieldNames, createCanonicalFieldEndpoint, findFieldByPath } from "@satsuma/core";
 import type { ExtractedWorkspace } from "../types.js";
 
 interface FieldEdgeEntry {
@@ -172,11 +173,11 @@ function buildFieldEdgeGraph(index: ExtractedWorkspace): FieldEdgeEntry[] {
     const sourceSchemas = mapping?.sources ?? [];
     const targetSchemas = mapping?.targets ?? [];
 
-    const toField = record.target ? canonicalKey(qualifyField(record.target, targetSchemas)) : null;
+    const toField = record.target ? arrowEndpoint(record.target, targetSchemas) : null;
     if (!toField) continue;
 
     for (const src of record.sources.length > 0 ? record.sources : [null]) {
-      const fromField = src ? canonicalKey(qualifyField(src, sourceSchemas)) : null;
+      const fromField = src ? arrowEndpoint(src, sourceSchemas) : null;
       edges.push({
         from: fromField,
         to: toField,
@@ -200,9 +201,11 @@ function buildFieldEdgeGraph(index: ExtractedWorkspace): FieldEdgeEntry[] {
     const mapping = index.mappings.get(rawMappingKey);
     if (!mapping) continue;
 
-    const sourceField = nlRef.resolvedTo.name; // already canonical
-    const rawTarget = qualifyField(nlRef.targetField, mapping.targets);
-    const targetField = canonicalKey(rawTarget);
+    // An @ref resolution already names its owning schema canonically, so it
+    // enters the typed domain through the endpoint constructor rather than being
+    // re-qualified against the mapping.
+    const sourceField = createCanonicalFieldEndpoint(nlRef.resolvedTo.name);
+    const targetField = arrowEndpoint(nlRef.targetField, mapping.targets);
 
     if (sourceField === targetField) continue;
 

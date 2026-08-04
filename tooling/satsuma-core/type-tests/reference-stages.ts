@@ -11,17 +11,23 @@ import {
   createAuthoredEntityRef,
   createAuthoredFieldRef,
   createCanonicalEntityRef,
+  createCanonicalFieldEndpoint,
   createContainerQualifiedFieldRef,
   createSchemaLocalPath,
   declaredFieldKind,
+  fieldEndpointOf,
+  fieldEndpointPath,
+  fieldEndpointSchema,
   isCoveredPath,
   qualifyContainerFieldRef,
+  resolveFieldEndpoint,
   schemaLocalFieldPath,
 } from "../src/index.js";
 import type {
   AuthoredEntityRef,
   AuthoredFieldRef,
   CanonicalEntityRef,
+  CanonicalFieldEndpoint,
   ContainerQualifiedFieldRef,
   SchemaLocalPath,
 } from "../src/index.js";
@@ -84,6 +90,49 @@ schemaLocalFieldPath(authoredField, authoredEntity, canonicalEntity, []);
 // @ts-expect-error The canonical identity cannot be replaced with an authored ref.
 schemaLocalFieldPath(qualified, authoredEntity, authoredEntity, []);
 
+// ── Arrow endpoints ──────────────────────────────────────────────────────────
+
+const endpoint: CanonicalFieldEndpoint = fieldEndpointOf(canonicalEntity, local);
+fieldEndpointSchema(endpoint);
+fieldEndpointPath(endpoint);
+
+// Resolution reports the ambiguous case in its type, so a caller that only
+// destructures `endpoint` does not compile — the fork has to be acknowledged.
+const resolution = resolveFieldEndpoint(authoredField, ["customers"]);
+// @ts-expect-error `endpoint` exists only on the unambiguous variant.
+void resolution.endpoint;
+if (resolution.kind === "field") {
+  const resolved: CanonicalFieldEndpoint = resolution.endpoint;
+  void resolved;
+}
+
+// Resolution consumes authored text only; a value that has already advanced
+// cannot be sent back through qualification.
+// @ts-expect-error Raw strings are not authored field references.
+resolveFieldEndpoint("city", ["customers"]);
+
+// @ts-expect-error An endpoint has completed qualification and cannot re-enter it.
+resolveFieldEndpoint(endpoint, ["customers"]);
+
+// Endpoint accessors require the endpoint stage, not an earlier field stage.
+// @ts-expect-error Authored field refs name no owning schema yet.
+fieldEndpointSchema(authoredField);
+
+// @ts-expect-error A schema-local path is relative and has no owner to report.
+fieldEndpointSchema(local);
+
+// @ts-expect-error Raw strings from a serialized payload must be validated first.
+fieldEndpointPath("::customers.city");
+
+// An entity id and an endpoint are different stages even though a schema-root
+// endpoint spells identically to one.
+// @ts-expect-error A canonical entity id is not an endpoint.
+fieldEndpointPath(canonicalEntity);
+
+// @ts-expect-error An endpoint may carry a field path and is not entity identity.
+fieldEndpointOf(endpoint, local);
+
+void createCanonicalFieldEndpoint("::customers.city");
 void qualified;
 void local;
 void canonicalEntity;
