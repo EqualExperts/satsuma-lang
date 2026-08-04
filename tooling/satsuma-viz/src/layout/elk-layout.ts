@@ -726,15 +726,20 @@ function addMappingEdges(mappings: MappingBlock[], edges: ElkEdge[], ctx: GraphC
       for (let i = 0; i < arrows.length; i++) {
         const a = arrows[i];
         if (!a) continue;
+        const authoredSource = a.sourceFields[0];
+        // A computed arrow (`-> target`) covers its target but declares no
+        // source endpoint. It therefore has no field-to-field line to draw:
+        // using the target path as a fallback manufactured lineage from a
+        // same-named source field (lgc-4bxl). The target card's filled coverage
+        // port distinguishes computed from unmapped without inventing a source.
+        if (!authoredSource) continue;
         // Ports are keyed by declared field path, so an arrow authored
         // element-relative inside a container (`.line1 -> .line1`) has to be
         // qualified against that container before findPort can match it. Until
         // 3cdd-yavi every such arrow resolved to no port and its edge was
         // silently skipped, so nested-iteration mappings drew no lines at all.
         const targetField = qualifyChildArrowPath(a.targetField, container.target);
-        const sourceField = a.sourceFields[0]
-          ? qualifyChildArrowPath(a.sourceFields[0], container.source)
-          : targetField;
+        const sourceField = qualifyChildArrowPath(authoredSource, container.source);
         const edgeId = `${prefix}:${i}`;
 
         // Attach the edge to the first source ref whose card actually

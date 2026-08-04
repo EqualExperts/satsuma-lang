@@ -1,6 +1,6 @@
 ---
 id: lgc-fu7o
-status: open
+status: in_progress
 deps: []
 links: [sl-hi0z, lgc-4bxl]
 created: 2026-08-03T22:25:37Z
