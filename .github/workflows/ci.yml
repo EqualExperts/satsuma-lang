@@ -119,6 +119,8 @@ jobs:
             tooling/vscode-satsuma/node_modules
             tooling/satsuma-lsp/node_modules
           key: workspace-${{ github.sha }}
+          restore-keys: |
+            workspace-
 
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
@@ -170,6 +172,8 @@ jobs:
             tooling/vscode-satsuma/node_modules
             tooling/satsuma-lsp/node_modules
           key: workspace-${{ github.sha }}
+          restore-keys: |
+            workspace-
 
       # @satsuma/scenario-gen has no build step and no coverage target, so it gets
       # no shard of its own in the tooling-modules matrix. Its tests run here,
@@ -256,6 +260,8 @@ jobs:
             tooling/satsuma-lsp/node_modules
             tooling/integration-tests/node_modules
           key: workspace-${{ github.sha }}
+          restore-keys: |
+            workspace-
 
       - name: Run cross-consumer parity sweeps
         run: npm test
@@ -300,6 +306,8 @@ jobs:
             tooling/vscode-satsuma/node_modules
             tooling/satsuma-lsp/node_modules
           key: workspace-${{ github.sha }}
+          restore-keys: |
+            workspace-
 
       - name: Check generated CST contract is up to date
         run: npm run check:cst-symbols
@@ -381,6 +389,8 @@ jobs:
             tooling/satsuma-lsp/node_modules
             tooling/integration-tests/node_modules
           key: workspace-${{ github.sha }}
+          restore-keys: |
+            workspace-
 
       # Default mode (no --from-logs): this job spawns each tracked package's
       # own test command itself, rather than reading logs the pre-commit hook
@@ -433,6 +443,8 @@ jobs:
             tooling/vscode-satsuma/node_modules
             tooling/satsuma-lsp/node_modules
           key: workspace-${{ github.sha }}
+          restore-keys: |
+            workspace-
 
       - name: Validate manifest and grammar
         run: npm run validate
@@ -544,6 +556,8 @@ jobs:
             tooling/vscode-satsuma/node_modules
             tooling/satsuma-lsp/node_modules
           key: workspace-${{ github.sha }}
+          restore-keys: |
+            workspace-
 
       - name: Pack tarball
         run: npm run pack
@@ -587,6 +601,8 @@ jobs:
             tooling/vscode-satsuma/node_modules
             tooling/satsuma-lsp/node_modules
           key: workspace-${{ github.sha }}
+          restore-keys: |
+            workspace-
 
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
@@ -678,6 +694,8 @@ jobs:
             tooling/vscode-satsuma/node_modules
             tooling/satsuma-lsp/node_modules
           key: workspace-${{ github.sha }}
+          restore-keys: |
+            workspace-
 
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
@@ -754,6 +772,8 @@ jobs:
             tooling/vscode-satsuma/node_modules
             tooling/satsuma-lsp/node_modules
           key: workspace-${{ github.sha }}
+          restore-keys: |
+            workspace-
 
       # test:coverage bypasses each package's `pretest` (npm only auto-runs
       # pretest before a script literally named `test`), so the CST-symbol
