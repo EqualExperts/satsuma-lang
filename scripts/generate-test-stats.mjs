@@ -62,6 +62,31 @@ export function parseCorpusTestCount(output) {
   return Number(match[1]);
 }
 
+/** Same as parseCorpusTestCount, but returns null instead of throwing — for callers with a fallback. */
+export function tryParseCorpusTestCount(output) {
+  const match = output.match(CORPUS_SUMMARY_PATTERN);
+  return match ? Number(match[1]) : null;
+}
+
+/**
+ * Resolves the corpus test count from a captured log that may be a real run
+ * or a deliberate skip (see collectCorpusTestCount's doc comment for why a
+ * skip is expected, not an error). Falls back to the previous test-stats.json
+ * value on a skip; throws if there is no previous value to fall back to.
+ */
+export function resolveCorpusTestCountFromLog(output, previousStats) {
+  const parsed = tryParseCorpusTestCount(output);
+  if (parsed !== null) {
+    return parsed;
+  }
+  if (previousStats?.parserCorpusTests === undefined) {
+    throw new Error(
+      "tree-sitter's corpus check was skipped this run and there is no previous test-stats.json to fall back to",
+    );
+  }
+  return previousStats.parserCorpusTests;
+}
+
 /**
  * Counts commands from the CLI's own `--help` output — the shipped source of
  * truth, rather than a count of `.command(...)` call sites in the source
@@ -108,14 +133,10 @@ export const TRACKED_PACKAGES = [
 
 // ── Collection ──────────────────────────────────────────────────────────
 
-function readCapturedLog(logDir, name) {
+/** Returns a captured log's contents, or null if run-repo-checks.sh never teed that step (e.g. a package it doesn't exercise locally). */
+function readCapturedLogIfPresent(logDir, name) {
   const logPath = path.join(logDir, `${name}.log`);
-  if (!fs.existsSync(logPath)) {
-    throw new Error(
-      `Expected a captured log at ${logPath} — did scripts/run-repo-checks.sh skip teeing this step's output?`,
-    );
-  }
-  return fs.readFileSync(logPath, "utf8");
+  return fs.existsSync(logPath) ? fs.readFileSync(logPath, "utf8") : null;
 }
 
 function runNpmScript(packageKey, npmScript) {
@@ -125,25 +146,77 @@ function runNpmScript(packageKey, npmScript) {
   });
 }
 
-function collectPackageCounts(fromLogsDir) {
+/**
+ * Resolves one package's test count from a captured log that may not exist —
+ * run-repo-checks.sh doesn't run every tracked package locally (it's the
+ * fast local gate, not the full CI matrix). No log means no fresh count this
+ * run; keep the last committed value rather than treat "the local hook
+ * doesn't exercise this package" as "the count is zero".
+ */
+export function resolvePackageCountFromLog(output, previousCount, key) {
+  if (output === null) {
+    if (previousCount === undefined) {
+      throw new Error(
+        `No captured log for ${key} and no previous test-stats.json value to fall back to`,
+      );
+    }
+    return previousCount;
+  }
+  return parseNodeTestCount(output);
+}
+
+function collectPackageCounts(fromLogsDir, previousStats) {
   const packages = {};
   for (const { key, npmScript } of TRACKED_PACKAGES) {
-    const output = fromLogsDir ? readCapturedLog(fromLogsDir, key) : runNpmScript(key, npmScript);
-    packages[key] = parseNodeTestCount(output);
+    packages[key] = fromLogsDir
+      ? resolvePackageCountFromLog(
+          readCapturedLogIfPresent(fromLogsDir, key),
+          previousStats?.packages?.[key],
+          key,
+        )
+      : parseNodeTestCount(runNpmScript(key, npmScript));
   }
   return packages;
 }
 
-function collectCorpusTestCount(fromLogsDir) {
-  // `npm run test`, not a bare `tree-sitter test --wasm`: the globally
-  // resolved tree-sitter-cli binary may lack the wasm feature, but the
-  // project's own devDependency (resolved by the npm script via
-  // node_modules/.bin) always has it — the same reason AGENTS.md tells
-  // humans to run this suite through `npm test`, not the CLI directly.
-  const output = fromLogsDir
-    ? readCapturedLog(fromLogsDir, "tree-sitter-satsuma")
-    : runNpmScript("tree-sitter-satsuma", "test");
-  return parseCorpusTestCount(output);
+/**
+ * In --from-logs mode, the captured log is whatever run-repo-checks.sh's own
+ * corpus step produced — and that step deliberately SKIPs (rather than
+ * fails) when the globally resolved tree-sitter-cli lacks the wasm feature,
+ * relying on the JS integration tests to cover the corpus instead. A skip
+ * means no fresh count is available this run; keep the last committed value
+ * rather than treat "the hook chose not to run this" as "the count is zero".
+ * Default (spawn) mode has no such gap — it always runs through the
+ * project's own wasm-capable local binary — so it always parses for real.
+ */
+function collectCorpusTestCount(fromLogsDir, previousStats) {
+  if (!fromLogsDir) {
+    // `npm run test`, not a bare `tree-sitter test --wasm`: the globally
+    // resolved tree-sitter-cli binary may lack the wasm feature, but the
+    // project's own devDependency (resolved by the npm script via
+    // node_modules/.bin) always has it — the same reason AGENTS.md tells
+    // humans to run this suite through `npm test`, not the CLI directly.
+    return parseCorpusTestCount(runNpmScript("tree-sitter-satsuma", "test"));
+  }
+
+  const output = readCapturedLogIfPresent(fromLogsDir, "tree-sitter-satsuma");
+  if (output === null) {
+    if (previousStats?.parserCorpusTests === undefined) {
+      throw new Error(
+        "No captured log for tree-sitter-satsuma and no previous test-stats.json value to fall back to",
+      );
+    }
+    return previousStats.parserCorpusTests;
+  }
+  return resolveCorpusTestCountFromLog(output, previousStats);
+}
+
+/** Reads the currently committed test-stats.json, if any — the fallback source when a run-repo-checks.sh step was skipped rather than run. */
+function readPreviousStats() {
+  if (!fs.existsSync(STATS_PATH)) {
+    return null;
+  }
+  return JSON.parse(fs.readFileSync(STATS_PATH, "utf8"));
 }
 
 /** Always introspects the already-built CLI directly — cheap, no test suite involved, identical in both run modes. */
@@ -172,13 +245,14 @@ function parseFromLogsArg(argv) {
 
 function main() {
   const fromLogsDir = parseFromLogsArg(process.argv.slice(2));
+  const previousStats = readPreviousStats();
 
   // Package tests run (or their logs are read) before the CLI is introspected:
   // satsuma-cli's own "test" script rebuilds dist/ via npm's automatic pretest
   // hook, so by the time collectCliCommandCount() runs, dist/index.js is fresh
   // in both run modes (run-repo-checks.sh also builds it explicitly first).
-  const packages = collectPackageCounts(fromLogsDir);
-  const parserCorpusTests = collectCorpusTestCount(fromLogsDir);
+  const packages = collectPackageCounts(fromLogsDir, previousStats);
+  const parserCorpusTests = collectCorpusTestCount(fromLogsDir, previousStats);
   const cliCommands = collectCliCommandCount();
 
   writeStats(buildStats({ cliCommands, parserCorpusTests, packages }));
