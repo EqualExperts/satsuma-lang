@@ -16,25 +16,17 @@ import type { Command } from "commander";
 import { loadWorkspace } from "../load-workspace.js";
 import { runCommand, CommandError, EXIT_NOT_FOUND, EXIT_PARSE_ERROR } from "../command-runner.js";
 import { parsePositiveInt } from "../option-parsers.js";
-import { resolveIndexKey, canonicalKey, distinctArrowRecords } from "../index-builder.js";
-import { resolveAllNLRefs } from "../nl-ref-extract.js";
-import { arrowEndpoint } from "../field-endpoints.js";
+import { resolveIndexKey, canonicalKey } from "../index-builder.js";
+import { createFieldEdgeSource } from "../field-edge-source.js";
 import { expandEntityFields } from "../spread-expand.js";
-import { collectFieldNames, createCanonicalFieldEndpoint, findFieldByPath } from "@satsuma/core";
-import type { ExtractedWorkspace } from "../types.js";
-
-interface FieldEdgeEntry {
-  from: string | null; // canonical field path or null for derived/no-source
-  to: string; // canonical field path
-  via_mapping: string; // canonical mapping key
-  classification: string;
-}
-
-interface FieldLineageResult {
-  field: string;
-  upstream: Array<{ field: string; via_mapping: string; classification: string }>;
-  downstream: Array<{ field: string; via_mapping: string; classification: string }>;
-}
+import {
+  buildFieldEdges,
+  collectFieldNames,
+  createCanonicalFieldEndpoint,
+  findFieldByPath,
+  traceFieldLineage,
+} from "@satsuma/core";
+import type { FieldLineageDirection, FieldLineageResult } from "@satsuma/core";
 
 export function register(program: Command): void {
   program
@@ -114,31 +106,17 @@ Examples:
           const qualifiedField = `${resolvedSchema.key}.${fieldName}`;
           const canonicalField = canonicalKey(qualifiedField);
 
-          // Build the field-level edge graph (declared + nl-derived)
-          const edges = buildFieldEdgeGraph(index);
-
           // Determine which directions to trace.
           // If both flags are set (or neither), trace both directions.
           const doUpstream = opts.upstream || !opts.downstream;
           const doDownstream = opts.downstream || !opts.upstream;
-
-          const upstream: Array<{ field: string; via_mapping: string; classification: string }> =
-            [];
-          const downstream: Array<{ field: string; via_mapping: string; classification: string }> =
-            [];
-
-          if (doUpstream) {
-            traceUpstream(canonicalField, edges, opts.depth, upstream);
-          }
-          if (doDownstream) {
-            traceDownstream(canonicalField, edges, opts.depth, downstream);
-          }
-
-          const result: FieldLineageResult = {
-            field: canonicalField,
-            upstream,
-            downstream,
-          };
+          const direction: FieldLineageDirection =
+            doUpstream && doDownstream ? "both" : doUpstream ? "upstream" : "downstream";
+          const edges = buildFieldEdges(createFieldEdgeSource(index)).edges;
+          const result = traceFieldLineage(edges, createCanonicalFieldEndpoint(canonicalField), {
+            depth: opts.depth,
+            direction,
+          });
 
           if (opts.json) {
             console.log(JSON.stringify(result, null, 2));
@@ -149,157 +127,6 @@ Examples:
         },
       ),
     );
-}
-
-// ── Field-edge graph ──────────────────────────────────────────────────────────
-
-/**
- * Build a list of all field-level edges from the workspace index,
- * including both declared arrows and NL-derived references.
- */
-function buildFieldEdgeGraph(index: ExtractedWorkspace): FieldEdgeEntry[] {
-  const edges: FieldEdgeEntry[] = [];
-
-  // Declared arrows from the field arrows index, deduplicated by reference
-  // (see distinctArrowRecords for why a positional key is not a safe identity).
-  for (const record of distinctArrowRecords(index.fieldArrows)) {
-    const mappingKey = canonicalKey(
-      record.namespace ? `${record.namespace}::${record.mapping}` : (record.mapping ?? ""),
-    );
-
-    const mapping = index.mappings.get(
-      record.namespace ? `${record.namespace}::${record.mapping}` : (record.mapping ?? ""),
-    );
-    const sourceSchemas = mapping?.sources ?? [];
-    const targetSchemas = mapping?.targets ?? [];
-
-    const toField = record.target ? arrowEndpoint(record.target, targetSchemas) : null;
-    if (!toField) continue;
-
-    for (const src of record.sources.length > 0 ? record.sources : [null]) {
-      const fromField = src ? arrowEndpoint(src, sourceSchemas) : null;
-      edges.push({
-        from: fromField,
-        to: toField,
-        via_mapping: mappingKey,
-        classification: record.classification,
-      });
-    }
-  }
-
-  // NL-derived field edges from @ref mentions
-  const nlRefs = resolveAllNLRefs(index);
-  const nlSeen = new Set<string>();
-  for (const nlRef of nlRefs) {
-    if (!nlRef.resolved || !nlRef.resolvedTo || nlRef.resolvedTo.kind !== "field") continue;
-    if (!nlRef.targetField) continue;
-
-    // nlRef.mapping is already namespace-qualified by resolveAllNLRefs —
-    // prepending nlRef.namespace again would produce "crm::crm::load" and
-    // make the mapping lookup fail, silently dropping the edge (sl-njej).
-    const rawMappingKey = nlRef.mapping;
-    const mapping = index.mappings.get(rawMappingKey);
-    if (!mapping) continue;
-
-    // An @ref resolution already names its owning schema canonically, so it
-    // enters the typed domain through the endpoint constructor rather than being
-    // re-qualified against the mapping.
-    const sourceField = createCanonicalFieldEndpoint(nlRef.resolvedTo.name);
-    const targetField = arrowEndpoint(nlRef.targetField, mapping.targets);
-
-    if (sourceField === targetField) continue;
-
-    const dedupKey = `${sourceField}|${targetField}|${rawMappingKey}`;
-    if (nlSeen.has(dedupKey)) continue;
-    nlSeen.add(dedupKey);
-
-    // Skip if there's already a declared (non-nl-derived) arrow from the same
-    // source to the same target in the same mapping
-    const mappingCanonical = canonicalKey(rawMappingKey);
-    const alreadyCovered = edges.some(
-      (e) =>
-        e.from === sourceField &&
-        e.to === targetField &&
-        e.via_mapping === mappingCanonical &&
-        e.classification !== "nl-derived",
-    );
-    if (alreadyCovered) continue;
-
-    edges.push({
-      from: sourceField,
-      to: targetField,
-      via_mapping: mappingCanonical,
-      classification: "nl-derived",
-    });
-  }
-
-  return edges;
-}
-
-// ── Traversal ─────────────────────────────────────────────────────────────────
-
-/**
- * Trace upstream: fields that flow INTO `start` (start is a target).
- * BFS up to `maxDepth` hops. Returns one entry per source field reached.
- */
-function traceUpstream(
-  start: string,
-  edges: FieldEdgeEntry[],
-  maxDepth: number,
-  result: Array<{ field: string; via_mapping: string; classification: string }>,
-): void {
-  const visited = new Set<string>([start]);
-  const queue: Array<{ field: string; depth: number }> = [{ field: start, depth: 0 }];
-
-  while (queue.length > 0) {
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- Safe: queue.length > 0 checked above
-    const { field, depth } = queue.shift()!;
-    if (depth >= maxDepth) continue;
-
-    for (const edge of edges) {
-      if (edge.to !== field || edge.from === null) continue;
-      if (visited.has(edge.from)) continue;
-      visited.add(edge.from);
-      result.push({
-        field: edge.from,
-        via_mapping: edge.via_mapping,
-        classification: edge.classification,
-      });
-      queue.push({ field: edge.from, depth: depth + 1 });
-    }
-  }
-}
-
-/**
- * Trace downstream: fields that `start` flows INTO (start is a source).
- * BFS up to `maxDepth` hops. Returns one entry per target field reached.
- */
-function traceDownstream(
-  start: string,
-  edges: FieldEdgeEntry[],
-  maxDepth: number,
-  result: Array<{ field: string; via_mapping: string; classification: string }>,
-): void {
-  const visited = new Set<string>([start]);
-  const queue: Array<{ field: string; depth: number }> = [{ field: start, depth: 0 }];
-
-  while (queue.length > 0) {
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- Safe: queue.length > 0 checked above
-    const { field, depth } = queue.shift()!;
-    if (depth >= maxDepth) continue;
-
-    for (const edge of edges) {
-      if (edge.from !== field) continue;
-      if (visited.has(edge.to)) continue;
-      visited.add(edge.to);
-      result.push({
-        field: edge.to,
-        via_mapping: edge.via_mapping,
-        classification: edge.classification,
-      });
-      queue.push({ field: edge.to, depth: depth + 1 });
-    }
-  }
 }
 
 // ── Formatters ────────────────────────────────────────────────────────────────

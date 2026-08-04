@@ -1,6 +1,6 @@
 # Satsuma Tooling Architecture
 
-> Last updated: 2026-08-03 — documented lint policy detection in core (ADR-047) and `FieldDecl` structural variants (ADR-045).
+> Last updated: 2026-08-04 — documented shared field-edge assembly and lineage traversal in core.
 
 This document is the canonical architecture reference for the Satsuma language tooling — the packages under `tooling/` that parse, analyse, format, validate, visualize, and provide IDE support for `.stm` files. The design is influenced by [rust-analyzer's architecture](https://rust-analyzer.github.io/book/contributing/architecture.html), adapted for a tree-sitter-backed DSL rather than a full programming language compiler.
 
@@ -30,7 +30,7 @@ The `tooling/` directory contains nine npm packages:
 ```mermaid
 graph TD
   TS[tree-sitter-satsuma<br/><i>grammar + WASM artifact</i>]
-  CORE[satsuma-core<br/><i>formatter · cst-utils · extract · validate<br/>coverage · parser · spread-expand · nl-ref · types</i>]
+  CORE[satsuma-core<br/><i>formatter · cst-utils · extract · validate<br/>coverage · field-lineage · parser · spread-expand · nl-ref · types</i>]
   VIZM[satsuma-viz-model<br/><i>VizModel protocol types</i>]
   VIZB[satsuma-viz-backend<br/><i>buildVizModel · mergeVizModels<br/>WorkspaceIndex · indexFile<br/>getImportReachableUris · createScopedIndex</i>]
   CLI[satsuma-cli<br/><i>command suite · ExtractedWorkspace</i>]
@@ -151,16 +151,18 @@ graph LR
   PAR["parser.ts\ninitParser() singleton\nparseSource()"]
   PE["parse-errors.ts\ncollectParseErrors()\nParseError"]
   COV["coverage.ts · coverage-paths.ts\nFieldCoverageEntry\nSchemaCoverageResult\nbuildCoveredFieldPaths()\nschemaLocalFieldPath()"]
+  FL["field-lineage.ts\nFieldEdgeSource · buildFieldEdges\ntraceFieldLineage"]
   VAL["validate.ts\nSemanticIndex · SemanticDiagnostic\ncollectSemanticDiagnostics()"]
   LNT["lint-findings.ts · lint-type-mismatch.ts\nlint-lineage-cycle.ts\nLintFinding\ndetectTypeMismatches()\ndetectLineageCycles()"]
 
-  IDX --> TYPES & FD & NEVER & GENCST & CST & CLS & CAN & META & EXT & SPR & NL & FMT & STR & REF & PAR & PE & COV & VAL & LNT
+  IDX --> TYPES & FD & NEVER & GENCST & CST & CLS & CAN & META & EXT & SPR & NL & FMT & STR & REF & PAR & PE & COV & FL & VAL & LNT
   FD --> TYPES
   EXT --> CST & CLS & CAN & META & FD & TYPES
   LNT --> COV & REF & TYPES
   SPR --> EXT & TYPES
   NL --> SPR & TYPES
   COV --> REF
+  FL --> REF & TYPES
   VAL --> CAN & TYPES
 ```
 
@@ -188,6 +190,9 @@ graph LR
 | `LintFinding` | `lint-findings.ts` | Same six fields, deliberately a distinct type: a *policy* finding, suppressible via `satsuma.config.yaml`, where `SemanticDiagnostic` is a *correctness* one. See ADR-047 |
 | `FieldCoverageEntry` | `coverage.ts` | `{ path, mapped: boolean }` — coverage status for one field path |
 | `SchemaCoverageResult` | `coverage.ts` | Per-schema list of `FieldCoverageEntry` records |
+| `FieldEdgeSource` | `field-lineage.ts` | Narrow adapter through which consumer indexes supply deduplicated arrows, mapping sides, resolved NL refs, and endpoint policy |
+| `FieldEdge` | `field-lineage.ts` | Canonical source/target endpoints plus mapping, classification, and graph metadata; shared by graph assembly and traversal |
+| `FieldLineageResult` | `field-lineage.ts` | Browser-portable breadth-first upstream/downstream traversal payload used by `satsuma field-lineage` |
 | `ParseError` | `parse-errors.ts` | `{ file, line, column, message }` — structural error from tree-sitter ERROR/MISSING nodes |
 
 Reference-stage brands are private and runtime-erased. CST, JSON, LSP, and
@@ -216,6 +221,7 @@ flowchart TD
 
   nlBridge["nl-ref-extract.ts<br/>DefinitionLookup adapter<br/>ExtractedWorkspace -> core callbacks"]
   spreadBridge["spread-expand.ts<br/>EntityFieldLookup adapter<br/>ExtractedWorkspace -> core callbacks"]
+  fieldEdgeBridge["field-edge-source.ts<br/>FieldEdgeSource adapter<br/>deduplicated arrows + resolved NL refs"]
   graphBuilder["graph-builder.ts<br/>schema-level graph for graph/lineage"]
   graphCommandBuilder["commands/graph-builder.ts<br/>rich schema + field graph"]
   lintEngine["lint-engine.ts<br/>lint rule registry, fixes,<br/>NL-hygiene rules; wraps core detectors"]
@@ -229,6 +235,7 @@ flowchart TD
   commands --> workspace
   commands --> graphBuilder
   commands --> graphCommandBuilder
+  commands --> fieldEdgeBridge
   commands --> lintEngine
   commands --> semanticWarnings
   loader --> workspace --> parser --> core
@@ -237,8 +244,10 @@ flowchart TD
   indexBuilder --> core
   indexBuilder --> nlBridge
   indexBuilder --> spreadBridge
+  graphCommandBuilder --> fieldEdgeBridge
   nlBridge --> core
   spreadBridge --> core
+  fieldEdgeBridge --> core
   semanticWarnings --> core
 ```
 

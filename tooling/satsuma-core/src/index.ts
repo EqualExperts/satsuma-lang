@@ -169,6 +169,24 @@ export {
   resolveScopedEntityRef,
 } from "./canonical-ref.js";
 export type { FieldEndpointResolution } from "./canonical-ref.js";
+export { buildFieldEdges, traceFieldLineage } from "./field-lineage.js";
+export type {
+  FieldEdgeStepLike,
+  FieldArrowLike,
+  FieldMappingSides,
+  ResolvedFieldNlRefLike,
+  FieldEndpointResolver,
+  FieldEdgeSource,
+  FieldEdge,
+  UnresolvedFieldNl,
+  FieldEdgeBuildResult,
+  FieldEdgeBuildOptions,
+  FieldLineageEdge,
+  FieldLineageHop,
+  FieldLineageResult,
+  FieldLineageDirection,
+  FieldLineageOptions,
+} from "./field-lineage.js";
 export { extractMetadata } from "./meta-extract.js";
 export {
   extractFieldTree,
