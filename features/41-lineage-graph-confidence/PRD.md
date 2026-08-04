@@ -40,9 +40,15 @@ instead of shipping.
 |---|---|---|
 | R1/R2 generated CST symbol contract | Delivered in core, CLI, LSP and viz-backend (`gcsc-ejb2`, `tcc-e35f`, `tcc-ef1b`, `tcc-yb3z`, `tcc-chls`) | **Already applies.** No further work — a renamed grammar symbol is already a compile error in every package that builds lineage. |
 | R3 semantic generator and renderer | Delivered (`cbdr-o6xn`, `cbdr-yp9m`), but lives in `satsuma-core/test/support/generated-scenarios.js`, which is under `test/`, is not compiled to `dist/`, and is absent from core's `exports` map | Needs promoting and extending. This is the reusable asset. |
-| R4 independent coverage oracle | Not ticketed | **Not needed here.** See below. |
-| R5 opaque path/ref stages | Not ticketed | Directly relevant — lineage endpoints are the same unbranded strings. |
+| R4 independent coverage oracle | Delivered (`cbdr-da0j`) | **Not needed here.** See below. |
+| R5 opaque path/ref stages | Delivered (`cbdr-e6ft`, `cbdr-5r4d`), recorded in ADR-044 | Directly relevant — lineage endpoints are the same unbranded strings. R6 is unblocked. |
+
 | Parity sweep (`satsuma-cli/test/coverage-viz-parity.test.ts`) | Delivered for coverage, 219 lines, one sweep over the corpus | The single highest-value pattern to replicate for edges. |
+
+> **Correction, 2026-08-04.** The R4 and R5 rows originally read "Not ticketed".
+> Both requirements landed on `main` one commit after the `c93b1130` this PRD was
+> checked against, so R6 was ready from the moment this feature started rather
+> than blocked. Nothing else in the PRD depended on the mistake.
 
 ### Why lineage needs no independent oracle
 
@@ -65,7 +71,7 @@ five places:
 
 | Site | What it does |
 |---|---|
-| `satsuma-core/src/canonical-ref.ts:56` `qualifyField` | qualifies an authored ref against a mapping's schema list |
+| `satsuma-core/src/canonical-ref.ts` `resolveFieldEndpoint` | qualifies an authored ref against a mapping's schema list (was `qualifyField`; see R6) |
 | `satsuma-cli/src/commands/graph-builder.ts:458` `buildFieldEdges` | declared arrows plus NL-derived edges → `FieldEdge[]` |
 | `satsuma-cli/src/commands/field-lineage.ts:159` `buildFieldEdgeGraph` | a near line-for-line duplicate of the above, minus namespace filtering and NL text |
 | `satsuma-viz/src/field-coverage.ts:82` `resolveSchemaLocalFieldPath` and `forEachMappingArrow` | wraps core's `schemaLocalFieldPath`, adding one card-specific rule; its doc-comment states the walk "mirrors core's `extractArrowRecords`" |
@@ -76,13 +82,18 @@ Only the fourth of these delegates its path rules to core, and even there the
 
 ### Three failure modes, all previously caught by hand
 
-**1. Invented endpoints.** `qualifyField` ends with an unconditional
-`` `${schemas[0]}.${field}` `` (`canonical-ref.ts:75`). It has no access to the
-declared field set, so it cannot tell a bare field name from a container header
-naming the schema root, and emits `mart::species_fact.species_fact` for
+**1. Invented endpoints.** `qualifyField` ended with an unconditional
+`` `${schemas[0]}.${field}` `` (`canonical-ref.ts:75`). It had no access to the
+declared field set, so it could not tell a bare field name from a container header
+naming the schema root, and emitted `mart::species_fact.species_fact` for
 `flatten observations -> species_fact`. `satsuma validate` reads the same token
 correctly via `resolveFieldPath`, so core holds two readings of one authored
 form. Open as **`r0-7w76`**.
+
+R6 has since replaced that function with `resolveFieldEndpoint`, which *reports*
+the fork instead of resolving it, and moved the guess to one named site in the
+CLI. The emitted string is unchanged — the decision is still `r0-7w76`'s — but
+there is now exactly one line to change when it is made.
 
 **2. Silently dropped edges.** `elk-layout.ts:754` reads
 `if (!sourceNode || !srcPort || !tgtPort) continue;`. When container-relative
@@ -207,7 +218,7 @@ for every axis at once:
 |---|---|
 | Multiple mappings forming chains, diamonds and deliberate cycles | the entire subject of traversal properties; `sg-pufq` is a diamond and `sl-y89y` is a re-entered node |
 | Multiple files plus `import` | the LSP's `computeFullLineage` merges per-file models across the import-reachable set; a single-file scenario cannot reach it |
-| Namespaces | `qualifyField` has a namespace-matching branch (`canonical-ref.ts:68-72`) with no generated coverage, and `r0-7w76` reproduces in both the global and namespaced cases |
+| Namespaces | endpoint resolution has a namespace-matching branch in `canonical-ref.ts` with no generated coverage, and `r0-7w76` reproduces in both the global and namespaced cases |
 | `each`/`flatten` containers with container-relative arrows | the exact shape of `3cdd-yavi` and `r0-7w76` |
 | NL `@ref` transform text | `cbh-y5og`'s phantom edges, and the `nl-derived` edge tier both CLI builders emit |
 | `derived` blocks | sourceless arrows, which the graph represents as `from: null` |
@@ -276,13 +287,14 @@ agree.
 
 ### R6 — Path/ref stage types for lineage endpoints
 
-Depends on Feature 39's R5 brands existing.
+Feature 39's R5 brands exist (`cbdr-e6ft`, `cbdr-5r4d`, ADR-044), so this builds
+on them rather than inventing any.
 
 - Apply the branded stages to graph and lineage endpoints, so an authored ref
   cannot be emitted where a qualified endpoint is required.
-- Give `qualifyField` a signature that cannot silently conflate "bare field name"
-  with "schema root token" — the caller must handle the ambiguous case rather
-  than receiving a guess.
+- Give the qualification function a signature that cannot silently conflate
+  "bare field name" with "schema root token" — the caller must handle the
+  ambiguous case rather than receiving a guess.
 - Replace ad-hoc unbranding such as `edge.from.split(".")[0]`
   (`graph-builder.ts:622`) with a named core accessor.
 
@@ -305,8 +317,11 @@ container header onto a schema root should mean; that remains `r0-7w76`.
 
 ### Structural invariants (R3)
 
-6. Reverting `qualifyField`'s guard makes the endpoint-existence property fail,
-   and the reported counterexample names the invented field.
+6. Making the CLI's one endpoint-policy site read a schema-root token as a field
+   for *every* bare token makes the endpoint-existence property fail, and the
+   reported counterexample names the invented field. (Originally written as
+   "reverting `qualifyField`'s guard"; that function had no guard to revert —
+   see `IMPLEMENTATION-NOTES.md`.)
 7. Restoring an unconditional `continue` in `elk-layout.ts`'s port resolution
    makes the arrow-to-edge completeness property fail.
 8. Removing the `nsFilter` node backfill in `graph-builder.ts` makes the
@@ -374,8 +389,9 @@ container header onto a schema root should mean; that remains `r0-7w76`.
    acquiring two parallel test suites.
 5. **Start where nothing blocks:** R1 and R2 depend on neither Feature 39's
    remaining requirements nor Feature 40, and are the work to begin immediately.
-6. **R6 waits for Feature 39 R5,** which is not yet ticketed. R6 must not
-   pre-empt that design by inventing its own brands.
+6. **R6 builds on Feature 39 R5,** which shipped as `cbdr-e6ft` and `cbdr-5r4d`
+   (ADR-044) before this feature began. R6 adds one stage to that vocabulary —
+   the canonical endpoint — and invents no brands of its own.
 7. **`ArrowEntry` does not gain a declaration-kind field — considered and
    deferred, 2026-08-03.** The viz encodes an arrow's declaration kind
    *structurally* (`eachBlocks` / `flattenBlocks` / `NestedArrowBlock`, and
@@ -420,7 +436,7 @@ Feature epic: `sl-8f2p`.
 | R3 structural edge invariants | `sl-hi0z` | `sl-dqyu` |
 | R4 reachability properties over the portable traversal | `sl-jsyn` | `sl-dqyu`, `sl-prlp` |
 | R5 cross-consumer lineage parity sweep | `sl-kwet` | `sl-hi0z`, `sl-prlp` |
-| R6 branded lineage endpoints | `sl-jyee` | `sl-hi0z`; also blocked on Feature 39 R5, which has no ticket yet — recorded in the ticket body, not as a `tk` dependency |
+| R6 branded lineage endpoints | `sl-jyee` | `sl-hi0z`, and Feature 39 R5 (`cbdr-5r4d`), which was already closed |
 
 The best first slice is **R1 + R2**: both are unblocked, neither touches
 production code, and together they are what makes every later requirement — and

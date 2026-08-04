@@ -33,7 +33,8 @@ import type {
 } from "@satsuma/core";
 import type { MappingRecord, NLRefData, ExtractedWorkspace } from "./types.js";
 import { expandEntityFields } from "./spread-expand.js";
-import { canonicalKey, distinctArrowRecords, qualifyField } from "./index-builder.js";
+import { distinctArrowRecords } from "./index-builder.js";
+import { arrowEndpoint } from "./field-endpoints.js";
 
 // Re-export pure functions and types directly.
 export { extractAtRefs, computeNLRefPosition, classifyRef, extractNLRefData };
@@ -124,11 +125,11 @@ export function countNlDerivedEdgesByMapping(index: ExtractedWorkspace): Map<str
     const sourceSchemas = mapping?.sources ?? [];
     const targetSchemas = mapping?.targets ?? [];
 
-    const toField = record.target ? canonicalKey(qualifyField(record.target, targetSchemas)) : null;
+    const toField = record.target ? arrowEndpoint(record.target, targetSchemas) : null;
     if (!toField) continue;
 
     for (const src of record.sources) {
-      const fromField = canonicalKey(qualifyField(src, sourceSchemas));
+      const fromField = arrowEndpoint(src, sourceSchemas);
       declaredCoverage.add(`${fromField}|${toField}|${mappingKey}`);
     }
   }
@@ -147,7 +148,7 @@ export function countNlDerivedEdgesByMapping(index: ExtractedWorkspace): Map<str
     if (!mapping) continue;
 
     const sourceField = nlRef.resolvedTo.name; // already canonical, e.g. "::schema.field"
-    const targetField = canonicalKey(qualifyField(nlRef.targetField, mapping.targets));
+    const targetField = arrowEndpoint(nlRef.targetField, mapping.targets);
 
     // Rule 1: skip self-references.
     if (sourceField === targetField) continue;

@@ -5,10 +5,11 @@
  * causes it:
  *
  * **An emitted endpoint need not exist.** No consumer checks that the field it
- * names is declared. `qualifyField` ends with an unconditional
- * `` `${schemas[0]}.${field}` `` (`canonical-ref.ts:75`) and has no access to the
- * declared field set, so it cannot tell a bare field name from a container header
- * naming the schema root — and invents an endpoint for the latter (`r0-7w76`).
+ * names is declared. Endpoint resolution has no access to the declared field set,
+ * so it cannot tell a bare field name from a container header naming the schema
+ * root; core now reports that fork instead of guessing (`resolveFieldEndpoint`),
+ * but the CLI's single policy site still reads it as a field and so still invents
+ * an endpoint for the latter (`r0-7w76`, undecided).
  *
  * **A dropped edge is indistinguishable from no edge.** Every resolver in the
  * chain fails closed by skipping. Skipping is sometimes correct, so nothing
@@ -153,10 +154,11 @@ describe("nothing invented: every emitted endpoint is a declared field (sl-hi0z)
     // which point invert it to the invariant stated in the sibling property above
     // and delete this comment. It is not an endorsement of the behaviour.
     //
-    // `qualifyField` cannot tell `flatten rows -> mart` — a header naming the target
-    // *schema* — from a bare field name, so it emits `::mart.mart`, a field nothing
-    // declares, while `satsuma validate` reads the same token correctly. Core holds
-    // two readings of one authored form.
+    // Endpoint resolution cannot tell `flatten rows -> mart` — a header naming the
+    // target *schema* — from a bare field name. Core reports both readings and
+    // `arrowEndpoint` (satsuma-cli/src/field-endpoints.ts) picks the field one, so the
+    // graph emits `::mart.mart`, a field nothing declares, while `satsuma validate`
+    // reads the same token correctly. Core holds two readings of one authored form.
     //
     // Pinned rather than skipped for two reasons. A skipped test proves nothing, and
     // `{ todo: … }` is not usable here: node's JUnit reporter puts a `failure=`
@@ -339,7 +341,7 @@ describe("structural consistency: every endpoint is backed by a node (sl-hi0z)",
 describe("the edge set does not depend on how the workspace is written (sl-hi0z)", () => {
   it("emits the same edges when declarations are reordered", async () => {
     // Nothing about which fields flow where is a function of declaration order —
-    // but `qualifyField` attaches an unqualified path to the *first* schema on its
+    // but endpoint resolution attaches an unqualified path to the *first* schema on its
     // side, so order-sensitivity is a live risk rather than a theoretical one.
     await fc.assert(
       fc.asyncProperty(

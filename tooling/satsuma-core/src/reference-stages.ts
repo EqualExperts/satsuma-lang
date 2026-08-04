@@ -3,14 +3,29 @@
  *
  * Owns the runtime-erased vocabulary that separates authored text from values
  * which have passed container qualification, schema localization, or workspace
- * canonicalization. It does not resolve schemas or decide coverage; callers
- * supply workspace identity and the coverage modules consume the resulting
- * stage types.
+ * canonicalization. It also owns the canonical endpoint spelling in both
+ * directions — composing an endpoint from a schema and a path, and taking it
+ * back apart — so no consumer has to re-derive an owning schema from a string.
+ *
+ * It does not resolve schemas or decide coverage: callers supply workspace
+ * identity, `canonical-ref.ts` decides which schema an authored arrow token
+ * belongs to, and the coverage modules consume the resulting stage types.
  */
 
 // This symbol is deliberately module-private. Consumers can obtain branded
 // values only from the validating constructors and semantic transitions below.
 declare const referenceStage: unique symbol;
+
+// ── Canonical spelling ───────────────────────────────────────────────────────
+// The two separators that make up canonical identity. Named because this module
+// both composes and decomposes that spelling, and a stray literal in either
+// direction is a silent identity bug rather than a compile error.
+
+/** Divides a namespace from an entity name. Empty namespace means global scope. */
+export const NAMESPACE_SEPARATOR = "::";
+
+/** Divides path segments inside one schema. */
+export const PATH_SEPARATOR = ".";
 
 /** A string whose semantic normalization stage is tracked by TypeScript. */
 type ReferenceAt<Stage extends string> = string & { readonly [referenceStage]: Stage };
@@ -29,6 +44,18 @@ export type AuthoredEntityRef = ReferenceAt<"authored-entity-ref">;
 
 /** Unique workspace entity id, including `::` for the global namespace. */
 export type CanonicalEntityRef = ReferenceAt<"canonical-entity-ref">;
+
+/**
+ * Unique workspace identity of one arrow endpoint: a {@link CanonicalEntityRef}
+ * for the owning schema, optionally followed by a path into that schema's
+ * fields (`crm::customers.address.city`).
+ *
+ * This is the last stage in the field family and the spelling `graph`,
+ * `lineage` and `field-lineage` emit. It differs from
+ * {@link ContainerQualifiedFieldRef} in naming its owning schema, and from
+ * {@link SchemaLocalPath} in not being relative to anything.
+ */
+export type CanonicalFieldEndpoint = ReferenceAt<"canonical-field-endpoint">;
 
 /**
  * Validate and brand one external string at a semantic boundary.
@@ -80,11 +107,89 @@ export function createAuthoredEntityRef(value: string): AuthoredEntityRef {
  * namespace (`crm::customers`).
  */
 export function createCanonicalEntityRef(value: string): CanonicalEntityRef {
-  const separator = value.indexOf("::");
-  if (separator < 0 || value.slice(separator + 2).length === 0) {
+  if (canonicalNameOf(value).length === 0) {
     throw new TypeError("Canonical entity reference must have [namespace]::name form");
   }
   return validatedReference<CanonicalEntityRef>(value, "Canonical entity reference");
+}
+
+/**
+ * The entity-name portion of a canonical spelling, or the empty string when the
+ * value has no namespace separator at all.
+ *
+ * Shared by the entity and endpoint constructors so both agree on what makes a
+ * canonical value well-formed. For an endpoint the result still carries the
+ * field path; callers that need the name alone stop at the first
+ * {@link PATH_SEPARATOR}.
+ */
+function canonicalNameOf(value: string): string {
+  const separator = value.indexOf(NAMESPACE_SEPARATOR);
+  if (separator < 0) return "";
+  return value.slice(separator + NAMESPACE_SEPARATOR.length);
+}
+
+// ── Field endpoints ──────────────────────────────────────────────────────────
+
+/**
+ * Validate a canonical field endpoint arriving from a serialized boundary.
+ *
+ * Endpoints travel as plain strings in JSON, VizModel and LSP payloads, so a
+ * consumer that needs the typed form re-enters the domain here rather than
+ * asserting. The shape rule is the entity rule plus one relaxation: a path may
+ * follow the schema name, and may also be absent — an endpoint is allowed to
+ * name a schema root.
+ */
+export function createCanonicalFieldEndpoint(value: string): CanonicalFieldEndpoint {
+  const name = canonicalNameOf(value);
+  if (name.length === 0 || name.startsWith(PATH_SEPARATOR)) {
+    throw new TypeError("Canonical field endpoint must have [namespace]::schema[.path] form");
+  }
+  return validatedReference<CanonicalFieldEndpoint>(value, "Canonical field endpoint");
+}
+
+/**
+ * Compose the endpoint identity of one field within one schema.
+ *
+ * Passing `null` for the path yields the schema root, which is a legal endpoint
+ * spelling; whether any *authored* form should resolve to it is a separate and
+ * still-open question (`r0-7w76`).
+ */
+export function fieldEndpointOf(
+  schema: CanonicalEntityRef,
+  path: SchemaLocalPath | null,
+): CanonicalFieldEndpoint {
+  const spelling = path === null ? schema : `${schema}${PATH_SEPARATOR}${path}`;
+  return createCanonicalFieldEndpoint(spelling);
+}
+
+/**
+ * The schema that owns an endpoint.
+ *
+ * This is the named accessor that replaces splitting an endpoint string on its
+ * first dot at each consumer (`sl-jyee`). Decomposition lives beside
+ * {@link fieldEndpointOf} so one module owns the spelling in both directions.
+ */
+export function fieldEndpointSchema(endpoint: CanonicalFieldEndpoint): CanonicalEntityRef {
+  const pathStart = endpointPathStart(endpoint);
+  return createCanonicalEntityRef(pathStart < 0 ? endpoint : endpoint.slice(0, pathStart));
+}
+
+/** The endpoint's path within its owning schema, or null when it names the root. */
+export function fieldEndpointPath(endpoint: CanonicalFieldEndpoint): SchemaLocalPath | null {
+  const pathStart = endpointPathStart(endpoint);
+  if (pathStart < 0) return null;
+  return createSchemaLocalPath(endpoint.slice(pathStart + PATH_SEPARATOR.length));
+}
+
+/**
+ * Offset of the separator between an endpoint's schema and its path, or -1.
+ *
+ * The search starts after the namespace separator so that a namespace can never
+ * be mistaken for the start of a field path.
+ */
+function endpointPathStart(endpoint: CanonicalFieldEndpoint): number {
+  const separator = endpoint.indexOf(NAMESPACE_SEPARATOR);
+  return endpoint.indexOf(PATH_SEPARATOR, separator + NAMESPACE_SEPARATOR.length);
 }
 
 /**

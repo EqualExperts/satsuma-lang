@@ -11,7 +11,10 @@
  */
 
 import { resolve } from "node:path";
-import { canonicalKey, distinctArrowRecords, qualifyField } from "../index-builder.js";
+import { createCanonicalFieldEndpoint, fieldEndpointSchema } from "@satsuma/core";
+import type { CanonicalFieldEndpoint } from "@satsuma/core";
+import { distinctArrowRecords } from "../index-builder.js";
+import { arrowEndpoint } from "../field-endpoints.js";
 import { expandEntityFields, expandNestedSpreads } from "../spread-expand.js";
 import { extractAtRefs, classifyRef, resolveRef, resolveAllNLRefs } from "../nl-ref-extract.js";
 import type { ExtractedWorkspace, FieldDecl } from "../types.js";
@@ -261,7 +264,7 @@ export function buildWorkspaceGraph(
 
   const fieldEdges: FieldEdge[] = schemaOnly
     ? aggregateFieldEdgesToSchemaLevel(result.edges, index, nsFilter)
-    : result.edges;
+    : result.edges.map(({ edge }) => edge);
   unresolvedNl.push(...result.unresolvedNl);
 
   // Count arrows (raw field arrows, not aggregated)
@@ -440,20 +443,28 @@ function extractNlSchemaRefs(
 // ── Field-level edges ────────────────────────────────────────────────────────
 
 /**
- * Qualify a field path with its schema name, handling edge cases:
- *  - Leading dot (nested field, e.g. ".PHONE_TYPE") -> "schema.PHONE_TYPE"
- *  - Already schema-qualified (multi-source, e.g. "crm.customer_id") -> unchanged
- *    when the prefix matches a known schema
- *  - Simple field name -> "schema.field"
+ * One field edge together with the branded endpoints it was assembled from.
+ *
+ * `FieldEdge` is the serialized shape and stays plain strings, but schema-level
+ * aggregation needs each endpoint's *owning schema*. Carrying the resolved
+ * endpoint alongside means aggregation reads the schema core determined, rather
+ * than re-deriving one by splitting the serialized string (`sl-jyee`).
  */
-// qualifyField lives in index-builder.ts (exported from there for shared use).
+interface ResolvedFieldEdge {
+  /** The edge exactly as it will be serialized. */
+  readonly edge: FieldEdge;
+  /** Source endpoint identity, or null for a computed (sourceless) arrow. */
+  readonly from: CanonicalFieldEndpoint | null;
+  /** Target endpoint identity, or null for a source-only arrow. */
+  readonly to: CanonicalFieldEndpoint | null;
+}
 
 /**
  * Build field-level edges from arrow records in the workspace index.
  *
- * Iterates all arrow records, qualifies source/target field paths with their
- * parent schema names, attaches transform and NL metadata, and resolves
- * nl-derived edges from @ref mentions.
+ * Iterates all arrow records, resolves source/target field paths to canonical
+ * endpoints, attaches transform and NL metadata, and resolves nl-derived edges
+ * from @ref mentions.
  */
 function buildFieldEdges(
   index: ExtractedWorkspace,
@@ -461,10 +472,10 @@ function buildFieldEdges(
   nsFilter: string | null,
   includeNl: boolean,
 ): {
-  edges: FieldEdge[];
+  edges: ResolvedFieldEdge[];
   unresolvedNl: Array<{ scope: string; arrow: string; text: string; file: string; line: number }>;
 } {
-  const edges: FieldEdge[] = [];
+  const edges: ResolvedFieldEdge[] = [];
   const unresolvedNl: Array<{
     scope: string;
     arrow: string;
@@ -499,9 +510,9 @@ function buildFieldEdges(
 
     const fromFields =
       record.sources.length > 0
-        ? record.sources.map((s) => canonicalKey(qualifyField(s, sourceSchemas)))
+        ? record.sources.map((s) => arrowEndpoint(s, sourceSchemas))
         : [null];
-    const toField = record.target ? canonicalKey(qualifyField(record.target, targetSchemas)) : null;
+    const toField = record.target ? arrowEndpoint(record.target, targetSchemas) : null;
 
     for (const fromField of fromFields) {
       const edge: FieldEdge = {
@@ -525,7 +536,7 @@ function buildFieldEdges(
         edge.derived = true;
       }
 
-      edges.push(edge);
+      edges.push({ edge, from: fromField, to: toField });
     }
 
     // Track unresolved NL for the output section — all transforms are NL
@@ -565,9 +576,11 @@ function buildFieldEdges(
       }
     }
 
-    const sourceField = nlRef.resolvedTo.name; // already canonical, e.g. "::s1.a"
-    const rawTarget = qualifyField(nlRef.targetField, mapping.targets);
-    const targetField = canonicalKey(rawTarget);
+    // An @ref resolution already names its owning schema canonically, so it
+    // enters the typed domain through the endpoint constructor rather than being
+    // re-qualified against the mapping.
+    const sourceField = createCanonicalFieldEndpoint(nlRef.resolvedTo.name);
+    const targetField = arrowEndpoint(nlRef.targetField, mapping.targets);
 
     // Skip if this is a self-reference (field references itself in its own transform)
     if (sourceField === targetField) continue;
@@ -581,21 +594,25 @@ function buildFieldEdges(
     // source->target in the same mapping (e.g. `c -> d { "@s1.c is processed" }`
     // — c is already the declared source, no need for a duplicate nl-derived edge).
     const alreadyCovered = edges.some(
-      (e) =>
-        e.from === sourceField &&
-        e.to === targetField &&
-        e.mapping === mappingKey &&
-        e.classification !== "nl-derived",
+      ({ edge }) =>
+        edge.from === sourceField &&
+        edge.to === targetField &&
+        edge.mapping === mappingKey &&
+        edge.classification !== "nl-derived",
     );
     if (alreadyCovered) continue;
 
     edges.push({
+      edge: {
+        from: sourceField,
+        to: targetField,
+        mapping: mappingKey,
+        classification: "nl-derived",
+        file: nlRef.file,
+        line: nlRef.line + 1,
+      },
       from: sourceField,
       to: targetField,
-      mapping: mappingKey,
-      classification: "nl-derived",
-      file: nlRef.file,
-      line: nlRef.line + 1,
     });
   }
 
@@ -605,22 +622,26 @@ function buildFieldEdges(
 // ── Schema-only aggregation ──────────────────────────────────────────────────
 
 /**
- * Aggregate field-level edges into schema-level edges by extracting the
- * schema prefix from dotted field paths and deduplicating. For mappings
- * with no field edges (e.g. derived-only), adds edges from the declared
- * source/target lists.
+ * Aggregate field-level edges into schema-level edges by projecting each
+ * endpoint onto its owning schema and deduplicating. For mappings with no field
+ * edges (e.g. derived-only), adds edges from the declared source/target lists.
+ *
+ * The owning schema comes from core's endpoint accessor, not from splitting the
+ * serialized endpoint here: this walk and the field-level walk must agree about
+ * who owns an endpoint, and two independent derivations of that is how they stop
+ * agreeing (`sl-jyee`).
  */
 function aggregateFieldEdgesToSchemaLevel(
-  fieldEdges: FieldEdge[],
+  fieldEdges: readonly ResolvedFieldEdge[],
   index: ExtractedWorkspace,
   nsFilter: string | null,
 ): FieldEdge[] {
   const aggregated: FieldEdge[] = [];
   const seen = new Set<string>();
 
-  for (const edge of fieldEdges) {
-    const fromSchema = edge.from ? edge.from.split(".")[0] : null;
-    const toSchema = edge.to ? edge.to.split(".")[0] : null;
+  for (const { edge, from, to } of fieldEdges) {
+    const fromSchema = from ? fieldEndpointSchema(from) : null;
+    const toSchema = to ? fieldEndpointSchema(to) : null;
     if (fromSchema && toSchema) {
       const key = `${fromSchema}->${toSchema}:${edge.mapping}`;
       if (!seen.has(key)) {

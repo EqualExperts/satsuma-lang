@@ -885,8 +885,8 @@ function extractBlockNoteRefs(
 // Arrows nest inside `each`, `flatten` and braced `src -> tgt` (`nested_arrow`)
 // blocks, and inside them a target is written relative to the container
 // (`-> .line_total`). The recorded targetField must be absolute from the target
-// schema root, because downstream qualifyField() prepends the schema and cannot
-// recover a base it was never given: `.line_total` became `tgt.line_total`
+// schema root, because downstream resolveFieldEndpoint() prepends the schema and
+// cannot recover a base it was never given: `.line_total` became `tgt.line_total`
 // rather than `tgt.lines.line_total`, inventing a field (sl-hrql).
 //
 // The rule itself is extract.ts's accumulating-prefix contract, which PRD 38

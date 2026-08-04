@@ -21,7 +21,7 @@ import {
   extractImports,
   extractNotes,
 } from "@satsuma/core";
-export { qualifyField, resolveScopedEntityRef } from "@satsuma/core";
+export { resolveScopedEntityRef } from "@satsuma/core";
 import type { ResolvedFileImport } from "@satsuma/core";
 import { extractNLRefData } from "./nl-ref-extract.js";
 import type {

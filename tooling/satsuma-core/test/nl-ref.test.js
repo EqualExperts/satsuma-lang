@@ -784,8 +784,8 @@ describe("resolveRef() — nested field paths (sl-ez36)", () => {
 // ── Container target qualification (sl-hrql) ──────────────────────────────────
 //
 // targetField must be absolute from the target schema root. Downstream
-// qualifyField() prepends the target schema and cannot recover a base it was
-// never given, so a relative ".line_total" became "tgt.line_total" — a field
+// resolveFieldEndpoint() prepends the target schema and cannot recover a base it
+// was never given, so a relative ".line_total" became "tgt.line_total" — a field
 // that does not exist, carrying the edge that the real one then appeared to lack.
 
 describe("extractNLRefData — container target qualification (sl-hrql)", () => {
