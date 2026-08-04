@@ -8,6 +8,8 @@ All tooling is parser-backed. Downstream tools should be built on the tree-sitte
 
 ## Repository Layout
 
+Current per-package test counts and the CLI command count are tracked in [`test-stats.json`](test-stats.json).
+
 - `docs/developer/SATSUMA-V2-SPEC.md`: authoritative language specification (v2)
 - `docs/product-owner/PROJECT-OVERVIEW.md`: product vision, motivation, and roadmap
 - `SATSUMA-CLI.md`: CLI command reference
@@ -21,16 +23,16 @@ All tooling is parser-backed. Downstream tools should be built on the tree-sitte
 - `useful-prompts/`: self-contained system prompts for web LLMs (Excel-to-Satsuma, Satsuma-to-Excel)
 - `skills/`: Agent Skills following the [agentskills.io](https://agentskills.io) standard (Excel-to-Satsuma conversion skill, Satsuma-to-Excel export skill)
 - `scripts/`: utility scripts used during development
-- `tooling/tree-sitter-satsuma/`: tree-sitter grammar (318 corpus tests), generated parser artifacts, and queries
-- `tooling/satsuma-core/`: **the shared library every other package builds on** (679 tests) — parsing, extraction, validation, formatting, NL `@ref` resolution, and the single definition of coverage semantics. Logic that more than one consumer needs belongs here; see [Core vs Consumer Packages](#core-vs-consumer-packages)
+- `tooling/tree-sitter-satsuma/`: tree-sitter grammar, generated parser artifacts, and queries
+- `tooling/satsuma-core/`: **the shared library every other package builds on** — parsing, extraction, validation, formatting, NL `@ref` resolution, and the single definition of coverage semantics. Logic that more than one consumer needs belongs here; see [Core vs Consumer Packages](#core-vs-consumer-packages)
 - `tooling/satsuma-scenario-gen/`: **test-only** generator of semantic Satsuma scenarios shared by every package's property suites — builds scenarios as plain data, renders them to source, and states the ground truth that follows by construction. Must never depend on `@satsuma/core` (core's tests depend on it, so the reverse edge would be a cycle); the adapters that drive production pipelines live in each consumer's test tree
-- `tooling/satsuma-cli/`: TypeScript CLI tool for workspace extraction, validation, and structural analysis (1031 tests)
-- `tooling/satsuma-lsp/`: editor-agnostic Language Server (semantic tokens, diagnostics, go-to-definition, find-references, completions, hover, rename, code lens, folding, document symbols); runnable standalone via `npx satsuma-lsp --stdio` (300 tests)
-- `tooling/satsuma-viz-model/`: the VizModel protocol contract (6 tests) — the payload shape the LSP produces and the viz component consumes, defined once so neither can drift
-- `tooling/satsuma-viz-backend/`: workspace indexing and VizModel assembly shared by the LSP and browser hosts (182 tests); also computes the field coverage the payload carries (ADR-042)
-- `tooling/satsuma-viz/`: the `satsuma-viz` Lit web component (128 tests) — overview graph and per-mapping detail view, embedded in the VS Code webview and the site playground
+- `tooling/satsuma-cli/`: TypeScript CLI tool for workspace extraction, validation, and structural analysis
+- `tooling/satsuma-lsp/`: editor-agnostic Language Server (semantic tokens, diagnostics, go-to-definition, find-references, completions, hover, rename, code lens, folding, document symbols); runnable standalone via `npx satsuma-lsp --stdio`
+- `tooling/satsuma-viz-model/`: the VizModel protocol contract — the payload shape the LSP produces and the viz component consumes, defined once so neither can drift
+- `tooling/satsuma-viz-backend/`: workspace indexing and VizModel assembly shared by the LSP and browser hosts; also computes the field coverage the payload carries (ADR-042)
+- `tooling/satsuma-viz/`: the `satsuma-viz` Lit web component — overview graph and per-mapping detail view, embedded in the VS Code webview and the site playground
 - `tooling/satsuma-viz-harness/`: Playwright harness for the viz component (99 tests) — human-in-the-loop, see [Viz harness Playwright tests](#viz-harness-playwright-tests-human-in-the-loop-workflow)
-- `tooling/vscode-satsuma/`: VS Code extension (LSP client, commands, webview panels) and TextMate grammar; delegates language intelligence to `satsuma-lsp` (34 tests)
+- `tooling/vscode-satsuma/`: VS Code extension (LSP client, commands, webview panels) and TextMate grammar; delegates language intelligence to `satsuma-lsp`
 
 ## Platform Lineage Entry Point
 
