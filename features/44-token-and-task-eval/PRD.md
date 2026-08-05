@@ -373,10 +373,16 @@ Two definitional consequences for the arms themselves:
 
 ### Satsuma pays for its own reference material
 
-`AI-AGENT-REFERENCE.md` is ~7k tokens of fixed overhead (27.5 KB, 4,026 words —
-to be measured exactly, not estimated) that the Satsuma arms need in order to
-work as intended. **Those tokens count against the Satsuma arm's budget.**
-Omitting them would be indefensible.
+`AI-AGENT-REFERENCE.md` was ~7k tokens of fixed overhead (27.5 KB, 4,026 words)
+before Feature 45 restructured it. **Whatever an arm actually loads counts
+against that arm's budget.** Omitting it would be indefensible. Feature 45 has
+implemented that restructure and its measurement (still pending merge and
+release — see
+[But the overhead is a *variable*, not a constant](#but-the-overhead-is-a-variable-not-a-constant--so-it-is-a-factor)
+below for the sequencing this protocol depends on), and the Satsuma arms in
+this feature charge the measured figures from
+[`reference/token-costs.md`](../../reference/token-costs.md), not a bytes/4
+estimate of the pre-restructure document.
 
 The consequence is worth stating up front because it likely reshapes the
 headline: on a small spec, Satsuma may well *lose* on total tokens, and only win
@@ -389,33 +395,34 @@ sweep spec size — 1, 3, 10 and 25 mappings — not just measure one size.
 
 ### But the overhead is a *variable*, not a constant — so it is a factor
 
-The fixed cost above assumes the whole reference is resident in context, which is
-how it is used today. It need not be. Section sizes of `AI-AGENT-REFERENCE.md`,
-measured with code fences handled correctly (naive measurement is fooled by the
-`##` headings *inside* the fenced conventions block):
+The fixed cost above assumed the whole reference was resident in context,
+which is how it was used before Feature 45. It need not be, and no longer is:
+this analysis — the CLI reference is a large, mostly reading-only share of the
+document; a task-appropriate slice roughly halves it; an MCP server's
+eagerly-injected tool schemas are worse than every mechanism actually
+shipped — is exactly the task-need analysis that drove Feature 45's split,
+and now has measured numbers behind it instead of bytes/4 estimates. See
+`features/45-agent-reference-progressive-disclosure/PRD.md`'s Background and
+"The measurement, pulled forward from Feature 44" sections for the reasoning,
+and [`reference/token-costs.md`](../../reference/token-costs.md) for the
+per-section/profile/envelope figures this feature's Satsuma arms now charge.
 
-| Section | Bytes | ≈ tokens | Share | Needed for |
-|---|---|---|---|---|
-| `## Portable Grammar & Conventions` | 12,964 | ~3,240 | 47% | **Writing only** (except the `@ref` and path-syntax rules) |
-| `## Satsuma CLI — Agent Tooling` | 11,418 | ~2,850 | 42% | **Reading/analysis only** |
-| `## Agent Workflow` | 2,988 | ~750 | 11% | Both — but splits cleanly into generate/read halves |
+Headline figures, so this feature's arms and budget calculations don't need
+to open that report just to get the numbers they charge:
 
-The CLI reference is **42% of the file**, and a task that only *reads* Satsuma
-needs almost none of the grammar — every CLI command has `--json`, so the agent
-consumes structured facts and barely sees Satsuma syntax. Conversely a codegen
-task needs the grammar and not the command reference. Today every task pays for
-both, so the flat ~7k figure charged above is a **worst case that understates
-Satsuma**: a task-appropriate slice is roughly half that.
-
-Candidate delivery mechanisms, ranked by expected resident cost:
-
-| Mechanism | Resident cost | Notes |
+| Mechanism (shipped) | Resident cost | Loaded cost (once used) |
 |---|---|---|
-| **Progressive disclosure via a skill** | ~50-100 tokens of frontmatter | The `skills/` (agentskills.io) pattern already in this repo; body loads on trigger. Pi's "lazy skills" is built around exactly this |
-| **Task-sliced reference** | ~300-token router + one slice on demand | No new machinery: `satsuma agent-reference --section grammar\|cli\|conventions` |
-| **Full file in context** (status quo) | ~7k | Simple, robust, and the agent cannot fail to have it |
-| **MCP server wrapping the CLI** | ~5-9k, *whether used or not* | Likely the **worst** on this axis: 23 commands × a few hundred tokens of eagerly-injected tool schema. MCP buys discoverability and typed arguments, not token efficiency — unless the client supports deferred schema loading |
-| **Prompt caching** | orthogonal | The reference is a static prefix, so cache reads make it ~90% cheaper in *dollars* while costing full *tokens*. Already handled by splitting cache-read from input in the metrics |
+| `--profile write` (CLI, or the skill's `write` slice) | 0 | 3,743 tokens |
+| `--profile read` (CLI, or the skill's `read` slice) | 0 | 4,360 tokens |
+| Skill envelope, before it triggers | 164 tokens (frontmatter only) | +6,738 tokens (whole document + intro) |
+| Portable blob (`AI-AGENT-REFERENCE.md` pasted in) | 6,653 tokens | 6,653 tokens (no lazy option) |
+| MCP comparison point (not shipped) | 2,253 tokens, every request | 2,253 tokens |
+
+All `o200k_base`, via `js-tiktoken`. The MCP comparison bears out the
+prediction above on the resident axis specifically — it is the only mechanism
+that costs tokens on requests that never touch Satsuma at all — while costing
+*less* than either profile's *loaded* figure, which is the nuance the
+one-line "worst" claim missed before measurement.
 
 **The counter-risk is real and is what makes this worth measuring rather than
 just assuming.** Progressive disclosure can cost *more*: an agent that never
@@ -428,9 +435,10 @@ Two measurements, chosen to be nearly free:
 1. **Static baseline cost per mechanism** (no model spend at all) — count what
    actually lands in context for each mechanism at each task type. This alone
    answers "is there a more token-efficient way", and it is the number that
-   picks the mechanism for the behavioural arms. **This measurement is owned by
-   Feature 45, not by this feature** (see below); this feature consumes its
-   output.
+   picks the mechanism for the behavioural arms. **This measurement was owned
+   by Feature 45, not by this feature** (see below), and is done: see
+   [`reference/token-costs.md`](../../reference/token-costs.md). This feature
+   consumes that output rather than re-measuring it.
 2. **One cheap behavioural check** — best static mechanism vs. status quo, one
    model, T1 (writing, needs grammar) + T4 (reading, needs CLI), n=3. It is
    looking for exactly one thing: does the agent reliably *load* what it needs,
@@ -453,7 +461,10 @@ This feature then measures the *restructured* reference. Two consequences:
   reference changed after pre-registration, the registered artifact would not be
   the measured one. This is also the Goodhart control: the split is derived from
   task-need analysis before any episode runs, and is not retuned against eval
-  outcomes.
+  outcomes. **Status: implemented, not yet merged/released** — the restructure
+  and its measurement (`reference/token-costs.md`) are done on
+  `feat/agent-reference-progressive-disclosure`; sl-6ips's gate (merged AND
+  in a release) is still open until that branch merges and a version ships.
 
 ## Tasks and how each is graded
 
