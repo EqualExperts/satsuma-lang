@@ -3,6 +3,10 @@
     "module": "commonjs",
     "moduleResolution": "node",
     "baseUrl": ".",
+    // "node"/baseUrl are deprecated in TypeScript 6.0 and removed in 7.0.
+    // This is a temporary suppression, not the fix — see di-xup1 to migrate
+    // this package onto "node16", matching every other workspace package.
+    "ignoreDeprecations": "6.0",
     "target": "es2022",
     "lib": ["es2022", "dom", "dom.iterable"],
     "types": ["node"],
