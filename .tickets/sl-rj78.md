@@ -1,6 +1,6 @@
 ---
 id: sl-rj78
-status: open
+status: closed
 deps: []
 links: [sl-d7fz]
 created: 2026-08-05T09:26:38Z
@@ -23,3 +23,10 @@ Screenshot: bug-reports/nested-field-not-highlighted-in-source.png
 
 Hovering/selecting an arrow row inside a flatten/each highlights the correct nested source field(s) in the sources pane, at any nesting depth. Regression test using a nested-iteration fixture (e.g. examples/nested-iteration).
 
+
+## Notes
+
+**2026-08-05T11:41:23Z**
+
+Cause: `_sourceHighlightFields`/`_targetHighlightFields`'s `_hoveredArrow` branch resolved `ArrowEntry.sourceFields`/`targetField` raw — the authored, container-relative paths (e.g. ".adults") — instead of the absolute paths every other resolution surface in the file uses, so a doubly-nested arrow's path only matched a declared field by coincidence when there was no nesting.
+Fix: added `_resolveHoveredArrow`, which re-walks `forEachMappingArrow` and matches the hovered arrow by object identity to recover its already-qualified absolute paths, and used it in both getters. Regression test added in field-coverage.test.js. (commit immediately after 7273d0da)

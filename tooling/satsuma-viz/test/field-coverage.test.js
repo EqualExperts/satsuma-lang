@@ -280,6 +280,86 @@ describe("sz-mapping-detail hover lookups recurse into nestedEach (sl-fm0q)", ()
     );
     assert.deepEqual([...targets], ["lines.discounts.code"]);
   });
+
+  // sl-rj78: hovering the ROW ITSELF (rather than a card field) went through a
+  // separate `_hoveredArrow` branch that resolved ArrowEntry.sourceFields/
+  // targetField raw — the authored, container-relative paths (".code") — instead
+  // of the absolute paths the two lookups above already resolve correctly.
+  // ".code" only matches a schema's declared field by coincidence when there is
+  // no nesting, so hovering a doubly-nested row highlighted nothing.
+  it("highlights the nested source and target fields when hovering the arrow row itself", async () => {
+    const detail = await makeDetail();
+    detail._hoveredArrow = detail.mapping.eachBlocks[0].nestedEach[0].arrows[0];
+    assert.deepEqual(
+      [...(detail._sourceHighlightFields.get("order") ?? [])],
+      ["items.discounts.code"],
+    );
+    assert.deepEqual([...detail._targetHighlightFields], ["lines.discounts.code"]);
+  });
+});
+
+// ── A computed arrow's sources are named by @ref, not by sourceFields (sl-d7fz) ──
+//
+// `-> tgt = "NL text with @refs"` is extracted with `sourceFields: []` by design
+// (viz-model.ts's extractComputedArrow: the pipe chain produces the value, there
+// is no declared source path). Hovering such a row highlighted the target field
+// only — the transform text visibly colors its @refs (markdown.ts's
+// highlightAtRefs), but nothing parsed them to find the source fields they name.
+
+describe("hovering a computed arrow highlights the fields its NL transform @refs (sl-d7fz)", () => {
+  const crmCustomers = schema("crm_customers", [field("first_name"), field("last_name")]);
+  const billing = schema("billing", [field("company_name")]);
+  const customer = schema("customer", [field("full_name")]);
+
+  const computedArrow = {
+    sourceFields: [],
+    targetField: "full_name",
+    transform: {
+      kind: "nl",
+      text:
+        'Concat @crm_customers.first_name + " " + @crm_customers.last_name. ' +
+        "If both are null, use @company_name instead.",
+      steps: [],
+    },
+    metadata: [],
+    comments: [],
+    location: loc,
+  };
+
+  async function makeDetail() {
+    const m = await import("../dist/satsuma-viz.js");
+    const detail = new m.SzMappingDetail();
+    detail.mapping = {
+      id: "m",
+      sourceRefs: ["crm_customers", "billing"],
+      targetRef: "customer",
+      arrows: [computedArrow],
+      eachBlocks: [],
+      flattenBlocks: [],
+      nestedArrows: [],
+      sourceBlock: null,
+      notes: [],
+      comments: [],
+      location: loc,
+    };
+    detail.sourceSchemas = [crmCustomers, billing];
+    detail.targetSchema = customer;
+    detail._hoveredArrow = computedArrow;
+    return detail;
+  }
+
+  it("highlights dotted @refs against the source schema they explicitly qualify", async () => {
+    const detail = await makeDetail();
+    assert.deepEqual(
+      [...(detail._sourceHighlightFields.get("crm_customers") ?? [])],
+      ["first_name", "last_name"],
+    );
+  });
+
+  it("highlights a bare @ref against whichever on-screen source schema declares that field", async () => {
+    const detail = await makeDetail();
+    assert.deepEqual([...(detail._sourceHighlightFields.get("billing") ?? [])], ["company_name"]);
+  });
 });
 
 // ── Element-relative paths inside containers (3cdd-yavi) ─────────────────────
