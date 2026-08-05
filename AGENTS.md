@@ -105,6 +105,60 @@ Tests should be high-value and low-inertia. A test suite is an asset only when t
 - **No smoke tests.** Do not write tests that only verify a function returns without throwing, or that a known-valid input produces a non-null result. Every assertion should validate a specific, meaningful property of the output.
 - **Name cases by behaviour, not by implementation.** Prefer `"reports a diagnostic when the same schema name appears in two files"` over `"duplicate schema test"`. The description should be a falsifiable statement about the system.
 
+### Unit tests prove logic; only a browser proves the visual contract
+
+sl-rj78 and sl-d7fz were both filed from a screenshot: a reader hovered an
+arrow row in the mapping detail view and the wrong fields (or no fields) lit
+up. Both were fixed by an agent that wrote unit tests calling the component's
+private `_sourceHighlightFields`/`_targetHighlightFields` getters directly,
+proved the resolution logic returned the right paths, ran the full
+`run-repo-checks.sh` suite green, and opened the PR. Every automated check
+passed. The fix was still unverified in the one sense that mattered: nothing
+had rendered `<sz-mapping-detail>` in a real DOM, dispatched a real
+`mouseenter`, and confirmed the `.hl` class actually landed on the actual
+field row a reader would see. The gap wasn't caught by CI — it was caught by
+the user asking "did this need a viz harness test?" after the PR was already
+open. That question should not have needed asking.
+
+The reason the getter tests missed it is structural, not an oversight this one
+time: a Lit component's `render()` output, its shadow-DOM class list, and its
+real mouse-event wiring are only observable by actually mounting the element —
+which is exactly what `tooling/satsuma-viz-harness/test/harness.test.ts`'s
+`"Hover highlighting between arrows and field rows"` suite already does for
+the non-nested case (`sfdc_opportunity.Amount` → `amount_usd`). A getter-level
+test is real coverage of the resolution logic and should still be written —
+but it answers "is the path computed correctly", not "does hovering the row
+highlight the field", and treating the first as a stand-in for the second is
+the mistake to avoid.
+
+**Before closing out any change to `satsuma-viz` or `vscode-satsuma` visual or
+interactive behaviour** (hover/highlight, expand/collapse, coverage
+indicators, layout, drag, click-to-navigate, anything a screenshot could
+show or a click could trigger), stop and answer both of these, out loud, in
+the response to the user — not silently in your own reasoning:
+
+1. **Is there a property here a unit test cannot observe?** If the change only
+   alters what a function returns, a unit test suffices — say so and move on.
+   If the change alters what gets *painted* or what a *user gesture* triggers
+   (a CSS class after a hover, a section expanding after a click, an element's
+   computed style), no amount of getter-level testing proves it; only a
+   rendered browser can.
+2. **Is Playwright coverage for it possible and proportionate?** Check whether
+   an existing `describe` block in `harness.test.ts` already covers the
+   interaction shape (see the "Hover highlighting" and "Field coverage
+   indicators" sections for the pattern) and either extend it or add a new
+   one. If the existing fixtures don't exercise the shape at all (e.g. no
+   fixture has the doubly-nested case a bug was filed against), say that
+   explicitly rather than silently reaching for the nearest fixture that
+   happens to be already wired up.
+
+If the answer to (1) is yes and (2) is yes, add the Playwright spec and run it
+through the sentinel workflow below before treating the task as done — do not
+defer it to a follow-up ticket. If (2) is no (the interaction genuinely cannot
+be expressed in the harness, or no fixture reaches the shape and adding one is
+out of scope for the ticket), say so explicitly in the response, and file a
+ticket for the fixture gap rather than letting the limitation go unstated.
+
 ### Viz harness Playwright tests (human-in-the-loop workflow)
 
 The `tooling/satsuma-viz-harness/` Playwright tests cannot run directly in the
