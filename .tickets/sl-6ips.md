@@ -1,6 +1,6 @@
 ---
 id: sl-6ips
-status: open
+status: closed
 deps: []
 links: []
 created: 2026-08-05T09:30:11Z
@@ -24,3 +24,13 @@ This gate exists so tk does not surface the probe tickets as ready work early. F
 - Feature 45 is merged and included in a release
 - AI-AGENT-REFERENCE.md's shipped delivery mechanism and its measured resident token cost are known, so Feature 44 can charge the real figure rather than a bytes/4 estimate
 
+
+## Notes
+
+**2026-08-05T15:56:02Z**
+
+Gate satisfied: Feature 45 merged in PR #492 and released in v0.13.0 (tag v0.13.0 -> 69296bd6, published 2026-08-05T15:54:05Z, three assets attached).
+
+Both acceptance criteria met. The shipped delivery mechanism is three envelopes composed from canonical reference/*.md sections: the CLI (resident cost 0, pay per --section/--profile slice), the generated AI-AGENT-REFERENCE.md portable blob (6813 tokens resident), and the satsuma-language skill (164 tokens resident, 7062 loaded). Measured with o200k_base via js-tiktoken and recorded in reference/token-costs.md, so Feature 44 can charge real figures rather than a bytes/4 estimate. Note the measurement contradicted the design assumption: --profile read (4520) costs more than --profile write (3743).
+
+Feature 44's Phase 0.5 probe epic sl-qz3v and its three children are now unblocked. (commit immediately after 1aa47896)
