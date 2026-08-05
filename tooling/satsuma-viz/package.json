@@ -23,7 +23,7 @@
     "@lit-labs/ssr-dom-shim": "^1.6.0",
     "@satsuma/scenario-gen": "*",
     "@satsuma/viz-backend": "*",
-    "@types/node": "^22.0.0",
+    "@types/node": "^26.1.2",
     "c8": "^12.0.0",
     "esbuild": "^0.28.1",
     "fast-check": "^4.9.0",
