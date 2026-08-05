@@ -1,7 +1,7 @@
 # Feature 45 — Progressive Disclosure for the AI Agent Reference
 
 > **Status: IMPLEMENTED** (2026-08-05) — all 9 `arpd-*` tickets closed (epic
-> `arpd-6iis`), PR TBD. Requested by the project owner to restructure
+> `arpd-6iis`), PR #492. Requested by the project owner to restructure
 > `AI-AGENT-REFERENCE.md` *before* Feature 44 measures anything, so the eval
 > measures the artifact we intend to ship rather than one we are about to
 > replace.
