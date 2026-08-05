@@ -15,6 +15,7 @@ The CLI requires a `.stm` file entry point (not a directory). The workspace is d
 | [`json-api-to-parquet/`](json-api-to-parquet/) | `pipeline.stm` | Commerce REST API order responses to Lakehouse Parquet |
 | [`merge-strategies/`](merge-strategies/) | `pipeline.stm` | All four merge strategies (upsert, append, soft delete, full refresh) |
 | [`metrics-platform/`](metrics-platform/) | `metrics.stm` | Business metrics (MRR, CLV, churn, conversion) as schema blocks with `(metric, ...)` metadata |
+| [`multi-hop-lineage/`](multi-hop-lineage/) | `pipeline.stm` | Artificial 7-schema, 6-hop chain with varying record nesting — a demo fixture for the field-chain viz, not a plausible pipeline |
 | [`multi-source/`](multi-source/) | `multi-source-hub.stm` | Multi-source arrows, data hub, and three-way join patterns |
 | [`namespaces/`](namespaces/) | `ns-platform.stm` | Namespace blocks, cross-namespace references, and namespace merging |
 | [`nested-iteration/`](nested-iteration/) | `pipeline.stm` | Nested `each`/`flatten` sub-blocks mapping hierarchical dispatch events to a courier manifest |

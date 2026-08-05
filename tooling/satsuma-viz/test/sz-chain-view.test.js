@@ -47,6 +47,31 @@ describe("sz-chain-view", () => {
     assert.match(serialized, /\bid\b/);
   });
 
+  it("renders a connector between every adjacent pair of rail segments, none before the first", async () => {
+    // scvc-8n4r: cards previously had nothing joining them but flexbox gap.
+    // One connector must sit between each of the four segments here (2
+    // upstream columns, focus, 1 downstream column) — three connectors, in
+    // rail order — and none should appear before the first segment.
+    const mod = await import("../dist/satsuma-viz.js");
+    const view = new mod.SzChainView();
+    view.chain = {
+      field: "::orders.id",
+      maxDepth: 5,
+      upstream: [
+        hop("::customers.id", "::load_customers", "none", 1),
+        hop("::legacy.id", "::migrate", "none", 2),
+      ],
+      downstream: [hop("::invoices.order_id", "::bill", "none", 1)],
+    };
+    const serialized = serialize(view.render());
+    const connectors = [...serialized.matchAll(/chain-connector-\S+/g)].map((m) => m[0]);
+    assert.deepEqual(connectors, [
+      "chain-connector-upstream-2-to-upstream-1",
+      "chain-connector-upstream-1-to-focus",
+      "chain-connector-focus-to-downstream-1",
+    ]);
+  });
+
   it("orders upstream columns furthest-first so hop distance increases moving away from the focus card", async () => {
     // Depth 2 must appear before depth 1 in the upstream rail so the reader's
     // eye moves focus -> near -> far in the same left-to-right direction the

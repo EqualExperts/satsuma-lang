@@ -1223,6 +1223,62 @@ test.describe("Field chain view", () => {
       page.locator("[data-testid^='mapping-detail-build-budget-vs-actual']").first(),
     ).toBeVisible();
   });
+
+  // scvc-8n4r: sz-chain-view's own unit tests can only prove a connector
+  // element with the right testid appears in render() output at the right
+  // position in the string — they cannot prove it is actually painted in the
+  // gap between the two cards it is meant to join, which is the entire point
+  // of the fix (cards previously had nothing joining them visually).
+  test("a connector arrow renders between every adjacent pair of rail segments, sitting in the gap between them", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    await page.waitForFunction(() => {
+      const harness = window.__satsumaHarness;
+      if (!harness?.setViewMode) return false; // app.js not evaluated yet
+      harness.setViewMode("single");
+      return true;
+    });
+    await loadFixture(page, nsMergingUri);
+
+    const cardPrefix = await expandOverviewCard(page, "reporting-dept-budget-vs-actual");
+    await page
+      .locator(`[data-testid='${cardPrefix}-field-actual-spend-lineage']`)
+      .click({ force: true });
+    await expect(page.locator("[data-testid='viz-root']")).toHaveAttribute(
+      "data-view-mode",
+      "chain",
+      { timeout: 10_000 },
+    );
+
+    // One connector for each of the four adjacent pairs in this fixture's
+    // rail: upstream depth-2 column, upstream depth-1 column, the focus
+    // card, and the two downstream columns.
+    const connectorTestIds = [
+      "chain-connector-upstream-2-to-upstream-1",
+      "chain-connector-upstream-1-to-focus",
+      "chain-connector-focus-to-downstream-1",
+      "chain-connector-downstream-1-to-downstream-2",
+    ];
+    for (const testId of connectorTestIds) {
+      await expect(page.locator(`[data-testid='${testId}']`)).toBeVisible();
+    }
+
+    // The upstream-1-to-focus connector must sit strictly in the horizontal
+    // gap between the depth-1 column and the focus card — proving it reads
+    // as a joint between them, not just an element that happens to exist
+    // somewhere in the DOM.
+    const [upstreamBox, connectorBox, focusBox] = await Promise.all([
+      page.locator("[data-testid='chain-column-upstream-1']").boundingBox(),
+      page.locator("[data-testid='chain-connector-upstream-1-to-focus']").boundingBox(),
+      page.locator("[data-testid='chain-focus']").boundingBox(),
+    ]);
+    if (!upstreamBox || !connectorBox || !focusBox) {
+      throw new Error("expected the upstream column, connector, and focus card to all render");
+    }
+    expect(connectorBox.x).toBeGreaterThanOrEqual(upstreamBox.x + upstreamBox.width - 1);
+    expect(connectorBox.x + connectorBox.width).toBeLessThanOrEqual(focusBox.x + 1);
+  });
 });
 
 test.describe("Hover highlighting between arrows and field rows", () => {

@@ -1,0 +1,88 @@
+// Deliberately artificial: seven schemas (s1..s7) chained end-to-end by six
+// mappings (hop1..hop6), each carrying exactly one field of interest through
+// a varying amount of record nesting (flat, then two levels deep, then one,
+// and so on) so the field-chain viz has a long, easy-to-follow lineage with
+// some dot-paths to render. Not a plausible real-world pipeline — it exists
+// only to demo tracing a field back and forward across many hops.
+
+schema s1 {
+  hop1_value  STRING
+}
+
+schema s2 {
+  envelope record {
+    payload record {
+      hop2_value  STRING
+    }
+  }
+}
+
+schema s3 {
+  hop3_value  STRING
+}
+
+schema s4 {
+  details record {
+    hop4_value  STRING
+  }
+}
+
+schema s5 {
+  meta record {
+    info record {
+      hop5_value  STRING
+    }
+  }
+}
+
+schema s6 {
+  hop6_value  STRING
+}
+
+schema s7 {
+  summary record {
+    hop7_value  STRING
+  }
+}
+
+mapping hop1 {
+  source { s1 }
+  target { s2 }
+
+  hop1_value -> envelope.payload.hop2_value
+}
+
+mapping hop2 {
+  source { s2 }
+  target { s3 }
+
+  envelope.payload.hop2_value -> hop3_value
+}
+
+mapping hop3 {
+  source { s3 }
+  target { s4 }
+
+  hop3_value -> details.hop4_value
+}
+
+mapping hop4 {
+  source { s4 }
+  target { s5 }
+
+  details.hop4_value -> meta.info.hop5_value
+}
+
+mapping hop5 {
+  source { s5 }
+  target { s6 }
+
+  meta.info.hop5_value -> hop6_value
+}
+
+mapping hop6 {
+  source { s6 }
+  target { s7 }
+
+  hop6_value -> summary.hop7_value
+}
