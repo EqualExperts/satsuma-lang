@@ -111,7 +111,7 @@ Inline annotations above blocks:
 
 ### Command Palette
 
-Eight commands available via `Ctrl+Shift+P`:
+Nine commands available via `Ctrl+Shift+P`:
 
 | Command | Description |
 |---|---|
@@ -123,10 +123,11 @@ Eight commands available via `Ctrl+Shift+P`:
 | **Satsuma: Show Field Lineage** | Trace a field's chain in the visualization panel's chain view |
 | **Satsuma: Show Coverage Overlay** | Open the visualization panel with the coverage overlay switched on |
 | **Satsuma: Show Mapping Coverage** | Show mapped/unmapped fields with gutter markers |
+| **Satsuma: Clear Mapping Coverage** | Remove the gutter markers and status bar item |
 
 ### Workspace Graph
 
-`Satsuma: Show Workspace Graph` opens an interactive SVG diagram of your workspace:
+`Satsuma: Overview Visualization` opens an interactive SVG diagram of your workspace:
 
 - **Nodes** by block type: schemas (rectangles), mappings (diamonds), metrics (circles), fragments (rounded rectangles)
 - **Edges** show data flow between schemas and mappings
