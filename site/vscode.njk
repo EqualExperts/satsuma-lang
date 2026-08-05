@@ -184,7 +184,7 @@ permalink: vscode.html
               <svg class="w-6 h-6 text-orange" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l5.447 2.724A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"/></svg>
             </div>
             <h4 class="text-base font-bold text-charcoal mb-2">Trace one field through the entire pipeline</h4>
-            <p class="text-warm-gray text-sm leading-relaxed">Field-Level Lineage renders a horizontal, multi-hop chain &mdash; source.field &rarr; [transform] &rarr; target.field &mdash; with NL transforms styled distinctly, so you can see exactly where a value comes from.</p>
+            <p class="text-warm-gray text-sm leading-relaxed">Click the lineage icon on any field and the visualization becomes a left-to-right rail: everything upstream of that field, the field itself in the middle, everything downstream. Each hop names the mapping responsible &mdash; click it to open that mapping, or click any field to re-centre the chain there. A hop that hit the traversal limit says so, so a truncated chain never looks complete.</p>
           </div>
 
           <div class="feature-card bg-white rounded-2xl p-6 border border-charcoal/5">
@@ -192,7 +192,7 @@ permalink: vscode.html
               <svg class="w-6 h-6 text-green" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
             </div>
             <h4 class="text-base font-bold text-charcoal mb-2">Know what's mapped without reading the arrows</h4>
-            <p class="text-warm-gray text-sm leading-relaxed">Green and red gutter markers plus a status-bar percentage show mapped vs. unmapped target fields for the mapping under your cursor &mdash; no CLI, no counting by hand.</p>
+            <p class="text-warm-gray text-sm leading-relaxed">Green and red gutter markers plus a status-bar percentage show mapped vs. unmapped target fields for the mapping under your cursor &mdash; no CLI, no counting by hand. For the whole workspace at once, the visualization's <em>Coverage</em> overlay repaints every schema card with the proportion of its fields that something actually maps, and marks the records that are only partly covered.</p>
           </div>
 
         </div>
@@ -205,7 +205,7 @@ permalink: vscode.html
     <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
       <div class="text-center mb-16 reveal">
         <h2 class="text-3xl sm:text-4xl font-bold text-charcoal mb-4">Every workflow above, one keystroke away</h2>
-        <p class="text-warm-gray text-lg max-w-2xl mx-auto">Open the Command Palette (<kbd class="font-mono text-xs bg-code-bg px-1.5 py-0.5 rounded border border-charcoal/10">Ctrl+Shift+P</kbd>) and type "Satsuma" for all 8 commands. Each one runs the CLI for you and renders the result.</p>
+        <p class="text-warm-gray text-lg max-w-2xl mx-auto">Open the Command Palette (<kbd class="font-mono text-xs bg-code-bg px-1.5 py-0.5 rounded border border-charcoal/10">Ctrl+Shift+P</kbd>) and type "Satsuma" for all 9 commands. Each one runs the CLI for you and renders the result.</p>
       </div>
 
       <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 reveal">
@@ -254,7 +254,7 @@ permalink: vscode.html
             <div class="w-8 h-8 bg-green/10 rounded-lg flex items-center justify-center flex-shrink-0">
               <svg class="w-4 h-4 text-green" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zm0 8a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zm12 0a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z"/></svg>
             </div>
-            <h3 class="font-semibold text-charcoal text-sm">Show Mapping Visualization</h3>
+            <h3 class="font-semibold text-charcoal text-sm">Overview Visualization</h3>
           </div>
           <p class="text-warm-gray text-xs leading-relaxed">Open an interactive SVG diagram of your workspace with click-to-navigate nodes.</p>
         </div>
@@ -264,9 +264,9 @@ permalink: vscode.html
             <div class="w-8 h-8 bg-green/10 rounded-lg flex items-center justify-center flex-shrink-0">
               <svg class="w-4 h-4 text-green" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l5.447 2.724A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"/></svg>
             </div>
-            <h3 class="font-semibold text-charcoal text-sm">Trace Field Lineage</h3>
+            <h3 class="font-semibold text-charcoal text-sm">Show Field Lineage</h3>
           </div>
-          <p class="text-warm-gray text-xs leading-relaxed">Open a visual multi-hop trace showing how a field flows from source to target.</p>
+          <p class="text-warm-gray text-xs leading-relaxed">Opens the chain view for the field under your cursor &mdash; its upstream and downstream hops on one rail.</p>
         </div>
 
         <div class="feature-card bg-cream rounded-xl p-5 border border-charcoal/5">
@@ -287,6 +287,16 @@ permalink: vscode.html
             <h3 class="font-semibold text-charcoal text-sm">Clear Mapping Coverage</h3>
           </div>
           <p class="text-warm-gray text-xs leading-relaxed">Removes the gutter markers and status bar item added by <em>Show Mapping Coverage</em>.</p>
+        </div>
+
+        <div class="feature-card bg-cream rounded-xl p-5 border border-charcoal/5">
+          <div class="flex items-center gap-3 mb-2">
+            <div class="w-8 h-8 bg-green/10 rounded-lg flex items-center justify-center flex-shrink-0">
+              <svg class="w-4 h-4 text-green" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3v18h18M7 16l4-4 3 3 5-6"/></svg>
+            </div>
+            <h3 class="font-semibold text-charcoal text-sm">Show Coverage Overlay</h3>
+          </div>
+          <p class="text-warm-gray text-xs leading-relaxed">Opens the workspace visualization with the coverage overlay already on, so every schema card shows how much of it is mapped.</p>
         </div>
       </div>
     </div>
