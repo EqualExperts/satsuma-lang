@@ -27,6 +27,8 @@ export type {
   SourceBlockInfo,
   SourceLocation,
   AggregateCoverage,
+  FieldChainModel,
+  FieldChainHop,
 } from "@satsuma/viz-model";
 
 export { CONSTRAINT_TAGS } from "@satsuma/viz-model";

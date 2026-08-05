@@ -8,6 +8,7 @@ import type {
   MappingBlock,
   SchemaCard,
   AggregateCoverage,
+  FieldChainModel,
 } from "./model.js";
 import {
   computeLayout,
@@ -19,9 +20,16 @@ import {
 import { SzOpenMappingEvent } from "./edges/sz-overview-edge-layer.js";
 import tokens from "./tokens.css";
 import { renderMarkdown } from "./markdown.js";
-import { buildCoverageIndex, mappingSchemaCoverage } from "./field-coverage.js";
+import { buildCoverageIndex, mappingSchemaCoverage, schemaHasFieldPath } from "./field-coverage.js";
 import type { SchemaCoverage } from "./field-coverage.js";
 import { metricAsSchemaCard } from "./metric-adapter.js";
+// Imported from the narrow reference-stages submodule, not the package root:
+// the root barrel re-exports parser/extraction code that needs Node's tree-
+// sitter bindings, which esbuild cannot bundle for this browser component
+// (mirrors sz-mapping-detail.ts's @satsuma/core/extract import).
+import { fieldEndpointPath, fieldEndpointSchema } from "@satsuma/core/reference-stages";
+import type { CanonicalFieldEndpoint } from "@satsuma/core/reference-stages";
+import { SzChainOpenMappingEvent } from "./components/sz-chain-view.js";
 
 export { VizModel } from "./model.js";
 export type { AggregateCoverage, NamespaceGroup } from "./model.js";
@@ -33,6 +41,7 @@ export { SzSchemaCard } from "./components/sz-schema-card.js";
 export type { SzCompactToggledDetail } from "./components/sz-schema-card.js";
 export { SzMetricCard } from "./components/sz-metric-card.js";
 export { SzFragmentCard } from "./components/sz-fragment-card.js";
+export { SzChainView, SzChainOpenMappingEvent } from "./components/sz-chain-view.js";
 export { SzEdgeLayer } from "./edges/sz-edge-layer.js";
 export { SzOverviewEdgeLayer, SzOpenMappingEvent } from "./edges/sz-overview-edge-layer.js";
 export { SzMappingDetail } from "./components/sz-mapping-detail.js";
@@ -182,7 +191,8 @@ export class SzFieldLineageEvent extends Event {
 }
 
 export type VizAutomationReadyState = "empty" | "loading" | "ready" | "fallback";
-export type VizAutomationRenderMode = "empty" | "overview" | "detail" | "fallback";
+export type VizAutomationRenderMode = "empty" | "overview" | "detail" | "chain" | "fallback";
+export type VizViewMode = "overview" | "detail" | "chain";
 
 export interface VizAutomationState {
   /** Stable renderer readiness state for browser automation. */
@@ -190,7 +200,7 @@ export interface VizAutomationState {
   /** Which major UI surface is currently rendered. */
   renderMode: VizAutomationRenderMode;
   /** Current user-facing view mode. */
-  viewMode: "overview" | "detail";
+  viewMode: VizViewMode;
 }
 
 export function sanitizeTestIdSegment(value: string): string {
@@ -221,11 +231,18 @@ export function describeVizAutomationState(args: {
   hasModel: boolean;
   hasOverviewLayout: boolean;
   hasDetailLayout: boolean;
+  /** Whether a chain model is currently loaded — chain mode has no ELK layout to wait on. */
+  hasChainModel: boolean;
   layoutError: boolean;
-  viewMode: "overview" | "detail";
+  viewMode: VizViewMode;
 }): VizAutomationState {
   if (!args.hasModel) {
     return { readyState: "empty", renderMode: "empty", viewMode: args.viewMode };
+  }
+  if (args.viewMode === "chain") {
+    return args.hasChainModel
+      ? { readyState: "ready", renderMode: "chain", viewMode: args.viewMode }
+      : { readyState: "loading", renderMode: "empty", viewMode: args.viewMode };
   }
   if (args.layoutError) {
     return { readyState: "fallback", renderMode: "fallback", viewMode: args.viewMode };
@@ -927,7 +944,16 @@ export class SatsumaViz extends LitElement {
   reduceMotion = false;
 
   @state()
-  private _viewMode: "overview" | "detail" = "overview";
+  private _viewMode: VizViewMode = "overview";
+
+  /**
+   * Chain view's currently displayed traversal, supplied by the host via
+   * {@link openFieldChain} — the component never computes lineage itself
+   * (PRD 36 open question 3, resolved REUSE). Null whenever `_viewMode` is
+   * not `"chain"`.
+   */
+  @state()
+  private _chainModel: FieldChainModel | null = null;
 
   @state()
   private _layout: LayoutResult | null = null;
@@ -1083,6 +1109,13 @@ export class SatsumaViz extends LitElement {
       this._viewMode = "detail";
       this._resetPanZoom();
     }) as EventListener);
+    // A chain-view hop's mapping label carries only a canonical mapping
+    // reference (no MappingBlock object survives the chain-model boundary),
+    // so this resolves it against the currently loaded model rather than
+    // reusing the "open-mapping" contract, which expects the object itself.
+    this.addEventListener("chain-open-mapping", ((e: SzChainOpenMappingEvent) => {
+      this._openMappingByRef(e.viaMapping);
+    }) as EventListener);
   }
 
   override disconnectedCallback() {
@@ -1179,10 +1212,86 @@ export class SatsumaViz extends LitElement {
       }
     }
 
-    // No surviving selection (first load, or the mapping was renamed/deleted).
+    // Chain view has no analogue of "the object still exists in the new
+    // model" — a FieldChainModel is a host-supplied traversal, not something
+    // reconstructible from VizModel alone. So instead of rebinding locally,
+    // ask the host to retrace: re-dispatching the same "field-lineage"
+    // request the original entry point used lets the host recompute against
+    // the fresh model and call openFieldChain() again (Feature 34 R1). The
+    // stale _chainModel keeps rendering until that response arrives.
+    if (this._viewMode === "chain" && this._chainModel) {
+      if (this._chainFieldStillExists(model, this._chainModel.field)) {
+        const { namespace, schemaName, fieldPath } = this._splitEndpointForReconcile(
+          this._chainModel.field,
+        );
+        const schemaId = namespace ? `${namespace}::${schemaName}` : schemaName;
+        this.dispatchEvent(new SzFieldLineageEvent(schemaId, fieldPath));
+        return;
+      }
+    }
+
+    // No surviving selection (first load, or the mapping/field was renamed
+    // or deleted).
     this._viewMode = "overview";
     this._selectedMapping = null;
     this._selectedMappingKey = null;
+    this._chainModel = null;
+  }
+
+  /** Whether a chain focus field's owning schema and path still exist in `model`. */
+  private _chainFieldStillExists(model: VizModel, endpoint: CanonicalFieldEndpoint): boolean {
+    const { namespace, schemaName, fieldPath } = this._splitEndpointForReconcile(endpoint);
+    const qualifiedId = namespace ? `${namespace}::${schemaName}` : schemaName;
+    for (const ns of model.namespaces) {
+      const schema = ns.schemas.find((s) => s.qualifiedId === qualifiedId);
+      if (schema) return fieldPath === "" || schemaHasFieldPath(schema, fieldPath);
+    }
+    return false;
+  }
+
+  /** Decompose a canonical field endpoint without importing the full chain-view module. */
+  private _splitEndpointForReconcile(endpoint: CanonicalFieldEndpoint): {
+    namespace: string | null;
+    schemaName: string;
+    fieldPath: string;
+  } {
+    const schemaRef = fieldEndpointSchema(endpoint);
+    const separator = schemaRef.indexOf("::");
+    return {
+      namespace: separator === 0 ? null : schemaRef.slice(0, separator),
+      schemaName: schemaRef.slice(separator + 2),
+      fieldPath: fieldEndpointPath(endpoint) ?? "",
+    };
+  }
+
+  /**
+   * Enter or refresh chain view with a host-computed traversal.
+   *
+   * The component never traces lineage itself (PRD 36 open question 3,
+   * resolved REUSE): a host listens for the bubbling "field-lineage" event —
+   * fired by a schema card's or mapping detail's field action, by a chain
+   * hop click, or by this component re-requesting a refresh after a model
+   * edit — computes the traversal via `@satsuma/viz-backend` or the LSP, and
+   * calls this method with the result.
+   */
+  openFieldChain(model: FieldChainModel): void {
+    this._chainModel = model;
+    this._viewMode = "chain";
+    this._resetPanZoom();
+  }
+
+  /** Resolve a chain hop's mapping reference against the current model and open its detail view. */
+  private _openMappingByRef(viaMapping: string): void {
+    if (!this.model) return;
+    const key = viaMapping.startsWith("::") ? `_::${viaMapping.slice(2)}` : viaMapping;
+    for (const ns of this.model.namespaces) {
+      for (const m of ns.mappings) {
+        if (this._mappingKey(m) === key) {
+          this._openOverviewMapping(m);
+          return;
+        }
+      }
+    }
   }
 
   /** Stable cross-rebuild key for a mapping; see _selectedMappingKey. */
@@ -1304,6 +1413,7 @@ export class SatsumaViz extends LitElement {
       hasModel: Boolean(this.model),
       hasOverviewLayout: Boolean(this._overviewLayout),
       hasDetailLayout: Boolean(this._layout),
+      hasChainModel: Boolean(this._chainModel),
       layoutError: this._layoutError,
       viewMode: this._viewMode,
     });
@@ -1331,6 +1441,36 @@ export class SatsumaViz extends LitElement {
 
     const filtered = this._filterNamespaces(namespaces);
     const toggleClasses = `${this._schemaOnly ? "schema-only" : ""} ${!this._showNotes ? "hide-notes" : ""}`;
+
+    // Chain view: a simple left-to-right rail, independent of the ELK
+    // overview/detail layouts computed below — it renders as soon as a host
+    // has supplied a chain model, whatever state those layouts are in.
+    if (this._viewMode === "chain") {
+      return html`
+        ${this._renderToolbar(namespaces)}
+        <div class="view-content">
+          <div
+            class="viewport"
+            data-testid="viz-viewport"
+            @wheel=${this._onWheel}
+            @mousedown=${this._onMouseDown}
+            @mousemove=${this._onMouseMove}
+            @mouseup=${this._onMouseUp}
+            @mouseleave=${this._onMouseUp}
+          >
+            <div
+              class="viewport-inner"
+              style="transform: translate(${this._panX}px, ${this._panY}px) scale(${this._zoom});"
+            >
+              <sz-chain-view .chain=${this._chainModel}></sz-chain-view>
+            </div>
+            <div class="zoom-indicator ${this._zoomIndicatorVisible ? "visible" : ""}">
+              ${Math.round(this._zoom * 100)}%
+            </div>
+          </div>
+        </div>
+      `;
+    }
 
     // If layout hasn't computed yet, show loading
     if (!this._layout && !this._overviewLayout && !this._layoutError) {
@@ -1471,6 +1611,8 @@ export class SatsumaViz extends LitElement {
     );
     const hasNamespaces = namedNs.length > 0;
     const inDetail = this._viewMode === "detail";
+    const inChain = this._viewMode === "chain";
+    const inOverview = this._viewMode === "overview";
 
     return html`
       <div class="toolbar">
@@ -1483,7 +1625,20 @@ export class SatsumaViz extends LitElement {
                 <div class="toolbar-sep"></div>
                 <span class="toolbar-title">${this._selectedMapping?.id ?? "Mapping Detail"}</span>
               `
-            : html`<span class="toolbar-title">&#9673; Mapping Viz</span>`
+            : inChain
+              ? html`
+                  <button
+                    class="toolbar-btn"
+                    data-testid="toolbar-chain-back"
+                    @click=${this._backToOverview}
+                    title="Back to overview"
+                  >
+                    &#9664; Overview
+                  </button>
+                  <div class="toolbar-sep"></div>
+                  <span class="toolbar-title">${this._chainFocusTitle()}</span>
+                `
+              : html`<span class="toolbar-title">&#9673; Mapping Viz</span>`
         }
         <div class="toolbar-sep"></div>
         <button
@@ -1499,7 +1654,7 @@ export class SatsumaViz extends LitElement {
         </button>
         <div class="toolbar-sep"></div>
         ${
-          !inDetail
+          inOverview
             ? html`<button
                   class="toolbar-btn"
                   data-testid="toolbar-toggle-coverage"
@@ -1514,7 +1669,7 @@ export class SatsumaViz extends LitElement {
             : ""
         }
         ${
-          !inDetail
+          inOverview
             ? html`<button
                 class="toolbar-btn"
                 data-testid="toolbar-fit"
@@ -1534,7 +1689,7 @@ export class SatsumaViz extends LitElement {
           &#8635; Refresh
         </button>
         ${
-          !inDetail
+          inOverview
             ? html`<button
                 class="toolbar-btn"
                 data-testid="toolbar-export"
@@ -1546,7 +1701,7 @@ export class SatsumaViz extends LitElement {
             : ""
         }
         ${
-          hasNamespaces && !inDetail
+          hasNamespaces && inOverview
             ? html`
                 <div class="toolbar-sep"></div>
                 <select
@@ -1567,7 +1722,7 @@ export class SatsumaViz extends LitElement {
             : ""
         }
         ${
-          this._getSourceFiles().length > 1 && !inDetail
+          this._getSourceFiles().length > 1 && inOverview
             ? html`
                 <div class="toolbar-sep"></div>
                 <select
@@ -1594,10 +1749,21 @@ export class SatsumaViz extends LitElement {
     `;
   }
 
+  /** Toolbar title for chain view: the focus field's qualified name. */
+  private _chainFocusTitle(): string {
+    if (!this._chainModel) return "Field Chain";
+    const { namespace, schemaName, fieldPath } = this._splitEndpointForReconcile(
+      this._chainModel.field,
+    );
+    const schemaId = namespace ? `${namespace}::${schemaName}` : schemaName;
+    return `Chain: ${schemaId}.${fieldPath}`;
+  }
+
   private _backToOverview() {
     this._viewMode = "overview";
     this._selectedMapping = null;
     this._selectedMappingKey = null;
+    this._chainModel = null;
     this._resetPanZoom();
   }
 
@@ -2090,6 +2256,7 @@ export class SatsumaViz extends LitElement {
       hasModel: Boolean(this.model),
       hasOverviewLayout: Boolean(this._overviewLayout),
       hasDetailLayout: Boolean(this._layout),
+      hasChainModel: Boolean(this._chainModel),
       layoutError: this._layoutError,
       viewMode: this._viewMode,
     });

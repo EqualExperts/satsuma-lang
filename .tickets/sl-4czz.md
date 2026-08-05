@@ -1,6 +1,6 @@
 ---
 id: sl-4czz
-status: in_progress
+status: closed
 deps: [sl-jcs6]
 links: []
 created: 2026-07-31T13:13:41Z
@@ -22,3 +22,15 @@ Entry points: field action in expanded cards and detail view (trace this field) 
 
 Three-mapping chain fixture renders all hops in order with correct labels and classifications; nl-derived hop distinct; namespace fan collapse and expand works; depth-limit affordance shown; hop refocus and mapping-label navigation work; edit-while-in-chain-view preserves state; unit tests pass locally.
 
+
+## Notes
+
+**2026-08-05T10:46:11Z**
+
+## Notes
+
+**2026-08-05T00:00:00Z**
+
+Cause: PRD 36 R4 had no chain-view rendering; the viz-model/backend traversal existed (sl-jcs6) but nothing painted it, and the "trace field" entry point (sz-schema-card's lineage icon) dispatched an event nobody consumed.
+
+Fix: added sz-chain-view.ts (a new left-to-right rail component: upstream columns furthest-first, focus card, downstream columns, namespace-fan collapse >3 hops, classification badges incl. a new nl-derived convention, depth-limit affordance). Wired satsuma-viz.ts with a "chain" view mode, a host-facing openFieldChain(model) API, Feature-34-R1-style reconciliation (re-requests a retrace via the existing field-lineage event on model edits; falls back to overview if the field no longer exists), and mapping-label navigation via a new chain-open-mapping event. Also closed a real gap found while implementing the depth-limit requirement: neither core's traceFieldLineage nor the CLI's field-lineage --json exposed any depth signal, so added per-hop depth and a maxDepth cap to FieldLineageResult/FieldChainModel (additive, golden fixture regenerated) — user-approved approach. (commit immediately after 0876998c)

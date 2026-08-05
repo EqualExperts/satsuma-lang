@@ -7,7 +7,7 @@
     "satsuma-lsp": 300,
     "satsuma-viz-model": 7,
     "satsuma-viz-backend": 190,
-    "satsuma-viz": 145,
+    "satsuma-viz": 167,
     "integration-tests": 3,
     "vscode-satsuma": 46
   }
