@@ -38,6 +38,16 @@ interface ChainColumn {
   hops: FieldChainHop[];
 }
 
+/**
+ * One rendered rail position — an upstream/downstream column or the centred
+ * focus card — carrying a stable `id` so the connector between two adjacent
+ * positions can be given a testid derived from both sides.
+ */
+interface RailSegment {
+  id: string;
+  content: TemplateResult;
+}
+
 /** One namespace's hops within a single column, before collapse is decided. */
 interface NamespaceGroup {
   namespace: string | null;
@@ -118,10 +128,34 @@ export class SzChainView extends LitElement {
     .chain-rail {
       display: flex;
       align-items: center;
-      gap: 24px;
+      gap: 8px;
       padding: 16px 8px;
       width: max-content;
       min-width: 100%;
+    }
+
+    /* Decorative flow arrow between two rail segments (bug scvc-8n4r): a
+     * short line with a triangular head, reusing the namespace-fan chip's
+     * border colour so it stays visible against both card backgrounds
+     * without introducing a new token. */
+    .chain-connector {
+      flex-shrink: 0;
+      align-self: center;
+      width: 28px;
+      height: 2px;
+      background: var(--sz-card-border-strong);
+    }
+
+    .chain-connector::after {
+      content: "";
+      display: block;
+      margin-left: 26px;
+      width: 0;
+      height: 0;
+      border-top: 4px solid transparent;
+      border-bottom: 4px solid transparent;
+      border-left: 6px solid var(--sz-card-border-strong);
+      transform: translateY(-3px);
     }
 
     .chain-column {
@@ -320,13 +354,46 @@ export class SzChainView extends LitElement {
     const upstreamColumns = toColumns(this.chain.upstream).reverse();
     const downstreamColumns = toColumns(this.chain.downstream);
 
+    // Every segment sits left-to-right in the direction data actually flows:
+    // an upstream column feeds the column (or focus card) to its right, and
+    // the focus card feeds the first downstream column, and so on. A
+    // connector between each adjacent pair therefore always points right —
+    // see `_renderConnector`.
+    const segments: RailSegment[] = [
+      ...upstreamColumns.map((column) => ({
+        id: `upstream-${column.depth}`,
+        content: this._renderColumn(column, "upstream"),
+      })),
+      { id: "focus", content: this._renderFocus(this.chain.field) },
+      ...downstreamColumns.map((column) => ({
+        id: `downstream-${column.depth}`,
+        content: this._renderColumn(column, "downstream"),
+      })),
+    ];
+
     return html`
       <div class="chain-rail" data-testid="chain-view">
-        ${upstreamColumns.map((column) => this._renderColumn(column, "upstream"))}
-        ${this._renderFocus(this.chain.field)}
-        ${downstreamColumns.map((column) => this._renderColumn(column, "downstream"))}
+        ${segments.map((segment, index) => {
+          const previous = segments[index - 1];
+          return previous
+            ? html`${this._renderConnector(previous.id, segment.id)}${segment.content}`
+            : segment.content;
+        })}
       </div>
     `;
+  }
+
+  /**
+   * A flow arrow between two adjacent rail segments (PRD 36's "connected by
+   * edges" design note). Purely visual: the actual edge data — which mapping,
+   * and its classification — already renders inside the hop card on the
+   * near side of the arrow (`_renderHop`'s `.hop-via`); this only makes the
+   * left-to-right chain legible as a chain rather than a row of unrelated
+   * cards.
+   */
+  private _renderConnector(fromId: string, toId: string): TemplateResult {
+    const testId = `chain-connector-${fromId}-to-${toId}`;
+    return html`<span class="chain-connector" data-testid=${testId} aria-hidden="true"></span>`;
   }
 
   private _renderFocus(field: CanonicalFieldEndpoint): TemplateResult {
