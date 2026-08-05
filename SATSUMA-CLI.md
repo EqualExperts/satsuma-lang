@@ -69,11 +69,19 @@ The `schema_edges` array includes edges with roles: `source`, `target`, `metric_
 
 ### Agent Setup
 
-| Command           | Operation                                                                             | Example                   |
-| ----------------- | ------------------------------------------------------------------------------------- | ------------------------- |
-| `agent-reference` | Print the AI Agent Reference — grammar, conventions, CLI guide, and workflow patterns | `satsuma agent-reference` |
+| Command                       | Operation                                                              | Example                                    |
+| ------------------------------ | ----------------------------------------------------------------------- | ------------------------------------------- |
+| `agent-reference`              | Print the whole AI Agent Reference — grammar, conventions, CLI guide, and workflow patterns | `satsuma agent-reference`                   |
+| `agent-reference --section <id>` | Print one named section only                                          | `satsuma agent-reference --section grammar` |
+| `agent-reference --profile write` | Print the slice a codegen/authoring task needs (grammar, conventions, common mistakes, examples, generate-workflow) | `satsuma agent-reference --profile write`   |
+| `agent-reference --profile read`  | Print the slice a lineage/impact/coverage/audit task needs (conventions, CLI command index and composition guidance, read-workflow) | `satsuma agent-reference --profile read`    |
+| `agent-reference --list`         | List every section id, its measured token cost, and which profile(s) need it | `satsuma agent-reference --list`            |
 
-Pipe the output into your agent's instructions file (e.g., `satsuma agent-reference > .github/copilot-instructions.md`) or paste it into a conversation. The content is baked into the CLI at build time from `AI-AGENT-REFERENCE.md`.
+Pipe the output into your agent's instructions file (e.g., `satsuma agent-reference > .github/copilot-instructions.md`) or paste it into a conversation.
+
+**Back-compatibility guarantee:** bare `satsuma agent-reference` (no flags) always prints the same content it did before `--section`/`--profile`/`--list` existed — every downstream consumer that pipes it today keeps working unchanged. `--section` and `--profile` are additive, task-scoped ways to pay for less of the document; they never change what the bare invocation prints.
+
+The content is baked into the CLI at build time — no runtime file read — from the canonical `reference/*.md` sections (see `reference/manifest.mjs`), not from a single hand-maintained file. `AI-AGENT-REFERENCE.md` itself is now a _generated_ artifact composed from those same sections (run `npm run regenerate:agent-reference` after editing one), so editing it directly will be overwritten; edit the `reference/*.md` section it corresponds to instead. See `reference/token-costs.md` for the measured token cost of every section, profile, and delivery envelope (CLI, portable blob, `skills/satsuma-language`).
 
 ### Formatting
 

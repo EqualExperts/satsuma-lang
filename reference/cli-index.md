@@ -2,7 +2,11 @@
 ## Satsuma CLI — Agent Tooling
 
 > **Include this section only when the agent has access to the `satsuma` CLI.**
-> Run `satsuma agent-reference` to print this entire document.
+> Run `satsuma agent-reference` to print this entire document, or
+> `satsuma agent-reference --profile read` to print just the slice a reading
+> task needs (this section plus the shared conventions) without the grammar a
+> reading task never uses. `satsuma agent-reference --list` shows every
+> section's id and measured token cost; `--section <id>` prints one of them.
 
 The `satsuma` CLI is a deterministic structural extraction tool. It extracts facts from parse trees and delivers NL content verbatim. **It does not interpret natural language — that is your job.** The CLI is the toolkit. You are the runtime.
 

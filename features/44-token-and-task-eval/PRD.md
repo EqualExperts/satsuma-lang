@@ -413,9 +413,9 @@ to open that report just to get the numbers they charge:
 | Mechanism (shipped) | Resident cost | Loaded cost (once used) |
 |---|---|---|
 | `--profile write` (CLI, or the skill's `write` slice) | 0 | 3,743 tokens |
-| `--profile read` (CLI, or the skill's `read` slice) | 0 | 4,360 tokens |
+| `--profile read` (CLI, or the skill's `read` slice) | 0 | 4,435 tokens |
 | Skill envelope, before it triggers | 164 tokens (frontmatter only) | +6,738 tokens (whole document + intro) |
-| Portable blob (`AI-AGENT-REFERENCE.md` pasted in) | 6,653 tokens | 6,653 tokens (no lazy option) |
+| Portable blob (`AI-AGENT-REFERENCE.md` pasted in) | 6,728 tokens | 6,728 tokens (no lazy option) |
 | MCP comparison point (not shipped) | 2,253 tokens, every request | 2,253 tokens |
 
 All `o200k_base`, via `js-tiktoken`. The MCP comparison bears out the

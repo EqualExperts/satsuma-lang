@@ -141,6 +141,29 @@ permalink: cli.html
             </div>
           </div>
         </div>
+
+        <div class="bg-cream rounded-2xl p-6 border border-charcoal/5 mt-6">
+          <h3 class="text-lg font-bold text-charcoal mb-2">Only need part of it?</h3>
+          <p class="text-sm text-warm-gray mb-4">
+            <code class="font-mono text-xs bg-code-bg px-1 rounded">satsuma agent-reference</code> with no flags always prints the whole document — that never changes, so anything already piping it keeps working. If your agent only writes Satsuma or only reads it, hand it just that slice instead:
+          </p>
+          <div class="terminal text-xs">
+            <div class="terminal-header">
+              <div class="terminal-dot red"></div>
+              <div class="terminal-dot yellow"></div>
+              <div class="terminal-dot green"></div>
+            </div>
+            <pre>
+<span class="output"># Generating or converting into Satsuma — grammar, conventions, examples</span>
+<span class="prompt">$</span> satsuma agent-reference <span class="flag">--profile write</span> <span class="flag">&gt;&gt;</span> AGENTS.md
+
+<span class="output"># Tracing lineage, coverage, or impact in an existing workspace</span>
+<span class="prompt">$</span> satsuma agent-reference <span class="flag">--profile read</span> <span class="flag">&gt;&gt;</span> AGENTS.md
+
+<span class="output"># List every section's id and measured token cost</span>
+<span class="prompt">$</span> satsuma agent-reference <span class="flag">--list</span></pre>
+          </div>
+        </div>
       </div>
     </div>
   </section>

@@ -19,7 +19,7 @@ Read the [Integration Engineer Tutorial](docs/tutorials/integration-engineer-tut
 Read the [Copilot + Excel reverse-engineering tutorial](docs/tutorials/copilot-excel-reverse-engineering-tutorial.md) — an end-to-end workflow for bootstrapping a fresh project in VS Code with GitHub Copilot agent mode, the Satsuma CLI, and the `excel-to-satsuma` skill.
 
 **How do I look up the full syntax?**
-Read the [language specification](docs/developer/SATSUMA-V2-SPEC.md). For a compact reference, see [AI-AGENT-REFERENCE.md](AI-AGENT-REFERENCE.md) or run `satsuma agent-reference`.
+Read the [language specification](docs/developer/SATSUMA-V2-SPEC.md). For a compact reference, see [AI-AGENT-REFERENCE.md](AI-AGENT-REFERENCE.md) or run `satsuma agent-reference`. To hand an agent only the slice a task needs — grammar and conventions for writing Satsuma, or the CLI command surface for reading/tracing it — run `satsuma agent-reference --profile write` or `--profile read` instead of the whole document; `--list` shows every section's id and measured token cost, and `--section <id>` prints one. The [`satsuma-language`](skills/satsuma-language) skill wraps the same content as a lazy-loading Agent Skill for harnesses that support them.
 
 **How do I see working examples?**
 Browse [examples/](examples/) — each scenario is a workspace subdirectory with one or more parser-validated `.stm` files.
