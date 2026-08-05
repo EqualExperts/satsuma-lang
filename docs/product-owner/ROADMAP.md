@@ -8,9 +8,13 @@ Feature specs live in `features/` while active and move to `archive/features/` o
 
 ## Active Feature Specs
 
-Features 36 and 40 are active. Everything numbered 01–35 plus Features
-37, 38, 39, 41, and 42 has shipped and is archived (see
-[Shipped Features](#shipped-features)).
+Features 36 and 40 are active, and Features 44 and 45 are proposed but not yet
+started. Everything numbered 01–35 plus Features 37, 38, 39, 41 and 42 has
+shipped and is archived (see [Shipped Features](#shipped-features)).
+
+Feature 43 (site audit fixes) has also shipped — all 11 `saf-*` tickets are closed
+— but its spec is still sitting in `features/` rather than `archive/features/`. It
+should be moved on the next tidy-up.
 
 ### Feature 36 — Viz Coverage Overlay and Field Chain View (not started)
 
@@ -24,12 +28,49 @@ A paint-only coverage overlay on the viz overview, uncovered-field treatment in 
 
 **Source:** `features/36-viz-coverage-and-chain-view/PRD.md`
 
+### Feature 45 — Progressive Disclosure for the AI Agent Reference (proposed)
+
+Restructure `AI-AGENT-REFERENCE.md` into canonical sections composed at build
+time, adding `satsuma agent-reference --section/--profile/--list` while keeping
+bare invocation byte-identical. Task-need analysis says slicing roughly halves the
+~7k-token resident cost. No tickets cut yet.
+
+**Sequencing:** this ships *before* Feature 44 hashes its protocol, so the eval
+measures the reference we intend to ship rather than one we are about to replace.
+Tracked by gate ticket `sl-6ips`.
+
+**Source:** `features/45-agent-reference-progressive-disclosure/PRD.md`
+
+### Feature 44 — Token and Task-Completion Eval (proposed)
+
+A pre-registered protocol replacing the site's "3-8x less token usage" and
+"40-60% smaller" claims with measured, CI-bounded numbers. Arms compare `.xlsx`,
+markdown, `.stm` alone, and `.stm` + CLI, all rendered mechanically from one
+neutral `MappingIntent` record so the comparison is genuinely paired.
+
+**Ready now:** nothing. The only unblocked ticket is the Feature 45 gate
+(`sl-6ips`); the Phase 0.5 probe epic (`sl-qz3v`) and its three children sit
+behind it.
+
+**Next step is deliberately cheap:** Phase 0.5 is a ~$8 hand-graded probe that
+returns a directional effect size *before* the `MappingIntent` machinery, the
+renderers, the graders and the pairing audit get built, with pre-committed kill
+thresholds. If the effect is inside noise, the honest outcome is to correct the
+site copy downward without running a full study.
+
+**Open for the project owner:** the run no longer fits its $100 cap once the
+markdown arm is included (~$118). Either drop the harness-invariance slice and run
+markdown at two rungs (~$98), or raise the cap.
+
+**Source:** `features/44-token-and-task-eval/PRD.md`
+
 ## Shipped Features
 
 Delivered and moved to `archive/features/`. Recent work, most recent first:
 
 | Feature | Shipped | What landed |
 | --- | --- | --- |
+| 43 — Marketing site audit fixes | 2026-08-05 | All 11 `saf-*` tickets: dead links, stats drift, fabricated example snippets, self-contradictions, and a reframe of `vscode.njk` around workflows and `cli.njk` around agents. Deliberately left the unsubstantiated "3-8x"/"40-60%"/">90%" numbers for Feature 44 to measure. Spec not yet moved to `archive/features/` |
 | 42 — Monorepo build tooling | 2026-08-04 | npm workspaces behind one root lockfile, a Turborepo task graph whose build order is derived from the manifests rather than written down, and a persisted content-hash cache (ADR-049). CI 4m35s → 1m56s warm; the eleven packages' `prebuild`/`pretest` sibling-build chains and `scripts/build-workspace.sh` are gone |
 | 39 — Correctness by default | 2026-08-04 | Generated CST contracts, opaque path/ref stages, generated coverage and formatter properties, an independent coverage oracle, enforced typecheck and type-aware lint gates, and structural `FieldDecl` variants |
 | 38 — Hierarchical field coverage | 2026-08-03 | Path-correct nested coverage, container tri-state, whole-subtree arrow semantics, leaf-only ratios, and parity across the CLI, LSP, VS Code, and viz consumers (ADR-035–041) |

@@ -175,8 +175,7 @@ This gives you the `satsuma` command on your PATH. Run `satsuma --help` to see
 available commands.
 
 > **Can't install the CLI or VS Code extension?** Satsuma is still useful
-> without any tooling. LLMs can read and generate `.stm` files directly — our
-> tests show 3–8x fewer tokens than equivalent spreadsheets or YAML — and
+> without any tooling. LLMs can read and generate `.stm` files directly, and
 > plain-text files version-control cleanly. See
 > **[Using Satsuma Without the CLI](docs/using-satsuma-without-cli.md)** for
 > workflows with web LLMs like ChatGPT, Gemini, or Claude.ai.
