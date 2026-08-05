@@ -99,13 +99,20 @@ known, the dots show it.
 
 **A chain view for one field's lineage.** The per-field lineage icon on a field row
 now opens a left-to-right rail: upstream hops furthest-first, the focused field in
-the middle, then downstream hops. Each hop names the mapping responsible for it as a
-button that opens that mapping's detail, badges its classification (`NL`, and
+the middle, then downstream hops, joined by connector arrows so the rail reads as one
+flow rather than a row of separate cards. Each hop names the mapping responsible for
+it as a button that opens that mapping's detail, badges its classification (`NL`, and
 `NL-derived` in its own palette), and lets you click any field to re-focus the chain
 there. Wide fans collapse by namespace once a column carries more than three hops
 and expand on click. A hop at the traversal limit is badged `⋮ depth limit`, so a
 truncated chain says so instead of looking complete. Editing the file while the
 chain is open re-traces it rather than dropping you back to the overview.
+
+`examples/multi-hop-lineage/` is in the corpus as a demo fixture for it: a
+deliberately artificial seven-schema, six-hop chain with varying record nesting,
+which gives three upstream and three downstream hops from the middle field. It is
+labelled in `examples/README.md` as exactly that — a fixture, not a plausible
+pipeline — so nobody mistakes it for a pattern worth copying.
 
 **In VS Code**, `Satsuma: Show Field Lineage` now opens that rail inside the main
 visualisation panel, answered by a new `satsuma/fieldChain` request against the
@@ -117,10 +124,18 @@ webview**, which is deleted along with its CLI shell-out — the old horizontal
 `Satsuma: Show Coverage Overlay`, opens the panel with the overlay already on,
 taking the extension from eight commands to nine.
 
-The chain view is reachable **only from VS Code** in this release. The Playwright
-harness and the site playground both surface the field-lineage icon and record the
-event it fires, but neither answers it yet, so clicking it there does not open the
-rail.
+Opening the chain view is a host's job — the component renders a model it is handed
+rather than tracing lineage itself — and all three hosts now do it, so the same
+gesture works in the extension, in the Playwright harness, and in the public
+playground, which is built from the harness bundle.
+
+The whole of this section is covered by browser tests rather than by unit tests
+alone: the coverage overlay's toggle and badge values, the port-dot treatments in
+both themes, and the chain view's hop ordering, classification badges, depth-limit
+affordance, namespace-fan collapse and connector arrows are each asserted against a
+rendered DOM. That matters here more than usual, because none of it is observable
+from a function's return value — a class that never lands on a row, or a connector
+that paints outside the gap it is meant to fill, passes every unit test there is.
 
 For the component's consumers, everything here is additive: `FieldChainModel` and
 `FieldChainHop` are new types delivered by a new request rather than folded into

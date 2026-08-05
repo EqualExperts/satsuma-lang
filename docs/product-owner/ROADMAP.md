@@ -20,11 +20,10 @@ markdown, `.stm` alone, and `.stm` + CLI, all rendered mechanically from one
 neutral `MappingIntent` record so the comparison is genuinely paired.
 
 **Ready now:** nothing. The only unblocked ticket is the Feature 45 gate
-(`sl-6ips`) — Feature 45 is implemented (all 9 `arpd-*` tickets closed) and
-its measured baselines are in `reference/token-costs.md`, but the gate needs
-that branch merged **and** released, not just implemented, so it stays open
-until then. The Phase 0.5 probe epic (`sl-qz3v`) and its three children sit
-behind it.
+(`sl-6ips`) — Feature 45 is merged (all 9 `arpd-*` tickets closed) and its
+measured baselines are in `reference/token-costs.md`, but the gate needs a
+**release**, not just a merge, so it stays open until one ships. The Phase 0.5
+probe epic (`sl-qz3v`) and its three children sit behind it.
 
 **Next step is deliberately cheap:** Phase 0.5 is a ~$8 hand-graded probe that
 returns a directional effect size *before* the `MappingIntent` machinery, the
@@ -44,8 +43,8 @@ Delivered and moved to `archive/features/`. Recent work, most recent first:
 
 | Feature | Shipped | What landed |
 | --- | --- | --- |
-| 36 — Viz coverage overlay and field chain view | 2026-08-05 (PR #502 pending merge) | A paint-only coverage overlay on the viz overview reading coverage already carried by the model (ADR-042), uncovered-field treatment in cards and the mapping detail view, and a field chain view rendering one field's full upstream/downstream lineage as a left-to-right rail with namespace-fan collapse and depth-limit affordances; VS Code reuses the LSP's own traversal via a new `satsuma/fieldChain` request rather than shipping a second one in the webview. `sl-nswc` wired the same client-side computation into the harness/playground's own click path, so both ship the full feature with no separate playground-exposure work needed — the deferral `sl-1ml2` recorded turned out to be moot the same day it was written. Closing follow-up: visual connectors between chain-view hop cards (`scvc-8n4r`, found via manual testing) |
-| 45 — Progressive disclosure for the AI Agent Reference | 2026-08-05 (implemented; PR #492 pending merge/release — see gate `sl-6ips`) | Canonical `reference/*.md` sections composed at build time into three envelopes (CLI, the now-generated `AI-AGENT-REFERENCE.md`, and the new `satsuma-language` skill); `agent-reference --section/--profile/--list` with bare invocation byte-identical; every bytes/4 estimate replaced by measured `o200k_base` counts in `reference/token-costs.md`, including an MCP-tool-schema comparison point |
+| 36 — Viz coverage overlay and field chain view | 2026-08-05 | A paint-only coverage overlay on the viz overview reading coverage already carried by the model (ADR-042), uncovered-field treatment in cards and the mapping detail view, and a field chain view rendering one field's full upstream/downstream lineage as a left-to-right rail with namespace-fan collapse and depth-limit affordances; VS Code reuses the LSP's own traversal via a new `satsuma/fieldChain` request rather than shipping a second one in the webview. `sl-nswc` wired the same client-side computation into the harness/playground's own click path, so both ship the full feature with no separate playground-exposure work needed — the deferral `sl-1ml2` recorded turned out to be moot the same day it was written. Closing follow-up: visual connectors between chain-view hop cards (`scvc-8n4r`, found via manual testing) |
+| 45 — Progressive disclosure for the AI Agent Reference | 2026-08-05 (merged; awaiting a release to close gate `sl-6ips`) | Canonical `reference/*.md` sections composed at build time into three envelopes (CLI, the now-generated `AI-AGENT-REFERENCE.md`, and the new `satsuma-language` skill); `agent-reference --section/--profile/--list` with bare invocation byte-identical; every bytes/4 estimate replaced by measured `o200k_base` counts in `reference/token-costs.md`, including an MCP-tool-schema comparison point |
 | 43 — Marketing site audit fixes | 2026-08-05 | All 11 `saf-*` tickets: dead links, stats drift, fabricated example snippets, self-contradictions, and a reframe of `vscode.njk` around workflows and `cli.njk` around agents. Deliberately left the unsubstantiated "3-8x"/"40-60%"/">90%" numbers for Feature 44 to measure |
 | 42 — Monorepo build tooling | 2026-08-04 | npm workspaces behind one root lockfile, a Turborepo task graph whose build order is derived from the manifests rather than written down, and a persisted content-hash cache (ADR-049). CI 4m35s → 1m56s warm; the eleven packages' `prebuild`/`pretest` sibling-build chains and `scripts/build-workspace.sh` are gone |
 | 39 — Correctness by default | 2026-08-04 | Generated CST contracts, opaque path/ref stages, generated coverage and formatter properties, an independent coverage oracle, enforced typecheck and type-aware lint gates, and structural `FieldDecl` variants |
