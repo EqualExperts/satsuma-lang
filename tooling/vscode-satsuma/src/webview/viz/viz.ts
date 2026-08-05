@@ -76,6 +76,13 @@ window.addEventListener("message", (event) => {
   } else if (msg.type === "expandedModels") {
     if (msg.theme) vizEl.theme = msg.theme;
     vizEl.addExpandedModels(msg.schemaId, msg.models);
+  } else if (msg.type === "fieldChain") {
+    // Answers the "field-lineage" event above (schema-card trace, chain-hop
+    // refocus, or edit-time reconciliation) with a host-computed traversal —
+    // the component never traces lineage itself (PRD 36 open question 3).
+    vizEl.openFieldChain(msg.payload);
+  } else if (msg.type === "setCoverageOverlay") {
+    vizEl.coverageOverlay = msg.value;
   } else if (msg.type === "error") {
     root.textContent = "";
     const div = document.createElement("div");

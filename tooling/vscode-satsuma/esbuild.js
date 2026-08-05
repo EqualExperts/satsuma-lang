@@ -102,17 +102,6 @@ const webviewVizConfig = {
 };
 
 /** @type {import("esbuild").BuildOptions} */
-const webviewFieldLineageConfig = {
-  entryPoints: ["src/webview/field-lineage/field-lineage.ts"],
-  bundle: true,
-  platform: "browser",
-  target: "es2022",
-  outfile: "dist/webview/field-lineage/field-lineage.js",
-  format: "iife",
-  sourcemap: true,
-};
-
-/** @type {import("esbuild").BuildOptions} */
 const webviewSchemaLineageConfig = {
   entryPoints: ["src/webview/schema-lineage/schema-lineage.ts"],
   bundle: true,
@@ -131,7 +120,6 @@ const { copyFileSync, mkdirSync, existsSync } = require("fs");
 const optionalAssets = [
   ["src/webview/lineage/lineage.css", "dist/webview/lineage/lineage.css"],
   ["src/webview/viz/viz.css", "dist/webview/viz/viz.css"],
-  ["src/webview/field-lineage/field-lineage.css", "dist/webview/field-lineage/field-lineage.css"],
   [
     "src/webview/schema-lineage/schema-lineage.css",
     "dist/webview/schema-lineage/schema-lineage.css",
@@ -195,14 +183,6 @@ async function build() {
     configs.push(webviewVizConfig);
   } catch {
     // Viz webview not yet created
-  }
-
-  // Only include field-lineage config if the entry point exists
-  try {
-    require("fs").accessSync("src/webview/field-lineage/field-lineage.ts");
-    configs.push(webviewFieldLineageConfig);
-  } catch {
-    // Field lineage webview not yet created
   }
 
   // Only include schema-lineage config if the entry point exists

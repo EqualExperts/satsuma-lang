@@ -14,9 +14,7 @@ import { registerWarningsCommand } from "./commands/warnings";
 import { registerSummaryCommand } from "./commands/summary";
 import { registerCoverageCommand } from "./commands/coverage";
 import { getEditorActionContext } from "./commands/action-context";
-import { resolveEntryFile } from "./commands/entry-file";
 import { VizPanel } from "./webview/viz/panel";
-import { FieldLineagePanel } from "./webview/field-lineage/panel";
 
 let client: LanguageClient | undefined;
 
@@ -73,25 +71,35 @@ export function activate(context: ExtensionContext): void {
   context.subscriptions.push(
     vscode.commands.registerCommand("satsuma.showViz", () => {
       if (client) {
-        VizPanel.createOrShow(context.extensionUri, client, cliPath);
+        VizPanel.createOrShow(context.extensionUri, client);
       }
     }),
   );
 
-  // Field Lineage webview (Phase 1 — ELK panel)
+  // Opens (or reveals) the viz panel with the coverage overlay preset on —
+  // a discoverable entry point into PRD 36 R1 alongside the toggle already
+  // built into the panel's own toolbar (sl-iwlv).
+  context.subscriptions.push(
+    vscode.commands.registerCommand("satsuma.showVizCoverage", () => {
+      if (!client) return;
+      VizPanel.createOrShow(context.extensionUri, client);
+      VizPanel.currentPanel?.setCoverageOverlay(true);
+    }),
+  );
+
+  // Traces a field's chain in the viz panel's chain view (PRD 36 R4). Reuses
+  // the LSP-computed model the panel already loads — no second, CLI-driven
+  // lineage computation, per the epic's REUSE decision (sl-iwlv).
   context.subscriptions.push(
     vscode.commands.registerCommand(
       "satsuma.traceFieldLineage",
       async (args?: { fieldPath?: string }) => {
-        // The CLI scopes the workspace via the entry file's imports and rejects
-        // directories (ADR-022) — never fall back to a folder path (sl-1ycv).
-        const entryFilePath = await resolveEntryFile();
-        if (!entryFilePath) return;
+        if (!client) return;
 
         // Prefer: explicit arg > LSP actionContext > user input
         let fieldPath: string | undefined = args?.fieldPath;
 
-        if (!fieldPath && client) {
+        if (!fieldPath) {
           const actionContext = await getEditorActionContext(client);
           fieldPath = actionContext.fieldPath ?? undefined;
         }
@@ -111,7 +119,8 @@ export function activate(context: ExtensionContext): void {
 
         if (!fieldPath) return;
 
-        FieldLineagePanel.createOrShow(context.extensionUri, cliPath, entryFilePath, fieldPath);
+        VizPanel.createOrShow(context.extensionUri, client);
+        await VizPanel.currentPanel?.traceField(fieldPath);
       },
     ),
   );

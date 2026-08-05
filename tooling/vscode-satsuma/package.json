@@ -86,6 +86,10 @@
         "command": "satsuma.showViz",
         "title": "Satsuma: Overview Visualization",
         "icon": "$(eye)"
+      },
+      {
+        "command": "satsuma.showVizCoverage",
+        "title": "Satsuma: Show Coverage Overlay"
       }
     ],
     "menus": {
@@ -100,6 +104,10 @@
         },
         {
           "command": "satsuma.showViz",
+          "when": "editorLangId == satsuma"
+        },
+        {
+          "command": "satsuma.showVizCoverage",
           "when": "editorLangId == satsuma"
         }
       ],
@@ -116,6 +124,11 @@
         },
         {
           "command": "satsuma.showCoverage",
+          "when": "editorLangId == satsuma",
+          "group": "satsuma"
+        },
+        {
+          "command": "satsuma.showVizCoverage",
           "when": "editorLangId == satsuma",
           "group": "satsuma"
         }

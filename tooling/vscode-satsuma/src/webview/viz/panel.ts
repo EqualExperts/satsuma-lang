@@ -2,9 +2,12 @@ import * as vscode from "vscode";
 import { join } from "path";
 import { isSatsumaFilePath } from "@satsuma/core/source-files";
 import type { LanguageClient } from "vscode-languageclient/node";
-import { FieldLineagePanel } from "../field-lineage/panel";
-import { resolveEntryFile } from "../../commands/entry-file";
-import { loadExpandedModels, loadFullLineageModel, vizThemeForKind } from "./integration";
+import {
+  loadExpandedModels,
+  loadFieldChain,
+  loadFullLineageModel,
+  vizThemeForKind,
+} from "./integration";
 import { RefreshGate } from "./refresh-gate";
 
 export class VizPanel {
@@ -12,7 +15,6 @@ export class VizPanel {
   private readonly panel: vscode.WebviewPanel;
   private readonly extensionUri: vscode.Uri;
   private readonly client: LanguageClient;
-  private readonly cliPath: string;
   private disposables: vscode.Disposable[] = [];
   /** URI of the last successfully loaded .stm file — used by Refresh to reload without requiring focus. */
   private _lastUri: string | undefined;
@@ -23,7 +25,7 @@ export class VizPanel {
    */
   private readonly refreshGate = new RefreshGate();
 
-  static createOrShow(extensionUri: vscode.Uri, client: LanguageClient, cliPath: string): void {
+  static createOrShow(extensionUri: vscode.Uri, client: LanguageClient): void {
     if (VizPanel.currentPanel) {
       VizPanel.currentPanel.panel.reveal(vscode.ViewColumn.Beside);
       VizPanel.currentPanel.refresh();
@@ -41,17 +43,15 @@ export class VizPanel {
       },
     );
 
-    VizPanel.currentPanel = new VizPanel(panel, extensionUri, client, cliPath);
+    VizPanel.currentPanel = new VizPanel(panel, extensionUri, client);
   }
 
   private constructor(
     panel: vscode.WebviewPanel,
     extensionUri: vscode.Uri,
     client: LanguageClient,
-    cliPath: string,
   ) {
     this.panel = panel;
-    this.cliPath = cliPath;
     this.extensionUri = extensionUri;
     this.client = client;
 
@@ -173,17 +173,7 @@ export class VizPanel {
     } else if (message.type === "expandLineage" && message.schemaId) {
       this.expandLineage(message.schemaId);
     } else if (message.type === "fieldLineage" && message.fieldPath) {
-      // The CLI rejects directories (ADR-022) — resolve a .stm entry file
-      // before opening the field-lineage panel (sl-1ycv).
-      void resolveEntryFile().then((entryFilePath) => {
-        if (!entryFilePath || !message.fieldPath) return;
-        FieldLineagePanel.createOrShow(
-          this.extensionUri,
-          this.cliPath,
-          entryFilePath,
-          message.fieldPath,
-        );
-      });
+      void this.traceFieldChain(message.fieldPath);
     } else if (message.type === "export" && message.content) {
       this.exportSvg(message.content as string);
     }
@@ -241,6 +231,61 @@ export class VizPanel {
       this.panel.webview.postMessage({
         type: "error",
         message: `Failed to expand lineage: ${err instanceof Error ? err.message : String(err)}`,
+      });
+    }
+  }
+
+  /**
+   * Trace a field's chain from the editor or command palette (sl-iwlv).
+   *
+   * Public so `satsuma.traceFieldLineage` can drive the panel's chain view
+   * directly instead of shelling out to the CLI and rendering a second,
+   * bespoke lineage panel — the workflow PRD 36 P2 replaces.
+   */
+  async traceField(fieldPath: string): Promise<void> {
+    await this.traceFieldChain(fieldPath);
+  }
+
+  /**
+   * Preset the overview's coverage overlay toggle (sl-iwlv), for
+   * `satsuma.showVizCoverage`. The component owns the toggle itself once the
+   * panel is open; this only sets its initial state on command invocation.
+   */
+  setCoverageOverlay(value: boolean): void {
+    this.panel.webview.postMessage({ type: "setCoverageOverlay", value });
+  }
+
+  /**
+   * Trace one field's chain and render it in the panel's chain view.
+   *
+   * Scoped to the same entry file as the loaded overview/full-lineage model
+   * (`_lastUri`, falling back to the active `.stm` editor) — a chain hop into
+   * a file that file doesn't import would not appear in the loaded model's
+   * cards anyway, so `chain-open-mapping` clicks stay resolvable.
+   */
+  private async traceFieldChain(fieldPath: string): Promise<void> {
+    const editor = vscode.window.activeTextEditor;
+    const entryUri =
+      (editor?.document.languageId === "satsuma" ? editor.document.uri.toString() : undefined) ??
+      this._lastUri;
+    if (!entryUri) {
+      this.panel.webview.postMessage({
+        type: "error",
+        message: "Open a .stm file to trace a field's chain",
+      });
+      return;
+    }
+
+    const baseGeneration = this.refreshGate.latest();
+    try {
+      const model = await loadFieldChain(this.client, entryUri, fieldPath);
+      if (!this.refreshGate.isCurrent(baseGeneration)) return;
+      this.panel.webview.postMessage({ type: "fieldChain", payload: model });
+    } catch (err) {
+      if (!this.refreshGate.isCurrent(baseGeneration)) return;
+      this.panel.webview.postMessage({
+        type: "error",
+        message: `Failed to trace field chain: ${err instanceof Error ? err.message : String(err)}`,
       });
     }
   }

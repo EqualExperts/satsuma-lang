@@ -41,7 +41,8 @@ import { computeActionContext } from "./action-context";
 import { prepareRename, computeRename } from "./rename";
 import { computeFormatting, initFormatting } from "./formatting";
 import { computeFullLineage } from "./full-lineage";
-import { buildVizModel } from "@satsuma/viz-backend";
+import { buildVizModel, buildFieldChainFromWorkspace } from "@satsuma/viz-backend";
+import type { FieldLineageDirection } from "@satsuma/core";
 import { computeMappingCoverage } from "./coverage";
 import { isSatsumaFilePath } from "@satsuma/core";
 import { findSatsumaSourceFiles } from "./source-scan";
@@ -401,6 +402,35 @@ connection.onRequest("satsuma/vizModel", (params: { uri: string }) => {
 connection.onRequest("satsuma/vizFullLineage", (params: { uri: string }) => {
   return computeFullLineage(params.uri, wsIndex, (uri) => trees.get(uri) ?? parseTreeFromDisk(uri));
 });
+
+/**
+ * Trace one field's upstream/downstream chain for the viz chain view.
+ *
+ * `uri` is the entry point the chain is scoped from — the same
+ * import-reachable-closure rule `satsuma/vizFullLineage` and `satsuma
+ * coverage` use — not necessarily the file that declares `fieldPath`.
+ * `fieldPath` is `schema.field` (namespace-qualified names accepted), matching
+ * the shape the component's field-lineage event already carries. Files not
+ * open in any editor are parsed straight from disk, so a chain can cross into
+ * imported-but-unopened files (mirrors sl-mg63's full-lineage fix).
+ */
+connection.onRequest(
+  "satsuma/fieldChain",
+  (params: {
+    uri: string;
+    fieldPath: string;
+    depth?: number;
+    direction?: FieldLineageDirection;
+  }) => {
+    return buildFieldChainFromWorkspace(
+      params.uri,
+      wsIndex,
+      (uri) => trees.get(uri) ?? parseTreeFromDisk(uri),
+      params.fieldPath,
+      { depth: params.depth, direction: params.direction },
+    );
+  },
+);
 
 /** Return linked file URIs for cross-file lineage expansion in the viz. */
 connection.onRequest(
