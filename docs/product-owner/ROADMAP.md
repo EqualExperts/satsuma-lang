@@ -14,11 +14,13 @@ shipped and is archived (see [Shipped Features](#shipped-features)).
 
 ### Feature 36 — Viz Coverage Overlay and Field Chain View (in progress)
 
-A paint-only coverage overlay on the viz overview, uncovered-field treatment in cards and detail views, and a chain view rendering one field's full upstream/downstream lineage. Seven tickets under epic `sl-3de8`; three closed (`sl-jcs6` chain traversal model, `sl-5m9x` overlay toggle, `sl-4czz` chain view rendering), four open.
+A paint-only coverage overlay on the viz overview, uncovered-field treatment in cards and detail views, and a chain view rendering one field's full upstream/downstream lineage. Seven tickets under epic `sl-3de8`; four closed (`sl-jcs6` chain traversal model, `sl-5m9x` overlay toggle, `sl-4czz` chain view rendering, `sl-iwlv` VS Code webview wiring), three open.
 
-**Ready now:** `sl-twe8` (uncovered-field treatment) and `sl-iwlv` (VS Code webview wiring, unblocked now that `sl-4czz` has landed). `sl-1ml2` and `sl-nswc` remain; `sl-nswc` (the harness Playwright suite) still waits on both `sl-twe8` and `sl-iwlv`.
+**Ready now:** `sl-twe8` (uncovered-field treatment). `sl-1ml2` and `sl-nswc` remain; `sl-nswc` (the harness Playwright suite) still waits on `sl-twe8`.
 
 **Landed alongside `sl-4czz`:** neither core's field-lineage traversal nor the CLI's `field-lineage --json` carried any depth signal, so the chain view's "depth limit reached" affordance could not be shown honestly. Added an additive `depth` (per hop) and `maxDepth` (traversal cap) to the shared CLI/browser JSON contract.
+
+**Landed alongside `sl-iwlv`:** the VS Code viz panel now feeds the chain view a host-computed `FieldChainModel` via a new LSP request (`satsuma/fieldChain`), reusing a host-neutral `buildFieldChainFromWorkspace` split out of `@satsuma/viz-backend`'s browser-only field-chain builder — mirroring the existing `vizFullLineage`/`computeFullLineage` split. `Satsuma: Show Field Lineage` now opens the chain view in the main viz panel instead of a second, CLI-driven lineage webview, which was deleted; a new `Satsuma: Show Coverage Overlay` command opens the panel with the overlay switched on. The coverage overlay itself needed no new host computation: the panel's existing full-lineage model already carries per-mapping coverage the component unions itself (ADR-042), which is already scoped the same way `satsuma coverage` scopes a workspace (the entry file's import-reachable closure).
 
 **Deferred by decision:** public-playground exposure of coverage is out of scope and gets its own future feature (`sl-1ml2`).
 

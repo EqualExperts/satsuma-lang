@@ -111,7 +111,7 @@ Inline annotations above blocks:
 
 ### Command Palette
 
-Seven commands available via `Ctrl+Shift+P`:
+Eight commands available via `Ctrl+Shift+P`:
 
 | Command | Description |
 |---|---|
@@ -120,7 +120,8 @@ Seven commands available via `Ctrl+Shift+P`:
 | **Satsuma: Show Warnings** | Show all `//!` warnings in the Problems panel |
 | **Satsuma: Show Workspace Summary** | Display workspace statistics |
 | **Satsuma: Overview Visualization** | Open the interactive workspace overview (also the eye icon in the editor title bar and the editor/Explorer context menus) |
-| **Satsuma: Show Field Lineage** | Open field-level lineage webview |
+| **Satsuma: Show Field Lineage** | Trace a field's chain in the visualization panel's chain view |
+| **Satsuma: Show Coverage Overlay** | Open the visualization panel with the coverage overlay switched on |
 | **Satsuma: Show Mapping Coverage** | Show mapped/unmapped fields with gutter markers |
 
 ### Workspace Graph
@@ -135,13 +136,20 @@ Seven commands available via `Ctrl+Shift+P`:
 
 ### Field-Level Lineage
 
-`Satsuma: Trace Field Lineage` traces a field through the entire data pipeline:
+`Satsuma: Show Field Lineage` traces a field's full upstream and downstream
+chain in the visualization panel's chain view — the same panel `Satsuma:
+Overview Visualization` opens, switched into its chain-view mode:
 
-- Cursor-aware field inference for arrow paths and schema fields
-- Multi-hop chain tracing via `satsuma arrows`
-- Horizontal flow: `source.field → [transform] → target.field`
-- NL transforms displayed with distinct styling
-- Click any node to navigate to the definition
+- Cursor-aware field inference; falls back to a QuickPick when the cursor
+  isn't on a field
+- Left-to-right rail: upstream sources → focus field → downstream consumers,
+  one card per hop
+- Multi-hop chains computed by the language server (`@satsuma/core`'s field
+  lineage traversal) — no separate CLI process
+- NL-derived hops (implicit dependencies referenced in prose) rendered with
+  distinct styling
+- Click a hop to re-focus the chain on that field, or a mapping label to open
+  its detail view
 
 ### Mapping Coverage
 

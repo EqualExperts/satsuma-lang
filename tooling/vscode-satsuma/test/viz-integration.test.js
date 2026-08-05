@@ -6,6 +6,7 @@ const {
   loadFullLineageModel,
   loadExpandedModels,
   buildFieldLineagePath,
+  loadFieldChain,
 } = require("../dist/client/webview/viz/integration.js");
 
 const ColorThemeKind = {
@@ -151,6 +152,45 @@ describe("loadExpandedModels", () => {
       models: [],
       theme: "dark",
     });
+  });
+});
+
+describe("loadFieldChain", () => {
+  it("requests the LSP field-chain traversal for the entry uri and field path", async () => {
+    const calls = [];
+    const client = {
+      async sendRequest(method, params) {
+        calls.push({ method, params });
+        return { field: "::b.id", maxDepth: 10, upstream: [], downstream: [] };
+      },
+    };
+
+    const model = await loadFieldChain(client, "file:///platform.stm", "b.id");
+
+    assert.deepEqual(calls, [
+      {
+        method: "satsuma/fieldChain",
+        params: { uri: "file:///platform.stm", fieldPath: "b.id", depth: undefined },
+      },
+    ]);
+    assert.deepEqual(model, { field: "::b.id", maxDepth: 10, upstream: [], downstream: [] });
+  });
+
+  it("forwards an explicit depth override to the request", async () => {
+    // The chain view's depth-limit affordance needs the server to echo the
+    // caller's own limit (see field-chain.test.js in the LSP package), so the
+    // host boundary must not silently drop it.
+    const calls = [];
+    const client = {
+      async sendRequest(_method, params) {
+        calls.push(params);
+        return { field: "::b.id", maxDepth: 2, upstream: [], downstream: [] };
+      },
+    };
+
+    await loadFieldChain(client, "file:///platform.stm", "b.id", 2);
+
+    assert.deepEqual(calls, [{ uri: "file:///platform.stm", fieldPath: "b.id", depth: 2 }]);
   });
 });
 

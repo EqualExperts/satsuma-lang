@@ -11,6 +11,7 @@ import type { LanguageClient } from "vscode-languageclient/node";
 const VIZ_MODEL_REQUEST = "satsuma/vizModel";
 const VIZ_FULL_LINEAGE_REQUEST = "satsuma/vizFullLineage";
 const VIZ_LINKED_FILES_REQUEST = "satsuma/vizLinkedFiles";
+const VIZ_FIELD_CHAIN_REQUEST = "satsuma/fieldChain";
 
 export type ThemeKind = number;
 
@@ -130,4 +131,22 @@ export async function loadExpandedModels<TModel>(
  */
 export function buildFieldLineagePath(schemaId: string, fieldName: string): string {
   return `${schemaId}.${fieldName}`;
+}
+
+/**
+ * Load a field's chain traversal through the LSP request boundary.
+ *
+ * `uri` scopes the traversal to that file's import-reachable closure — the
+ * same file the panel already has loaded via {@link loadFullLineageModel} —
+ * so a hop can cross into an imported file the chain view has never rendered
+ * a card for. Depth defaults to the server's own default (matching
+ * `satsuma field-lineage`'s `--depth 10`) when omitted.
+ */
+export async function loadFieldChain<TModel>(
+  client: Pick<LanguageClient, "sendRequest">,
+  uri: string,
+  fieldPath: string,
+  depth?: number,
+): Promise<TModel> {
+  return client.sendRequest<TModel>(VIZ_FIELD_CHAIN_REQUEST, { uri, fieldPath, depth });
 }

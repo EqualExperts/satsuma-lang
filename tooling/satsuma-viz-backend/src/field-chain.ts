@@ -1,10 +1,17 @@
 /**
- * field-chain.ts — build a field traversal from an in-memory workspace.
+ * field-chain.ts — build a field traversal from a workspace index.
  *
- * This is the browser-side adapter around core's single field-edge builder and
- * traversal. It owns import scoping, workspace-to-core projection, and the
- * current endpoint-ambiguity policy; it does not implement lineage semantics or
- * depend on the CLI. The result is the exact JSON shape the CLI publishes.
+ * Owns import scoping, workspace-to-core projection, and the current
+ * endpoint-ambiguity policy around core's single field-edge builder and
+ * traversal; it does not implement lineage semantics or depend on the CLI.
+ * The result is the exact JSON shape the CLI publishes.
+ *
+ * {@link buildFieldChainFromWorkspace} is the host-neutral core of this module:
+ * given a `WorkspaceIndex` and a tree loader, it does not care whether the
+ * trees came from parsing host-supplied text (the browser path, via
+ * {@link buildFieldChainFromSources}) or from an LSP's own open-editor/on-disk
+ * cache — the same split `full-lineage.ts` uses for the merged VizModel. Only
+ * the "how do I get a WorkspaceIndex and its trees" part is host-specific.
  */
 
 import {
@@ -26,11 +33,15 @@ import type {
   NLRefDataItem,
 } from "@satsuma/core";
 import type { FieldChainModel } from "@satsuma/viz-model";
+import type { Tree } from "./parser-utils";
 import { buildInMemoryWorkspace } from "./in-memory-workspace";
 import type { SourceDocument } from "./in-memory-workspace";
 import { createScopedIndex, getImportReachableUris, resolveDefinition } from "./workspace-index";
 import type { WorkspaceIndex } from "./workspace-index";
 import { createWorkspaceDefinitionLookup } from "./workspace-definition-lookup";
+
+/** Returns a parse tree for a URI, from whichever source the host has, or null/undefined when unavailable. */
+export type TreeLoader = (uri: string) => Tree | null | undefined;
 
 /** Default mapping-hop limit, matching `satsuma field-lineage`. */
 export const DEFAULT_FIELD_CHAIN_DEPTH = 10;
@@ -102,7 +113,7 @@ interface ChainInputs {
 /** Extract and qualify the core inputs for one import-reachable workspace. */
 function collectChainInputs(
   reachableUris: Set<string>,
-  treesByUri: ReturnType<typeof buildInMemoryWorkspace>["treesByUri"],
+  loadTree: TreeLoader,
   workspace: WorkspaceIndex,
 ): ChainInputs {
   const arrows: FieldArrowLike[] = [];
@@ -110,7 +121,7 @@ function collectChainInputs(
   const nlRefData: NLRefDataItem[] = [];
 
   for (const uri of reachableUris) {
-    const tree = treesByUri.get(uri);
+    const tree = loadTree(uri);
     if (!tree) continue;
 
     for (const mapping of extractMappings(tree.rootNode)) {
@@ -136,30 +147,33 @@ function collectChainInputs(
 }
 
 /**
- * Build a CLI-compatible field chain from host-supplied source documents.
+ * Build a CLI-compatible field chain from an already-built workspace index.
  *
- * Only documents reachable from `entryUri` through imports contribute edges.
- * The function reads no filesystem or process state and is safe in the browser;
- * callers must initialise core's WASM parser before invoking it.
+ * Host-neutral: the LSP calls this with its own `WorkspaceIndex` and a tree
+ * loader over open-editor/on-disk trees, and {@link buildFieldChainFromSources}
+ * calls it with a workspace freshly built from browser-supplied text. Neither
+ * host's tree-acquisition strategy leaks into the traversal below.
+ *
+ * Only files reachable from `entryUri` through imports contribute edges,
+ * matching `satsuma coverage`'s and `vizFullLineage`'s scoping rule: "the
+ * workspace" means the entry file's transitive import closure, not every file
+ * a host happens to have loaded.
  */
-export function buildFieldChainFromSources(
+export function buildFieldChainFromWorkspace(
   entryUri: string,
-  documents: SourceDocument[],
+  workspace: WorkspaceIndex,
+  loadTree: TreeLoader,
   focusField: string,
   options: BuildFieldChainOptions = {},
 ): FieldChainModel {
   const field = canonicalFocusField(focusField);
   const maxDepth = options.depth ?? DEFAULT_FIELD_CHAIN_DEPTH;
-  const { index, treesByUri } = buildInMemoryWorkspace(documents);
-  if (!treesByUri.has(entryUri)) return { field, maxDepth, upstream: [], downstream: [] };
+  if (!loadTree(entryUri)) return { field, maxDepth, upstream: [], downstream: [] };
 
-  const reachableUris = getImportReachableUris(entryUri, index);
-  const workspace = createScopedIndex(index, reachableUris);
-  const inputs = collectChainInputs(reachableUris, treesByUri, workspace);
-  const lookup = createWorkspaceDefinitionLookup(
-    workspace,
-    (key) => inputs.mappings.get(key) ?? null,
-  );
+  const reachableUris = getImportReachableUris(entryUri, workspace);
+  const scoped = createScopedIndex(workspace, reachableUris);
+  const inputs = collectChainInputs(reachableUris, loadTree, scoped);
+  const lookup = createWorkspaceDefinitionLookup(scoped, (key) => inputs.mappings.get(key) ?? null);
   const nlRefs = resolveAllNLRefs(inputs.nlRefData, lookup);
   const edges = buildFieldEdges({
     arrows: inputs.arrows,
@@ -172,4 +186,29 @@ export function buildFieldChainFromSources(
     depth: maxDepth,
     direction: options.direction ?? "both",
   });
+}
+
+/**
+ * Build a CLI-compatible field chain from host-supplied source documents.
+ *
+ * The browser-path wrapper around {@link buildFieldChainFromWorkspace}: parses
+ * `documents` into a fresh `WorkspaceIndex` and tree set (the shared first half
+ * every browser-side workspace operation needs, per `in-memory-workspace.ts`),
+ * then delegates. Reads no filesystem or process state and is safe in the
+ * browser; callers must initialise core's WASM parser before invoking it.
+ */
+export function buildFieldChainFromSources(
+  entryUri: string,
+  documents: SourceDocument[],
+  focusField: string,
+  options: BuildFieldChainOptions = {},
+): FieldChainModel {
+  const { index, treesByUri } = buildInMemoryWorkspace(documents);
+  return buildFieldChainFromWorkspace(
+    entryUri,
+    index,
+    (uri) => treesByUri.get(uri),
+    focusField,
+    options,
+  );
 }
