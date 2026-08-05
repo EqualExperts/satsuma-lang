@@ -34,7 +34,7 @@
 > longer fits the $100 cap, and [Costed run plan](#costed-run-plan--100-hard-cap)
 > puts that choice to the project owner rather than silently absorbing it.
 >
-> **Direct antecedent.** `features/43-site-audit-fixes/PRD.md` (Non-goals)
+> **Direct antecedent.** `archive/features/43-site-audit-fixes/PRD.md` (Non-goals)
 > records "3-8x less token usage", "40-60% smaller", and
 > ">90% LLM-generates-valid-Satsuma" as unsubstantiated marketing numbers, and
 > explicitly left them for the project owner to triage into a future feature.
