@@ -47,8 +47,9 @@ mapping bc { source { b } target { c } id -> id }
 
     assert.deepEqual(result, {
       field: "::b.id",
-      upstream: [{ field: "::a.id", via_mapping: "::ab", classification: "none" }],
-      downstream: [{ field: "::c.id", via_mapping: "::bc", classification: "none" }],
+      maxDepth: 10,
+      upstream: [{ field: "::a.id", via_mapping: "::ab", classification: "none", depth: 1 }],
+      downstream: [{ field: "::c.id", via_mapping: "::bc", classification: "none", depth: 1 }],
     });
   });
 
@@ -72,11 +73,12 @@ mapping load {
     );
 
     assert.deepEqual(result.upstream, [
-      { field: "::source_data.id", via_mapping: "::load", classification: "nl" },
+      { field: "::source_data.id", via_mapping: "::load", classification: "nl", depth: 1 },
       {
         field: "::source_data.audit",
         via_mapping: "::load",
         classification: "nl-derived",
+        depth: 1,
       },
     ]);
   });
@@ -84,6 +86,8 @@ mapping load {
   it("limits traversal by mapping depth while retaining the nearest hop", () => {
     // The public builder must forward its limit to core; silently ignoring it
     // would make a wide workspace expensive and contradict the CLI contract.
+    // maxDepth must echo the caller's limit, not the core default, so a host
+    // renderer can tell a boundary hop from a genuine dead end.
     const result = chainFrom(
       `
 schema a { id string }
@@ -97,9 +101,10 @@ mapping bc { source { b } target { c } id -> id }
     );
 
     assert.deepEqual(result.upstream, [
-      { field: "::b.id", via_mapping: "::bc", classification: "none" },
+      { field: "::b.id", via_mapping: "::bc", classification: "none", depth: 1 },
     ]);
     assert.deepEqual(result.downstream, []);
+    assert.equal(result.maxDepth, 1);
   });
 });
 

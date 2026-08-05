@@ -51,6 +51,13 @@ export interface FieldChainHop {
   via_mapping: string;
   /** Whether the connection is direct, transformed NL, or inferred from an NL `@ref`. */
   classification: Classification;
+  /**
+   * Mapping-hop distance from the focus field. A hop whose depth equals the
+   * traversal's requested depth sits on the boundary and may have further
+   * neighbours that were never visited — renderers use this to show an
+   * explicit "depth limit reached" affordance rather than a silent cutoff.
+   */
+  depth: number;
 }
 
 /**
@@ -60,6 +67,13 @@ export interface FieldChainHop {
 export interface FieldChainModel {
   /** Canonical field at the centre of the traversal. */
   field: CanonicalFieldEndpoint;
+  /**
+   * The traversal's requested depth cap. A hop whose `depth` equals this
+   * value sits on the boundary and may have further, untraced neighbours —
+   * compare the two to render an honest "depth limit reached" affordance
+   * rather than a silent cutoff.
+   */
+  maxDepth: number;
   /** Upstream fields, nearest first, with cycles and depth limits guarded by core. */
   upstream: FieldChainHop[];
   /** Downstream fields, nearest first, with cycles and depth limits guarded by core. */

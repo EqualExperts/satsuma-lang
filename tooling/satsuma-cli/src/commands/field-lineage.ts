@@ -48,9 +48,15 @@ The field reference is <schema>.<field>. Namespace-qualified names work
 JSON output shape:
   {
     "field": "::schema.field",
-    "upstream":   [{ "field": "::src.f", "via_mapping": "::m", "classification": "none" }, ...],
-    "downstream": [{ "field": "::tgt.f", "via_mapping": "::m", "classification": "none" }, ...]
+    "maxDepth": 10,
+    "upstream":   [{ "field": "::src.f", "via_mapping": "::m", "classification": "none", "depth": 1 }, ...],
+    "downstream": [{ "field": "::tgt.f", "via_mapping": "::m", "classification": "none", "depth": 1 }, ...]
   }
+
+  "maxDepth" echoes the requested --depth. Each hop's "depth" is its hop
+  distance from the focus field; a hop with depth equal to maxDepth sits
+  exactly on the traversal boundary and may have further neighbours that
+  --depth excluded.
 
 Examples:
   satsuma field-lineage s2.a                     # full upstream + downstream
