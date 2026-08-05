@@ -49,6 +49,16 @@ const sapUri = libraryUri("sap-po-to-mfcs/pipeline.stm");
 const ffgUri = libraryUri("filter-flatten-governance/filter-flatten-governance.stm");
 /** buy-to-om-order contract fixture — used for compact card expansion tests. */
 const buyToOmUri = libraryUri("contracts/buy-to-om-order.stm");
+/** Nested each/flatten fixture — doubly-nested arrows (sl-rj78). */
+const nestedIterationUri = libraryUri("nested-iteration/pipeline.stm");
+/**
+ * Governance fixture's own mapping — a two-source join (crm_customers,
+ * finance_transactions) with computed arrows whose NL text names source
+ * fields by @ref rather than by a declared source path (sl-d7fz). Distinct
+ * from `ffgUri`, which points at the sibling entry point file in the same
+ * directory.
+ */
+const governanceUri = libraryUri("filter-flatten-governance/governance.stm");
 
 /**
  * Open a specific named mapping by clicking its overview mapping card.
@@ -953,6 +963,76 @@ test.describe("Hover highlighting between arrows and field rows", () => {
 
     const sourceField = detail.locator(
       "[data-testid='mapping-detail-opportunity-ingestion-source-schema-card-sfdc-opportunity-field-amount']",
+    );
+    await expect(sourceField).toHaveClass(/\bhl\b/);
+  });
+});
+
+test.describe("Hover highlighting resolves nested arrow paths (sl-rj78)", () => {
+  test("hovering a doubly-nested arrow row highlights the correct source and target field, not nothing", async ({
+    page,
+  }) => {
+    // The `dispatch manifest` mapping nests `each lines -> .lines` inside
+    // `each orders -> orders`, so `.sku -> .sku`'s authored paths are relative
+    // to TWO levels of container. Pre-fix, the `_hoveredArrow` branch matched
+    // those raw paths (".sku") against the schemas' declared fields directly,
+    // which only succeeds by coincidence when there is no nesting — here it
+    // matches nothing, so hovering the row lit up neither card.
+    await page.goto("/");
+    await page.waitForFunction(() => {
+      const harness = window.__satsumaHarness;
+      if (!harness?.setViewMode) return false; // app.js not evaluated yet
+      harness.setViewMode("single");
+      return true;
+    });
+    await loadFixture(page, nestedIterationUri);
+    const detail = await openMappingByName(page, "dispatch-manifest");
+
+    await detail
+      .locator(
+        "[data-testid='mapping-detail-dispatch-manifest-arrow-row-each-orders-each-lines-sku']",
+      )
+      .hover();
+
+    const sourceField = detail.locator(
+      "[data-testid='mapping-detail-dispatch-manifest-source-schema-card-warehouse-dispatch-events-field-orders-lines-sku']",
+    );
+    const targetField = detail.locator(
+      "[data-testid='mapping-detail-dispatch-manifest-target-schema-card-dispatch-manifest-json-field-orders-lines-sku']",
+    );
+
+    await expect(sourceField).toHaveClass(/\bhl\b/);
+    await expect(targetField).toHaveClass(/\bhl\b/);
+  });
+});
+
+test.describe("Hover highlighting resolves @refs in NL transforms (sl-d7fz)", () => {
+  test("hovering a computed arrow highlights the source field its NL text names by @ref", async ({
+    page,
+  }) => {
+    // `customer 360 assembly` joins crm_customers and finance_transactions.
+    // `-> total_transaction_amt`'s NL transform names its source purely via
+    // `@finance_transactions.amount` — a computed arrow has no declared
+    // source path at all (viz-model.ts's extractComputedArrow), so nothing
+    // but parsing the transform text itself can find the field to highlight.
+    await page.goto("/");
+    await page.waitForFunction(() => {
+      const harness = window.__satsumaHarness;
+      if (!harness?.setViewMode) return false; // app.js not evaluated yet
+      harness.setViewMode("single");
+      return true;
+    });
+    await loadFixture(page, governanceUri);
+    const detail = await openMappingByName(page, "customer-360-assembly");
+
+    await detail
+      .locator(
+        "[data-testid='mapping-detail-customer-360-assembly-arrow-row-total-transaction-amt']",
+      )
+      .hover();
+
+    const sourceField = detail.locator(
+      "[data-testid='mapping-detail-customer-360-assembly-source-schema-card-finance-transactions-field-amount']",
     );
     await expect(sourceField).toHaveClass(/\bhl\b/);
   });
