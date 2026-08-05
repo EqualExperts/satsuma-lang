@@ -1,8 +1,8 @@
 {
   "name": "satsuma-cli",
-  "version": "0.12.0",
+  "version": "0.13.0",
   "private": true,
-  "description": "Satsuma CLI \u2014 LLM context slicer for Satsuma workspaces",
+  "description": "Satsuma CLI — LLM context slicer for Satsuma workspaces",
   "license": "MIT",
   "type": "module",
   "bin": {

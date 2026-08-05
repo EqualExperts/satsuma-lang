@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## v0.13.0 — 2026-08-05
+
 ### `agent-reference` can hand an agent one slice instead of the whole document (`arpd-6iis`)
 
 **Nothing changes unless you ask for it.** `satsuma agent-reference` with no flags
