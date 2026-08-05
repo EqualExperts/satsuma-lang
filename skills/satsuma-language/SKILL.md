@@ -416,10 +416,16 @@ JSON shape for `field-lineage --json`:
 ```json
 {
   "field":      "::schema.field",
-  "upstream":   [{"field": "::src.f", "via_mapping": "::m", "classification": "none"}, ...],
-  "downstream": [{"field": "::tgt.f", "via_mapping": "::m", "classification": "nl-derived"}, ...]
+  "maxDepth":   10,
+  "upstream":   [{"field": "::src.f", "via_mapping": "::m", "classification": "none", "depth": 1}, ...],
+  "downstream": [{"field": "::tgt.f", "via_mapping": "::m", "classification": "nl-derived", "depth": 1}, ...]
 }
 ```
+
+`maxDepth` echoes the `--depth` you requested. Each hop's `depth` is its hop
+distance from the focus field; a hop whose depth equals `maxDepth` sits
+exactly on the traversal boundary — it may have further neighbours that were
+never traced, not a confirmed dead end.
 
 ### Transform classification
 

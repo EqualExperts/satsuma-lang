@@ -17,27 +17,27 @@
         "mistakes": 448,
         "examples": 441,
         "cli-index": 1136,
-        "cli-composition": 1587,
+        "cli-composition": 1672,
         "workflow-generate": 460,
         "workflow-read": 264
       },
       "perProfile": {
         "write": 3743,
-        "read": 4435
+        "read": 4520
       },
-      "wholeDocument": 6728,
+      "wholeDocument": 6813,
       "envelopes": {
         "cli": {
           "resident": 0,
           "loaded": "on demand — see per-section/profile figures above"
         },
         "portable-blob": {
-          "resident": 6728,
-          "loaded": 6728
+          "resident": 6813,
+          "loaded": 6813
         },
         "skill": {
           "resident": 164,
-          "loaded": 6977
+          "loaded": 7062
         },
         "mcp-comparison": {
           "resident": 2253,
