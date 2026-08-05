@@ -36,8 +36,8 @@
  * `file-open`, and `file-save` events.
  */
 
-import { ensureParserReady, buildModel } from "./model-pipeline";
-import type { VizModel } from "./model-pipeline";
+import { ensureParserReady, buildModel, buildFieldChain } from "./model-pipeline";
+import type { VizModel, FieldChainModel } from "./model-pipeline";
 import { highlightSatsuma } from "./highlight";
 import { SatsumaEditor } from "./editor";
 import { DocumentLibrary, STARTER_SOURCE } from "./library";
@@ -421,7 +421,22 @@ function ensureVizElement(): HTMLElement {
     }
   });
   el.addEventListener("field-lineage", (e) => {
-    recordNormalizedEvent("field-lineage", e, normalizeFieldEvent);
+    const detail = recordNormalizedEvent(
+      "field-lineage",
+      e,
+      normalizeFieldEvent,
+    ) as HarnessFieldPayload | null;
+    // Trace the field and hand the result to the component's host-agnostic
+    // chain-view API (PRD 36 R3/R4): the harness plays the same "host computes,
+    // component renders" role VS Code and the LSP play in production.
+    if (detail?.fieldName && harness.fixture) {
+      const chain = buildFieldChain(
+        harness.fixture,
+        library.documents(),
+        `${detail.schemaId}.${detail.fieldName}`,
+      );
+      (el as unknown as { openFieldChain(model: FieldChainModel): void }).openFieldChain(chain);
+    }
   });
   el.addEventListener("open-mapping", (e) => {
     recordNormalizedEvent("open-mapping", e, normalizeOpenMappingEvent);

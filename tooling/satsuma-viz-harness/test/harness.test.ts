@@ -59,6 +59,14 @@ const nestedIterationUri = libraryUri("nested-iteration/pipeline.stm");
  * directory.
  */
 const governanceUri = libraryUri("filter-flatten-governance/governance.stm");
+/**
+ * Namespace-merging fixture — the corpus's only field whose lineage genuinely
+ * spans multiple mappings on both sides with `nl-derived` hops mixed in
+ * (sl-nswc): `reporting::dept_budget_vs_actual.actual_spend` has 3 upstream
+ * hops at depth 1 and 4 at depth 2 (collapsing into a namespace-fan chip),
+ * plus 2 downstream hops. No other fixture in the harness reaches this shape.
+ */
+const nsMergingUri = libraryUri("namespaces/ns-merging.stm");
 
 /**
  * Open a specific named mapping by clicking its overview mapping card.
@@ -957,6 +965,264 @@ test.describe("Field coverage indicators", () => {
       expect(appearances.partial).toMatch(/gradient/);
     });
   }
+});
+
+// sl-nswc (PRD 36 R5): sl-5m9x's own unit tests (coverage-overlay.test.js,
+// schema-card-coverage.test.js) already prove the toggle property and geometry
+// invariant it pins survive a *simulated* DOM. What only a real browser can
+// prove is that the toolbar button the user actually clicks flips the overlay
+// on every schema card in one page, with the CLI's own numbers, and that the
+// paint-only promise ("toggling never reshuffles the diagram") holds for
+// bounding boxes Playwright reads off real rendered elements.
+test.describe("Coverage overlay toggle", () => {
+  test("toggle switches every schema card between field counts and covered/total ratios with percentage badges matching `satsuma coverage --json`", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    await page.waitForFunction(() => {
+      const harness = window.__satsumaHarness;
+      if (!harness?.setViewMode) return false; // app.js not evaluated yet
+      harness.setViewMode("single");
+      return true;
+    });
+    await loadFixture(page, ffgUri);
+
+    const toggle = page.locator("[data-testid='toolbar-toggle-coverage']");
+    await expect(toggle).toHaveAttribute("aria-pressed", "false");
+
+    // order_events is read by two mappings in this fixture, so its aggregate
+    // (20/22, 90%) genuinely differs from either mapping's own coverage —
+    // the same case sl-twe8 used, confirmed via `satsuma coverage --json`
+    // against filter-flatten-governance.stm.
+    const orderEventsCount = page.locator(
+      "[data-testid='overview-schema-card-order-events-header-count']",
+    );
+    const orderEventsBadge = page.locator(
+      "[data-testid='overview-schema-card-order-events-coverage-percent']",
+    );
+    await expect(orderEventsCount).toHaveText("22 fields");
+    await expect(orderEventsBadge).toHaveCount(0);
+
+    await toggle.click();
+    await expect(toggle).toHaveAttribute("aria-pressed", "true");
+
+    await expect(orderEventsCount).toHaveText("20/22");
+    await expect(orderEventsBadge).toHaveText("90%");
+
+    // customer_profiles (3/8, 37%) and completed_orders_parquet (15/15, 100%)
+    // pin the "one fully-mapped, one half-mapped schema" acceptance test from
+    // the PRD against the same fixture, so all three assertions are checked
+    // against one `satsuma coverage --json` run rather than three fixtures.
+    await expect(
+      page.locator("[data-testid='overview-schema-card-customer-profiles-header-count']"),
+    ).toHaveText("3/8");
+    await expect(
+      page.locator("[data-testid='overview-schema-card-customer-profiles-coverage-percent']"),
+    ).toHaveText("37%");
+    await expect(
+      page.locator(
+        "[data-testid='overview-schema-card-completed-orders-parquet-coverage-percent']",
+      ),
+    ).toHaveText("100%");
+
+    await toggle.click();
+    await expect(toggle).toHaveAttribute("aria-pressed", "false");
+    await expect(orderEventsCount).toHaveText("22 fields");
+    await expect(orderEventsBadge).toHaveCount(0);
+  });
+
+  test("toggling coverage mode does not change overview card geometry", async ({ page }) => {
+    await page.goto("/");
+    await page.waitForFunction(() => {
+      const harness = window.__satsumaHarness;
+      if (!harness?.setViewMode) return false; // app.js not evaluated yet
+      harness.setViewMode("single");
+      return true;
+    });
+    await loadFixture(page, ffgUri);
+
+    const before = await readOverviewCardBoxes(page);
+    await page.locator("[data-testid='toolbar-toggle-coverage']").click();
+    await expect(page.locator("[data-testid='toolbar-toggle-coverage']")).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    const after = await readOverviewCardBoxes(page);
+
+    // Same cards, same boxes: the overlay repaints headers in place, it never
+    // triggers a relayout (PRD 36 R1's "paint-only" requirement).
+    expect(after).toEqual(before);
+  });
+});
+
+// sl-nswc (PRD 36 R4/R5): sl-4czz's own unit tests drive <sz-chain-view>
+// directly with hand-built FieldChainModel fixtures and can only prove the
+// rendering function is correct. They cannot prove the real entry point (a
+// click on a field row's lineage icon) reaches it, that the harness's own
+// host wiring (buildFieldChain -> openFieldChain, added alongside these
+// specs) produces a model matching the CLI, or that two sibling hops at the
+// same depth are genuinely two separate, clickable DOM elements — the exact
+// testid-collision defect a substring-matching unit test cannot observe
+// (fixed in sz-chain-view.ts alongside this suite).
+//
+// examples/namespaces/ns-merging.stm is the only fixture in the corpus whose
+// lineage genuinely fans out on both sides with `nl-derived` hops mixed in —
+// see the `nsMergingUri` doc comment above for the shape, confirmed via
+// `satsuma field-lineage reporting::dept_budget_vs_actual.actual_spend
+// examples/namespaces/ns-merging.stm --json` before writing these assertions.
+test.describe("Field chain view", () => {
+  /** Expand a namespaced overview card and return its field-row test-id prefix. */
+  async function expandOverviewCard(page: Page, qualifiedIdTestSegment: string): Promise<string> {
+    const cardPrefix = `overview-schema-card-${qualifiedIdTestSegment}`;
+    await page
+      .locator(`sz-schema-card[data-testid^='${cardPrefix}']`)
+      .locator(".header-toggle")
+      .click();
+    return cardPrefix;
+  }
+
+  test("tracing a field with multiple upstream and downstream mappings opens a chain view with nl-derived hops, including a collapsed namespace fan", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    await page.waitForFunction(() => {
+      const harness = window.__satsumaHarness;
+      if (!harness?.setViewMode) return false; // app.js not evaluated yet
+      harness.setViewMode("single");
+      return true;
+    });
+    await loadFixture(page, nsMergingUri);
+
+    const cardPrefix = await expandOverviewCard(page, "reporting-dept-budget-vs-actual");
+    await page
+      .locator(`[data-testid='${cardPrefix}-field-actual-spend-lineage']`)
+      .click({ force: true });
+
+    await expect(page.locator("[data-testid='viz-root']")).toHaveAttribute(
+      "data-view-mode",
+      "chain",
+      { timeout: 10_000 },
+    );
+    const focus = page.locator("[data-testid='chain-focus']");
+    await expect(focus).toContainText("dept_budget_vs_actual");
+    await expect(focus).toContainText("actual_spend");
+
+    // Depth 1 upstream: 3 hops (2 in the `staging` namespace, 1 in `source`),
+    // none exceeding the namespace-fan collapse threshold, so all three render
+    // as individually addressable hop cards — the exact shape the testid fix
+    // in sz-chain-view.ts makes possible.
+    const stgAmount = page.locator(
+      "[data-testid^='chain-hop-upstream-1-staging-stg-gl-entries-amount']",
+    );
+    const stgDepartment = page.locator(
+      "[data-testid^='chain-hop-upstream-1-staging-stg-gl-entries-department']",
+    );
+    const budgetFiscalYear = page.locator(
+      "[data-testid^='chain-hop-upstream-1-source-finance-budgets-fiscal-year']",
+    );
+    await expect(stgAmount).toHaveAttribute("data-classification", "nl");
+    await expect(stgDepartment).toHaveAttribute("data-classification", "nl-derived");
+    await expect(budgetFiscalYear).toHaveAttribute("data-classification", "nl-derived");
+
+    // Depth 2 upstream: 4 hops, all in `source` — over the collapse threshold,
+    // so they start as one summary chip until expanded (PRD 36 open question 2).
+    const depth2Chip = page.locator("[data-testid='chain-group-upstream:2:source']");
+    await expect(depth2Chip).toBeVisible();
+    await expect(depth2Chip).toContainText("4 fields");
+    await expect(
+      page.locator("[data-testid^='chain-hop-upstream-2-source-finance-gl-amount']"),
+    ).toHaveCount(0);
+    await depth2Chip.click();
+    await expect(
+      page.locator("[data-testid^='chain-hop-upstream-2-source-finance-gl-amount']"),
+    ).toHaveAttribute("data-classification", "none");
+
+    // Downstream: 2 hops, one column each, both nl-derived — the field this
+    // mapping computes flows into two further computed fields on the same
+    // record, neither backed by a declared arrow.
+    await expect(
+      page.locator(
+        "[data-testid^='chain-hop-downstream-1-reporting-dept-budget-vs-actual-variance']",
+      ),
+    ).toHaveAttribute("data-classification", "nl-derived");
+    await expect(
+      page.locator(
+        "[data-testid^='chain-hop-downstream-2-reporting-dept-budget-vs-actual-variance-pct']",
+      ),
+    ).toHaveAttribute("data-classification", "nl-derived");
+  });
+
+  test("clicking a hop's field re-focuses the chain view on that field", async ({ page }) => {
+    await page.goto("/");
+    await page.waitForFunction(() => {
+      const harness = window.__satsumaHarness;
+      if (!harness?.setViewMode) return false; // app.js not evaluated yet
+      harness.setViewMode("single");
+      return true;
+    });
+    await loadFixture(page, nsMergingUri);
+
+    const cardPrefix = await expandOverviewCard(page, "reporting-dept-budget-vs-actual");
+    await page
+      .locator(`[data-testid='${cardPrefix}-field-actual-spend-lineage']`)
+      .click({ force: true });
+    await expect(page.locator("[data-testid='viz-root']")).toHaveAttribute(
+      "data-view-mode",
+      "chain",
+      { timeout: 10_000 },
+    );
+
+    await page
+      .locator("[data-testid^='chain-hop-field-upstream-1-staging-stg-gl-entries-amount']")
+      .click();
+
+    // Re-focused on staging::stg_gl_entries.amount: a fresh trace from that
+    // field's own perspective, not the original focus field's hop list.
+    const focus = page.locator("[data-testid='chain-focus']");
+    await expect(focus).toContainText("stg_gl_entries");
+    await expect(focus).toContainText("amount");
+    await expect(
+      page.locator("[data-testid^='chain-hop-upstream-1-source-finance-gl-amount']"),
+    ).toHaveAttribute("data-classification", "none");
+    await expect(
+      page.locator(
+        "[data-testid^='chain-hop-downstream-1-reporting-dept-budget-vs-actual-actual-spend']",
+      ),
+    ).toHaveAttribute("data-classification", "nl");
+  });
+
+  test("clicking a hop's mapping label opens that mapping's detail view", async ({ page }) => {
+    await page.goto("/");
+    await page.waitForFunction(() => {
+      const harness = window.__satsumaHarness;
+      if (!harness?.setViewMode) return false; // app.js not evaluated yet
+      harness.setViewMode("single");
+      return true;
+    });
+    await loadFixture(page, nsMergingUri);
+
+    const cardPrefix = await expandOverviewCard(page, "reporting-dept-budget-vs-actual");
+    await page
+      .locator(`[data-testid='${cardPrefix}-field-actual-spend-lineage']`)
+      .click({ force: true });
+    await expect(page.locator("[data-testid='viz-root']")).toHaveAttribute(
+      "data-view-mode",
+      "chain",
+      { timeout: 10_000 },
+    );
+
+    await page
+      .locator("[data-testid^='chain-hop-mapping-upstream-1-staging-stg-gl-entries-amount']")
+      .click();
+
+    await expect(page.locator("[data-testid='viz-root']")).toHaveAttribute(
+      "data-view-mode",
+      "detail",
+    );
+    await expect(
+      page.locator("[data-testid^='mapping-detail-build-budget-vs-actual']").first(),
+    ).toBeVisible();
+  });
 });
 
 test.describe("Hover highlighting between arrows and field rows", () => {
