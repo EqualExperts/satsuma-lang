@@ -10,7 +10,7 @@
  * is the only way to add, remove, reorder, or reassign a section.
  *
  * Profile assignment follows the task-need analysis in
- * features/45-agent-reference-progressive-disclosure/PRD.md: a "write" task
+ * archive/features/45-agent-reference-progressive-disclosure/PRD.md: a "write" task
  * (generating Satsuma) needs the grammar, conventions, common mistakes,
  * worked examples, and the generate-workflow steps; a "read" task (lineage,
  * impact, coverage, audit) needs the CLI command surface, composition
