@@ -16,6 +16,7 @@ describe("viz automation helpers", () => {
         hasModel: true,
         hasOverviewLayout: false,
         hasDetailLayout: false,
+        hasChainModel: false,
         layoutError: false,
         viewMode: "overview",
       }),
@@ -30,6 +31,7 @@ describe("viz automation helpers", () => {
         hasModel: true,
         hasOverviewLayout: true,
         hasDetailLayout: true,
+        hasChainModel: false,
         layoutError: false,
         viewMode: "overview",
       }),
@@ -44,10 +46,43 @@ describe("viz automation helpers", () => {
         hasModel: true,
         hasOverviewLayout: false,
         hasDetailLayout: false,
+        hasChainModel: false,
         layoutError: true,
         viewMode: "overview",
       }),
       { readyState: "fallback", renderMode: "fallback", viewMode: "overview" },
+    );
+  });
+
+  it("reports loading state for chain view before a host has supplied a chain model", async () => {
+    // Chain view has no ELK layout to wait on — its own readiness signal is
+    // whether openFieldChain() has been called yet, not hasOverviewLayout.
+    const mod = await import("../dist/satsuma-viz.js");
+    assert.deepEqual(
+      mod.describeVizAutomationState({
+        hasModel: true,
+        hasOverviewLayout: true,
+        hasDetailLayout: true,
+        hasChainModel: false,
+        layoutError: false,
+        viewMode: "chain",
+      }),
+      { readyState: "loading", renderMode: "empty", viewMode: "chain" },
+    );
+  });
+
+  it("reports ready chain state once a chain model has been supplied", async () => {
+    const mod = await import("../dist/satsuma-viz.js");
+    assert.deepEqual(
+      mod.describeVizAutomationState({
+        hasModel: true,
+        hasOverviewLayout: true,
+        hasDetailLayout: true,
+        hasChainModel: true,
+        layoutError: false,
+        viewMode: "chain",
+      }),
+      { readyState: "ready", renderMode: "chain", viewMode: "chain" },
     );
   });
 
