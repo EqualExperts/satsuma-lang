@@ -14,9 +14,9 @@ shipped and is archived (see [Shipped Features](#shipped-features)).
 
 ### Feature 36 — Viz Coverage Overlay and Field Chain View (in progress)
 
-A paint-only coverage overlay on the viz overview, uncovered-field treatment in cards and detail views, and a chain view rendering one field's full upstream/downstream lineage. Seven tickets under epic `sl-3de8`; four closed (`sl-jcs6` chain traversal model, `sl-5m9x` overlay toggle, `sl-4czz` chain view rendering, `sl-iwlv` VS Code webview wiring), three open.
+A paint-only coverage overlay on the viz overview, uncovered-field treatment in cards and detail views, and a chain view rendering one field's full upstream/downstream lineage. Seven tickets under epic `sl-3de8`; six closed (`sl-jcs6` chain traversal model, `sl-5m9x` overlay toggle, `sl-4czz` chain view rendering, `sl-iwlv` VS Code webview wiring, `sl-twe8` uncovered-field treatment, `sl-1ml2` this roadmap note), one open.
 
-**Ready now:** `sl-twe8` (uncovered-field treatment). `sl-1ml2` and `sl-nswc` remain; `sl-nswc` (the harness Playwright suite) still waits on `sl-twe8`.
+**Ready now:** `sl-nswc` (the harness Playwright spec suite for coverage overlay and chain view) — its four deps are all closed.
 
 **Landed alongside `sl-4czz`:** neither core's field-lineage traversal nor the CLI's `field-lineage --json` carried any depth signal, so the chain view's "depth limit reached" affordance could not be shown honestly. Added an additive `depth` (per hop) and `maxDepth` (traversal cap) to the shared CLI/browser JSON contract.
 
