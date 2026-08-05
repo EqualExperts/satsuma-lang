@@ -70,6 +70,7 @@
     "lint:python": "ruff check scripts/ tooling/tree-sitter-satsuma/scripts/ skills/ smoke-tests/ && ruff format --check scripts/ tooling/tree-sitter-satsuma/scripts/ skills/ smoke-tests/",
     "format": "prettier --write \"**/*.{ts,mts,cts,js,mjs,cjs}\" && ruff format scripts/ tooling/tree-sitter-satsuma/scripts/ skills/ smoke-tests/",
     "test:scripts": "node --test scripts/*.test.mjs",
+    "regenerate:agent-reference": "node scripts/regenerate-agent-reference.mjs",
     "test:coverage": "turbo run test:coverage"
   },
   "overrides": {
