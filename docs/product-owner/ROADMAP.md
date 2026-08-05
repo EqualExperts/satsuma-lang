@@ -14,11 +14,11 @@ shipped and is archived (see [Shipped Features](#shipped-features)).
 
 ### Feature 36 — Viz Coverage Overlay and Field Chain View (in progress)
 
-A paint-only coverage overlay on the viz overview, uncovered-field treatment in cards and detail views, and a chain view rendering one field's full upstream/downstream lineage. Seven tickets under epic `sl-3de8`; two closed (`sl-jcs6` chain traversal model, `sl-5m9x` overlay toggle), five open.
+A paint-only coverage overlay on the viz overview, uncovered-field treatment in cards and detail views, and a chain view rendering one field's full upstream/downstream lineage. Seven tickets under epic `sl-3de8`; three closed (`sl-jcs6` chain traversal model, `sl-5m9x` overlay toggle, `sl-4czz` chain view rendering), four open.
 
-**Ready now:** `sl-4czz` (chain view rendering) and `sl-twe8` (uncovered-field treatment) follow from the two closed tickets. `sl-iwlv`, `sl-1ml2`, and `sl-nswc` remain.
+**Ready now:** `sl-twe8` (uncovered-field treatment) and `sl-iwlv` (VS Code webview wiring, unblocked now that `sl-4czz` has landed). `sl-1ml2` and `sl-nswc` remain; `sl-nswc` (the harness Playwright suite) still waits on both `sl-twe8` and `sl-iwlv`.
 
-**Prerequisite worth pulling in:** `3cdd-yavi` — viz-backend does not qualify relative child-arrow paths against their container, so coverage lookups and edge ports silently drop every relative-path arrow. That directly undermines the overlay.
+**Landed alongside `sl-4czz`:** neither core's field-lineage traversal nor the CLI's `field-lineage --json` carried any depth signal, so the chain view's "depth limit reached" affordance could not be shown honestly. Added an additive `depth` (per hop) and `maxDepth` (traversal cap) to the shared CLI/browser JSON contract.
 
 **Deferred by decision:** public-playground exposure of coverage is out of scope and gets its own future feature (`sl-1ml2`).
 
