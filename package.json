@@ -71,6 +71,8 @@
     "format": "prettier --write \"**/*.{ts,mts,cts,js,mjs,cjs}\" && ruff format scripts/ tooling/tree-sitter-satsuma/scripts/ skills/ smoke-tests/",
     "test:scripts": "node --test scripts/*.test.mjs",
     "regenerate:agent-reference": "node scripts/regenerate-agent-reference.mjs",
+    "regenerate:satsuma-language-skill": "node scripts/regenerate-satsuma-language-skill.mjs",
+    "measure:agent-reference-tokens": "node scripts/measure-agent-reference-tokens.mjs",
     "test:coverage": "turbo run test:coverage"
   },
   "overrides": {
@@ -90,6 +92,7 @@
     "commander": "^15.0.0",
     "eslint": "^10.8.0",
     "globals": "^17.8.0",
+    "js-tiktoken": "^1.0.21",
     "markdownlint-cli2": "^0.23.2",
     "prettier": "^3.9.6",
     "turbo": "2.10.8",

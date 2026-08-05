@@ -18,6 +18,11 @@
  * scripts/agent-reference-compose.test.mjs's sibling assertions (see the
  * "envelope drift" tests added for arpd-f3xm) fail `npm run test:scripts`
  * if this file's body and the canonical sections disagree.
+ *
+ * The write only happens when this file runs as the entry point — it also
+ * exports FRONTMATTER for scripts/measure-agent-reference-tokens.mjs to
+ * import, and an import must not have the side effect of rewriting the
+ * skill file on disk.
  */
 
 import { writeFileSync } from "node:fs";
@@ -31,7 +36,10 @@ const outPath = join(repoRoot, "skills", "satsuma-language", "SKILL.md");
 // Hand-authored skill metadata — the only part of this file that is not
 // composed from reference/. Kept small deliberately: this is exactly the
 // "resident" cost a skill-aware harness pays before the skill triggers.
-const FRONTMATTER = `---
+// Exported so scripts/measure-agent-reference-tokens.mjs can measure that
+// resident cost directly from this string, rather than re-typing it and
+// risking the measurement drifting from what the skill file actually ships.
+export const FRONTMATTER = `---
 name: satsuma-language
 description: >
   Reference for writing or reading Satsuma (.stm) data-mapping files —
@@ -63,8 +71,10 @@ const INTRO = `
 
 `;
 
-writeFileSync(outPath, FRONTMATTER + INTRO + composeFull(loadSections()));
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  writeFileSync(outPath, FRONTMATTER + INTRO + composeFull(loadSections()));
 
-console.log(
-  "regenerate-satsuma-language-skill: wrote skills/satsuma-language/SKILL.md from reference/*.md",
-);
+  console.log(
+    "regenerate-satsuma-language-skill: wrote skills/satsuma-language/SKILL.md from reference/*.md",
+  );
+}
