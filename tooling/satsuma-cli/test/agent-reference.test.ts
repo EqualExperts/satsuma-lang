@@ -74,6 +74,21 @@ describe("satsuma agent-reference", () => {
     assert.equal(Number(grammarListing![1]), encoding.encode(grammarSection).length);
   });
 
+  it("every id --list reports resolves via --section (arpd-f3xm)", async () => {
+    // --list is the discovery surface; --section is how you act on it. If
+    // the two ever disagreed — --list naming an id --section rejects, or
+    // vice versa — an agent would follow --list's advice into a dead end.
+    const { stdout: listing } = await run("agent-reference", "--list");
+    const ids = [...listing.matchAll(/^(\S+)\s+tokens=/gm)].map((match) => match[1]);
+
+    assert.ok(ids.length > 0, "expected --list to report at least one section id");
+    for (const id of ids) {
+      const { stdout, code } = await run("agent-reference", "--section", id);
+      assert.equal(code, 0, `--section ${id} (listed by --list) should succeed`);
+      assert.ok(stdout.length > 0, `--section ${id} should print non-empty content`);
+    }
+  });
+
   it("--section prints exactly one named section, not the whole document", async () => {
     const { stdout, code } = await run("agent-reference", "--section", "grammar");
 

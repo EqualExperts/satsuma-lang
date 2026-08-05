@@ -104,6 +104,35 @@ test("the satsuma-language skill body ends with the exact full-document composit
   assert.ok(skillBody.endsWith(composed), "skill body does not end with the composed sections");
 });
 
+test("no canonical section is orphaned from every shipped envelope (arpd-f3xm)", () => {
+  // Distinct from the profile-orphan test above: this checks the three
+  // *envelopes* Feature 45 actually ships — the CLI's bare invocation
+  // (== composeFull, proven byte-identical to AI-AGENT-REFERENCE.md above),
+  // the portable blob, and the skill body — rather than the write/read
+  // profile slices. A section present in the manifest but never reachable
+  // from any of the three would be dead content nothing ever surfaces.
+  const sections = loadSections();
+  const cliFullDoc = composeFull(sections);
+  const portableBlob = fs.readFileSync(path.join(repoRoot, "AI-AGENT-REFERENCE.md"), "utf8");
+  const skillBody = fs.readFileSync(
+    path.join(repoRoot, "skills", "satsuma-language", "SKILL.md"),
+    "utf8",
+  );
+
+  for (const section of sections) {
+    for (const [envelopeName, envelopeContent] of [
+      ["cli", cliFullDoc],
+      ["portable-blob", portableBlob],
+      ["skill", skillBody],
+    ]) {
+      assert.ok(
+        envelopeContent.includes(section.content),
+        `section "${section.id}" is missing from the ${envelopeName} envelope`,
+      );
+    }
+  }
+});
+
 /** Recovers which sections (in order) a composed string was built from, by content identity. */
 function sectionIdsIn(composed, sections) {
   const ids = [];
