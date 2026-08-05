@@ -176,13 +176,14 @@ describe("traceFieldLineage", () => {
     assert.deepEqual(traceFieldLineage(edges, b, { depth: 10, direction: "both" }), {
       field: "::b.id",
       upstream: [
-        { field: "::a.id", via_mapping: "::a_to_b", classification: "none" },
-        { field: "::c.id", via_mapping: "::cycle", classification: "none" },
+        { field: "::a.id", via_mapping: "::a_to_b", classification: "none", depth: 1 },
+        { field: "::c.id", via_mapping: "::cycle", classification: "none", depth: 1 },
       ],
       downstream: [
-        { field: "::c.id", via_mapping: "ns::b_to_c", classification: "nl" },
-        { field: "::d.id", via_mapping: "::b_to_d", classification: "nl-derived" },
+        { field: "::c.id", via_mapping: "ns::b_to_c", classification: "nl", depth: 1 },
+        { field: "::d.id", via_mapping: "::b_to_d", classification: "nl-derived", depth: 1 },
       ],
+      maxDepth: 10,
     });
   });
 
@@ -192,10 +193,11 @@ describe("traceFieldLineage", () => {
     assert.deepEqual(traceFieldLineage(edges, b, { depth: 1, direction: "upstream" }), {
       field: "::b.id",
       upstream: [
-        { field: "::a.id", via_mapping: "::a_to_b", classification: "none" },
-        { field: "::c.id", via_mapping: "::cycle", classification: "none" },
+        { field: "::a.id", via_mapping: "::a_to_b", classification: "none", depth: 1 },
+        { field: "::c.id", via_mapping: "::cycle", classification: "none", depth: 1 },
       ],
       downstream: [],
+      maxDepth: 1,
     });
   });
 
@@ -241,18 +243,23 @@ describe("traceFieldLineage", () => {
     // `leaf` is three hops away only through hub's two-hop side, so it appears
     // if and only if hub was claimed at its shortest depth. Full ordered compare
     // also pins breadth-first emission order and one hop per reached field.
+    // `leaf` also sits exactly on the requested depth cap (3), equal to
+    // `result.maxDepth`: consumers compare a hop's `depth` against `maxDepth`
+    // to render the "may continue beyond here" affordance instead of
+    // presenting a boundary hop as a confirmed dead end.
     const result = traceFieldLineage(downstreamDiamond, start, {
       depth: 3,
       direction: "downstream",
     });
 
     assert.deepEqual(result.downstream, [
-      { field: "::near.id", via_mapping: "::start_to_near", classification: "none" },
-      { field: "::detour.id", via_mapping: "::start_to_detour", classification: "none" },
-      { field: "::hub.id", via_mapping: "::near_to_hub", classification: "none" },
-      { field: "::relay.id", via_mapping: "::detour_to_relay", classification: "none" },
-      { field: "::leaf.id", via_mapping: "::hub_to_leaf", classification: "none" },
+      { field: "::near.id", via_mapping: "::start_to_near", classification: "none", depth: 1 },
+      { field: "::detour.id", via_mapping: "::start_to_detour", classification: "none", depth: 1 },
+      { field: "::hub.id", via_mapping: "::near_to_hub", classification: "none", depth: 2 },
+      { field: "::relay.id", via_mapping: "::detour_to_relay", classification: "none", depth: 2 },
+      { field: "::leaf.id", via_mapping: "::hub_to_leaf", classification: "none", depth: 3 },
     ]);
+    assert.equal(result.maxDepth, 3);
   });
 
   it("reaches the field on the depth boundary above a two-path field upstream", () => {
@@ -273,11 +280,16 @@ describe("traceFieldLineage", () => {
     });
 
     assert.deepEqual(result.upstream, [
-      { field: "::near.id", via_mapping: "::near_to_sink", classification: "none" },
-      { field: "::detour.id", via_mapping: "::detour_to_sink", classification: "none" },
-      { field: "::hub.id", via_mapping: "::hub_to_near", classification: "none" },
-      { field: "::relay.id", via_mapping: "::relay_to_detour", classification: "none" },
-      { field: "::ancestor.id", via_mapping: "::ancestor_to_hub", classification: "none" },
+      { field: "::near.id", via_mapping: "::near_to_sink", classification: "none", depth: 1 },
+      { field: "::detour.id", via_mapping: "::detour_to_sink", classification: "none", depth: 1 },
+      { field: "::hub.id", via_mapping: "::hub_to_near", classification: "none", depth: 2 },
+      { field: "::relay.id", via_mapping: "::relay_to_detour", classification: "none", depth: 2 },
+      {
+        field: "::ancestor.id",
+        via_mapping: "::ancestor_to_hub",
+        classification: "none",
+        depth: 3,
+      },
     ]);
   });
 

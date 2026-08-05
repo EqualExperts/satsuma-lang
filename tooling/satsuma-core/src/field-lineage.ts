@@ -156,6 +156,15 @@ export interface FieldLineageHop {
   via_mapping: string;
   /** Classification of the edge used for the hop. */
   classification: Classification;
+  /**
+   * Mapping-hop distance from the focus field (1 for its direct neighbours).
+   * A hop with `depth === options.depth` sits exactly at the traversal's
+   * depth cap: because BFS is depth-exact (see `traceDirection`), any further
+   * neighbours it may have were never visited. Consumers use this to render
+   * an honest "depth limit reached" affordance rather than presenting such a
+   * hop as a confirmed dead end (no-silent-truncation rule).
+   */
+  depth: number;
 }
 
 /** Published field-lineage payload shared by CLI and browser hosts. */
@@ -166,6 +175,14 @@ export interface FieldLineageResult {
   upstream: FieldLineageHop[];
   /** Breadth-first descendants of the focus field. */
   downstream: FieldLineageHop[];
+  /**
+   * The traversal's requested depth cap (the `depth` this result was built
+   * with). Consumers compare a hop's own `depth` against this value to tell a
+   * boundary hop (may have further, untraced neighbours) from a genuine dead
+   * end reached before the cap — the per-hop `depth` field alone cannot make
+   * that distinction.
+   */
+  maxDepth: number;
 }
 
 /** Which side or sides of a field should be traversed. */
@@ -351,6 +368,7 @@ function traceDirection(
         field: next,
         via_mapping: canonicalMappingRef(edge.mapping),
         classification: edge.classification,
+        depth: item.depth + 1,
       });
       queue.push({ field: next, depth: item.depth + 1 });
     }
@@ -383,5 +401,5 @@ export function traceFieldLineage(
     options.direction === "upstream"
       ? []
       : traceDirection(stableEdges, start, options.depth, "downstream");
-  return { field: start, upstream, downstream };
+  return { field: start, upstream, downstream, maxDepth: options.depth };
 }

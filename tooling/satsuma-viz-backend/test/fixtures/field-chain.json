@@ -4,24 +4,29 @@
     {
       "field": "::staged.id",
       "via_mapping": "::curate_records",
-      "classification": "nl"
+      "classification": "nl",
+      "depth": 1
     },
     {
       "field": "::raw.audit_code",
       "via_mapping": "::curate_records",
-      "classification": "nl-derived"
+      "classification": "nl-derived",
+      "depth": 1
     },
     {
       "field": "::raw.id",
       "via_mapping": "::stage_records",
-      "classification": "none"
+      "classification": "none",
+      "depth": 2
     }
   ],
   "downstream": [
     {
       "field": "::published.id",
       "via_mapping": "::publish_records",
-      "classification": "none"
+      "classification": "none",
+      "depth": 1
     }
-  ]
+  ],
+  "maxDepth": 10
 }

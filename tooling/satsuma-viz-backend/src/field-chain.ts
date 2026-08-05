@@ -149,8 +149,9 @@ export function buildFieldChainFromSources(
   options: BuildFieldChainOptions = {},
 ): FieldChainModel {
   const field = canonicalFocusField(focusField);
+  const maxDepth = options.depth ?? DEFAULT_FIELD_CHAIN_DEPTH;
   const { index, treesByUri } = buildInMemoryWorkspace(documents);
-  if (!treesByUri.has(entryUri)) return { field, upstream: [], downstream: [] };
+  if (!treesByUri.has(entryUri)) return { field, maxDepth, upstream: [], downstream: [] };
 
   const reachableUris = getImportReachableUris(entryUri, index);
   const workspace = createScopedIndex(index, reachableUris);
@@ -168,7 +169,7 @@ export function buildFieldChainFromSources(
   }).edges;
 
   return traceFieldLineage(edges, field, {
-    depth: options.depth ?? DEFAULT_FIELD_CHAIN_DEPTH,
+    depth: maxDepth,
     direction: options.direction ?? "both",
   });
 }

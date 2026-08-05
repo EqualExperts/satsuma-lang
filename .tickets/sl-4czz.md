@@ -1,6 +1,6 @@
 ---
 id: sl-4czz
-status: open
+status: in_progress
 deps: [sl-jcs6]
 links: []
 created: 2026-07-31T13:13:41Z
