@@ -1,18 +1,9 @@
 {
   "compilerOptions": {
-    "module": "commonjs",
-    "moduleResolution": "node",
-    "baseUrl": ".",
-    // "node"/baseUrl are deprecated in TypeScript 6.0 and removed in 7.0.
-    // This is a temporary suppression, not the fix — see di-xup1 to migrate
-    // this package onto "node16", matching every other workspace package.
-    "ignoreDeprecations": "6.0",
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
     "target": "es2022",
     "types": ["node"],
-    "paths": {
-      "@satsuma/core": ["./node_modules/@satsuma/core/dist/index.d.ts"],
-      "@satsuma/viz-model": ["./node_modules/@satsuma/viz-model/dist/index.d.ts"]
-    },
     "strict": true,
     "noUncheckedIndexedAccess": true,
     "outDir": "dist",
