@@ -9,18 +9,14 @@ Feature specs live in `features/` while active and move to `archive/features/` o
 ## Active Feature Specs
 
 Features 36 and 40 are active, and Features 44 and 45 are proposed but not yet
-started. Everything numbered 01–35 plus Features 37, 38, 39, 41 and 42 has
+started. Everything numbered 01–35 plus Features 37, 38, 39, 41, 42 and 43 has
 shipped and is archived (see [Shipped Features](#shipped-features)).
 
-Feature 43 (site audit fixes) has also shipped — all 11 `saf-*` tickets are closed
-— but its spec is still sitting in `features/` rather than `archive/features/`. It
-should be moved on the next tidy-up.
+### Feature 36 — Viz Coverage Overlay and Field Chain View (in progress)
 
-### Feature 36 — Viz Coverage Overlay and Field Chain View (not started)
+A paint-only coverage overlay on the viz overview, uncovered-field treatment in cards and detail views, and a chain view rendering one field's full upstream/downstream lineage. Seven tickets under epic `sl-3de8`; two closed (`sl-jcs6` chain traversal model, `sl-5m9x` overlay toggle), five open.
 
-A paint-only coverage overlay on the viz overview, uncovered-field treatment in cards and detail views, and a chain view rendering one field's full upstream/downstream lineage. Eight tickets, none started (epic `sl-3de8`).
-
-**Ready now:** its core dependencies (`sl-gsxu`, `sl-4qvp`) shipped with Feature 35, so `sl-jcs6` (chain traversal model) and `sl-5m9x` (overlay toggle) can both start. `sl-4czz`, `sl-twe8`, `sl-iwlv`, and `sl-nswc` follow from those.
+**Ready now:** `sl-4czz` (chain view rendering) and `sl-twe8` (uncovered-field treatment) follow from the two closed tickets. `sl-iwlv`, `sl-1ml2`, and `sl-nswc` remain.
 
 **Prerequisite worth pulling in:** `3cdd-yavi` — viz-backend does not qualify relative child-arrow paths against their container, so coverage lookups and edge ports silently drop every relative-path arrow. That directly undermines the overlay.
 
@@ -70,7 +66,7 @@ Delivered and moved to `archive/features/`. Recent work, most recent first:
 
 | Feature | Shipped | What landed |
 | --- | --- | --- |
-| 43 — Marketing site audit fixes | 2026-08-05 | All 11 `saf-*` tickets: dead links, stats drift, fabricated example snippets, self-contradictions, and a reframe of `vscode.njk` around workflows and `cli.njk` around agents. Deliberately left the unsubstantiated "3-8x"/"40-60%"/">90%" numbers for Feature 44 to measure. Spec not yet moved to `archive/features/` |
+| 43 — Marketing site audit fixes | 2026-08-05 | All 11 `saf-*` tickets: dead links, stats drift, fabricated example snippets, self-contradictions, and a reframe of `vscode.njk` around workflows and `cli.njk` around agents. Deliberately left the unsubstantiated "3-8x"/"40-60%"/">90%" numbers for Feature 44 to measure |
 | 42 — Monorepo build tooling | 2026-08-04 | npm workspaces behind one root lockfile, a Turborepo task graph whose build order is derived from the manifests rather than written down, and a persisted content-hash cache (ADR-049). CI 4m35s → 1m56s warm; the eleven packages' `prebuild`/`pretest` sibling-build chains and `scripts/build-workspace.sh` are gone |
 | 39 — Correctness by default | 2026-08-04 | Generated CST contracts, opaque path/ref stages, generated coverage and formatter properties, an independent coverage oracle, enforced typecheck and type-aware lint gates, and structural `FieldDecl` variants |
 | 38 — Hierarchical field coverage | 2026-08-03 | Path-correct nested coverage, container tri-state, whole-subtree arrow semantics, leaf-only ratios, and parity across the CLI, LSP, VS Code, and viz consumers (ADR-035–041) |

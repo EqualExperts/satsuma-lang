@@ -1,6 +1,7 @@
 # Feature 43 — Marketing Site Audit Fixes
 
-> **Status: PROPOSED** (raised 2026-08-04) — found during a full-site audit of
+> **Status: IMPLEMENTED** (2026-08-05) — all 11 `saf-*` tickets closed (epic
+> `saf-dmvx`), PR #485. Found during a full-site audit of
 > `site/` (the Eleventy-built marketing/docs site deployed at
 > `equalexperts.github.io/satsuma-lang`) requested by the project owner: an
 > exhaustive search for incorrect claims, invalid example syntax, dead links,
