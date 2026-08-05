@@ -8,23 +8,9 @@ Feature specs live in `features/` while active and move to `archive/features/` o
 
 ## Active Feature Specs
 
-Features 36 and 40 are active, and Feature 44 is proposed but not yet started.
-Everything numbered 01–35 plus Features 37, 38, 39, 41, 42, 43 and 45 has
+Feature 40 is active, and Feature 44 is proposed but not yet started.
+Everything numbered 01–36 plus Features 37, 38, 39, 41, 42, 43 and 45 has
 shipped and is archived (see [Shipped Features](#shipped-features)).
-
-### Feature 36 — Viz Coverage Overlay and Field Chain View (in progress)
-
-A paint-only coverage overlay on the viz overview, uncovered-field treatment in cards and detail views, and a chain view rendering one field's full upstream/downstream lineage. Seven tickets under epic `sl-3de8`; six closed (`sl-jcs6` chain traversal model, `sl-5m9x` overlay toggle, `sl-4czz` chain view rendering, `sl-iwlv` VS Code webview wiring, `sl-twe8` uncovered-field treatment, `sl-1ml2` this roadmap note), one open.
-
-**Ready now:** `sl-nswc` (the harness Playwright spec suite for coverage overlay and chain view) — its four deps are all closed.
-
-**Landed alongside `sl-4czz`:** neither core's field-lineage traversal nor the CLI's `field-lineage --json` carried any depth signal, so the chain view's "depth limit reached" affordance could not be shown honestly. Added an additive `depth` (per hop) and `maxDepth` (traversal cap) to the shared CLI/browser JSON contract.
-
-**Landed alongside `sl-iwlv`:** the VS Code viz panel now feeds the chain view a host-computed `FieldChainModel` via a new LSP request (`satsuma/fieldChain`), reusing a host-neutral `buildFieldChainFromWorkspace` split out of `@satsuma/viz-backend`'s browser-only field-chain builder — mirroring the existing `vizFullLineage`/`computeFullLineage` split. `Satsuma: Show Field Lineage` now opens the chain view in the main viz panel instead of a second, CLI-driven lineage webview, which was deleted; a new `Satsuma: Show Coverage Overlay` command opens the panel with the overlay switched on. The coverage overlay itself needed no new host computation: the panel's existing full-lineage model already carries per-mapping coverage the component unions itself (ADR-042), which is already scoped the same way `satsuma coverage` scopes a workspace (the entry file's import-reachable closure).
-
-**Deferred by decision — field-chain view only, not the coverage overlay:** the coverage overlay toggle lives unconditionally in `satsuma-viz`'s toolbar and reads coverage already embedded in the model (ADR-042), so it needs no host wiring and already works in the site playground and the harness dev preview — there is nothing left to expose. The field-chain view is different: entering it needs a host to compute a `FieldChainModel` and call the component's `openFieldChain()`, which only VS Code does today (via the `satsuma/fieldChain` LSP request, landed alongside `sl-iwlv`). The playground and harness client (`tooling/satsuma-viz-harness/src/client/app.ts`) already receive the schema card's `field-lineage` DOM event but only record it for Playwright assertions — clicking the action does nothing visible. Exposing it there needs a browser-side computation (reusing `buildFieldChainFromSources` from `@satsuma/viz-backend`, the browser-safe counterpart of `buildFieldChainFromWorkspace`) plus a playground UX decision, so it gets its own future feature (`sl-1ml2`). Playground chrome is a product surface with its own UX bar — Feature 34 spent a full R1–R8 polish pass on the playground's chrome and edit-loop behaviour before treating it as done — so this should get the same deliberate design pass rather than being bolted on. It waits until Feature 36 has proven the chain view in the harness (`sl-nswc`, still open) and VS Code first.
-
-**Source:** `features/36-viz-coverage-and-chain-view/PRD.md`
 
 ### Feature 44 — Token and Task-Completion Eval (proposed)
 
@@ -58,6 +44,7 @@ Delivered and moved to `archive/features/`. Recent work, most recent first:
 
 | Feature | Shipped | What landed |
 | --- | --- | --- |
+| 36 — Viz coverage overlay and field chain view | 2026-08-05 (PR #502 pending merge) | A paint-only coverage overlay on the viz overview reading coverage already carried by the model (ADR-042), uncovered-field treatment in cards and the mapping detail view, and a field chain view rendering one field's full upstream/downstream lineage as a left-to-right rail with namespace-fan collapse and depth-limit affordances; VS Code reuses the LSP's own traversal via a new `satsuma/fieldChain` request rather than shipping a second one in the webview. `sl-nswc` wired the same client-side computation into the harness/playground's own click path, so both ship the full feature with no separate playground-exposure work needed — the deferral `sl-1ml2` recorded turned out to be moot the same day it was written. Closing follow-up: visual connectors between chain-view hop cards (`scvc-8n4r`, found via manual testing) |
 | 45 — Progressive disclosure for the AI Agent Reference | 2026-08-05 (implemented; PR #492 pending merge/release — see gate `sl-6ips`) | Canonical `reference/*.md` sections composed at build time into three envelopes (CLI, the now-generated `AI-AGENT-REFERENCE.md`, and the new `satsuma-language` skill); `agent-reference --section/--profile/--list` with bare invocation byte-identical; every bytes/4 estimate replaced by measured `o200k_base` counts in `reference/token-costs.md`, including an MCP-tool-schema comparison point |
 | 43 — Marketing site audit fixes | 2026-08-05 | All 11 `saf-*` tickets: dead links, stats drift, fabricated example snippets, self-contradictions, and a reframe of `vscode.njk` around workflows and `cli.njk` around agents. Deliberately left the unsubstantiated "3-8x"/"40-60%"/">90%" numbers for Feature 44 to measure |
 | 42 — Monorepo build tooling | 2026-08-04 | npm workspaces behind one root lockfile, a Turborepo task graph whose build order is derived from the manifests rather than written down, and a persisted content-hash cache (ADR-049). CI 4m35s → 1m56s warm; the eleven packages' `prebuild`/`pretest` sibling-build chains and `scripts/build-workspace.sh` are gone |
