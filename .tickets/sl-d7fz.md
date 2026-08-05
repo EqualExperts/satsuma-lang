@@ -1,6 +1,6 @@
 ---
 id: sl-d7fz
-status: open
+status: closed
 deps: []
 links: [sl-rj78]
 created: 2026-08-05T09:27:33Z
@@ -21,3 +21,10 @@ Screenshot: bug-reports/source-nlref-not-highlighted.png. Related to sl-rj78 (ne
 
 Hovering/selecting a computed-arrow row highlights every source field named by an @ref in its NL transform text, across every source schema on screen. Regression test using a computed arrow with multiple @-refs spanning more than one source schema.
 
+
+## Notes
+
+**2026-08-05T11:41:23Z**
+
+Cause: `_sourceHighlightFields` only ever highlighted fields listed in `ArrowEntry.sourceFields`, which is always empty for a computed arrow by design (the value comes from the pipe chain) — nothing parsed the transform's NL text for @refs the way `highlightAtRefs` does for display styling, so a computed arrow's source fields never highlighted.
+Fix: `_sourceHighlightFields` now extracts @refs from the hovered arrow's transform text (core's `extractAtRefs`) and resolves each one against every on-screen source schema with the same `resolveSchemaLocalFieldPath` used for declared `sourceFields`. Regression test added in field-coverage.test.js. (commit immediately after 7273d0da)

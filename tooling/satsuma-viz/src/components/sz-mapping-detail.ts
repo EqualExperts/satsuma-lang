@@ -16,9 +16,10 @@ import {
   resolveSchemaLocalFieldPath,
   scopeWithin,
 } from "../field-coverage.js";
-import type { ContainerScope } from "../field-coverage.js";
+import type { ContainerScope, MappingArrowVisit } from "../field-coverage.js";
 import { highlightAtRefs } from "../markdown.js";
 import { qualifyChildArrowPath } from "@satsuma/core/extract";
+import { extractAtRefs } from "@satsuma/core/nl-ref";
 import type { SchemaCoverage } from "../field-coverage.js";
 
 function sanitizeTestIdSegment(value: string): string {
@@ -389,6 +390,27 @@ export class SzMappingDetail extends LitElement {
     if (e.fieldName) this._hoveredArrow = null;
   }) as EventListener;
 
+  /**
+   * Absolute paths for `_hoveredArrow`, resolved by re-running the same walk
+   * every other resolution surface uses and matching on object identity.
+   *
+   * `_hoveredArrow` is set straight from `ArrowEntry.sourceFields`/`targetField`
+   * on mouseenter, which are authored paths — `.adults` under a `flatten`
+   * heading, not `transects.sightings.adults`. Resolving against a schema's
+   * declared fields needs the absolute form, the same requirement that sent
+   * `_isArrowHighlighted` through `qualifyChildArrowPath` two functions below.
+   * Re-walking here (rather than caching a scope alongside `_hoveredArrow`)
+   * keeps this getter as the only place besides `_isArrowHighlighted` that
+   * knows arrows need qualifying before resolution (sl-rj78).
+   */
+  private _resolveHoveredArrow(m: MappingBlock): MappingArrowVisit | null {
+    let found: MappingArrowVisit | null = null;
+    forEachMappingArrow(m, (entry) => {
+      if (entry.arrow === this._hoveredArrow) found = entry;
+    });
+    return found;
+  }
+
   /** Compute which source fields should be highlighted. */
   private get _sourceHighlightFields(): Map<string, Set<string>> {
     const result = new Map<string, Set<string>>();
@@ -399,12 +421,20 @@ export class SzMappingDetail extends LitElement {
     );
 
     if (this._hoveredArrow) {
+      const hovered = this._resolveHoveredArrow(m);
+      const sourceFields = hovered?.sourceFields ?? this._hoveredArrow.sourceFields;
+      // A computed arrow's NL transform names its sources by @ref rather than
+      // by ArrowEntry.sourceFields — the pipe chain produces the value, so
+      // extraction leaves sourceFields empty (viz-model.ts's extractComputedArrow).
+      // Parsing the same text highlightAtRefs highlights for display finds the
+      // fields those @refs actually name (sl-d7fz).
+      const atRefs = extractAtRefs(this._hoveredArrow.transform?.text ?? "").map((r) => r.ref);
       for (const sr of m.sourceRefs) {
         const fields = new Set<string>();
         const schema = sourceSchemaById.get(sr);
         if (!schema) continue;
-        for (const sf of this._hoveredArrow.sourceFields) {
-          const localPath = resolveSchemaLocalFieldPath(sf, schema, m.sourceRefs);
+        for (const fieldRef of [...sourceFields, ...atRefs]) {
+          const localPath = resolveSchemaLocalFieldPath(fieldRef, schema, m.sourceRefs);
           if (localPath) fields.add(localPath);
         }
         if (fields.size > 0) result.set(sr, fields);
@@ -428,9 +458,9 @@ export class SzMappingDetail extends LitElement {
 
     if (this._hoveredArrow) {
       if (!targetSchema) return new Set();
-      const localPath = resolveSchemaLocalFieldPath(this._hoveredArrow.targetField, targetSchema, [
-        m.targetRef,
-      ]);
+      const hovered = this._resolveHoveredArrow(m);
+      const targetField = hovered?.targetField ?? this._hoveredArrow.targetField;
+      const localPath = resolveSchemaLocalFieldPath(targetField, targetSchema, [m.targetRef]);
       return localPath ? new Set([localPath]) : new Set();
     }
 
