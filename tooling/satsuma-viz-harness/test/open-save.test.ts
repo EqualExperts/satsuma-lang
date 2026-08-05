@@ -73,11 +73,16 @@ test.describe("Open a local file (client-only)", () => {
     // The viz re-rendered from the opened text: its unique schema is on screen
     // and the sfdc cards are gone.
     await expect(
-      page.locator("[data-testid^='overview-schema-card-']", {
+      page.locator("sz-schema-card[data-testid^='overview-schema-card-']", {
         hasText: "opened_from_disk",
       }),
     ).toBeVisible({ timeout: 10_000 });
-    await expect(page.locator("[data-testid^='overview-schema-card-']")).toHaveCount(1);
+    // Tag-qualified to sz-schema-card: an untagged prefix match also picks up
+    // the card's header-count span (same testid prefix, sl-5m9x), which would
+    // double this count (sl-iwlv).
+    await expect(page.locator("sz-schema-card[data-testid^='overview-schema-card-']")).toHaveCount(
+      1,
+    );
 
     expect(requests).toEqual([]);
 

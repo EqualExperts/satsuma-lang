@@ -129,7 +129,10 @@ test.describe("Overview view — sfdc-to-snowflake fixture", () => {
     // Each overview schema card gets a stable data-testid based on its qualifiedId.
     // We assert that at least two schema cards appear so the test validates real
     // content rather than an empty-but-ready state.
-    const schemaCards = page.locator("[data-testid^='overview-schema-card-']");
+    // Tag-qualified to sz-schema-card: the header-count span inside each card
+    // carries a testid built from the same prefix (sl-5m9x), so an untagged
+    // prefix match would count each card twice (sl-iwlv).
+    const schemaCards = page.locator("sz-schema-card[data-testid^='overview-schema-card-']");
     await expect(schemaCards).toHaveCount(4);
   });
 
@@ -220,7 +223,10 @@ test.describe("Cross-file lineage expansion", () => {
     // Use nth(1) as a retrying assertion — the lineage model includes schemas from
     // both metrics.stm and metric_sources.stm, so at least two cards must appear.
     // A bare .count() is a point-in-time snapshot that races with layout completion.
-    const schemaCards = page.locator("[data-testid^='overview-schema-card-']");
+    // Tag-qualified to sz-schema-card: the header-count span inside each card
+    // carries a testid built from the same prefix (sl-5m9x), so an untagged
+    // prefix match would count each card twice (sl-iwlv).
+    const schemaCards = page.locator("sz-schema-card[data-testid^='overview-schema-card-']");
     await expect(schemaCards.nth(1)).toBeVisible({ timeout: 20_000 });
   });
 
@@ -392,7 +398,10 @@ test.describe("Overview view — sfdc-to-snowflake single-file mode", () => {
     });
     await loadFixture(page, sfdcUri);
 
-    const schemaCards = page.locator("[data-testid^='overview-schema-card-']");
+    // Tag-qualified to sz-schema-card: the header-count span inside each card
+    // carries a testid built from the same prefix (sl-5m9x), so an untagged
+    // prefix match would count each card twice (sl-iwlv).
+    const schemaCards = page.locator("sz-schema-card[data-testid^='overview-schema-card-']");
     await expect(schemaCards).toHaveCount(4);
 
     // None of the sfdc schemas live inside a namespace, so the namespace pill
@@ -1075,15 +1084,17 @@ interface CardBox {
 /**
  * Read bounding boxes for every overview schema card visible in the viz.
  * Returns boxes sorted by test id so order is deterministic across runs.
+ *
+ * Tag-qualified to `sz-schema-card`: an untagged prefix match also picks up
+ * each card's header-count span (same testid prefix, sl-5m9x), which always
+ * nests inside its own card's box and would read as a false overlap.
  */
 async function readOverviewCardBoxes(page: Page): Promise<CardBox[]> {
+  const cards = "sz-schema-card[data-testid^='overview-schema-card-']";
   // Wait for at least one schema card to attach so the page evaluation
   // does not race the first render after fixture load.
-  await page
-    .locator("[data-testid^='overview-schema-card-']")
-    .first()
-    .waitFor({ state: "attached", timeout: 10_000 });
-  const boxes = await page.locator("[data-testid^='overview-schema-card-']").evaluateAll((els) =>
+  await page.locator(cards).first().waitFor({ state: "attached", timeout: 10_000 });
+  const boxes = await page.locator(cards).evaluateAll((els) =>
     (els as HTMLElement[]).map((el) => {
       const r = el.getBoundingClientRect();
       return {
@@ -1367,7 +1378,7 @@ test.describe("Compact card expansion in overview", () => {
   test("compact schema card shows no fields initially", async ({ page }) => {
     // Compact cards in overview mode display only the schema name and a field
     // count.  The fields list must be absent until the user clicks the header.
-    const card = page.locator("[data-testid^='overview-schema-card-buy-order']");
+    const card = page.locator("sz-schema-card[data-testid^='overview-schema-card-buy-order']");
     await expect(card).toBeVisible();
 
     // The fields section is rendered only when _compactExpanded is true.
@@ -1380,7 +1391,7 @@ test.describe("Compact card expansion in overview", () => {
     // A single click on the toggle arrow must request expansion and render
     // the fields list below the header. The arrow is a dedicated control —
     // the rest of the header is reserved for navigation (sl-tw0r).
-    const card = page.locator("[data-testid^='overview-schema-card-buy-order']");
+    const card = page.locator("sz-schema-card[data-testid^='overview-schema-card-buy-order']");
     await card.locator(".header-toggle").click();
 
     // At least one field row must now appear inside the card.
@@ -1390,7 +1401,7 @@ test.describe("Compact card expansion in overview", () => {
 
   test("clicking the toggle arrow a second time collapses the fields", async ({ page }) => {
     // Two clicks must return the card to its compact (fields-hidden) state.
-    const card = page.locator("[data-testid^='overview-schema-card-buy-order']");
+    const card = page.locator("sz-schema-card[data-testid^='overview-schema-card-buy-order']");
     const header = card.locator(".header-toggle");
 
     await header.click();
@@ -1414,7 +1425,7 @@ test.describe("Compact card expansion in overview", () => {
     const canvas = page.locator(".canvas");
     const heightBefore = await canvas.evaluate((el) => el.getBoundingClientRect().height);
 
-    const card = page.locator("[data-testid^='overview-schema-card-buy-order']");
+    const card = page.locator("sz-schema-card[data-testid^='overview-schema-card-buy-order']");
     await card.locator(".header-toggle").click();
     await expect(card.locator("[data-testid$='-field-id']").first()).toBeVisible({
       timeout: 5_000,
@@ -1439,7 +1450,7 @@ test.describe("Compact card expansion in overview", () => {
     // expanding the many-field order_events card directly above
     // customer_profiles is exactly the geometry that used to overlap.
     await loadFixture(page, ffgUri);
-    const card = page.locator("[data-testid^='overview-schema-card-order-events']");
+    const card = page.locator("sz-schema-card[data-testid^='overview-schema-card-order-events']");
     await card.locator(".header-toggle").click();
     await expect(card.locator("[data-testid$='-field-event-id']").first()).toBeVisible({
       timeout: 5_000,
@@ -1477,7 +1488,7 @@ test.describe("Compact card expansion in overview", () => {
     // on the header name.
     await page.evaluate(() => window.__satsumaHarness.clearEvents());
 
-    const card = page.locator("[data-testid^='overview-schema-card-buy-order']");
+    const card = page.locator("sz-schema-card[data-testid^='overview-schema-card-buy-order']");
     await card.locator(".header-toggle").click();
     await expect(card.locator("[data-testid$='-field-id']").first()).toBeVisible({
       timeout: 5_000,

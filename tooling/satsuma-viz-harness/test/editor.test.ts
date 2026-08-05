@@ -46,9 +46,15 @@ async function openWithFixture(page: Page): Promise<void> {
   );
 }
 
-/** Count the schema cards currently rendered in the overview. */
+/**
+ * Count the schema cards currently rendered in the overview.
+ *
+ * Tag-qualified to `sz-schema-card`: the header-count span inside each card
+ * carries a testid built from the same `overview-schema-card-<id>` prefix
+ * (sl-5m9x), so an untagged prefix match doubles every count (sl-iwlv).
+ */
 function schemaCards(page: Page) {
-  return page.locator("[data-testid^='overview-schema-card-']");
+  return page.locator("sz-schema-card[data-testid^='overview-schema-card-']");
 }
 
 // A minimal, self-contained valid document with exactly one schema. Used to prove
@@ -170,9 +176,7 @@ test.describe("Live editor — debounced re-render and resilience", () => {
     await page.locator("#source-input").fill(SINGLE_SCHEMA_DOC);
 
     await expect(schemaCards(page)).toHaveCount(1, { timeout: 5_000 });
-    await expect(page.locator("[data-testid^='overview-schema-card-']")).toContainText(
-      "playground_only",
-    );
+    await expect(schemaCards(page)).toContainText("playground_only");
   });
 
   test("an empty buffer keeps the last good viz and shows the parse-status indicator", async ({
