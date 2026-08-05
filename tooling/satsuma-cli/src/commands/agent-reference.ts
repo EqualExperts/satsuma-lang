@@ -27,6 +27,7 @@
 
 import type { Command } from "commander";
 import {
+  AGENT_REFERENCE_TOKENIZER,
   agentReferenceSections,
   type AgentReferenceSection,
 } from "../generated/agent-reference.js";
@@ -123,12 +124,26 @@ function composeProfile(profile: string): string {
     .join("");
 }
 
-/** Renders `--list`'s one-line-per-section summary. */
+/**
+ * Renders `--list`'s one-line-per-section summary: id, profiles, and a
+ * measured (not estimated) token count under {@link AGENT_REFERENCE_TOKENIZER}
+ * — see reference/token-cost.mjs for where that count comes from, and
+ * scripts/measure-agent-reference-tokens.mjs for the fuller per-envelope
+ * report this figure is one row of.
+ */
 function formatSectionList(): string {
   const idWidth = Math.max(...agentReferenceSections.map((section) => section.id.length));
+  const tokenWidth = Math.max(
+    ...agentReferenceSections.map((section) => String(section.tokenCost).length),
+  );
   return (
     agentReferenceSections
-      .map((section) => `${section.id.padEnd(idWidth)}  profiles=${section.profiles.join(",")}`)
+      .map(
+        (section) =>
+          `${section.id.padEnd(idWidth)}  ` +
+          `tokens=${String(section.tokenCost).padStart(tokenWidth)} (${AGENT_REFERENCE_TOKENIZER})  ` +
+          `profiles=${section.profiles.join(",")}`,
+      )
       .join("\n") + "\n"
   );
 }

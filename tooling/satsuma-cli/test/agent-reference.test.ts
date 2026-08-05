@@ -47,11 +47,31 @@ describe("satsuma agent-reference", () => {
       "workflow-generate",
       "workflow-read",
     ]) {
-      assert.match(stdout, new RegExp(`^${id}\\s+profiles=`, "m"));
+      assert.match(
+        stdout,
+        new RegExp(`^${id}\\s+tokens=\\s*\\d+ \\(o200k_base\\)\\s+profiles=`, "m"),
+      );
     }
     // conventions is the one section both profiles need — a superset, not a
     // minimal cut, per the PRD's risk mitigation for missing-content gaps.
-    assert.match(stdout, /^conventions\s+profiles=write,read/m);
+    assert.match(stdout, /^conventions\s+tokens=\s*\d+ \(o200k_base\)\s+profiles=write,read/m);
+  });
+
+  it("--list's token counts are a real tokenizer measurement of each section's own content, not a byte-count estimate", async () => {
+    // The PRD's whole complaint about the pre-Feature-45 document was that
+    // every ≈-token figure was bytes/4. This proves --list's numbers are
+    // measured from the same content --section prints, under the tokenizer
+    // reference/token-cost.mjs uses — not a guess that could silently drift
+    // from what a --section call actually costs.
+    const { getEncoding } = await import("js-tiktoken");
+    const encoding = getEncoding("o200k_base");
+
+    const { stdout: listing } = await run("agent-reference", "--list");
+    const { stdout: grammarSection } = await run("agent-reference", "--section", "grammar");
+
+    const grammarListing = listing.match(/^grammar\s+tokens=\s*(\d+) \(o200k_base\)/m);
+    assert.ok(grammarListing, "expected a tokens=<n> (o200k_base) entry for the grammar section");
+    assert.equal(Number(grammarListing![1]), encoding.encode(grammarSection).length);
   });
 
   it("--section prints exactly one named section, not the whole document", async () => {

@@ -13,7 +13,7 @@ import { readFileSync } from "fs";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
 import { initParser } from "./parser.js";
-import { commandModuleSpecifier } from "./command-loader.js";
+import { COMMAND_MODULES, commandModuleSpecifier } from "./command-loader.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -45,35 +45,11 @@ process.on("unhandledRejection", (err: unknown) => {
   process.exit(2);
 });
 
-// Register commands — each module calls program.command(...)
-const commands = [
-  // Phase 1+: loaded as they are implemented
-  "commands/summary.js",
-  "commands/schema.js",
-  "commands/metric.js",
-  "commands/mapping.js",
-  "commands/find.js",
-  "commands/lineage.js",
-  "commands/where-used.js",
-  "commands/warnings.js",
-  "commands/context.js",
-  "commands/arrows.js",
-  "commands/fields.js",
-  "commands/coverage.js",
-  "commands/nl.js",
-  "commands/meta.js",
-  "commands/match-fields.js",
-  "commands/validate.js",
-  "commands/diff.js",
-  "commands/nl-refs.js",
-  "commands/graph.js",
-  "commands/lint.js",
-  "commands/agent-reference.js",
-  "commands/fmt.js",
-  "commands/field-lineage.js",
-];
-
-for (const cmd of commands) {
+// Register commands — each module calls program.command(...). The module
+// list itself lives in command-loader.ts's COMMAND_MODULES, so anything else
+// that needs to enumerate every command (e.g. the token-cost comparison in
+// scripts/measure-agent-reference-tokens.mjs) reads the same source.
+for (const cmd of COMMAND_MODULES) {
   // Import via a file:// URL, not a raw path: Node's ESM loader rejects bare
   // absolute paths like "C:\…\summary.js" on Windows (gh-265). See command-loader.
   const mod = (await import(commandModuleSpecifier(__dirname, cmd))) as {

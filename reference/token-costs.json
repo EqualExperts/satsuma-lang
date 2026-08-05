@@ -1,0 +1,50 @@
+{
+  "sectionOrder": [
+    "grammar",
+    "conventions",
+    "mistakes",
+    "examples",
+    "cli-index",
+    "cli-composition",
+    "workflow-generate",
+    "workflow-read"
+  ],
+  "tokenizers": {
+    "o200k_base": {
+      "perSection": {
+        "grammar": 948,
+        "conventions": 1450,
+        "mistakes": 448,
+        "examples": 441,
+        "cli-index": 1061,
+        "cli-composition": 1587,
+        "workflow-generate": 460,
+        "workflow-read": 264
+      },
+      "perProfile": {
+        "write": 3743,
+        "read": 4360
+      },
+      "wholeDocument": 6653,
+      "envelopes": {
+        "cli": {
+          "resident": 0,
+          "loaded": "on demand — see per-section/profile figures above"
+        },
+        "portable-blob": {
+          "resident": 6653,
+          "loaded": 6653
+        },
+        "skill": {
+          "resident": 164,
+          "loaded": 6902
+        },
+        "mcp-comparison": {
+          "resident": 2253,
+          "loaded": 2253,
+          "commandCount": 23
+        }
+      }
+    }
+  }
+}
