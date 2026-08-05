@@ -905,6 +905,58 @@ test.describe("Field coverage indicators", () => {
       expect(appearances.partial).toMatch(/gradient/);
     });
   }
+
+  // sl-twe8: the test above proves the port dot is drawn distinctly in the
+  // mapping detail view, which renders one mapping's own verdicts. The
+  // overview's expanded compact card reuses the exact same <sz-schema-card>
+  // markup, but feeds it the *aggregate* coverage unioned across every
+  // mapping that references the schema (buildCoverageIndex) — a different
+  // data path that has never been exercised in a real browser. order_events
+  // is read by both mappings in this fixture, so its aggregate differs from
+  // either mapping's own view: `tag_ids` and the deeply nested
+  // `line_items.discount_lines.discount_amount` are the only two leaves
+  // nothing anywhere maps (confirmed via `satsuma coverage --json` against
+  // this fixture), which makes `line_items` itself a genuine partial
+  // container — the case worth proving here.
+  for (const theme of ["light", "dark"] as const) {
+    test(`uncovered-field treatment renders distinctly in an expanded overview card (${theme})`, async ({
+      page,
+    }) => {
+      await page.goto(`/?theme=${theme}`);
+      await page.waitForFunction(() => {
+        const harness = window.__satsumaHarness;
+        if (!harness?.setViewMode) return false; // app.js not evaluated yet
+        harness.setViewMode("single");
+        return true;
+      });
+      await loadFixture(page, ffgUri);
+
+      const card = page.locator("sz-schema-card[data-testid^='overview-schema-card-order-events']");
+      await card.locator(".header-toggle").click();
+
+      const cardPrefix = "overview-schema-card-order-events";
+      const row = (path: string) => card.locator(`[data-testid='${cardPrefix}-field-${path}']`);
+
+      await expect(row("event-id")).toBeVisible({ timeout: 5_000 });
+      await expect(row("event-id")).toHaveAttribute("data-coverage-state", "covered");
+      await expect(row("tag-ids")).toHaveAttribute("data-coverage-state", "uncovered");
+      await expect(row("line-items")).toHaveAttribute("data-coverage-state", "partial");
+      await expect(row("line-items-discount-lines-discount-amount")).toHaveAttribute(
+        "data-coverage-state",
+        "uncovered",
+      );
+
+      const appearances = {
+        covered: await portAppearance(card, `${cardPrefix}-field-event-id`),
+        partial: await portAppearance(card, `${cardPrefix}-field-line-items`),
+        uncovered: await portAppearance(card, `${cardPrefix}-field-tag-ids`),
+      };
+      // Pairwise distinct, same requirement as the mapping-detail case above —
+      // this time proven against the aggregate data path instead.
+      expect(new Set(Object.values(appearances)).size, JSON.stringify(appearances)).toBe(3);
+      expect(appearances.partial).toMatch(/gradient/);
+    });
+  }
 });
 
 test.describe("Hover highlighting between arrows and field rows", () => {
