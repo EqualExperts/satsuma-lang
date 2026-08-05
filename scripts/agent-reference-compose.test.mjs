@@ -89,6 +89,21 @@ test("composeSection rejects a section id absent from the manifest", () => {
   );
 });
 
+test("the satsuma-language skill body ends with the exact full-document composition", () => {
+  // The skill is Feature 45's lazy-loading envelope: its body must be the
+  // composed reference content, not a hand-restated summary that could drift
+  // from the CLI's `agent-reference` output or the AI-AGENT-REFERENCE.md
+  // portable blob. Everything before the composed content is hand-authored
+  // frontmatter/intro, which this test deliberately does not constrain.
+  const composed = composeFull(loadSections());
+  const skillBody = fs.readFileSync(
+    path.join(repoRoot, "skills", "satsuma-language", "SKILL.md"),
+    "utf8",
+  );
+
+  assert.ok(skillBody.endsWith(composed), "skill body does not end with the composed sections");
+});
+
 /** Recovers which sections (in order) a composed string was built from, by content identity. */
 function sectionIdsIn(composed, sections) {
   const ids = [];

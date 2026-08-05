@@ -1,7 +1,7 @@
 ---
 id: arpd-zp4u
 status: open
-deps: [arpd-skpo]
+deps: [arpd-skpo, arpd-p10c]
 links: []
 created: 2026-08-05T09:56:50Z
 type: task
