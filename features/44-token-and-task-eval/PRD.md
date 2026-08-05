@@ -402,7 +402,7 @@ document; a task-appropriate slice roughly halves it; an MCP server's
 eagerly-injected tool schemas are worse than every mechanism actually
 shipped — is exactly the task-need analysis that drove Feature 45's split,
 and now has measured numbers behind it instead of bytes/4 estimates. See
-`features/45-agent-reference-progressive-disclosure/PRD.md`'s Background and
+`archive/features/45-agent-reference-progressive-disclosure/PRD.md`'s Background and
 "The measurement, pulled forward from Feature 44" sections for the reasoning,
 and [`reference/token-costs.md`](../../reference/token-costs.md) for the
 per-section/profile/envelope figures this feature's Satsuma arms now charge.
@@ -448,7 +448,7 @@ Two measurements, chosen to be nearly free:
 
 **Agreed sequencing (2026-08-04).** Restructuring the reference is a product
 improvement that stands on its own merits, and it happens **first**, as
-`features/45-agent-reference-progressive-disclosure/PRD.md`. The static baseline
+`archive/features/45-agent-reference-progressive-disclosure/PRD.md`. The static baseline
 measurement moves into that feature, because it is the evidence for which
 mechanism to build and it should inform the restructure rather than post-date it.
 
@@ -1013,7 +1013,7 @@ disliking the answer, and quietly keeping the old number.
    runs mostly on synthetic scenarios.
 4. ~~**Whether restructuring `AI-AGENT-REFERENCE.md` waits for the eval.**~~
    **Settled 2026-08-04: it goes first**, as Feature 45
-   (`features/45-agent-reference-progressive-disclosure/PRD.md`). The static
+   (`archive/features/45-agent-reference-progressive-disclosure/PRD.md`). The static
    baseline measurement moves there; this feature measures the restructured
    reference and must not hash its protocol until Feature 45 is released. See
    [But the overhead is a *variable*](#but-the-overhead-is-a-variable-not-a-constant--so-it-is-a-factor).

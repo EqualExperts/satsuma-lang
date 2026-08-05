@@ -272,8 +272,8 @@ function renderReport(sections, tokenizers) {
     "rerun after any change to `reference/*.md` or the CLI's command surface",
     "will overwrite this file.",
     "",
-    "See [features/45-agent-reference-progressive-disclosure/PRD.md]" +
-      "(../features/45-agent-reference-progressive-disclosure/PRD.md) for what " +
+    "See [archive/features/45-agent-reference-progressive-disclosure/PRD.md]" +
+      "(../archive/features/45-agent-reference-progressive-disclosure/PRD.md) for what " +
       "these figures replace and why they're measured rather than estimated.",
     "",
   ];
