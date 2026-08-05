@@ -160,6 +160,28 @@ describe("sz-chain-view", () => {
       assert.match(serialized, /chain-hop-field-upstream-1/);
       assert.doesNotMatch(serialized, /chain-group-upstream:1:crm/);
     });
+
+    // A substring-match assertion (as above) cannot tell one hit from two
+    // identical ones, so it would not have caught the two sibling hops here
+    // sharing a testid before the field-path suffix was added — only a real
+    // DOM query (Playwright) can prove a testid addresses exactly one
+    // element. This test asserts the property the substring checks cannot:
+    // real uniqueness of each rendered testid.
+    it("gives each ungrouped hop at the same depth its own distinct testid", async () => {
+      const mod = await import("../dist/satsuma-viz.js");
+      const view = new mod.SzChainView();
+      view.chain = {
+        field: "::orders.id",
+        maxDepth: 5,
+        upstream: [hop("crm::a.id", "crm::m1", "none", 1), hop("crm::b.id", "crm::m1", "none", 1)],
+        downstream: [],
+      };
+      const testIds = [...serialize(view.render()).matchAll(/chain-hop-upstream-1-\S+/g)].map(
+        (m) => m[0],
+      );
+      assert.equal(testIds.length, 2);
+      assert.notEqual(testIds[0], testIds[1]);
+    });
   });
 
   it("dispatches a field-lineage request when a hop's field is clicked, for the host to retrace", async () => {

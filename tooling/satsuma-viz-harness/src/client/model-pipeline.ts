@@ -14,15 +14,24 @@
  */
 
 import { initParser } from "@satsuma/core";
-import { buildModelResultFromSources } from "@satsuma/viz-backend";
+import { buildModelResultFromSources, buildFieldChainFromSources } from "@satsuma/viz-backend";
 import type {
   SourceDocument,
   BuildModelOptions,
   BuildModelResult,
   VizModel,
+  BuildFieldChainOptions,
 } from "@satsuma/viz-backend";
+import type { FieldChainModel } from "@satsuma/viz-model";
 
-export type { SourceDocument, BuildModelOptions, BuildModelResult, VizModel };
+export type {
+  SourceDocument,
+  BuildModelOptions,
+  BuildModelResult,
+  VizModel,
+  BuildFieldChainOptions,
+  FieldChainModel,
+};
 
 // The two WASM artifacts the parser needs. Both are served alongside the page:
 // the harness server serves them at the site root, and the static playground
@@ -78,4 +87,21 @@ export function buildModel(
   options?: BuildModelOptions,
 ): BuildModelResult {
   return buildModelResultFromSources(entryUri, documents, options);
+}
+
+/**
+ * Build a field chain (upstream/downstream lineage) for `focusField` — a
+ * "schema.field" reference in the same form the CLI's
+ * `field-lineage <schema.field>` argument takes — from in-memory `documents`.
+ * A thin pass-through to the core pipeline, mirroring `buildModel`'s role but
+ * for the chain-view entry point (PRD 36 R3/R4): the parser must already be
+ * initialised.
+ */
+export function buildFieldChain(
+  entryUri: string,
+  documents: SourceDocument[],
+  focusField: string,
+  options?: BuildFieldChainOptions,
+): FieldChainModel {
+  return buildFieldChainFromSources(entryUri, documents, focusField, options);
 }

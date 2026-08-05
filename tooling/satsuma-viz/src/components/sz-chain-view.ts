@@ -21,7 +21,7 @@ import { fieldEndpointPath, fieldEndpointSchema } from "@satsuma/core/reference-
 import type { CanonicalFieldEndpoint } from "@satsuma/core/reference-stages";
 import type { Classification } from "@satsuma/core/types";
 import type { FieldChainHop, FieldChainModel } from "../model.js";
-import { SzFieldLineageEvent } from "../satsuma-viz.js";
+import { SzFieldLineageEvent, sanitizeTestIdSegment } from "../satsuma-viz.js";
 
 /**
  * A namespace group within one depth column is collapsed to a summary chip
@@ -384,10 +384,18 @@ export class SzChainView extends LitElement {
     const parts = splitEndpoint(hop.field);
     const qualifiedId = qualifiedIdOf(parts);
     const atDepthLimit = this.chain !== null && hop.depth === this.chain.maxDepth;
-    const cardTestId = `chain-hop-${direction}-${hop.depth}`;
-    const mappingTestId = `chain-hop-mapping-${direction}-${hop.depth}`;
-    const fieldTestId = `chain-hop-field-${direction}-${hop.depth}`;
-    const depthLimitTestId = `chain-depth-limit-${direction}-${hop.depth}`;
+    // A column can hold more than one hop below the namespace-fan collapse
+    // threshold (e.g. two sibling fields on the same source schema at the
+    // same depth) — direction+depth alone collides for those, so the field
+    // itself breaks the tie. Regex-based unit tests only ever assert a
+    // testid's presence as a substring and cannot see a real DOM collision;
+    // only Playwright driving an actual click proves each hop is individually
+    // addressable (the same class of gap noted in AGENTS.md's viz-testing rule).
+    const hopId = sanitizeTestIdSegment(`${qualifiedId}.${parts.fieldPath}`);
+    const cardTestId = `chain-hop-${direction}-${hop.depth}-${hopId}`;
+    const mappingTestId = `chain-hop-mapping-${direction}-${hop.depth}-${hopId}`;
+    const fieldTestId = `chain-hop-field-${direction}-${hop.depth}-${hopId}`;
+    const depthLimitTestId = `chain-depth-limit-${direction}-${hop.depth}-${hopId}`;
     const mappingTitle = `Open mapping ${hop.via_mapping}`;
     const fieldTitle = `Trace ${qualifiedId}.${parts.fieldPath}`;
 
