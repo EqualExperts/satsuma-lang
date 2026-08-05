@@ -89,10 +89,10 @@ whole file into a single exported string
 Grouping by what a task actually needs — this is the analysis that drives the
 split, deliberately *not* eval scores (see the Goodhart note below):
 
-| Task shape | Needs | Tokens (`o200k_base`, measured) | vs. 6,728 whole document |
+| Task shape | Needs | Tokens (`o200k_base`, measured) | vs. 6,813 whole document |
 |---|---|---|---|
-| **Writing** Satsuma (codegen, conversion, authoring) | EBNF, conventions, common mistakes, examples, the generate-workflow steps | **3,743** | **44% cut** |
-| **Reading** Satsuma (lineage, impact, coverage, audit) | Command reference, composition guidance, transform classification, the `@ref` and path-syntax parts of conventions, the read-workflow steps | **4,435** | **34% cut** |
+| **Writing** Satsuma (codegen, conversion, authoring) | EBNF, conventions, common mistakes, examples, the generate-workflow steps | **3,743** | **45% cut** |
+| **Reading** Satsuma (lineage, impact, coverage, audit) | Command reference, composition guidance, transform classification, the `@ref` and path-syntax parts of conventions, the read-workflow steps | **4,520** | **34% cut** |
 
 (These were originally estimated at ~3,600/~48% and ~3,300/~52% respectively;
 measurement — see `reference/token-costs.md` — found `read` costs more than
@@ -234,16 +234,16 @@ bytes/4 estimates the rest of this section originally carried:
 
 | Figure | Old bytes/4 estimate | Measured (`o200k_base`) |
 |---|---|---|
-| Whole document | ~6,900 | **6,728** |
+| Whole document | ~6,900 | **6,813** |
 | `write` profile | ~3,600 | **3,743** |
-| `read` profile | ~3,300 | **4,435** |
+| `read` profile | ~3,300 | **4,520** |
 | Skill envelope, resident (frontmatter only) | ~50–100 | **164** |
 | MCP comparison, resident (23 command schemas) | "a few hundred tokens" × 23, unmeasured | **2,253** total (~98/command) |
 
 The two profiles turned out closer in cost than the original estimate
 suggested — `read` needs the whole CLI command surface (`cli-index` +
-`cli-composition`, 2,648 tokens together), which is larger than `write`'s
-grammar (948). Both are still well under the 6,728-token whole document: 44%
+`cli-composition`, 2,808 tokens together), which is larger than `write`'s
+grammar (948). Both are still well under the 6,813-token whole document: 45%
 and 34% cuts respectively, not the ~48%/52% the pre-measurement estimate
 guessed. See `reference/token-costs.md` for the full per-section breakdown
 that table sizes are drawn from, and its "Per section" table in particular
