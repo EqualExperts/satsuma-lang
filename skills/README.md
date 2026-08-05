@@ -9,6 +9,7 @@ any reference docs, scripts, or templates the skill needs.
 
 | Skill | What it does |
 | --- | --- |
+| [`satsuma-language`](satsuma-language) | Grammar, conventions, CLI command surface, and workflow patterns for writing or reading Satsuma — a lazy-loading envelope over the same content `satsuma agent-reference` and `AI-AGENT-REFERENCE.md` compose from (Feature 45). |
 | [`excel-to-satsuma`](excel-to-satsuma) | Convert Excel mapping spreadsheets into idiomatic Satsuma. Includes a Python helper CLI and a Claude Code slash command. |
 | [`satsuma-to-excel`](satsuma-to-excel) | Generate stakeholder-ready Excel workbooks from `.stm` files. |
 | [`satsuma-explainer`](satsuma-explainer) | Plain-English walkthroughs, PII audits, coverage checks, and impact analysis of `.stm` files for non-technical stakeholders. |
