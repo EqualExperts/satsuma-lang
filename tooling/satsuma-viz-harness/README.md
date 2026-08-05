@@ -33,6 +33,43 @@ either.
 
 ---
 
+## Running the dev server locally (live preview, not Playwright)
+
+Sometimes you just want to look at the current `<satsuma-viz>` UI in a real
+browser — not run the Playwright regression suite. This starts the harness's
+own Node HTTP server (`src/server.ts`), which serves the harness web UI (a
+fixture picker over `examples/**` plus the production viz component) at
+**<http://localhost:3333>**.
+
+```bash
+# One-time (or after changing core/viz-model/viz-backend/viz source):
+npx turbo run build --filter=@satsuma/viz-harness
+
+# Start the server:
+npm --prefix tooling/satsuma-viz-harness run dev
+```
+
+Then open <http://localhost:3333> in your browser. The server does not
+hot-reload — after further source changes, stop it (`Ctrl-C`, or
+`kill "$(lsof -ti:3333)"`), re-run the turbo build, and start it again.
+
+Note `npm run dev` here runs this package's own `build` script first, which
+only rebuilds *this* package's bundle from already-built dependencies — it
+does not build `@satsuma/core`, `@satsuma/viz`, etc. themselves. Run the
+`turbo run build` step above whenever a dependency changed, not just this
+package.
+
+Claude Code users: the `/viz-dev` command (`.claude/commands/viz-dev.md`)
+automates all of the above, including the agent-sandbox Turborepo env vars
+(see AGENTS.md "Running Turborepo in the agent sandbox") and confirming the
+server actually came up before handing you the URL.
+
+This is unrelated to the sentinel-file Playwright workflow described below —
+that workflow drives an automated headless browser for regression tests, not
+a human-facing preview.
+
+---
+
 ## The playground (server-free live editor)
 
 `npm run build:playground` emits `dist/playground/` — a flat, static bundle
