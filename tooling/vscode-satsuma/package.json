@@ -198,7 +198,7 @@
   ],
   "devDependencies": {
     "@satsuma/viz-backend": "*",
-    "@types/node": "^22.0.0",
+    "@types/node": "^26.1.2",
     "@types/vscode": "~1.125.0",
     "esbuild": "^0.28.1",
     "tree-sitter-satsuma": "*",
