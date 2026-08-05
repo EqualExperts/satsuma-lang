@@ -279,6 +279,7 @@ editing a package's `dependencies`/`devDependencies`, nothing else (ADR-049).
 | Coverage for every package that reports it | `npm run test:coverage` |
 | The repo-level scripts' own tests | `npm run test:scripts` |
 | Everything the pre-commit hook runs | `./scripts/run-repo-checks.sh` |
+| Preview the current viz UI locally | `npx turbo run build --filter=@satsuma/viz-harness && npm --prefix tooling/satsuma-viz-harness run dev`, then open <http://localhost:3333> — see [tooling/satsuma-viz-harness/README.md](tooling/satsuma-viz-harness/README.md#running-the-dev-server-locally-live-preview-not-playwright). Claude Code users can just run `/viz-dev`. |
 
 `--filter` takes a package's **declared name**, not its directory:
 `@satsuma/core`, `@satsuma/lsp`, `satsuma-cli`, `tree-sitter-satsuma`. It pulls in
