@@ -1869,6 +1869,45 @@ test.describe("Compact card expansion in overview", () => {
     await expect(card.locator("[data-testid$='-field-id']")).toHaveCount(0);
   });
 
+  test("clicking the field-count text toggles the fields, like the arrow (sl-6g23)", async ({
+    page,
+  }) => {
+    // The arrow glyph alone was a ~12px hit target on a compact card, so the
+    // count next to it joined the toggle's target (sl-6g23). Only a real click
+    // on the rendered span proves the listener is wired to that element; a
+    // handler-level test would pass whether or not it reached the DOM.
+    const card = page.locator("sz-schema-card[data-testid^='overview-schema-card-buy-order']");
+    const count = card.locator(".header-count");
+
+    await count.click();
+    await expect(card.locator("[data-testid$='-field-id']").first()).toBeVisible({
+      timeout: 5_000,
+    });
+
+    // Symmetric: the count collapses as well as expands.
+    await count.click();
+    await expect(card.locator("[data-testid$='-field-id']")).toHaveCount(0);
+  });
+
+  test("the field-count click expands without navigating (sl-tw0r still holds)", async ({
+    page,
+  }) => {
+    // Widening the toggle's hit area must not widen navigation's. sl-tw0r's
+    // rule is that anything wired to expand is navigation-silent, or a host
+    // that opens documents on navigate (VS Code) yanks the editor away the
+    // moment a card is expanded — so the new target needs the same guard the
+    // arrow has.
+    await page.evaluate(() => window.__satsumaHarness.clearEvents());
+
+    const card = page.locator("sz-schema-card[data-testid^='overview-schema-card-buy-order']");
+    await card.locator(".header-count").click();
+    await expect(card.locator("[data-testid$='-field-id']").first()).toBeVisible({
+      timeout: 5_000,
+    });
+
+    expect(await recordedEvents(page, "navigate")).toEqual([]);
+  });
+
   test("expanding grows the canvas and collapsing shrinks it back (symmetric re-layout)", async ({
     page,
   }) => {
