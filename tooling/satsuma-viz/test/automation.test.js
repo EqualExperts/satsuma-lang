@@ -187,7 +187,12 @@ describe("viz automation helpers", () => {
       ["sensitivity"],
     );
 
-    // The note text must still reach the rendered output via the field-note row.
+    // The note must still reach the rendered output as the shaded field-note
+    // row. Only the row's presence is asserted here: since vnm-kisd the text
+    // itself goes through renderMarkdown behind an unsafeHTML directive, which
+    // serializes to an opaque object rather than to the note string — proving
+    // the reader SEES the text now needs a real DOM, and the Playwright
+    // "Note rendering" suite in the viz harness is where that is proven.
     const serialize = (t) => {
       if (t == null || typeof t !== "object") return String(t ?? "");
       if (Array.isArray(t)) return t.map(serialize).join(" ");
@@ -198,7 +203,6 @@ describe("viz automation helpers", () => {
     };
     const serialized = serialize(card._renderField(field, 0));
     assert.match(serialized, /field-note/);
-    assert.match(serialized, /Unique key across ORDERS tables/);
   });
 
   it("gives mapping-detail source and target schema cards distinct testIdPrefix values", async () => {

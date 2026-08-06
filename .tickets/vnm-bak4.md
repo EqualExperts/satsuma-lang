@@ -1,6 +1,6 @@
 ---
 id: vnm-bak4
-status: open
+status: closed
 deps: []
 links: [vnm-kisd]
 created: 2026-08-06T17:23:22Z
@@ -40,3 +40,24 @@ An arrow's `(note "...")` does render — `sz-mapping-detail.ts:793` picks the e
 - A mapping with no notes renders exactly as it does today — no empty section, no extra vertical space.
 - Playwright harness coverage in `tooling/satsuma-viz-harness/test/harness.test.ts` asserts the rendered DOM for both a mapping-level note and a Markdown arrow note. No `describe` block covers note rendering today and no fixture carries a mapping-level `note { }` or a Markdown arrow note — both fixtures need adding. Per AGENTS.md, whether a note is painted at all, and whether a collapsible section opens on click, are properties no getter-level test can observe.
 
+
+## Notes
+
+**2026-08-06T18:15:18Z**
+
+**2026-08-06T18:20:00Z**
+
+Cause: `sz-mapping-detail` never read `MappingBlock.notes` at all, so `note { }`
+blocks reached the webview payload and were invisible; arrow notes rendered but
+through `highlightAtRefs` only, which handles `@ref` tokens and nothing else, so
+their Markdown showed verbatim. A mapping's `( note "..." )` metadata entry was
+additionally rendering as a raw pill.
+Fix: added a collapsible mapping-notes section between the header and the arrow
+table (expanded by default, mirroring sz-schema-card — a mapping's note is the
+context a reader needs before its arrows), routed arrow notes through
+`renderMarkdown`, and withheld `note` from the header pill row so declaration
+notes join the section instead of showing raw. Also guarded `m.notes ?? []` — a
+payload without `notes` was taking the whole detail view down. Placement and the
+`@ref`/Markdown composition are shared with [[vnm-kisd]] via the new
+`satsuma-viz/src/notes.ts`. Verified in a real browser, 136 Playwright passed.
+(commit immediately after 3bbbcb0b)

@@ -4,6 +4,7 @@ import { unsafeHTML } from "lit/directives/unsafe-html.js";
 import type { SchemaCard, FieldEntry, MetadataEntry } from "../model.js";
 import { SzNavigateEvent, SzFieldHoverEvent, SzFieldLineageEvent } from "../satsuma-viz.js";
 import { renderMarkdown } from "../markdown.js";
+import { noteSectionStyles, renderNotesSection } from "../notes.js";
 import type { FieldCoverageEntry, FieldCoverageState } from "@satsuma/core/coverage";
 import { uncoveredFieldCoverage } from "@satsuma/core/coverage";
 import { toCoverageFields } from "../field-coverage.js";
@@ -76,582 +77,566 @@ function sanitizeTestIdSegment(value: string): string {
 
 @customElement("sz-schema-card")
 export class SzSchemaCard extends LitElement {
-  static override styles = css`
-    :host {
-      display: block;
-      width: 100%;
-      box-sizing: border-box;
-      min-width: var(--sz-card-min-width, 240px);
-      max-width: var(--sz-card-max-width, 380px);
-      border-radius: var(--sz-card-radius);
-      background: var(--sz-card-bg);
-      border: 1px solid var(--sz-card-border);
-      box-shadow: var(--sz-card-shadow);
-      overflow: hidden;
-      font-family: var(--sz-font-sans);
-    }
+  static override styles = [
+    noteSectionStyles,
+    css`
+      :host {
+        display: block;
+        width: 100%;
+        box-sizing: border-box;
+        min-width: var(--sz-card-min-width, 240px);
+        max-width: var(--sz-card-max-width, 380px);
+        border-radius: var(--sz-card-radius);
+        background: var(--sz-card-bg);
+        border: 1px solid var(--sz-card-border);
+        box-shadow: var(--sz-card-shadow);
+        overflow: hidden;
+        font-family: var(--sz-font-sans);
+      }
 
-    :host([content-width]) {
-      width: max-content;
-      max-width: none;
-    }
+      :host([content-width]) {
+        width: max-content;
+        max-width: none;
+      }
 
-    /*
+      /*
      * While a compact card is expanded, the overview layout sizes its node
      * from a height ESTIMATE (field-note lines are not estimated), so let any
      * small overshoot paint past the host instead of being clipped.
      */
-    :host([compact-expanded]) {
-      overflow: visible;
-    }
+      :host([compact-expanded]) {
+        overflow: visible;
+      }
 
-    /* A field's enum overlay (sl-2ne7) paints outside its field row, and
+      /* A field's enum overlay (sl-2ne7) paints outside its field row, and
        the row sits inside a non-compact card's normal-flow field list —
        which clips by default, unlike a compact-expanded card. Reflected
        whenever an overlay is open so it can escape whichever card hosts
        it, then removed on collapse to restore ordinary clipping. */
-    :host([has-enum-overlay]) {
-      overflow: visible;
-    }
+      :host([has-enum-overlay]) {
+        overflow: visible;
+      }
 
-    .header {
-      position: relative;
-      overflow: hidden;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      /* Pinned to the shared HEADER_HEIGHT geometry constant: the ELK layout
+      .header {
+        position: relative;
+        overflow: hidden;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        /* Pinned to the shared HEADER_HEIGHT geometry constant: the ELK layout
          sizes nodes and computes edge anchors from it, so the rendered header
          must occupy exactly that box (sl-wixe). Flex centres the content. */
-      height: ${HEADER_HEIGHT}px;
-      box-sizing: border-box;
-      padding: 0 12px;
-      background: var(--sz-orange);
-      color: var(--sz-text-on-accent);
-      cursor: pointer;
-      user-select: none;
-    }
+        height: ${HEADER_HEIGHT}px;
+        box-sizing: border-box;
+        padding: 0 12px;
+        background: var(--sz-orange);
+        color: var(--sz-text-on-accent);
+        cursor: pointer;
+        user-select: none;
+      }
 
-    /* Coverage changes paint only this inset layer; the header's box model and
+      /* Coverage changes paint only this inset layer; the header's box model and
        therefore every overview-layout coordinate remain untouched (sl-5m9x). */
-    .coverage-fill {
-      position: absolute;
-      inset: 0 auto 0 0;
-      width: var(--sz-coverage-percent, 0%);
-      background: var(--sz-coverage-fill);
-      pointer-events: none;
-    }
+      .coverage-fill {
+        position: absolute;
+        inset: 0 auto 0 0;
+        width: var(--sz-coverage-percent, 0%);
+        background: var(--sz-coverage-fill);
+        pointer-events: none;
+      }
 
-    .header > :not(.coverage-fill) {
-      position: relative;
-      z-index: 1;
-    }
+      .header > :not(.coverage-fill) {
+        position: relative;
+        z-index: 1;
+      }
 
-    /* Without a namespace pill row the header is the top of the card and
+      /* Without a namespace pill row the header is the top of the card and
        owns the top rounding. The host normally clips (overflow: hidden), but
        compact-expanded cards set overflow: visible, so the rounding must be
        on the header itself. */
-    .header:first-child {
-      border-radius: var(--sz-card-radius) var(--sz-card-radius) 0 0;
-    }
+      .header:first-child {
+        border-radius: var(--sz-card-radius) var(--sz-card-radius) 0 0;
+      }
 
-    /* The namespace pill row, when present, is the top of the card — so the
+      /* The namespace pill row, when present, is the top of the card — so the
        header is no longer :first-child and the rule above cannot fire. This
        row therefore owns the top rounding for a namespaced card; without it
        such a card's top corners went square the moment compact-expanded
        dropped the host's clip (sl-yedr). Pinned to the shared
        NAMESPACE_PILL_HEIGHT the overview layout reserves for this row. */
-    .namespace-pill-row {
-      height: ${NAMESPACE_PILL_HEIGHT}px;
-      box-sizing: border-box;
-      display: flex;
-      align-items: end;
-      padding: 0 12px;
-      background: var(--sz-orange);
-    }
+      .namespace-pill-row {
+        height: ${NAMESPACE_PILL_HEIGHT}px;
+        box-sizing: border-box;
+        display: flex;
+        align-items: end;
+        padding: 0 12px;
+        background: var(--sz-orange);
+      }
 
-    .namespace-pill-row:first-child {
-      border-radius: var(--sz-card-radius) var(--sz-card-radius) 0 0;
-    }
+      .namespace-pill-row:first-child {
+        border-radius: var(--sz-card-radius) var(--sz-card-radius) 0 0;
+      }
 
-    .namespace-pill-chip {
-      display: inline-block;
-      font-size: 10px;
-      font-weight: 700;
-      padding: 1px 8px;
-      border-radius: 999px;
-      background: var(--sz-namespace-pill-chip-bg);
-      color: var(--sz-orange-dark);
-    }
+      .namespace-pill-chip {
+        display: inline-block;
+        font-size: 10px;
+        font-weight: 700;
+        padding: 1px 8px;
+        border-radius: 999px;
+        background: var(--sz-namespace-pill-chip-bg);
+        color: var(--sz-orange-dark);
+      }
 
-    .header.report {
-      background: var(--sz-report);
-    }
+      .header.report {
+        background: var(--sz-report);
+      }
 
-    .header-icon {
-      width: 16px;
-      height: 16px;
-      flex-shrink: 0;
-    }
+      .header-icon {
+        width: 16px;
+        height: 16px;
+        flex-shrink: 0;
+      }
 
-    .header-name {
-      font-size: 14px;
-      font-weight: 600;
-      flex: 1;
-      overflow: var(--sz-header-name-overflow);
-      text-overflow: var(--sz-header-name-overflow-mode);
-      white-space: nowrap;
-    }
+      .header-name {
+        font-size: 14px;
+        font-weight: 600;
+        flex: 1;
+        overflow: var(--sz-header-name-overflow);
+        text-overflow: var(--sz-header-name-overflow-mode);
+        white-space: nowrap;
+      }
 
-    .header-count {
-      font-size: 11px;
-      opacity: 0.85;
-      flex-shrink: 0;
-      /* Part of the toggle's click target, not the navigate target: the arrow
+      .header-count {
+        font-size: 11px;
+        opacity: 0.85;
+        flex-shrink: 0;
+        /* Part of the toggle's click target, not the navigate target: the arrow
          glyph alone is a poor Fitts's-law target on a compact overview card
          (sl-6g23). The count is the one other header element whose meaning is
          "the fields", so it toggles them; the name and icon still navigate.
          Padding only — no margin offset — so the header's fixed-height box and
          every coordinate the ELK layout derives from it stay untouched. */
-      cursor: pointer;
-      padding: 4px 0;
-    }
+        cursor: pointer;
+        padding: 4px 0;
+      }
 
-    .coverage-badge {
-      padding: 1px 5px;
-      border-radius: var(--sz-badge-radius);
-      background: var(--sz-coverage-badge-bg);
-      color: var(--sz-text-on-accent);
-      font-size: 10px;
-      font-weight: 700;
-      line-height: 1.4;
-      flex-shrink: 0;
-    }
+      .coverage-badge {
+        padding: 1px 5px;
+        border-radius: var(--sz-badge-radius);
+        background: var(--sz-coverage-badge-bg);
+        color: var(--sz-text-on-accent);
+        font-size: 10px;
+        font-weight: 700;
+        line-height: 1.4;
+        flex-shrink: 0;
+      }
 
-    .header-toggle {
-      font-size: 12px;
-      flex-shrink: 0;
-      transition: transform 0.15s ease;
-      /* The arrow is its own click target (toggle only, never navigate —
+      .header-toggle {
+        font-size: 12px;
+        flex-shrink: 0;
+        transition: transform 0.15s ease;
+        /* The arrow is its own click target (toggle only, never navigate —
          sl-tw0r); pad it so the hit area is comfortably larger than the
          12px glyph. */
-      padding: 4px 6px;
-      margin: -4px -6px;
-      cursor: pointer;
-    }
+        padding: 4px 6px;
+        margin: -4px -6px;
+        cursor: pointer;
+      }
 
-    .header-toggle[data-collapsed] {
-      transform: rotate(-90deg);
-    }
+      .header-toggle[data-collapsed] {
+        transform: rotate(-90deg);
+      }
 
-    .label {
-      padding: 4px 12px 6px;
-      font-size: 12px;
-      color: var(--sz-text-muted);
-      font-style: italic;
-      border-bottom: 1px solid var(--sz-card-border);
-      max-width: 400px;
-      word-break: break-word;
-    }
+      .label {
+        padding: 4px 12px 6px;
+        font-size: 12px;
+        color: var(--sz-text-muted);
+        font-style: italic;
+        border-bottom: 1px solid var(--sz-card-border);
+        max-width: 400px;
+        word-break: break-word;
+      }
 
-    .fields {
-      padding: 4px 0;
-    }
+      .fields {
+        padding: 4px 0;
+      }
 
-    .field-row {
-      position: relative;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      padding: 3px 12px;
-      height: var(--sz-field-height);
-      cursor: pointer;
-    }
+      .field-row {
+        position: relative;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 3px 12px;
+        height: var(--sz-field-height);
+        cursor: pointer;
+      }
 
-    .field-row:hover {
-      background: var(--sz-row-hover-bg);
-    }
+      .field-row:hover {
+        background: var(--sz-row-hover-bg);
+      }
 
-    .port {
-      width: var(--sz-port-size);
-      height: var(--sz-port-size);
-      border-radius: 50%;
-      flex-shrink: 0;
-    }
+      .port {
+        width: var(--sz-port-size);
+        height: var(--sz-port-size);
+        border-radius: 50%;
+        flex-shrink: 0;
+      }
 
-    .port.mapped {
-      background: var(--sz-orange-dark);
-    }
+      .port.mapped {
+        background: var(--sz-orange-dark);
+      }
 
-    .port.unmapped {
-      border: 1.5px solid var(--sz-text-muted);
-      background: transparent;
-    }
+      .port.unmapped {
+        border: 1.5px solid var(--sz-text-muted);
+        background: transparent;
+      }
 
-    /* Partly covered: something under this record is mapped and something is
+      /* Partly covered: something under this record is mapped and something is
        not. A half-filled dot inside an accent ring reads as the state between
        the solid dot and the hollow one, and it is a difference in *shape* — at
        the 8px port size a difference in shade alone would not survive (sl-f0x6).
        The ring takes the accent rather than the muted outline of .port.unmapped
        because part of this subtree is mapped; the unfilled half is what still
        needs attention. */
-    .port.partial {
-      border: 1.5px solid var(--sz-orange-dark);
-      background: linear-gradient(to right, var(--sz-orange-dark) 0 50%, transparent 50% 100%);
-    }
+      .port.partial {
+        border: 1.5px solid var(--sz-orange-dark);
+        background: linear-gradient(to right, var(--sz-orange-dark) 0 50%, transparent 50% 100%);
+      }
 
-    /* Coverage not computed: neither filled nor the hollow ring that reads as a
+      /* Coverage not computed: neither filled nor the hollow ring that reads as a
        gap. A dashed, faded outline says "no verdict" rather than "no coverage"
        — see the coverage property's doc comment. */
-    .port.unknown {
-      border: 1.5px dashed var(--sz-text-muted);
-      background: transparent;
-      opacity: 0.45;
-    }
+      .port.unknown {
+        border: 1.5px dashed var(--sz-text-muted);
+        background: transparent;
+        opacity: 0.45;
+      }
 
-    .field-name {
-      font-family: var(--sz-font-mono);
-      font-size: 12px;
-      font-weight: 500;
-      color: var(--sz-text);
-      flex: var(--sz-field-name-flex);
-      overflow: var(--sz-field-name-overflow);
-      text-overflow: var(--sz-field-name-overflow-mode);
-      white-space: nowrap;
-    }
+      .field-name {
+        font-family: var(--sz-font-mono);
+        font-size: 12px;
+        font-weight: 500;
+        color: var(--sz-text);
+        flex: var(--sz-field-name-flex);
+        overflow: var(--sz-field-name-overflow);
+        text-overflow: var(--sz-field-name-overflow-mode);
+        white-space: nowrap;
+      }
 
-    .field-type {
-      font-family: var(--sz-font-mono);
-      font-size: 11px;
-      color: var(--sz-text-muted);
-      flex-shrink: 0;
-    }
+      .field-type {
+        font-family: var(--sz-font-mono);
+        font-size: 11px;
+        color: var(--sz-text-muted);
+        flex-shrink: 0;
+      }
 
-    .badges {
-      display: flex;
-      gap: 3px;
-      flex-shrink: 0;
-    }
+      .badges {
+        display: flex;
+        gap: 3px;
+        flex-shrink: 0;
+      }
 
-    .badge {
-      font-family: var(--sz-font-sans);
-      font-size: 10px;
-      font-weight: 500;
-      padding: 1px 5px;
-      border-radius: var(--sz-badge-radius);
-      background: var(--sz-badge-bg);
-      color: var(--sz-badge-text);
-      line-height: 1.4;
-    }
+      .badge {
+        font-family: var(--sz-font-sans);
+        font-size: 10px;
+        font-weight: 500;
+        padding: 1px 5px;
+        border-radius: var(--sz-badge-radius);
+        background: var(--sz-badge-bg);
+        color: var(--sz-badge-text);
+        line-height: 1.4;
+      }
 
-    /* Field-level metadata pill (sl-6x1o): same chip shape as constraint
+      /* Field-level metadata pill (sl-6x1o): same chip shape as constraint
        badges; the key is emphasised so "sensitivity internal" reads as
        key + value at a glance. */
-    .badge.field-meta .badge-key {
-      font-weight: 700;
-      opacity: 0.85;
-    }
+      .badge.field-meta .badge-key {
+        font-weight: 700;
+        opacity: 0.85;
+      }
 
-    .badge.pii {
-      background: var(--sz-warning-bg);
-      color: var(--sz-warning-icon);
-    }
+      .badge.pii {
+        background: var(--sz-warning-bg);
+        color: var(--sz-warning-icon);
+      }
 
-    /* An enum badge always shows only its collapsed count (sl-2ne7): joining
+      /* An enum badge always shows only its collapsed count (sl-2ne7): joining
        every value into one pill ("enum enterprise | mid_market | smb |
        individual") made a single constraint the widest thing on the row.
        Values are legible on demand, in the overlay below. */
-    .badge.enum-badge {
-      cursor: pointer;
-    }
+      .badge.enum-badge {
+        cursor: pointer;
+      }
 
-    /* Positioned against the field row (.field-row is its containing block),
+      /* Positioned against the field row (.field-row is its containing block),
        not the small inline badge, so the panel reads as belonging to the row
        rather than hanging off one word inside it. Floats below the row
        instead of reflowing it — the row's own box is untouched, so the ELK
        layout's field-row height estimate still holds while this is open. */
-    .enum-overlay {
-      position: absolute;
-      top: 100%;
-      left: 12px;
-      right: 12px;
-      margin-top: 2px;
-      z-index: 50;
-      display: flex;
-      flex-wrap: wrap;
-      gap: 4px;
-      padding: 8px;
-      border-radius: var(--sz-badge-radius);
-      background: var(--sz-card-bg);
-      border: 1px solid var(--sz-card-border);
-      box-shadow: var(--sz-card-shadow);
-      cursor: default;
-    }
+      .enum-overlay {
+        position: absolute;
+        top: 100%;
+        left: 12px;
+        right: 12px;
+        margin-top: 2px;
+        z-index: 50;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px;
+        padding: 8px;
+        border-radius: var(--sz-badge-radius);
+        background: var(--sz-card-bg);
+        border: 1px solid var(--sz-card-border);
+        box-shadow: var(--sz-card-shadow);
+        cursor: default;
+      }
 
-    .enum-overlay .enum-value-chip {
-      font-family: var(--sz-font-sans);
-      font-size: 10px;
-      font-weight: 500;
-      padding: 1px 5px;
-      border-radius: var(--sz-badge-radius);
-      background: var(--sz-badge-bg);
-      color: var(--sz-badge-text);
-      line-height: 1.4;
-    }
+      .enum-overlay .enum-value-chip {
+        font-family: var(--sz-font-sans);
+        font-size: 10px;
+        font-weight: 500;
+        padding: 1px 5px;
+        border-radius: var(--sz-badge-radius);
+        background: var(--sz-badge-bg);
+        color: var(--sz-badge-text);
+        line-height: 1.4;
+      }
 
-    .comment-badge {
-      width: 16px;
-      height: 16px;
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 10px;
-      font-weight: 700;
-      flex-shrink: 0;
-      cursor: help;
-    }
+      .comment-badge {
+        width: 16px;
+        height: 16px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 10px;
+        font-weight: 700;
+        flex-shrink: 0;
+        cursor: help;
+      }
 
-    .comment-badge.warning {
-      background: var(--sz-warning-bg);
-      color: var(--sz-warning-icon);
-    }
+      .comment-badge.warning {
+        background: var(--sz-warning-bg);
+        color: var(--sz-warning-icon);
+      }
 
-    .comment-badge.question {
-      background: var(--sz-question-bg);
-      color: var(--sz-question-icon);
-    }
+      .comment-badge.question {
+        background: var(--sz-question-bg);
+        color: var(--sz-question-icon);
+      }
 
-    .nested {
-      padding-left: 20px;
-    }
+      .nested {
+        padding-left: 20px;
+      }
 
-    .collapsed .fields {
-      display: none;
-    }
+      .collapsed .fields {
+        display: none;
+      }
 
-    .collapsed .label,
-    .collapsed .metadata-pills {
-      display: none;
-    }
+      .collapsed .label,
+      .collapsed .metadata-pills {
+        display: none;
+      }
 
-    .collapsed .notes-section {
-      display: none;
-    }
+      .collapsed .notes-section {
+        display: none;
+      }
 
-    .metadata-pills {
-      /* Pills stack one per row and are EXCLUDED from the card's intrinsic
+      .metadata-pills {
+        /* Pills stack one per row and are EXCLUDED from the card's intrinsic
          width (contain: inline-size) — a long metadata value such as a
          namespace URI must never widen the card beyond what its field rows
          need (sl-dw9x). Overlong values end-truncate; the full text lives in
          each pill's title tooltip. Row heights are pinned to the shared
          geometry constants the layout estimates with. */
-      contain: inline-size;
-      display: flex;
-      flex-direction: column;
-      align-items: flex-start;
-      gap: ${META_PILL_ROW_GAP}px;
-      padding: 4px 12px 6px;
-      border-bottom: 1px solid var(--sz-card-border);
-    }
+        contain: inline-size;
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: ${META_PILL_ROW_GAP}px;
+        padding: 4px 12px 6px;
+        border-bottom: 1px solid var(--sz-card-border);
+      }
 
-    .meta-pill {
-      font-family: var(--sz-font-sans);
-      font-size: 10px;
-      font-weight: 500;
-      height: ${META_PILL_ROW_HEIGHT}px;
-      box-sizing: border-box;
-      padding: 1px 6px;
-      border-radius: var(--sz-badge-radius);
-      background: var(--sz-namespace-bg);
-      color: var(--sz-text-muted);
-      line-height: 1.4;
-      white-space: nowrap;
-      max-width: 100%;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
+      .meta-pill {
+        font-family: var(--sz-font-sans);
+        font-size: 10px;
+        font-weight: 500;
+        height: ${META_PILL_ROW_HEIGHT}px;
+        box-sizing: border-box;
+        padding: 1px 6px;
+        border-radius: var(--sz-badge-radius);
+        background: var(--sz-namespace-bg);
+        color: var(--sz-text-muted);
+        line-height: 1.4;
+        white-space: nowrap;
+        max-width: 100%;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
 
-    .meta-pill .meta-key {
-      color: var(--sz-orange-dark);
-    }
+      .meta-pill .meta-key {
+        color: var(--sz-orange-dark);
+      }
 
-    .spread-indicator {
-      display: flex;
-      align-items: center;
-      gap: 4px;
-      padding: 3px 12px;
-      font-size: 11px;
-      color: var(--sz-green);
-      border-top: 1px dotted var(--sz-green);
-    }
+      .spread-indicator {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        padding: 3px 12px;
+        font-size: 11px;
+        color: var(--sz-green);
+        border-top: 1px dotted var(--sz-green);
+      }
 
-    .spread-indicator .spread-icon {
-      font-size: 10px;
-    }
+      .spread-indicator .spread-icon {
+        font-size: 10px;
+      }
 
-    .notes-section {
-      border-top: 1px dashed var(--sz-card-border);
-      padding: 6px 12px;
-    }
+      .lineage-btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 18px;
+        height: 18px;
+        border: none;
+        border-radius: 3px;
+        background: transparent;
+        color: var(--sz-text-muted);
+        cursor: pointer;
+        flex-shrink: 0;
+        padding: 0;
+        opacity: 0;
+        transition:
+          opacity 0.1s,
+          background 0.1s;
+      }
 
-    .notes-toggle {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      cursor: pointer;
-      font-size: 12px;
-      color: var(--sz-text-muted);
-      user-select: none;
-      padding: 2px 0;
-    }
+      .field-row:hover .lineage-btn {
+        opacity: 1;
+      }
 
-    .notes-toggle:hover {
-      color: var(--sz-text);
-    }
+      .lineage-btn:hover {
+        background: var(--sz-accent-wash);
+        color: var(--sz-orange-dark);
+      }
 
-    .notes-toggle .arrow {
-      font-size: 10px;
-      transition: transform 0.15s ease;
-    }
+      /* Cross-highlighting */
+      :host([has-highlight]) .field-row {
+        opacity: 0.5;
+        transition: opacity 0.15s ease;
+      }
 
-    .notes-toggle .arrow[data-expanded] {
-      transform: rotate(90deg);
-    }
+      :host([has-highlight]) .field-row.hl {
+        opacity: 1;
+      }
 
-    .note-content {
-      font-family: var(--sz-font-sans);
-      font-size: 12px;
-      color: var(--sz-text);
-      line-height: 1.5;
-      padding: 4px 0 2px 22px;
-      word-break: break-word;
-      max-width: 400px;
-    }
+      :host([has-highlight]) .field-row.hl.hl-source {
+        background: var(--sz-accent-wash);
+      }
 
-    .note-content p {
-      margin: 0 0 6px;
-    }
+      :host([has-highlight]) .field-row.hl.hl-target {
+        background: var(--sz-green-wash);
+      }
 
-    .note-content p:last-child {
-      margin-bottom: 0;
-    }
+      :host([has-highlight]) .field-row.hl .field-name {
+        font-weight: 700;
+      }
 
-    .note-content h1,
-    .note-content h2,
-    .note-content h3 {
-      font-size: 12px;
-      font-weight: 700;
-      margin: 6px 0 2px;
-    }
+      :host([content-width]) .field-row {
+        width: max-content;
+        min-width: 100%;
+      }
 
-    .note-content ul,
-    .note-content ol {
-      margin: 0 0 6px;
-      padding-left: 16px;
-    }
+      /* Shaded note row displayed beneath a field that has notes. */
+      .field-note {
+        font-family: var(--sz-font-sans);
+        font-size: 11px;
+        font-style: italic;
+        color: var(--sz-text-muted);
+        line-height: 1.4;
+        padding: 2px 12px 4px 38px;
+        background: var(--sz-row-hover-bg);
+        max-width: 400px;
+        word-break: break-word;
+      }
 
-    .note-content li {
-      margin: 1px 0;
-    }
+      /*
+     * A field note's body is Markdown (SATSUMA-V2-SPEC.md:43 — the spec's own
+     * worked example is a bulleted list on a field), so the block elements
+     * renderMarkdown emits need card-scale spacing here just as they do in the
+     * entity-level notes section (vnm-kisd). Margins are tighter than
+     * .note-content's because this row sits inside a dense field list, and the
+     * row's height is NOT part of the layout's card-height estimate — see the
+     * :host([compact-expanded]) rule above.
+     */
+      .field-note p {
+        margin: 0 0 4px;
+      }
 
-    .note-content code {
-      font-family: var(--sz-font-mono);
-      font-size: 11px;
-      background: var(--sz-row-active-bg);
-      padding: 1px 4px;
-      border-radius: 3px;
-    }
+      .field-note p:last-child,
+      .field-note ul:last-child,
+      .field-note ol:last-child {
+        margin-bottom: 0;
+      }
 
-    .note-content strong {
-      font-weight: 700;
-    }
+      .field-note h1,
+      .field-note h2,
+      .field-note h3 {
+        font-size: 11px;
+        font-weight: 700;
+        font-style: normal;
+        margin: 4px 0 2px;
+      }
 
-    .note-content em {
-      font-style: italic;
-    }
+      .field-note ul,
+      .field-note ol {
+        margin: 0 0 4px;
+        padding-left: 16px;
+      }
 
-    .lineage-btn {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      width: 18px;
-      height: 18px;
-      border: none;
-      border-radius: 3px;
-      background: transparent;
-      color: var(--sz-text-muted);
-      cursor: pointer;
-      flex-shrink: 0;
-      padding: 0;
-      opacity: 0;
-      transition:
-        opacity 0.1s,
-        background 0.1s;
-    }
+      .field-note li {
+        margin: 1px 0;
+      }
 
-    .field-row:hover .lineage-btn {
-      opacity: 1;
-    }
+      .field-note code {
+        font-family: var(--sz-font-mono);
+        font-style: normal;
+        font-size: 10px;
+        background: var(--sz-row-active-bg);
+        padding: 1px 4px;
+        border-radius: 3px;
+      }
 
-    .lineage-btn:hover {
-      background: var(--sz-accent-wash);
-      color: var(--sz-orange-dark);
-    }
+      .field-note strong {
+        font-weight: 700;
+        color: var(--sz-text);
+      }
 
-    /* Cross-highlighting */
-    :host([has-highlight]) .field-row {
-      opacity: 0.5;
-      transition: opacity 0.15s ease;
-    }
+      .field-note em {
+        font-style: italic;
+      }
 
-    :host([has-highlight]) .field-row.hl {
-      opacity: 1;
-    }
+      .field-note .at-ref {
+        font-weight: 600;
+        font-style: normal;
+        color: var(--sz-at-ref);
+      }
 
-    :host([has-highlight]) .field-row.hl.hl-source {
-      background: var(--sz-accent-wash);
-    }
+      :host([content-width]) .header-name {
+        --sz-header-name-overflow: visible;
+        --sz-header-name-overflow-mode: clip;
+        min-width: max-content;
+      }
 
-    :host([has-highlight]) .field-row.hl.hl-target {
-      background: var(--sz-green-wash);
-    }
-
-    :host([has-highlight]) .field-row.hl .field-name {
-      font-weight: 700;
-    }
-
-    :host([content-width]) .field-row {
-      width: max-content;
-      min-width: 100%;
-    }
-
-    /* Shaded note row displayed beneath a field that has notes. */
-    .field-note {
-      font-family: var(--sz-font-sans);
-      font-size: 11px;
-      font-style: italic;
-      color: var(--sz-text-muted);
-      line-height: 1.4;
-      padding: 2px 12px 4px 38px;
-      background: var(--sz-row-hover-bg);
-      max-width: 400px;
-      word-break: break-word;
-    }
-
-    :host([content-width]) .header-name {
-      --sz-header-name-overflow: visible;
-      --sz-header-name-overflow-mode: clip;
-      min-width: max-content;
-    }
-
-    :host([content-width]) .field-name {
-      --sz-field-name-flex: 0 0 auto;
-      --sz-field-name-overflow: visible;
-      --sz-field-name-overflow-mode: clip;
-      min-width: max-content;
-    }
-  `;
+      :host([content-width]) .field-name {
+        --sz-field-name-flex: 0 0 auto;
+        --sz-field-name-overflow: visible;
+        --sz-field-name-overflow-mode: clip;
+        min-width: max-content;
+      }
+    `,
+  ];
 
   @property({ type: Object })
   schema: SchemaCard | null = null;
@@ -924,25 +909,12 @@ export class SzSchemaCard extends LitElement {
   }
 
   private _renderNotes(notes: import("../model.js").NoteBlock[]) {
-    return html`
-      <div class="notes-section" data-testid=${`${this.testIdPrefix}-notes`}>
-        <div
-          class="notes-toggle"
-          data-testid=${`${this.testIdPrefix}-notes-toggle`}
-          @click=${this._toggleNotes}
-        >
-          <span class="arrow" ?data-expanded=${this._notesExpanded}>&#9654;</span>
-          <span>&#128221; ${notes.length === 1 ? "Note" : `${notes.length} Notes`}</span>
-        </div>
-        ${
-          this._notesExpanded
-            ? notes.map(
-                (n) => html`<div class="note-content">${unsafeHTML(renderMarkdown(n.text))}</div>`,
-              )
-            : ""
-        }
-      </div>
-    `;
+    return renderNotesSection({
+      notes,
+      expanded: this._notesExpanded,
+      onToggle: (e: Event) => this._toggleNotes(e),
+      testIdPrefix: this.testIdPrefix,
+    });
   }
 
   private _toggleNotes(e: Event) {
@@ -1072,7 +1044,7 @@ export class SzSchemaCard extends LitElement {
                   class="field-note"
                   style=${depth > 0 ? `padding-left: ${38 + depth * 20}px` : ""}
                 >
-                  ${n.text}
+                  ${unsafeHTML(renderMarkdown(n.text))}
                 </div>`,
             )
           : ""

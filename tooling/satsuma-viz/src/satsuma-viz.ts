@@ -63,6 +63,11 @@ export {
   schemaHasFieldPath,
 } from "./field-coverage.js";
 export { metricAsSchemaCard, metricFieldEntries } from "./metric-adapter.js";
+// Note/NL text rendering. Exported so the two levels can be tested directly:
+// the block renderer used for note bodies and the inline one used for NL
+// transform text, join descriptions and filters.
+export { renderMarkdown, highlightAtRefs } from "./markdown.js";
+export { renderNotesSection, noteSectionStyles } from "./notes.js";
 export type {
   LayoutResult,
   LayoutNode,

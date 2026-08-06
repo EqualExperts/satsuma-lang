@@ -85,6 +85,17 @@ const cycleUri = libraryUri("lineage-cycle/pipeline.stm");
  * enum values. No other fixture wired into this suite reaches that shape.
  */
 const multiSourceJoinUri = libraryUri("multi-source/multi-source-join.stm");
+/**
+ * The corpus's notes showcase, and the only fixture reaching all three note
+ * positions the viz renders (vnm-kisd, vnm-bak4):
+ *   - `legacy_sqlserver.PHONE_NBR` carries the five-bullet Markdown field note
+ *     the spec itself uses as its worked example (SATSUMA-V2-SPEC.md:225)
+ *   - `customer migration` opens with a three-bullet `note { }` block
+ *   - `EMAIL_ADDR -> email` carries a Markdown arrow note
+ * Every note here is indented in source, which is the shape that makes
+ * dedenting a precondition for Markdown rendering rather than a nicety.
+ */
+const dbToDbUri = libraryUri("db-to-db/pipeline.stm");
 
 /**
  * Open a specific named mapping by clicking its overview mapping card.
@@ -779,6 +790,109 @@ test.describe("Mapping detail — completed orders (multi-source join)", () => {
 // overflow, that the field row's own box stays put while it's open, or that
 // clicking away / Escape closes it again — only a rendered browser can.
 // ---------------------------------------------------------------------------
+
+test.describe("Note rendering — Markdown in field, mapping and arrow notes", () => {
+  /**
+   * Open the db-to-db customer-migration detail view, where all three note
+   * positions are visible at once.
+   */
+  async function openCustomerMigration(page: Page) {
+    await page.goto("/");
+    await page.waitForFunction(() => {
+      const harness = window.__satsumaHarness;
+      if (!harness?.setViewMode) return false; // app.js not evaluated yet
+      harness.setViewMode("single");
+      return true;
+    });
+    await loadFixture(page, dbToDbUri);
+    return openMappingByName(page, "customer-migration");
+  }
+
+  test("renders a field note's Markdown as real formatting, not as literal source text", async ({
+    page,
+  }) => {
+    // The bug as reported: a `"""` note on a field showed its Markdown source.
+    // PHONE_NBR's note is the spec's own worked example, so what a reader sees
+    // here is the direct answer to "should I expect the visualiser to draw
+    // that markdown?".
+    const detail = await openCustomerMigration(page);
+    const cardPrefix = "mapping-detail-customer-migration-source-schema-card-legacy-sqlserver";
+    const note = detail.locator(`[data-testid^='${cardPrefix}'] .field-note`).first();
+
+    await expect(note).toBeVisible();
+    // Five bullets, each a real <li> — this is what a unit test on the
+    // converter cannot observe: that the list reaches the painted field row.
+    await expect(note.locator("li")).toHaveCount(5);
+    await expect(note.locator("strong").first()).toHaveText("42%");
+    await expect(note.locator("code").first()).toHaveText("(555) 123-4567");
+    // The markers themselves must be gone: their presence WAS the bug.
+    await expect(note).not.toContainText("**");
+  });
+
+  test("renders a mapping-level note block, which was previously dropped entirely", async ({
+    page,
+  }) => {
+    // `MappingBlock.notes` reached the payload and sz-mapping-detail never read
+    // it, so a `note { }` inside a mapping was invisible however it was
+    // written. Its bullets prove both that it renders and that it renders as
+    // Markdown.
+    const detail = await openCustomerMigration(page);
+    const notes = detail.locator("[data-testid='mapping-detail-customer-migration-notes']");
+
+    await expect(notes).toBeVisible();
+    await expect(notes).toContainText("Mapping assumptions");
+    await expect(notes.locator(".note-content li")).toHaveCount(3);
+  });
+
+  test("collapses and re-expands the mapping notes section on toggle click", async ({ page }) => {
+    // The section is expanded by default, so the toggle's whole job is
+    // reclaiming the space — a gesture only a real click in a real DOM proves.
+    const detail = await openCustomerMigration(page);
+    const notes = detail.locator("[data-testid='mapping-detail-customer-migration-notes']");
+    const toggle = detail.locator("[data-testid='mapping-detail-customer-migration-notes-toggle']");
+
+    await expect(notes.locator(".note-content")).toHaveCount(1);
+    await toggle.click();
+    await expect(notes.locator(".note-content")).toHaveCount(0);
+    await toggle.click();
+    await expect(notes.locator(".note-content")).toHaveCount(1);
+  });
+
+  test("renders an arrow note's Markdown beneath its arrow row", async ({ page }) => {
+    // Arrow notes always rendered, but through highlightAtRefs only, so their
+    // Markdown showed verbatim. The row must still sit under the arrow it
+    // documents rather than becoming an entity-level note.
+    const detail = await openCustomerMigration(page);
+    const noteRow = detail.locator("[data-testid$='-note'] .arrow-note").first();
+
+    await expect(noteRow).toBeVisible();
+    await expect(noteRow.locator("li")).toHaveCount(3);
+    await expect(noteRow.locator("strong").first()).toHaveText("in order");
+    await expect(noteRow.locator("code").first()).toHaveText("trim");
+    await expect(noteRow).not.toContainText("**");
+  });
+
+  test("shows a mapping with no notes exactly as before, with no empty section", async ({
+    page,
+  }) => {
+    // The notes section must cost nothing when a mapping has no notes —
+    // an empty toggle would take vertical space from every arrow table in the
+    // corpus.
+    await page.goto("/");
+    await page.waitForFunction(() => {
+      const harness = window.__satsumaHarness;
+      if (!harness?.setViewMode) return false;
+      harness.setViewMode("single");
+      return true;
+    });
+    await loadFixture(page, sfdcUri);
+    const detail = await openMappingByName(page, "opportunity-ingestion");
+
+    await expect(
+      detail.locator("[data-testid='mapping-detail-opportunity-ingestion-notes']"),
+    ).toHaveCount(0);
+  });
+});
 
 test.describe("Field enum badge collapse/expand (sl-2ne7)", () => {
   test("collapses to a count, expands into an overlay without reflowing the row, and closes on a second click, outside click, or Escape", async ({

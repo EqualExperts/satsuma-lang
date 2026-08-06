@@ -2,6 +2,7 @@ import { LitElement, html, css } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import type { MetricCard, MetricFieldEntry } from "../model.js";
 import { SzNavigateEvent } from "../satsuma-viz.js";
+import { noteSectionStyles, renderNotesSection } from "../notes.js";
 import { HEADER_HEIGHT, NAMESPACE_PILL_HEIGHT } from "../layout/geometry.js";
 
 const MEASURE_ICONS: Record<string, string> = {
@@ -12,171 +13,135 @@ const MEASURE_ICONS: Record<string, string> = {
 
 @customElement("sz-metric-card")
 export class SzMetricCard extends LitElement {
-  static override styles = css`
-    :host {
-      display: block;
-      width: 100%;
-      box-sizing: border-box;
-      min-width: var(--sz-card-min-width, 240px);
-      max-width: var(--sz-card-max-width, 380px);
-      border-radius: var(--sz-card-radius);
-      background: var(--sz-card-bg);
-      border: 1px solid var(--sz-card-border);
-      box-shadow: var(--sz-card-shadow);
-      overflow: hidden;
-      font-family: var(--sz-font-sans);
-    }
+  static override styles = [
+    noteSectionStyles,
+    css`
+      :host {
+        display: block;
+        width: 100%;
+        box-sizing: border-box;
+        min-width: var(--sz-card-min-width, 240px);
+        max-width: var(--sz-card-max-width, 380px);
+        border-radius: var(--sz-card-radius);
+        background: var(--sz-card-bg);
+        border: 1px solid var(--sz-card-border);
+        box-shadow: var(--sz-card-shadow);
+        overflow: hidden;
+        font-family: var(--sz-font-sans);
+      }
 
-    .header {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      /* Pinned to the shared HEADER_HEIGHT geometry constant: the ELK layout
+      .header {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        /* Pinned to the shared HEADER_HEIGHT geometry constant: the ELK layout
          sizes nodes and computes edge anchors from it, so the rendered header
          must occupy exactly that box (sl-wixe). Flex centres the content. */
-      height: ${HEADER_HEIGHT}px;
-      box-sizing: border-box;
-      padding: 0 12px;
-      background: var(--sz-violet);
-      color: var(--sz-text-on-accent);
-      cursor: pointer;
-      user-select: none;
-    }
+        height: ${HEADER_HEIGHT}px;
+        box-sizing: border-box;
+        padding: 0 12px;
+        background: var(--sz-violet);
+        color: var(--sz-text-on-accent);
+        cursor: pointer;
+        user-select: none;
+      }
 
-    /* Without a namespace pill row the header is the top of the card and
+      /* Without a namespace pill row the header is the top of the card and
        owns the top rounding (the host clips when overflow is hidden, but
        this keeps the geometry honest regardless of clipping). */
-    .header:first-child {
-      border-radius: var(--sz-card-radius) var(--sz-card-radius) 0 0;
-    }
+      .header:first-child {
+        border-radius: var(--sz-card-radius) var(--sz-card-radius) 0 0;
+      }
 
-    .header-icon {
-      font-size: 14px;
-      flex-shrink: 0;
-    }
+      .header-icon {
+        font-size: 14px;
+        flex-shrink: 0;
+      }
 
-    .header-name {
-      font-size: 14px;
-      font-weight: 600;
-      flex: 1;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
+      .header-name {
+        font-size: 14px;
+        font-weight: 600;
+        flex: 1;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
 
-    .header-toggle {
-      font-size: 12px;
-      flex-shrink: 0;
-      transition: transform 0.15s ease;
-    }
+      .header-toggle {
+        font-size: 12px;
+        flex-shrink: 0;
+        transition: transform 0.15s ease;
+      }
 
-    .header-toggle[data-collapsed] {
-      transform: rotate(-90deg);
-    }
+      .header-toggle[data-collapsed] {
+        transform: rotate(-90deg);
+      }
 
-    .meta {
-      padding: 4px 12px 6px;
-      font-size: 11px;
-      color: var(--sz-text-muted);
-      border-bottom: 1px solid var(--sz-card-border);
-      line-height: 1.5;
-    }
+      .meta {
+        padding: 4px 12px 6px;
+        font-size: 11px;
+        color: var(--sz-text-muted);
+        border-bottom: 1px solid var(--sz-card-border);
+        line-height: 1.5;
+      }
 
-    .meta-row {
-      display: flex;
-      gap: 6px;
-    }
+      .meta-row {
+        display: flex;
+        gap: 6px;
+      }
 
-    .meta-label {
-      opacity: 0.7;
-    }
+      .meta-label {
+        opacity: 0.7;
+      }
 
-    .fields {
-      padding: 4px 0;
-    }
+      .fields {
+        padding: 4px 0;
+      }
 
-    .field-row {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      padding: 3px 12px;
-      height: var(--sz-field-height);
-      cursor: pointer;
-    }
+      .field-row {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 3px 12px;
+        height: var(--sz-field-height);
+        cursor: pointer;
+      }
 
-    .field-row:hover {
-      background: var(--sz-row-hover-bg);
-    }
+      .field-row:hover {
+        background: var(--sz-row-hover-bg);
+      }
 
-    .measure-icon {
-      width: 16px;
-      text-align: center;
-      font-size: 13px;
-      font-weight: 600;
-      color: var(--sz-violet);
-      flex-shrink: 0;
-    }
+      .measure-icon {
+        width: 16px;
+        text-align: center;
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--sz-violet);
+        flex-shrink: 0;
+      }
 
-    .field-name {
-      font-family: var(--sz-font-mono);
-      font-size: 12px;
-      font-weight: 500;
-      color: var(--sz-text);
-      flex: 1;
-    }
+      .field-name {
+        font-family: var(--sz-font-mono);
+        font-size: 12px;
+        font-weight: 500;
+        color: var(--sz-text);
+        flex: 1;
+      }
 
-    .field-type {
-      font-family: var(--sz-font-mono);
-      font-size: 11px;
-      color: var(--sz-text-muted);
-      flex-shrink: 0;
-    }
+      .field-type {
+        font-family: var(--sz-font-mono);
+        font-size: 11px;
+        color: var(--sz-text-muted);
+        flex-shrink: 0;
+      }
 
-    .collapsed .fields,
-    .collapsed .meta,
-    .collapsed .notes-section {
-      display: none;
-    }
-
-    .notes-section {
-      border-top: 1px dashed var(--sz-card-border);
-      padding: 6px 12px;
-    }
-
-    .notes-toggle {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      cursor: pointer;
-      font-size: 12px;
-      color: var(--sz-text-muted);
-      user-select: none;
-      padding: 2px 0;
-    }
-
-    .notes-toggle:hover {
-      color: var(--sz-text);
-    }
-
-    .notes-toggle .arrow {
-      font-size: 10px;
-      transition: transform 0.15s ease;
-    }
-
-    .notes-toggle .arrow[data-expanded] {
-      transform: rotate(90deg);
-    }
-
-    .note-content {
-      font-family: var(--sz-font-sans);
-      font-size: 12px;
-      color: var(--sz-text);
-      line-height: 1.5;
-      padding: 4px 0 2px 22px;
-      white-space: pre-wrap;
-      word-break: break-word;
-    }
-  `;
+      .collapsed .fields,
+      .collapsed .meta,
+      .collapsed .notes-section {
+        display: none;
+      }
+    `,
+  ];
 
   @property({ type: Object })
   metric: MetricCard | null = null;
@@ -267,19 +232,11 @@ export class SzMetricCard extends LitElement {
   }
 
   private _renderNotes(notes: import("../model.js").NoteBlock[]) {
-    return html`
-      <div class="notes-section">
-        <div class="notes-toggle" @click=${this._toggleNotes}>
-          <span class="arrow" ?data-expanded=${this._notesExpanded}>&#9654;</span>
-          <span>&#128221; ${notes.length === 1 ? "Note" : `${notes.length} Notes`}</span>
-        </div>
-        ${
-          this._notesExpanded
-            ? notes.map((n) => html`<div class="note-content">${n.text}</div>`)
-            : ""
-        }
-      </div>
-    `;
+    return renderNotesSection({
+      notes,
+      expanded: this._notesExpanded,
+      onToggle: (e: Event) => this._toggleNotes(e),
+    });
   }
 
   private _toggleNotes(e: Event) {
