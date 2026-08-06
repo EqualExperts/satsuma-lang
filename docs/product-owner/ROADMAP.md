@@ -27,7 +27,7 @@ measured baselines are in `reference/token-costs.md`, but the gate needs a
 probe epic (`sl-qz3v`) and its three children sit behind it.
 
 **Next step is deliberately cheap:** Phase 0.5 is a ~$8 hand-graded probe that
-returns a directional effect size *before* the `MappingIntent` machinery, the
+returns a directional effect size _before_ the `MappingIntent` machinery, the
 renderers, the graders and the pairing audit get built, with pre-committed kill
 thresholds. If the effect is inside noise, the honest outcome is to correct the
 site copy downward without running a full study.
@@ -38,43 +38,35 @@ markdown at two rungs (~$98), or raise the cap.
 
 **Source:** `features/44-token-and-task-eval/PRD.md`
 
-### Feature 46 — Generated-Input Confidence for Diagnostics and Editor Intelligence (proposed)
+### Feature 46 — Generated-Input Confidence for Diagnostics and Editor Intelligence (delivered)
 
-Points the generated-property machinery from Features 39 and 41 at the two
-surfaces it has never reached. Every generated workspace in the repository is
-valid *by construction*, so the whole diagnostic surface — `validate`, `lint`
-and the LSP's mirror of both — is still proved by hand-written fixtures; and
-`satsuma-lsp` has no generated coverage at all, although `references`,
+**Delivered 2026-08-06.** All seven requirements shipped, each with its mutation
+check run and recorded on its ticket. Test counts: core 703 → 708, CLI
+1074 → 1157, LSP 303 → 323, `scenario-gen` 30 → 47.
+
+Pointed the generated-property machinery from Features 39 and 41 at the two
+surfaces it had never reached. Every generated workspace in the repository was
+valid _by construction_, so the whole diagnostic surface — `validate`, `lint`
+and the LSP's mirror of both — was proved by hand-written fixtures alone; and
+`satsuma-lsp` had no generated coverage at all, although `references`,
 `definition` and `rename` are inverse relations over ground truth the generator
 already states.
 
-A seventh requirement rides along because the property is one test against
-machinery that already exists: the formatter is proved idempotent and
-CST-preserving, but nothing proves it preserves *meaning* — a formatter that
-dropped the trailing source of a multi-source arrow would pass every property
-in the file.
+**Seven bugs found and filed, none fixed here.** `gpt-bc1x` (a rename from a
+downstream declaration leaves upstream imports naming the old symbol),
+`gpt-fjo7` (rename leaves NL `@ref` mentions dangling), `gpt-68ka` (the LSP
+never reports `unresolved-nl-ref`, so it under-reports against the CLI),
+`gpt-qhfo`, `gpt-jwek`, `gpt-4p1z` and `gpt-i1uv`. Each is pinned by a test
+asserting today's behaviour, so the fix turns that test red — the feature's
+contract with itself was that a property failing against current behaviour is a
+bug ticket, never a licence to change the behaviour under cover of a test change.
+No diagnostic semantics, rule severity or command output changed.
 
-**Ready now:** four of the seven tickets. `gpt-pwze` (R1, the defect-mutator
-layer in `scenario-gen`), `gpt-21jp` (R3, the LSP scenario adapter),
-`gpt-clpj` (R6, inverse-relation properties for the query commands) and
-`gpt-h0dc` (R7, formatter semantics). R2 and R5 wait on R1's mutators; R4 waits
-on R3's adapter. `gpt-o0fk` sits outside the requirement set — the feature's own
-planning misread the lint rule registry, which turns out to be pinned by nothing,
-so it applies `docs.test.ts`'s command-coverage pattern to lint rules.
-
-**Suggested order:** R3 first. It is the cheapest of the three and proves the
-adapter pattern in a third package, and its oracle already exists. R1 is the
-larger investment but unlocks two further tickets.
-
-**Every requirement is accepted by a mutation check** — the property must be
-shown to fail against a deliberately broken implementation, with the
-counterexample naming the defect. A property that passes both before and after
-the break proves nothing.
-
-**Decided 2026-08-06:** diagnostic properties assert positions to the mutated
-construct, not to an exact line — an exact line would couple them to renderer
-layout choices that `scenario-gen` deliberately owns. Nothing is open for the
-project owner.
+**Still open, both raised by this feature's own delivery:** `gpt-ek0e` (export
+the owning-schema split — the helper turns out to already exist, so the ticket
+carries a findings note) and `gpt-l0nz` (no generated workspace declares a
+`transform` block, which is the only shape that can tell a structural comparison
+from a textual one).
 
 **Source:** `features/46-generated-property-expansion/PRD.md` (epic `gpt-uazn`)
 
@@ -82,21 +74,21 @@ project owner.
 
 Delivered and moved to `archive/features/`. Recent work, most recent first:
 
-| Feature | Shipped | What landed |
-| --- | --- | --- |
-| 40 — Shared field lineage view | Superseded 2026-08-06 (never implemented) | Proposed a new `sz-field-lineage` component, a portable traversal, and harness Playwright coverage. Feature 36 delivered all three independently (`sz-chain-view`, `sl-prlp`'s `@satsuma/core` traversal, `sl-nswc`'s harness wiring) before this feature's tickets were picked up, so they were closed as superseded rather than built again. Two acceptance criteria Feature 36 never covered — a distinct unknown-field render state, and cyclic-chain rendering proven above the core traversal layer — carried forward as `sv-embb` |
-| 36 — Viz coverage overlay and field chain view | 2026-08-05 | A paint-only coverage overlay on the viz overview reading coverage already carried by the model (ADR-042), uncovered-field treatment in cards and the mapping detail view, and a field chain view rendering one field's full upstream/downstream lineage as a left-to-right rail with namespace-fan collapse and depth-limit affordances; VS Code reuses the LSP's own traversal via a new `satsuma/fieldChain` request rather than shipping a second one in the webview. `sl-nswc` wired the same client-side computation into the harness/playground's own click path, so both ship the full feature with no separate playground-exposure work needed — the deferral `sl-1ml2` recorded turned out to be moot the same day it was written. Closing follow-up: visual connectors between chain-view hop cards (`scvc-8n4r`, found via manual testing) |
-| 45 — Progressive disclosure for the AI Agent Reference | 2026-08-05 (merged; awaiting a release to close gate `sl-6ips`) | Canonical `reference/*.md` sections composed at build time into three envelopes (CLI, the now-generated `AI-AGENT-REFERENCE.md`, and the new `satsuma-language` skill); `agent-reference --section/--profile/--list` with bare invocation byte-identical; every bytes/4 estimate replaced by measured `o200k_base` counts in `reference/token-costs.md`, including an MCP-tool-schema comparison point |
-| 43 — Marketing site audit fixes | 2026-08-05 | All 11 `saf-*` tickets: dead links, stats drift, fabricated example snippets, self-contradictions, and a reframe of `vscode.njk` around workflows and `cli.njk` around agents. Deliberately left the unsubstantiated "3-8x"/"40-60%"/">90%" numbers for Feature 44 to measure |
-| 42 — Monorepo build tooling | 2026-08-04 | npm workspaces behind one root lockfile, a Turborepo task graph whose build order is derived from the manifests rather than written down, and a persisted content-hash cache (ADR-049). CI 4m35s → 1m56s warm; the eleven packages' `prebuild`/`pretest` sibling-build chains and `scripts/build-workspace.sh` are gone |
-| 39 — Correctness by default | 2026-08-04 | Generated CST contracts, opaque path/ref stages, generated coverage and formatter properties, an independent coverage oracle, enforced typecheck and type-aware lint gates, and structural `FieldDecl` variants |
-| 38 — Hierarchical field coverage | 2026-08-03 | Path-correct nested coverage, container tri-state, whole-subtree arrow semantics, leaf-only ratios, and parity across the CLI, LSP, VS Code, and viz consumers (ADR-035–041) |
-| 35 — Workspace coverage command | 2026-08-01 | `satsuma coverage` with per-mapping/per-schema/workspace rollups, a stable `--json` contract, and a `--fail-under` CI gate on exit code 3; `computeMappingCoverage` relocated into `@satsuma/core` |
-| 34 — Live editor UX polish | 2026-06-10 | All eight R1–R8 fixes to the public playground chrome and edit-loop behaviour (ADR-029, ADR-030) |
-| 33 — Live editor / "Try it Live!" | 2026-06-10 | The client-only browser playground (ADR-027, ADR-028) — see [below](#browser-playground--live-editor-shipped--feature-33) |
-| 32 — Viz light mode | 2026-06-09 | Light and dark as first-class viz themes, driven by the VS Code colour theme, with one palette source of truth in `tokens.css` |
-| 31 — Alignment with the EE brand | 2026-06-04 | Repository move to `EqualExperts/satsuma-lang`, EE named as maintainer, `assets/ee-brand/`, README and site brand touches |
-| 30 — Viz test suite expansion | 2026-04-09 | Real-interaction Playwright coverage across viz fixture families, geometry sanity helpers, and a deterministic screenshot review workflow |
+| Feature                                                | Shipped                                                         | What landed                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| ------------------------------------------------------ | --------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 40 — Shared field lineage view                         | Superseded 2026-08-06 (never implemented)                       | Proposed a new `sz-field-lineage` component, a portable traversal, and harness Playwright coverage. Feature 36 delivered all three independently (`sz-chain-view`, `sl-prlp`'s `@satsuma/core` traversal, `sl-nswc`'s harness wiring) before this feature's tickets were picked up, so they were closed as superseded rather than built again. Two acceptance criteria Feature 36 never covered — a distinct unknown-field render state, and cyclic-chain rendering proven above the core traversal layer — carried forward as `sv-embb`                                                                                                                                                                                                                                                                                                               |
+| 36 — Viz coverage overlay and field chain view         | 2026-08-05                                                      | A paint-only coverage overlay on the viz overview reading coverage already carried by the model (ADR-042), uncovered-field treatment in cards and the mapping detail view, and a field chain view rendering one field's full upstream/downstream lineage as a left-to-right rail with namespace-fan collapse and depth-limit affordances; VS Code reuses the LSP's own traversal via a new `satsuma/fieldChain` request rather than shipping a second one in the webview. `sl-nswc` wired the same client-side computation into the harness/playground's own click path, so both ship the full feature with no separate playground-exposure work needed — the deferral `sl-1ml2` recorded turned out to be moot the same day it was written. Closing follow-up: visual connectors between chain-view hop cards (`scvc-8n4r`, found via manual testing) |
+| 45 — Progressive disclosure for the AI Agent Reference | 2026-08-05 (merged; awaiting a release to close gate `sl-6ips`) | Canonical `reference/*.md` sections composed at build time into three envelopes (CLI, the now-generated `AI-AGENT-REFERENCE.md`, and the new `satsuma-language` skill); `agent-reference --section/--profile/--list` with bare invocation byte-identical; every bytes/4 estimate replaced by measured `o200k_base` counts in `reference/token-costs.md`, including an MCP-tool-schema comparison point                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| 43 — Marketing site audit fixes                        | 2026-08-05                                                      | All 11 `saf-*` tickets: dead links, stats drift, fabricated example snippets, self-contradictions, and a reframe of `vscode.njk` around workflows and `cli.njk` around agents. Deliberately left the unsubstantiated "3-8x"/"40-60%"/">90%" numbers for Feature 44 to measure                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| 42 — Monorepo build tooling                            | 2026-08-04                                                      | npm workspaces behind one root lockfile, a Turborepo task graph whose build order is derived from the manifests rather than written down, and a persisted content-hash cache (ADR-049). CI 4m35s → 1m56s warm; the eleven packages' `prebuild`/`pretest` sibling-build chains and `scripts/build-workspace.sh` are gone                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| 39 — Correctness by default                            | 2026-08-04                                                      | Generated CST contracts, opaque path/ref stages, generated coverage and formatter properties, an independent coverage oracle, enforced typecheck and type-aware lint gates, and structural `FieldDecl` variants                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| 38 — Hierarchical field coverage                       | 2026-08-03                                                      | Path-correct nested coverage, container tri-state, whole-subtree arrow semantics, leaf-only ratios, and parity across the CLI, LSP, VS Code, and viz consumers (ADR-035–041)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| 35 — Workspace coverage command                        | 2026-08-01                                                      | `satsuma coverage` with per-mapping/per-schema/workspace rollups, a stable `--json` contract, and a `--fail-under` CI gate on exit code 3; `computeMappingCoverage` relocated into `@satsuma/core`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| 34 — Live editor UX polish                             | 2026-06-10                                                      | All eight R1–R8 fixes to the public playground chrome and edit-loop behaviour (ADR-029, ADR-030)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| 33 — Live editor / "Try it Live!"                      | 2026-06-10                                                      | The client-only browser playground (ADR-027, ADR-028) — see [below](#browser-playground--live-editor-shipped--feature-33)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| 32 — Viz light mode                                    | 2026-06-09                                                      | Light and dark as first-class viz themes, driven by the VS Code colour theme, with one palette source of truth in `tokens.css`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| 31 — Alignment with the EE brand                       | 2026-06-04                                                      | Repository move to `EqualExperts/satsuma-lang`, EE named as maintainer, `assets/ee-brand/`, README and site brand touches                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| 30 — Viz test suite expansion                          | 2026-04-09                                                      | Real-interaction Playwright coverage across viz fixture families, geometry sanity helpers, and a deterministic screenshot review workflow                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
 
 Two open tickets are follow-ups to archived features rather than outstanding scope: `f3vt-qb8u` (dense lineage layouts route edges through unrelated mapping cards — surfaced by Feature 30's suite, needs an edge-routing strategy decision) and `3cc-iedv` (whole-record arrow leaves nested leaves uncovered — a duplicate of the defect Feature 38's `sl-r6b0` fixes).
 
@@ -150,6 +142,7 @@ The LSP server is complete (Phases 1-3 delivered: semantic tokens, diagnostics, 
 ### Data Modelling Tooling (Feature 06, Phases 2-3)
 
 The Feature 06 convention spec and examples are complete. Future phases include:
+
 - **Phase 2:** Linting rules that validate metadata token combinations (e.g., `hub` + `dimension` conflict)
 - **Phase 3:** DDL/dbt model generation from convention-annotated schemas
 
@@ -213,23 +206,20 @@ All convention documentation has been written. See [`archive/features/21-convent
 
 These principles guide all future syntax and convention decisions:
 
-- **Stay declarative and BA-friendly** — describe *what*, not *how*.
+- **Stay declarative and BA-friendly** — describe _what_, not _how_.
 - **Lean on existing constructs** — `(metadata)` tokens, bare `"NL strings"` in `{ }`, `note { }` blocks, and vocabulary conventions — before inventing new keywords.
 - **Natural language is the escape hatch** — for anything too complex or domain-specific to express in a piped transform chain, write intent in English and let the interpreter figure it out.
-- **Vocabulary tokens are the extension mechanism** — new semantics come from *convention* (token dictionaries) and *tooling* (linters, interpreters), not grammar changes.
+- **Vocabulary tokens are the extension mechanism** — new semantics come from _convention_ (token dictionaries) and _tooling_ (linters, interpreters), not grammar changes.
 - **High bar for new keywords** — "Is this concept so fundamentally different from schema/fragment/mapping that using an existing keyword would confuse a BA reading the file?"
 
 ---
 
-Better field level lineage commands 
+Better field level lineage commands
 
 Split satsuma into
 
-satsuma field-lineage --from --to in_filename.stm 
+satsuma field-lineage --from --to in_filename.stm
 satsuma schema-lineage considers any mappings that use the schema as a source or target
-
-
-
 
 lieage anchor point is fully qualified field (or list subfield) lilke ns::schema.field.record.list.subfield
 
@@ -237,11 +227,12 @@ If a simpler form is given we should try to resolve if it is unabiguoug is is OK
 
 Need MUCH better docs for the options in subcommands!
 
-ALL stm subcommands should operate on an entry-point FILE rather than a folder -- people can have project files that  just import all the relative bits they need
+ALL stm subcommands should operate on an entry-point FILE rather than a folder -- people can have project files that just import all the relative bits they need
 
-file-level commands all DO follow imports to bring in context 
+file-level commands all DO follow imports to bring in context
 
 imports can include ../../ paths (outside current dir)
 
 ---
+
 self-mappings (same source and target schema) are OK -- we can use that to represent things like increments, and DON'T cause graph cycles.

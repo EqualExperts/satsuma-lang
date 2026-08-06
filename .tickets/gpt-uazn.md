@@ -1,6 +1,6 @@
 ---
 id: gpt-uazn
-status: open
+status: closed
 deps: []
 links: [gpt-pwze, gpt-o0fk]
 created: 2026-08-06T13:43:52Z
@@ -78,3 +78,80 @@ CLAUDE.md says logic that belongs in core moves **as part of the ticket**, not a
 ## One acceptance criterion that is factually wrong
 
 `gpt-h0dc` predicted that dropping the trailing source of a multi-source arrow would fail the new semantic property while CST-preservation survived. It does not — see that ticket's closing note. The property was kept for contract reasons and the test file's module comment argues the case. If a reviewer disagrees, deleting it is clean.
+
+**2026-08-06T19:03:53Z**
+
+Cause: not a defect — this epic delivers Feature 46. Two structural gaps: every
+generated workspace in the repository was valid by construction, so the whole
+diagnostic surface was fixture-only; and satsuma-lsp had no generated coverage
+at all.
+Fix: R1–R7 all shipped on `feat/generated-property-testing` (draft PR #512),
+each with its mutation check run and recorded on its own ticket. The PRD's
+status line, ticket map and Decisions section, and ROADMAP.md's entry, are
+reconciled in the same commit. (commit immediately after 5ae35134)
+
+Test counts: core 703 -> 708, CLI 1074 -> 1157, LSP 303 -> 323,
+scenario-gen 30 -> 47.
+
+## Every requirement, and the mutation check that accepted it
+
+- **R1 `gpt-pwze`** — 12 defect mutators, 3 null mutators, the `WorkspaceDefect`
+  contract.
+- **R2 `gpt-vq0r`** — validate and lint over mutated workspaces. Suppressing the
+  `duplicate-definition` push fails it naming the missing rule and entity;
+  keying the duplicate check on cross-file visibility fails the *null*-mutation
+  property with a spurious finding.
+- **R3 `gpt-21jp`** — the LSP scenario adapter and definition/references duality.
+- **R4 `gpt-8izj`** — rename round trip. Dropping cross-file edits fails it with
+  the surviving `import { s1 }`.
+- **R5 `gpt-ocmp`** — diff algebra. Comparing raw `body` instead of
+  `canonicalBody` fails the reformat property naming `clean_string`.
+- **R6 `gpt-clpj`** — inverse relations for `arrows`, `where-used`, `find`.
+- **R7 `gpt-h0dc`** — the formatter preserves meaning, not only shape.
+- **`gpt-o0fk`** (outside the requirement set) — the lint registry pinned to the
+  docs.
+- **`gpt-l9rp`** (raised by R3's review, closed before R4 consumed it) — the
+  declared-usage-site oracle moved into `scenario-gen`'s `ground-truth.js`.
+
+## Seven bugs found, filed, and pinned — none fixed here
+
+`gpt-bc1x`, `gpt-qhfo`, `gpt-i1uv`, `gpt-jwek`, `gpt-4p1z`, and from R4
+`gpt-fjo7` and `gpt-68ka`. Each is pinned by a test asserting today's behaviour,
+so its fix turns that test red. No diagnostic semantics, rule severity or
+command output changed anywhere in this feature, which was its stated contract.
+
+## Three requirements were wrong as written, and were corrected rather than met
+
+Each correction is argued in the header of the file that carries it and recorded
+as a PRD decision:
+
+1. **R2's set comparison had to become a multiset**, and predictions pair with
+   observations by maximum bipartite matching — an entity is only observable as
+   a *substring* of a message, and substring containment is not one-to-one.
+2. **R4 had to state which index it asks.** Whole-folder, with the scoped
+   behaviour pinned as `gpt-bc1x`. Now PRD decision 5.
+3. **R5's "diff is empty across every null mutation" is false.** Renaming an
+   entity consistently is a structural change and `diff` is right to report it;
+   the null mutators preserve meaning for the *diagnostic* surface, not entity
+   identity.
+
+Also worth keeping: **`gpt-h0dc`'s acceptance criterion is factually wrong** and
+was recorded as such rather than satisfied — CST-structure preservation implies
+semantic-index preservation, because every extractor is a pure function of the
+CST. The property was kept for contract, not detection.
+
+## Two tickets left open on purpose
+
+`gpt-ek0e` (the helper it asks for already exists; the ticket now carries a
+findings note listing four things it got wrong, including a fifth copy it missed
+and a behavioural difference between two of the copies) and `gpt-l0nz` (no
+generated workspace declares a `transform` block). Neither is a child of this
+epic and neither blocks it.
+
+## One trap worth carrying forward
+
+`npm run build` in `satsuma-lsp` is esbuild's bundle; the per-module `dist/*.js`
+its tests `require` come from `npm run compile`. R4's mutation check appeared to
+*pass* — the property did not fail — purely because the file under test was
+never rebuilt. A mutation check that mysteriously fails to fail is the signal to
+check what the test actually loaded.
