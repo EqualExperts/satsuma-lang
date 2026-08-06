@@ -8,9 +8,9 @@ Feature specs live in `features/` while active and move to `archive/features/` o
 
 ## Active Feature Specs
 
-Feature 44 is proposed but not yet started. Everything numbered 01–36 plus
-Features 37, 38, 39, 41, 42, 43 and 45 has shipped and is archived; Feature 40
-was superseded before its own tickets were implemented (see
+Features 44 and 46 are proposed but not yet started. Everything numbered 01–36
+plus Features 37, 38, 39, 41, 42, 43 and 45 has shipped and is archived; Feature
+40 was superseded before its own tickets were implemented (see
 [Shipped Features](#shipped-features)).
 
 ### Feature 44 — Token and Task-Completion Eval (proposed)
@@ -37,6 +37,37 @@ markdown arm is included (~$118). Either drop the harness-invariance slice and r
 markdown at two rungs (~$98), or raise the cap.
 
 **Source:** `features/44-token-and-task-eval/PRD.md`
+
+### Feature 46 — Generated-Input Confidence for Diagnostics and Editor Intelligence (proposed)
+
+Points the generated-property machinery from Features 39 and 41 at the two
+surfaces it has never reached. Every generated workspace in the repository is
+valid *by construction*, so the whole diagnostic surface — `validate`, `lint`
+and the LSP's mirror of both — is still proved by hand-written fixtures; and
+`satsuma-lsp` has no generated coverage at all, although `references`,
+`definition` and `rename` are inverse relations over ground truth the generator
+already states.
+
+**Ready now:** three of the six tickets. `gpt-pwze` (R1, the defect-mutator
+layer in `scenario-gen`), `gpt-21jp` (R3, the LSP scenario adapter) and
+`gpt-clpj` (R6, inverse-relation properties for the query commands). R2 and R5
+wait on R1's mutators; R4 waits on R3's adapter.
+
+**Suggested order:** R3 first. It is the cheapest of the three and proves the
+adapter pattern in a third package, and its oracle already exists. R1 is the
+larger investment but unlocks two further tickets.
+
+**Every requirement is accepted by a mutation check** — the property must be
+shown to fail against a deliberately broken implementation, with the
+counterexample naming the defect. A property that passes both before and after
+the break proves nothing.
+
+**Open for the project owner:** should the diagnostic properties assert
+positions to the exact line, or only to the mutated construct? Exact lines make
+the properties sensitive to renderer layout choices that `scenario-gen`
+deliberately owns. The PRD assumes the weaker claim.
+
+**Source:** `features/46-generated-property-expansion/PRD.md` (epic `gpt-uazn`)
 
 ## Shipped Features
 

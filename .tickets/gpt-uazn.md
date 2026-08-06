@@ -1,0 +1,19 @@
+---
+id: gpt-uazn
+status: open
+deps: []
+links: []
+created: 2026-08-06T13:43:52Z
+type: epic
+priority: 1
+assignee: Thorben Louw
+tags: [feature-46, testing, diagnostics, lsp]
+---
+# Feature 46: generated-input confidence for diagnostics and editor intelligence
+
+Deliver Feature 46 from features/46-generated-property-expansion/PRD.md: close the two structural gaps left by Features 39 and 41. Every generated workspace in the repo is valid by construction, so the whole diagnostic surface (validate, lint, and the LSP's mirror of both) is still fixture-only; and satsuma-lsp has no generated coverage at all, despite three of its features being inverse relations over ground truth the generator already states. Covers a defect-mutator layer in scenario-gen, diagnostic properties in both directions (missed and spurious), an LSP scenario adapter, rename round-trip, diff algebra, and inverse-relation properties for the query commands.
+
+## Acceptance Criteria
+
+R1-R6 are delivered through linked child tickets with their PRD acceptance tests passing; every requirement is accepted by a mutation check that shows the property failing against a deliberately broken implementation, with the counterexample naming the defect; every child records its cause/fix note and passing relevant automated tests before closure; the PRD ticket map and status are reconciled when the epic closes; no diagnostic semantics, rule severities or command output change.
+
