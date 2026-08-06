@@ -1,6 +1,6 @@
 ---
 id: sl-7ind
-status: open
+status: closed
 deps: [sl-v3w5]
 links: []
 created: 2026-08-03T12:24:35Z
@@ -23,3 +23,14 @@ Closing this ticket is what makes the feature a consolidation rather than an add
 - Verified in a real VS Code session: the panel renders and matches the pre-port reference screenshots.
 - Exactly one lineage renderer exists in the repo afterwards.
 
+
+## Notes
+
+**2026-08-06T13:20:35Z**
+
+## Notes
+
+**2026-08-06T00:00:00Z**
+
+Cause: this ticket asked to repoint FieldLineagePanel at a shared component and delete the VS Code-only renderer -- but sl-iwlv (Feature 36, merged 2026-08-05) already did exactly this. satsuma.traceFieldLineage now opens sz-chain-view in the main viz panel via a host-computed FieldChainModel (LSP satsuma/fieldChain request); the 560-line field-lineage.ts renderer, 284-line panel.ts, and 330-line CSS this ticket wanted deleted were deleted in that commit.
+Fix: closing as superseded, not implemented -- verified via git log/show on 7fe09a98 (sl-iwlv) that the field-lineage/ directory no longer exists and the panel renders sz-chain-view. features/40-shared-field-lineage-view/PRD.md updated to Status: SUPERSEDED. (commit immediately after 9fe61674)

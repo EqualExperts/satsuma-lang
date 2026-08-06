@@ -8,9 +8,10 @@ Feature specs live in `features/` while active and move to `archive/features/` o
 
 ## Active Feature Specs
 
-Feature 40 is active, and Feature 44 is proposed but not yet started.
-Everything numbered 01–36 plus Features 37, 38, 39, 41, 42, 43 and 45 has
-shipped and is archived (see [Shipped Features](#shipped-features)).
+Feature 44 is proposed but not yet started. Everything numbered 01–36 plus
+Features 37, 38, 39, 41, 42, 43 and 45 has shipped and is archived; Feature 40
+was superseded before its own tickets were implemented (see
+[Shipped Features](#shipped-features)).
 
 ### Feature 44 — Token and Task-Completion Eval (proposed)
 
@@ -43,6 +44,7 @@ Delivered and moved to `archive/features/`. Recent work, most recent first:
 
 | Feature | Shipped | What landed |
 | --- | --- | --- |
+| 40 — Shared field lineage view | Superseded 2026-08-06 (never implemented) | Proposed a new `sz-field-lineage` component, a portable traversal, and harness Playwright coverage. Feature 36 delivered all three independently (`sz-chain-view`, `sl-prlp`'s `@satsuma/core` traversal, `sl-nswc`'s harness wiring) before this feature's tickets were picked up, so they were closed as superseded rather than built again. Two acceptance criteria Feature 36 never covered — a distinct unknown-field render state, and cyclic-chain rendering proven above the core traversal layer — carried forward as `sv-embb` |
 | 36 — Viz coverage overlay and field chain view | 2026-08-05 | A paint-only coverage overlay on the viz overview reading coverage already carried by the model (ADR-042), uncovered-field treatment in cards and the mapping detail view, and a field chain view rendering one field's full upstream/downstream lineage as a left-to-right rail with namespace-fan collapse and depth-limit affordances; VS Code reuses the LSP's own traversal via a new `satsuma/fieldChain` request rather than shipping a second one in the webview. `sl-nswc` wired the same client-side computation into the harness/playground's own click path, so both ship the full feature with no separate playground-exposure work needed — the deferral `sl-1ml2` recorded turned out to be moot the same day it was written. Closing follow-up: visual connectors between chain-view hop cards (`scvc-8n4r`, found via manual testing) |
 | 45 — Progressive disclosure for the AI Agent Reference | 2026-08-05 (merged; awaiting a release to close gate `sl-6ips`) | Canonical `reference/*.md` sections composed at build time into three envelopes (CLI, the now-generated `AI-AGENT-REFERENCE.md`, and the new `satsuma-language` skill); `agent-reference --section/--profile/--list` with bare invocation byte-identical; every bytes/4 estimate replaced by measured `o200k_base` counts in `reference/token-costs.md`, including an MCP-tool-schema comparison point |
 | 43 — Marketing site audit fixes | 2026-08-05 | All 11 `saf-*` tickets: dead links, stats drift, fabricated example snippets, self-contradictions, and a reframe of `vscode.njk` around workflows and `cli.njk` around agents. Deliberately left the unsubstantiated "3-8x"/"40-60%"/">90%" numbers for Feature 44 to measure |
