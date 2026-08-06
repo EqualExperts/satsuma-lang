@@ -20,11 +20,20 @@ A pre-registered protocol replacing the site's "3-8x less token usage" and
 markdown, `.stm` alone, and `.stm` + CLI, all rendered mechanically from one
 neutral `MappingIntent` record so the comparison is genuinely paired.
 
-**Ready now:** nothing. The only unblocked ticket is the Feature 45 gate
-(`sl-6ips`) — Feature 45 is merged (all 9 `arpd-*` tickets closed) and its
-measured baselines are in `reference/token-costs.md`, but the gate needs a
-**release**, not just a merge, so it stays open until one ships. The Phase 0.5
-probe epic (`sl-qz3v`) and its three children sit behind it.
+**Ready now:** the Phase 0.5 probe. The Feature 45 gate (`sl-6ips`) is **closed** —
+Feature 45 shipped in PR #492 and released in v0.13.0 on 2026-08-05, and its
+measured baselines are in `reference/token-costs.md`. So the probe epic
+(`sl-qz3v`) is unblocked, and `sl-jdho` (author the scenario and answer keys) is
+ready work; `sl-x9m1` and `sl-3yzd` follow it in sequence.
+
+**Also in flight, out of PRD order:** the static-compactness half of the
+measurement (arms S/Y/J — `.stm` against equivalent YAML and JSON) has been
+pulled forward out of Phase 2. It needs no `MappingIntent` and no model spend,
+because YAML and JSON are mechanical re-serialisations of the same content rather
+than independently authored artifacts, so the pairing machinery the spreadsheet
+and markdown arms require does not apply to them. It is the shortest path to
+replacing the live "40-60% smaller than YAML" claim with a measured figure. Arms
+X, M and C still wait for `MappingIntent`.
 
 **Next step is deliberately cheap:** Phase 0.5 is a ~$8 hand-graded probe that
 returns a directional effect size _before_ the `MappingIntent` machinery, the

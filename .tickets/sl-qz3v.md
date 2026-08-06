@@ -2,7 +2,7 @@
 id: sl-qz3v
 status: open
 deps: [sl-jdho, sl-x9m1, sl-3yzd]
-links: []
+links: [sc-wspp]
 created: 2026-08-05T09:29:10Z
 type: epic
 priority: 1
