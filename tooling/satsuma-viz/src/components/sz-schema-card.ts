@@ -1,7 +1,7 @@
 import { LitElement, html, css, type TemplateResult } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import { unsafeHTML } from "lit/directives/unsafe-html.js";
-import type { SchemaCard, FieldEntry } from "../model.js";
+import type { SchemaCard, FieldEntry, MetadataEntry } from "../model.js";
 import { SzNavigateEvent, SzFieldHoverEvent, SzFieldLineageEvent } from "../satsuma-viz.js";
 import { renderMarkdown } from "../markdown.js";
 import type { FieldCoverageEntry, FieldCoverageState } from "@satsuma/core/coverage";
@@ -102,6 +102,15 @@ export class SzSchemaCard extends LitElement {
      * small overshoot paint past the host instead of being clipped.
      */
     :host([compact-expanded]) {
+      overflow: visible;
+    }
+
+    /* A field's enum overlay (sl-2ne7) paints outside its field row, and
+       the row sits inside a non-compact card's normal-flow field list —
+       which clips by default, unlike a compact-expanded card. Reflected
+       whenever an overlay is open so it can escape whichever card hosts
+       it, then removed on collapse to restore ordinary clipping. */
+    :host([has-enum-overlay]) {
       overflow: visible;
     }
 
@@ -250,6 +259,7 @@ export class SzSchemaCard extends LitElement {
     }
 
     .field-row {
+      position: relative;
       display: flex;
       align-items: center;
       gap: 6px;
@@ -345,6 +355,48 @@ export class SzSchemaCard extends LitElement {
     .badge.pii {
       background: var(--sz-warning-bg);
       color: var(--sz-warning-icon);
+    }
+
+    /* An enum badge always shows only its collapsed count (sl-2ne7): joining
+       every value into one pill ("enum enterprise | mid_market | smb |
+       individual") made a single constraint the widest thing on the row.
+       Values are legible on demand, in the overlay below. */
+    .badge.enum-badge {
+      cursor: pointer;
+    }
+
+    /* Positioned against the field row (.field-row is its containing block),
+       not the small inline badge, so the panel reads as belonging to the row
+       rather than hanging off one word inside it. Floats below the row
+       instead of reflowing it — the row's own box is untouched, so the ELK
+       layout's field-row height estimate still holds while this is open. */
+    .enum-overlay {
+      position: absolute;
+      top: 100%;
+      left: 12px;
+      right: 12px;
+      margin-top: 2px;
+      z-index: 50;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      padding: 8px;
+      border-radius: var(--sz-badge-radius);
+      background: var(--sz-card-bg);
+      border: 1px solid var(--sz-card-border);
+      box-shadow: var(--sz-card-shadow);
+      cursor: default;
+    }
+
+    .enum-overlay .enum-value-chip {
+      font-family: var(--sz-font-sans);
+      font-size: 10px;
+      font-weight: 500;
+      padding: 1px 5px;
+      border-radius: var(--sz-badge-radius);
+      background: var(--sz-badge-bg);
+      color: var(--sz-badge-text);
+      line-height: 1.4;
     }
 
     .comment-badge {
@@ -667,6 +719,14 @@ export class SzSchemaCard extends LitElement {
   @state()
   private _notesExpanded = true;
 
+  /**
+   * The dotted field path whose enum overlay is open, or `null` if none is.
+   * At most one is open per card — a second badge click on a different field
+   * replaces it rather than stacking overlays.
+   */
+  @state()
+  private _expandedEnumField: string | null = null;
+
   override updated(changed: Map<string, unknown>) {
     if (changed.has("highlightFields")) {
       if (this.highlightFields.size > 0) {
@@ -674,6 +734,64 @@ export class SzSchemaCard extends LitElement {
       } else {
         this.removeAttribute("has-highlight");
       }
+    }
+    if (changed.has("_expandedEnumField")) {
+      // Lifts the host's clip only while an overlay needs to paint past it
+      // — see the :host([has-enum-overlay]) rule above.
+      if (this._expandedEnumField !== null) {
+        this.setAttribute("has-enum-overlay", "");
+      } else {
+        this.removeAttribute("has-enum-overlay");
+      }
+    }
+  }
+
+  override disconnectedCallback() {
+    super.disconnectedCallback();
+    // Belt-and-braces: normally _closeEnumOverlay removes these, but a card
+    // can be removed from the DOM (schema navigated away from) while its
+    // overlay is still open, which never fires that handler.
+    window.removeEventListener("keydown", this._onEnumOverlayKeydown);
+    window.removeEventListener("click", this._onEnumOverlayOutsideClick);
+  }
+
+  /** Opens `fieldPath`'s enum overlay, replacing any other open one. */
+  private _openEnumOverlay(fieldPath: string) {
+    this._expandedEnumField = fieldPath;
+    window.addEventListener("keydown", this._onEnumOverlayKeydown);
+    window.addEventListener("click", this._onEnumOverlayOutsideClick);
+  }
+
+  private _closeEnumOverlay() {
+    this._expandedEnumField = null;
+    window.removeEventListener("keydown", this._onEnumOverlayKeydown);
+    window.removeEventListener("click", this._onEnumOverlayOutsideClick);
+  }
+
+  /**
+   * Bound once (arrow function, not a method) so the exact same reference
+   * can be passed to both `addEventListener` and `removeEventListener`.
+   */
+  private _onEnumOverlayKeydown = (e: KeyboardEvent) => {
+    if (e.key === "Escape") this._closeEnumOverlay();
+  };
+
+  /**
+   * Any click that reaches `window` has already bubbled past both the badge
+   * that opens the overlay and the overlay panel itself — the row's own
+   * click handler, the badge's, and the overlay's each stop propagation —
+   * so by the time this fires, the click was outside all of them.
+   */
+  private _onEnumOverlayOutsideClick = () => {
+    this._closeEnumOverlay();
+  };
+
+  private _onEnumBadgeClick(e: Event, fieldPath: string) {
+    e.stopPropagation();
+    if (this._expandedEnumField === fieldPath) {
+      this._closeEnumOverlay();
+    } else {
+      this._openEnumOverlay(fieldPath);
     }
   }
 
@@ -857,6 +975,11 @@ export class SzSchemaCard extends LitElement {
     // Use the dotted path so nested customer.email is distinguishable from a
     // sibling top-level email field (sl-eikr).
     const fieldTestId = `${this.testIdPrefix}-field-${sanitizeTestIdSegment(fieldPath)}`;
+    const metaPills = this._fieldMetaPills(f);
+    // At most one enum entry per field (the grammar allows a single enum
+    // constraint), so a single lookup covers both the collapsed badge and,
+    // once expanded, the overlay's value list.
+    const enumEntry = metaPills.find((m) => m.key === "enum");
     // The older, coarser attribute, kept byte-identical for the automation built
     // on it: a record is "mapped" as soon as anything beneath it is (core's
     // `entry.mapped`, i.e. state !== "uncovered"). `unknown` rather than
@@ -890,13 +1013,19 @@ export class SzSchemaCard extends LitElement {
             .filter((c) => c !== "pii")
             .map((c) => html`<span class="badge">${c}</span>`)}
           ${hasPii ? html`<span class="badge pii" title="PII">&#128737; pii</span>` : ""}
-          ${this._fieldMetaPills(f).map(
-            (m) =>
-              html`<span class="badge field-meta" title=${`${m.key} ${m.value}`.trim()}
-                ><span class="badge-key">${m.key}</span>${m.value ? ` ${m.value}` : ""}</span
-              >`,
+          ${metaPills.map((m) =>
+            m.key === "enum"
+              ? this._renderEnumBadge(fieldPath, fieldTestId, m)
+              : html`<span class="badge field-meta" title=${`${m.key} ${m.value}`.trim()}
+                  ><span class="badge-key">${m.key}</span>${m.value ? ` ${m.value}` : ""}</span
+                >`,
           )}
         </span>
+        ${
+          enumEntry && this._expandedEnumField === fieldPath
+            ? this._renderEnumOverlay(fieldTestId, enumEntry)
+            : ""
+        }
         ${
           hasWarning
             ? html`<span class="comment-badge warning" title=${this._commentText(f, "warning")}
@@ -969,6 +1098,49 @@ export class SzSchemaCard extends LitElement {
     return (f.metadata ?? []).filter(
       (m) => m.key !== "note" && !(m.value === "" && f.constraints.includes(m.key)),
     );
+  }
+
+  /**
+   * An enum entry's individual values. Prefers `m.values` (present from
+   * sl-2ne7 onward); falls back to re-splitting the joined `value` for
+   * payloads from an older viz-backend or a cached webview that predate it,
+   * the same tolerance `_fieldMetaPills` already extends to a missing
+   * `metadata` array.
+   */
+  private _enumValues(m: MetadataEntry): string[] {
+    return m.values ?? (m.value ? m.value.split(" | ") : []);
+  }
+
+  /**
+   * An enum badge collapses to a count rather than the joined value list
+   * (sl-2ne7): with several values, the joined form was the widest thing on
+   * the row. Clicking it opens {@link _renderEnumOverlay} for the same field.
+   */
+  private _renderEnumBadge(fieldPath: string, fieldTestId: string, m: MetadataEntry) {
+    const values = this._enumValues(m);
+    return html`<span
+      class="badge field-meta enum-badge"
+      data-testid=${`${fieldTestId}-enum-badge`}
+      title=${`enum: ${values.join(", ")}`}
+      @click=${(e: Event) => this._onEnumBadgeClick(e, fieldPath)}
+      ><span class="badge-key">enum</span> (${values.length})</span
+    >`;
+  }
+
+  /**
+   * The overlay a click on {@link _renderEnumBadge} opens: every value as its
+   * own chip, individually legible. Positioned absolute against the field
+   * row (its `position: relative` containing block) so it floats below the
+   * row rather than reflowing it or the card around it.
+   */
+  private _renderEnumOverlay(fieldTestId: string, m: MetadataEntry) {
+    return html`<div
+      class="enum-overlay"
+      data-testid=${`${fieldTestId}-enum-overlay`}
+      @click=${(e: Event) => e.stopPropagation()}
+    >
+      ${this._enumValues(m).map((v) => html`<span class="enum-value-chip">${v}</span>`)}
+    </div>`;
   }
 
   /**

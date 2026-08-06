@@ -1508,7 +1508,10 @@ function extractComments(uri: string, node: SyntaxNode): CommentEntry[] {
  * - tag  → {key: tagName, value: ""}
  * - kv   → {key: keyName, value: valueText}
  * - note → {key: "note", value: noteText}
- * - enum → {key: "enum", value: "val1 | val2 | ..."} (joined for display)
+ * - enum → {key: "enum", value: "val1 | val2 | ...", values: [val1, val2, ...]}
+ *   (joined string for display, plus the raw list so a renderer that needs
+ *   each value on its own — e.g. an expanded enum badge overlay — doesn't
+ *   have to re-split `value` and guess at the join separator, sl-2ne7)
  * - slice → skipped (handled separately by metric metadata extraction)
  */
 function metaEntriesToViz(entries: MetaEntry[]): MetadataEntry[] {
@@ -1525,7 +1528,7 @@ function metaEntriesToViz(entries: MetaEntry[]): MetadataEntry[] {
         result.push({ key: "note", value: entry.text });
         break;
       case "enum":
-        result.push({ key: "enum", value: entry.values.join(" | ") });
+        result.push({ key: "enum", value: entry.values.join(" | "), values: entry.values });
         break;
       case "slice":
         // Slices are handled separately by extractMetricMetadata

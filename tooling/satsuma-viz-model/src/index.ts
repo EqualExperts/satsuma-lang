@@ -429,6 +429,16 @@ export interface CommentEntry {
 export interface MetadataEntry {
   key: string;
   value: string;
+  /**
+   * The individual allowed values, present only when `key` is `"enum"`.
+   * `value` already carries the same values joined with `" | "` for renderers
+   * that just want display text (tooltips, hover text); this array exists so
+   * a renderer that needs to treat each value as its own element (e.g. a
+   * schema card's enum badge, which collapses to a count and expands each
+   * value into its own chip — sl-2ne7) does not have to re-split `value` and
+   * guess at the join separator.
+   */
+  values?: string[];
 }
 
 /** File position of an entity or field declaration in a .stm source file. */

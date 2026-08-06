@@ -1,6 +1,6 @@
 ---
 id: sl-2ne7
-status: open
+status: closed
 deps: []
 links: [sl-om1l]
 created: 2026-08-05T09:25:33Z
@@ -27,3 +27,14 @@ Screenshot: bug-reports/enum-render-is-ugly.png
 - Doesn't regress the ELK layout's field-row height estimate (the collapsed state's height must match what layout already assumes).
 - Covers a multi-value enum fixture in both compact and expanded card states, both themes.
 
+
+## Notes
+
+**2026-08-06T14:24:40Z**
+
+## Notes
+
+**2026-08-06T14:20:00Z**
+
+Cause: metaEntriesToViz only stored an enum's values as one pipe-joined display string, and sz-schema-card.ts rendered that whole string as a single field-meta badge, so a 4+ value enum ("enum enterprise | mid_market | smb | individual") became the widest thing on the row.
+Fix: MetadataEntry now carries an optional `values: string[]` alongside the joined `value` (viz-model contract + viz-backend emit it for enum entries); sz-schema-card's enum badge collapses to a count ("enum (4)") and a click opens an absolutely-positioned overlay (with an added `has-enum-overlay` host attribute lifting the card's clip) listing every value, closing on a second click, an outside click, or Escape. Playwright coverage added for the collapse/expand/outside-click/Escape/no-reflow behaviour in both the mapping-detail card and the overview compact-expanded card, in both themes, against the corpus's existing 4-value `crm_customers.segment` enum fixture (multi-source-join.stm). (commit immediately after 398991a1)

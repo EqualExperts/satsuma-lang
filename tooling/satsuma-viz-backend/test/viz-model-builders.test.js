@@ -442,6 +442,23 @@ describe("extractFieldEntries (direct)", () => {
     // Neither key is a constraint tag, so the badge list stays empty.
     assert.deepStrictEqual(field.constraints, []);
   });
+
+  // sl-2ne7: sz-schema-card collapses an enum badge to a count and expands
+  // each value into its own chip on click, so it needs the individual values
+  // rather than only the joined display string metaEntriesToViz also emits.
+  it("carries both the joined display string and the raw value list for an enum field", () => {
+    const src = "schema s {\n  segment VARCHAR(20) (enum {enterprise, mid_market, smb})\n}";
+    const body = findNode(root(src), "schema_body");
+    const [field] = extractFieldEntries(URI, body);
+
+    assert.deepStrictEqual(field.metadata, [
+      {
+        key: "enum",
+        value: "enterprise | mid_market | smb",
+        values: ["enterprise", "mid_market", "smb"],
+      },
+    ]);
+  });
 });
 
 describe("extractSpreads (direct)", () => {
