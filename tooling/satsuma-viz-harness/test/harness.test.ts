@@ -78,6 +78,13 @@ const nsMergingUri = libraryUri("namespaces/ns-merging.stm");
  * these tests pin for the browser-rendered chain.
  */
 const cycleUri = libraryUri("lineage-cycle/pipeline.stm");
+/**
+ * Multi-source-join fixture — its `crm_customers.segment` field carries the
+ * four-value enum from the sl-2ne7 bug report (`enum {enterprise,
+ * mid_market, smb, individual}`), the corpus's only field with that many
+ * enum values. No other fixture wired into this suite reaches that shape.
+ */
+const multiSourceJoinUri = libraryUri("multi-source/multi-source-join.stm");
 
 /**
  * Open a specific named mapping by clicking its overview mapping card.
@@ -757,6 +764,152 @@ test.describe("Mapping detail — completed orders (multi-source join)", () => {
       detail.locator("[data-testid='mapping-detail-completed-orders-arrow-row-tier']"),
     ).toBeVisible();
   });
+});
+
+// ---------------------------------------------------------------------------
+// Enum badge collapse/expand (sl-2ne7)
+//
+// A multi-value enum used to render as one unbroken pill joining every value
+// ("enum enterprise | mid_market | smb | individual"), the widest thing on a
+// field row that already carries other tags. Unit-level coverage in
+// tooling/satsuma-viz/test/automation.test.js pins that the collapsed badge
+// and the expanded overlay's markup are computed correctly from
+// `_expandedEnumField`; none of it proves the click actually opens the
+// overlay in a real DOM, that the overlay escapes the card's clipped
+// overflow, that the field row's own box stays put while it's open, or that
+// clicking away / Escape closes it again — only a rendered browser can.
+// ---------------------------------------------------------------------------
+
+test.describe("Field enum badge collapse/expand (sl-2ne7)", () => {
+  test("collapses to a count, expands into an overlay without reflowing the row, and closes on a second click, outside click, or Escape", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    await page.waitForFunction(() => {
+      const harness = window.__satsumaHarness;
+      if (!harness?.setViewMode) return false; // app.js not evaluated yet
+      harness.setViewMode("single");
+      return true;
+    });
+    await loadFixture(page, multiSourceJoinUri);
+    const detail = await openMappingByName(page, "customer-360");
+
+    const cardPrefix = "mapping-detail-customer-360-source-schema-card-crm-customers";
+    const badge = detail.locator(`[data-testid='${cardPrefix}-field-segment-enum-badge']`);
+    const overlay = detail.locator(`[data-testid='${cardPrefix}-field-segment-enum-overlay']`);
+    const segmentRow = detail.locator(`[data-testid='${cardPrefix}-field-segment']`);
+    // The field declared immediately after `segment` in crm_customers — its
+    // position must not shift when the overlay opens above it.
+    const regionRow = detail.locator(`[data-testid='${cardPrefix}-field-region']`);
+
+    // Collapsed by default: a count, not the four-value pipe-joined list.
+    await expect(badge).toBeVisible();
+    await expect(badge).toHaveText(/enum\s*\(4\)/);
+    await expect(segmentRow).not.toContainText("enterprise | mid_market");
+    await expect(overlay).toHaveCount(0);
+
+    const segmentBoxBefore = await segmentRow.boundingBox();
+    const regionBoxBefore = await regionRow.boundingBox();
+
+    await badge.click();
+    await expect(overlay).toBeVisible();
+    for (const value of ["enterprise", "mid_market", "smb", "individual"]) {
+      await expect(overlay).toContainText(value);
+    }
+
+    // The row's own box and the row below it must be exactly where they were
+    // — the overlay floats over the card rather than pushing the field list
+    // (AC: "Doesn't regress the ELK layout's field-row height estimate").
+    expect(await segmentRow.boundingBox()).toEqual(segmentBoxBefore);
+    expect(await regionRow.boundingBox()).toEqual(regionBoxBefore);
+
+    // A second click on the same badge collapses it again.
+    await badge.click();
+    await expect(overlay).toHaveCount(0);
+
+    // Escape collapses an open overlay.
+    await badge.click();
+    await expect(overlay).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(overlay).toHaveCount(0);
+
+    // A click anywhere outside the badge and the overlay collapses it too —
+    // the schema card's own header is a convenient target: distinct from
+    // both, and its own click handler (navigate) has no side effect here.
+    await badge.click();
+    await expect(overlay).toBeVisible();
+    await detail.locator(`[data-testid='${cardPrefix}-header']`).click();
+    await expect(overlay).toHaveCount(0);
+  });
+
+  test("collapses and expands the same way inside an overview compact-expanded card", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    await page.waitForFunction(() => {
+      const harness = window.__satsumaHarness;
+      if (!harness?.setViewMode) return false; // app.js not evaluated yet
+      harness.setViewMode("single");
+      return true;
+    });
+    await loadFixture(page, multiSourceJoinUri);
+
+    const card = page.locator("sz-schema-card[data-testid^='overview-schema-card-crm-customers']");
+    await card.locator(".header-toggle").click();
+
+    const cardPrefix = "overview-schema-card-crm-customers";
+    const badge = card.locator(`[data-testid='${cardPrefix}-field-segment-enum-badge']`);
+    const overlay = card.locator(`[data-testid='${cardPrefix}-field-segment-enum-overlay']`);
+
+    await expect(badge).toHaveText(/enum\s*\(4\)/);
+    await expect(overlay).toHaveCount(0);
+
+    await badge.click();
+    await expect(overlay).toBeVisible();
+    for (const value of ["enterprise", "mid_market", "smb", "individual"]) {
+      await expect(overlay).toContainText(value);
+    }
+
+    await badge.click();
+    await expect(overlay).toHaveCount(0);
+  });
+
+  // The port dot cases above (sl-f0x6) already prove theming is exercised
+  // pairwise; this proves the *new* overlay element specifically paints a
+  // real, non-transparent panel distinct from its own chip text in both.
+  for (const theme of ["light", "dark"] as const) {
+    test(`enum overlay renders a visible, legible panel in the ${theme} theme`, async ({
+      page,
+    }) => {
+      await page.goto(`/?theme=${theme}`);
+      await page.waitForFunction(() => {
+        const harness = window.__satsumaHarness;
+        if (!harness?.setViewMode) return false; // app.js not evaluated yet
+        harness.setViewMode("single");
+        return true;
+      });
+      await loadFixture(page, multiSourceJoinUri);
+      const detail = await openMappingByName(page, "customer-360");
+
+      const cardPrefix = "mapping-detail-customer-360-source-schema-card-crm-customers";
+      const badge = detail.locator(`[data-testid='${cardPrefix}-field-segment-enum-badge']`);
+      const overlay = detail.locator(`[data-testid='${cardPrefix}-field-segment-enum-overlay']`);
+
+      await badge.click();
+      await expect(overlay).toBeVisible();
+
+      const { panelBg, chipBg } = await overlay.evaluate((el) => {
+        const chip = el.querySelector(".enum-value-chip");
+        return {
+          panelBg: getComputedStyle(el).backgroundColor,
+          chipBg: chip ? getComputedStyle(chip).backgroundColor : null,
+        };
+      });
+      expect(panelBg).not.toBe("rgba(0, 0, 0, 0)");
+      expect(chipBg).not.toBe("rgba(0, 0, 0, 0)");
+      expect(chipBg).not.toBe(panelBg);
+    });
+  }
 });
 
 test.describe("Mapping detail — order line facts (flatten)", () => {

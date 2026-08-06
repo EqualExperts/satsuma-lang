@@ -293,3 +293,123 @@ describe("viz automation helpers", () => {
     assert.match(serialized, /detail-schema-card-customers-field-customer-id-lineage/);
   });
 });
+
+/**
+ * sz-schema-card enum badge (sl-2ne7) — a multi-value enum used to render as
+ * one unbroken pill joining every value ("enum enterprise | mid_market | smb
+ * | individual"), which was the widest thing on a field row carrying several
+ * tags. These cases pin the fix: the badge always shows a collapsed count,
+ * and the full value list is reachable only through the click-to-expand
+ * overlay, keyed off the card's private `_expandedEnumField` state.
+ *
+ * Playwright coverage for the actual click/outside-click/Escape gestures and
+ * the overlay's real paint (it must escape the card's clipped overflow)
+ * lives in tooling/satsuma-viz-harness/test/harness.test.ts — none of that is
+ * observable from a serialized render() output, which is all a Node test can
+ * drive here.
+ */
+describe("sz-schema-card enum badge (sl-2ne7)", () => {
+  const LOC = { uri: "file:///t.stm", line: 0, character: 0 };
+
+  /** A `segment` field carrying the four-value enum from the bug report. */
+  function segmentField() {
+    return {
+      name: "segment",
+      type: "VARCHAR(20)",
+      constraints: [],
+      metadata: [
+        {
+          key: "enum",
+          value: "enterprise | mid_market | smb | individual",
+          values: ["enterprise", "mid_market", "smb", "individual"],
+        },
+      ],
+      notes: [],
+      comments: [],
+      children: [],
+      location: LOC,
+    };
+  }
+
+  /**
+   * Serializes a lit-html TemplateResult with template values interleaved in
+   * source order, so e.g. "(" and the count and ")" land adjacent exactly as
+   * the template author wrote them — a plain "strings then values" join (as
+   * used for existence-only checks elsewhere in this file) would scatter the
+   * count away from its parentheses and make an adjacency assertion like
+   * `/\(4\)/` meaningless. Same approach as schema-card-coverage.test.js's
+   * `renderText`.
+   */
+  function serialize(value) {
+    if (value == null) return "";
+    if (Array.isArray(value)) return value.map(serialize).join("");
+    if (typeof value === "object" && value.strings && "values" in value) {
+      return value.strings
+        .map((s, i) => s + (i < value.values.length ? serialize(value.values[i]) : ""))
+        .join("");
+    }
+    return String(value);
+  }
+
+  it("collapses to a count and omits the joined value list by default", async () => {
+    const mod = await import("../dist/satsuma-viz.js");
+    const card = new mod.SzSchemaCard();
+    card.testIdPrefix = "src-crm";
+    card.coverage = [];
+    const serialized = serialize(card._renderField(segmentField(), 0));
+
+    assert.match(serialized, /src-crm-field-segment-enum-badge/);
+    assert.match(serialized, /\(4\)/);
+    // The overlay must not be present at all while collapsed — not merely
+    // hidden by CSS — or Playwright's `.toBeVisible()` on the collapsed
+    // fixture would be trivially true for the wrong reason.
+    assert.doesNotMatch(serialized, /enum-overlay/);
+    assert.doesNotMatch(serialized, /enterprise \| mid_market/);
+  });
+
+  it("expands into an overlay listing every value once its field path is the expanded one", async () => {
+    const mod = await import("../dist/satsuma-viz.js");
+    const card = new mod.SzSchemaCard();
+    card.testIdPrefix = "src-crm";
+    card.coverage = [];
+    card._expandedEnumField = "segment";
+    const serialized = serialize(card._renderField(segmentField(), 0));
+
+    assert.match(serialized, /src-crm-field-segment-enum-overlay/);
+    for (const value of ["enterprise", "mid_market", "smb", "individual"]) {
+      assert.match(serialized, new RegExp(value));
+    }
+  });
+
+  it("collapses again once a different field becomes the expanded one", async () => {
+    // Only one overlay is open at a time (per the card's own state doc
+    // comment) — a stale path from a previously expanded field must not
+    // leave this field's overlay rendered too.
+    const mod = await import("../dist/satsuma-viz.js");
+    const card = new mod.SzSchemaCard();
+    card.testIdPrefix = "src-crm";
+    card.coverage = [];
+    card._expandedEnumField = "some_other_field";
+    const serialized = serialize(card._renderField(segmentField(), 0));
+
+    assert.doesNotMatch(serialized, /enum-overlay/);
+  });
+
+  it("derives the count and overlay values from the joined string when an older payload has no values array", async () => {
+    // Cached webview payloads or an LSP older than sl-2ne7 emit MetadataEntry
+    // without `values` — only the joined `value` string metaEntriesToViz has
+    // always produced. The badge must still collapse correctly rather than
+    // reading `values.length` off `undefined`.
+    const mod = await import("../dist/satsuma-viz.js");
+    const card = new mod.SzSchemaCard();
+    card.testIdPrefix = "src-crm";
+    card.coverage = [];
+    const legacyField = segmentField();
+    legacyField.metadata = [{ key: "enum", value: "enterprise | mid_market | smb | individual" }];
+    card._expandedEnumField = "segment";
+    const serialized = serialize(card._renderField(legacyField, 0));
+
+    assert.match(serialized, /\(4\)/);
+    assert.match(serialized, /individual/);
+  });
+});
