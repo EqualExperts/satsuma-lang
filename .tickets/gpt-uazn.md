@@ -17,3 +17,19 @@ Deliver Feature 46 from features/46-generated-property-expansion/PRD.md: close t
 
 R1-R6 are delivered through linked child tickets with their PRD acceptance tests passing; every requirement is accepted by a mutation check that shows the property failing against a deliberately broken implementation, with the counterexample naming the defect; every child records its cause/fix note and passing relevant automated tests before closure; the PRD ticket map and status are reconciled when the epic closes; no diagnostic semantics, rule severities or command output change.
 
+
+## Notes
+
+**2026-08-06T13:50:27Z**
+
+Project owner decisions, 2026-08-06.
+
+1. R2 asserts diagnostic positions to the mutated construct, not to an exact
+   line. Recorded as PRD decision 4; gpt-vq0r's design updated.
+2. No bug raised for lint-lineage-cycle / lint-type-mismatch. The claim that they
+   were exported from core but unregistered was a false positive: lint-engine.ts
+   registers both through the TYPE_MISMATCH_RULE_ID and LINEAGE_CYCLE_RULE_ID
+   constants rather than as literal id strings, so a grep for 'id: "..."' misses
+   them, and lint-command.test.ts already drives both end to end. All six rules
+   are reachable from satsuma lint and all six are in scope for R1's mutators.
+   Recorded as PRD decision 3.
