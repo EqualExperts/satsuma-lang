@@ -638,3 +638,65 @@ function declaredRefsOf(file) {
     ...file.schemas.map((schema) => declarationKey(schema.name, schema.namespace)),
   ]);
 }
+
+// ── Comparing two scenarios ────────────────────────────────────────────────
+
+/**
+ * The declarations that differ between two scenario workspaces.
+ *
+ * The oracle for a *change-detection* property: `satsuma diff` reports a
+ * structural delta between two workspaces, and the question "which entities may
+ * that delta legitimately mention" is answered by the scenarios themselves. A
+ * consumer that derived it from the delta instead would be comparing `diff` with
+ * itself.
+ *
+ * Declarations are keyed by kind and authored ref (`ns::name` inside a
+ * namespace), which is the key `diff` reports under, and compared by deep value.
+ * A declaration present on one side only counts as changed. **Two declarations
+ * of the same kind and ref in one workspace collapse to the last of them** —
+ * which is the right answer here rather than a limitation: a duplicate
+ * declaration is merged by every extractor in the toolchain, so a workspace with
+ * one and a workspace with two are structurally the same and `diff` is right to
+ * say nothing.
+ *
+ * @param {import("./workspace-model.js").ScenarioWorkspace} before
+ * @param {import("./workspace-model.js").ScenarioWorkspace} after
+ * @returns {string[]} authored refs, sorted, without their kind prefix
+ */
+export function scenarioChangedDeclarations(before, after) {
+  const changed = new Set();
+  const [left, right] = [declarationValues(before), declarationValues(after)];
+
+  for (const [key, value] of left) {
+    if (right.get(key) !== value) changed.add(refOfDeclarationKey(key));
+  }
+  for (const [key, value] of right) {
+    if (left.get(key) !== value) changed.add(refOfDeclarationKey(key));
+  }
+  return [...changed].sort();
+}
+
+/** Every declaration of a workspace as `kind:ref` → a deep-value string. */
+function declarationValues(workspace) {
+  const values = new Map();
+  for (const file of workspace.files) {
+    for (const fragment of file.fragments) {
+      values.set(`fragment:${fragment.name}`, JSON.stringify(fragment));
+    }
+    for (const schema of file.schemas) {
+      values.set(`schema:${declarationKey(schema.name, schema.namespace)}`, JSON.stringify(schema));
+    }
+    for (const mapping of file.mappings) {
+      values.set(
+        `mapping:${declarationKey(mapping.name, mapping.namespace)}`,
+        JSON.stringify(mapping),
+      );
+    }
+  }
+  return values;
+}
+
+/** Strip the `kind:` prefix a declaration key carries — the ref `diff` reports. */
+function refOfDeclarationKey(key) {
+  return key.slice(key.indexOf(":") + 1);
+}
