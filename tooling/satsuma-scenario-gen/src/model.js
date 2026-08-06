@@ -14,7 +14,18 @@
 
 // ── Field declarations ─────────────────────────────────────────────────────
 
-/** @typedef {{ name: string, kind: "scalar" }} ScenarioScalarField */
+/**
+ * A scalar field declaration.
+ *
+ * `type` is the declared type text as it will be authored (`STRING`, `DATE`,
+ * `UUID(pk)`). It is optional because almost every generated scenario wants the
+ * default: `render.js` writes `STRING` when nothing is chosen. A scenario names a
+ * type only when the *difference* between two types is the thing under test —
+ * which is `type-mismatch-direct-arrow`, and constraint flags smuggled into type
+ * arguments (`constraint-in-type-args`).
+ *
+ * @typedef {{ name: string, kind: "scalar", type?: string }} ScenarioScalarField
+ */
 /**
  * A record field, which owns nested declarations and may spread a fragment.
  *
@@ -75,7 +86,19 @@
 /** Maximum generated leaves; small bounds make shrunk counterexamples reviewable. */
 export const MAX_GENERATED_LEAVES = 5;
 
-/** Construct one scalar declaration in the generated semantic model. */
+/**
+ * Construct one scalar declaration in the generated semantic model.
+ *
+ * A scalar carries no `type` and renders with the `STRING` default. The two
+ * mutators that care about a declared type (`retype-bare-arrow-target` and
+ * `absorb-constraint-into-type-args`) set `.type` on a cloned declaration rather
+ * than constructing a typed field here — which is why this stays one parameter.
+ *
+ * **Deliberately one parameter.** Several arbitraries pass this straight to
+ * `Array#map`, which supplies the element *index* as a second argument, so a
+ * second `type` parameter would silently declare `field_1 1` and every generated
+ * workspace would stop parsing.
+ */
 export function scalarField(name) {
   return { name, kind: "scalar" };
 }

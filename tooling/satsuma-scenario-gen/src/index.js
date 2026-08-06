@@ -97,6 +97,36 @@ export {
   wholeStructureScenarioArbitrary,
 } from "./arbitraries.js";
 
+// ── Defect mutators ────────────────────────────────────────────────────────
+// The negative half of the generator: a valid workspace in, one broken workspace
+// plus every diagnostic that break predicts out. `expected` is what the mutation
+// *adds* to a clean baseline, named by rule id and entity only — never by message
+// text or byte offset (Feature 46 PRD, decision 1).
+
+export {
+  DEFECT_MUTATORS,
+  DIAGNOSTIC_RULES,
+  NULL_MUTATORS,
+  absorbConstraintIntoTypeArgs,
+  breakNlRefTarget,
+  closeLineageCycle,
+  conflictNamespaceNote,
+  deleteMappedField,
+  duplicateEntityAcrossFiles,
+  duplicateEntityWithinFile,
+  expectedForSurface,
+  isWorkspaceDefect,
+  pointNlRefOutsideSourceList,
+  referenceUndefinedEntity,
+  renameEntityConsistently,
+  retypeBareArrowTarget,
+  reverseDeclarationOrder,
+  splitAcrossFiles,
+  targetRecordWithoutChildren,
+  withholdSpreadImport,
+  workspaceHasSchemaCycle,
+} from "./mutators.js";
+
 export {
   chainWorkspaceArbitrary,
   computedArrowWorkspaceArbitrary,
@@ -134,4 +164,8 @@ export {
  * @typedef {import("./workspace-model.js").ScenarioWorkspace} ScenarioWorkspace
  * @typedef {import("./ground-truth.js").ScenarioFieldEdge} ScenarioFieldEdge
  * @typedef {import("./ground-truth.js").ScenarioSchemaEdge} ScenarioSchemaEdge
+ * @typedef {import("./mutators.js").PredictedDiagnostic} PredictedDiagnostic
+ * @typedef {import("./mutators.js").WorkspaceDefect} WorkspaceDefect
+ * @typedef {import("./mutators.js").MutationNotApplicable} MutationNotApplicable
+ * @typedef {import("./mutators.js").MutationResult} MutationResult
  */
