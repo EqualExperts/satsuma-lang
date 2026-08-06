@@ -195,11 +195,16 @@ export function flattenBlock(source, target, children) {
  * import graph that disagrees with its own usage, which is a generator bug the
  * properties would then report as a toolchain bug.
  *
+ * Two fields exist only so that a defect mutator can express a defect the derived
+ * form cannot (see mutators.js); every valid scenario leaves both empty.
+ *
  * @typedef {{
  *   path: string,
  *   fragments: import("./model.js").ScenarioEntity[],
  *   schemas: ScenarioSchemaDecl[],
  *   mappings: ScenarioMappingDecl[],
+ *   namespaceNotes?: Record<string, string>,
+ *   withheldImports?: string[],
  * }} ScenarioFile
  */
 
@@ -234,9 +239,37 @@ export function mappingDecl({ name, namespace = null, sources, targets, arrows }
   return { name, namespace, sources, targets, arrows };
 }
 
-/** Build one file. */
-export function scenarioFile({ path, fragments = [], schemas = [], mappings = [] }) {
-  return { path, fragments, schemas, mappings };
+/**
+ * Build one file.
+ *
+ * `namespaceNotes` attaches a `note` to a namespace block this file opens, and
+ * `withheldImports` names entities to leave *out* of the derived import list.
+ * Both exist for defect mutators and are empty in every valid scenario:
+ *
+ * - A conflicting namespace-level `note` across two files is the only way to
+ *   reach `namespace-metadata-conflict`, and namespaces here are not
+ *   declarations — they are derived from each declaration's `namespace` — so
+ *   there is nowhere else to hang the tag.
+ * - `import` statements are *derived from usage*, so a file always imports what
+ *   it references and an import-scope violation is otherwise unreachable. This
+ *   is the one deliberate hole in that derivation.
+ */
+export function scenarioFile({
+  path,
+  fragments = [],
+  schemas = [],
+  mappings = [],
+  namespaceNotes = {},
+  withheldImports = [],
+}) {
+  return {
+    path,
+    fragments,
+    schemas,
+    mappings,
+    ...(Object.keys(namespaceNotes).length > 0 ? { namespaceNotes } : {}),
+    ...(withheldImports.length > 0 ? { withheldImports } : {}),
+  };
 }
 
 /** Build a workspace whose first file is the entry file. */

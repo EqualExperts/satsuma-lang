@@ -44,7 +44,43 @@ production implementation of Satsuma's semantics.
 | `src/workspace-render.js` | workspace → one Satsuma source per file, imports derived |
 | `src/ground-truth.js` | declared paths, declared edges, reachability over them |
 | `src/workspace-arbitraries.js` | one generated domain per lineage axis |
+| `src/mutators.js` | one-defect mutations and the diagnostics each predicts |
 | `src/index.js` | the public surface |
+
+## The negative half: defect mutators
+
+Every domain above builds workspaces the toolchain should *accept*, so the whole
+diagnostic surface was proved by hand-written fixtures. `src/mutators.js` is the
+other half: give it a valid workspace and it returns a `WorkspaceDefect` — the
+mutated workspace, what was broken, and **every** diagnostic that break predicts.
+
+```js
+const defect = deleteMappedField(workspace);
+// { applicable: true,
+//   workspace,
+//   mutation: { kind: "delete-mapped-field", target: "middle.field_0" },
+//   expected: [{ rule: "field-not-in-schema", file: "entry.stm",
+//                entity: "field_0", line: 15, surfaces: ["validate"] }, …] }
+```
+
+Four things a consumer must know:
+
+- **The prediction is complete, not minimal.** One defect cascades — deleting a
+  mid-chain field breaks the arrow that fills it *and* the arrow that reads it —
+  and repeated `(rule, file, entity)` keys are meaningful, so compare multisets.
+- **`expected` is what the mutation adds** to a diagnostic-free baseline:
+  `diagnostics(mutated) = diagnostics(base) ⊎ expected`, the *multiset* sum, for
+  the reason above — set union would drop a cascade's second diagnostic.
+- **`surfaces` says which command reports it.** `duplicate-definition` and
+  `unresolved-nl-ref` are in both the `validate` and the lint registry;
+  `expectedForSurface(defect, "lint")` filters.
+- **A mutator that cannot break a workspace says so** (`applicable: false` plus a
+  reason) rather than returning a workspace that is still valid — a vacuous
+  mutation would look exactly like a missed diagnostic.
+
+The `NULL_MUTATORS` are the same contract with an empty prediction: reordering
+declarations, splitting them across more files and renaming an entity everywhere
+must change the source and add no diagnostic at all.
 
 ## Two ideas worth knowing before reading the code
 

@@ -36,8 +36,13 @@ const INDENT = "  ";
  * A multi-schema side must qualify, because a bare path would be ambiguous — and
  * that qualified spelling is the branch of `resolveFieldEndpoint` that matches a
  * prefix against the declared schema list.
+ *
+ * Exported for `mutators.js`, whose predicted diagnostics have to name a field the
+ * way the *source text* names it — a diagnostic message quotes the authored path,
+ * not the model's `{ schema, path }`. Deriving that spelling twice is how the two
+ * would drift.
  */
-function authoredEndpoint({ schema, path }, sideSchemas) {
+export function authoredEndpoint({ schema, path }, sideSchemas) {
   return sideSchemas.length === 1 && sideSchemas[0] === schema ? path : `${schema}.${path}`;
 }
 
@@ -194,13 +199,23 @@ function namespacesOf(file) {
   return seen;
 }
 
-/** Render one `namespace name { … }` block with the declarations it owns. */
+/**
+ * Render one `namespace name { … }` block with the declarations it owns.
+ *
+ * A `note` tag is emitted only when the file carries one for this namespace. A
+ * namespace block may be reopened in several files, and the index merges their
+ * metadata — two files disagreeing about the same tag is what
+ * `namespace-metadata-conflict` reports, and the only way a scenario can say it.
+ */
 function renderNamespace(name, file) {
+  const note = file.namespaceNotes?.[name];
+  const header =
+    note === undefined ? `namespace ${name} {` : `namespace ${name} (note "${note}") {`;
   const body = [
     ...file.schemas.filter((s) => s.namespace === name).map((s) => renderSchema(s, INDENT)),
     ...file.mappings.filter((m) => m.namespace === name).map((m) => renderMapping(m, INDENT)),
   ];
-  return [`namespace ${name} {`, body.join("\n\n"), "}"].join("\n");
+  return [header, body.join("\n\n"), "}"].join("\n");
 }
 
 // ── Imports ────────────────────────────────────────────────────────────────
@@ -252,7 +267,12 @@ function declaredEntities(file) {
  */
 function renderImports(file, workspace) {
   const own = declaredEntities(file);
-  const wanted = [...referencedEntities(file)].filter((ref) => !own.has(ref));
+  // `withheldImports` is the one hole in the derivation, and it is deliberate: a
+  // file that always imports what it references can never violate import scope,
+  // so the mutator that reaches ADR-022's check needs a way to drop one statement
+  // the file's own declarations still depend on.
+  const withheld = new Set(file.withheldImports ?? []);
+  const wanted = [...referencedEntities(file)].filter((ref) => !own.has(ref) && !withheld.has(ref));
 
   const byFile = new Map();
   for (const other of workspace.files) {

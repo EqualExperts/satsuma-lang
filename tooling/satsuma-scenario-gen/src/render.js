@@ -22,9 +22,21 @@ function renderMembers(fields, spreads, indent) {
   return members.join("\n");
 }
 
+/**
+ * Declared type of a generated scalar when the scenario names none.
+ *
+ * Every generated field was `STRING` before defect mutators existed, and staying
+ * `STRING` by default is what keeps `type-mismatch-direct-arrow` silent on a
+ * valid workspace: the rule fires on a *difference*, so a domain with one type
+ * has nothing for it to report (see mutators.js `retypeBareArrowTarget`).
+ */
+const DEFAULT_SCALAR_TYPE = "STRING";
+
 /** Render one scalar or record field declaration. */
 function renderField(field, indent) {
-  if (field.kind === "scalar") return `${indent}${field.name} STRING`;
+  if (field.kind === "scalar") {
+    return `${indent}${field.name} ${field.type ?? DEFAULT_SCALAR_TYPE}`;
+  }
 
   const keyword = field.isList ? "list_of record" : "record";
   const body = renderMembers(field.fields, field.spreads, `${indent}  `);
