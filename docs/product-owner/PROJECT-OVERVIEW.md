@@ -64,7 +64,7 @@ can work side by side.
 
 4. **Natural language should be first-class, but bounded.** Notes, review context, and underspecified business rules should travel with the mapping instead of being pushed into Slack threads or detached documents. That natural language should be explicitly located and easy for tooling to extract.
 
-5. **It should be 40-60% smaller than equivalent YAML.** Token efficiency matters for AI consumption, but it also matters for human scanning. Less ceremony means faster comprehension.
+5. **It should be leaner than equivalent YAML.** Token efficiency matters for AI consumption, but it also matters for human scanning. Less ceremony means faster comprehension. *Measured 2026-08-06: a median 9% smaller than YAML and 36% smaller than JSON across the 21 specs in `examples/` (`reference/static-compactness.md`). The goal as originally written said 40-60%, which the measurement does not support.*
 
 6. **It should handle the real world.** Not just clean REST-to-REST API mappings, but legacy SQL Server databases with dates stored as VARCHAR, EDI fixed-length messages with qualifier-filtered segments, COBOL copybooks with field names that contain spaces, and XML with deeply nested namespaces.
 
@@ -199,7 +199,7 @@ Satsuma keeps that intent in-band so both humans and AI agents can use it.
 | Existing approach | Strengths | Satsuma advantage |
 |---|---|---|
 | **Excel spreadsheets** | Familiar, flexible | Parseable, versionable, validated, AI-readable |
-| **YAML-based specs** (our v3) | Structured, machine-readable | 40-60% fewer tokens, far more readable |
+| **YAML-based specs** (our v3) | Structured, machine-readable | ~9% fewer tokens (measured), a fixed grammar rather than per-author conventions, and an oracle in `validate`/`lint` |
 | **DBML** | Beautiful syntax, great tooling | Satsuma extends the paradigm to transformations, not just schema |
 | **dbt** | SQL-native, tested, versioned | Satsuma covers non-SQL sources (EDI, XML, events) and documents the *mapping intent* not just the implementation |
 | **Informatica / Talend mappings** | Visual, enterprise-grade | Satsuma is open, text-based, Git-friendly, vendor-neutral |
@@ -234,7 +234,7 @@ instead of pushed outside it.**
 How we'll know Satsuma is working:
 
 1. **Adoption:** Teams choose Satsuma over Excel for new mapping documents
-2. **AI reliability:** Claude/GPT can produce valid Satsuma >90% of the time from a system prompt
+2. **AI reliability:** Claude/GPT can produce valid Satsuma >90% of the time from a system prompt. *This is a target, not a result — it has never been measured. Measuring it is a generation-validity experiment distinct from Feature 44's comprehension-cost arms (Feature 44 PRD, open decision 6), and the claim has been pulled from the site until it is.*
 3. **Agent leverage:** Teams use parser-backed Satsuma tooling plus LLM reasoning for code generation, review, lineage, or impact analysis
 4. **Tooling ecosystem:** Parser, extraction CLI, validator/lint, and visualizer/editor tooling exist
 5. **Community:** Others contribute examples, tools, or extensions

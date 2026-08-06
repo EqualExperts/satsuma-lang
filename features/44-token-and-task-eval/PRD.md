@@ -898,21 +898,36 @@ otherwise.
 landing page.** A commitment that fixes two of eight leaves the claim in
 circulation:
 
-| Location | Claim |
-|---|---|
-| `README.md:179` | "**our tests show** 3–8x fewer tokens than equivalent spreadsheets or YAML" |
-| `site/index.njk:259` | "40-60% Smaller" / "3-8x less token usage" |
-| `site/index.njk:524` | "3–8x more compact than spreadsheets" |
-| `site/index.njk:654` | FAQ — "5–7 lines of YAML … 40–60% smaller than YAML" |
-| `docs/using-satsuma-without-cli.md:38-40` | "3–8x more compact than equivalent spreadsheets, YAML, or free-form docs" |
-| `docs/tutorials/data-engineer-tutorial.md:368` | "3-8x more compact than equivalent spreadsheets or YAML documents" |
-| `docs/product-owner/PROJECT-OVERVIEW.md:67`, `:202` | "40-60% smaller than equivalent YAML" (`:67` is phrased as a design goal, `:202` as a result) |
-| `docs/product-owner/PROJECT-OVERVIEW.md:237` | ">90% LLM-generates-valid-Satsuma" — a future target in a success-metrics list |
+| Location | Claim | Status |
+|---|---|---|
+| `README.md:179` | "**our tests show** 3–8x fewer tokens than equivalent spreadsheets or YAML" | Corrected earlier |
+| `site/index.njk:259` | "40-60% Smaller" / "3-8x less token usage" | **Corrected 2026-08-06** |
+| `site/index.njk:524` | "3–8x more compact than spreadsheets" | **Corrected 2026-08-06** |
+| `site/index.njk:654` | FAQ — "5–7 lines of YAML … 40–60% smaller than YAML" | **Corrected 2026-08-06** |
+| `docs/using-satsuma-without-cli.md:38-40` | "3–8x more compact than equivalent spreadsheets, YAML, or free-form docs" | **Corrected 2026-08-06** |
+| `docs/tutorials/data-engineer-tutorial.md:368` | "3-8x more compact than equivalent spreadsheets or YAML documents" | **Corrected 2026-08-06** |
+| `docs/product-owner/PROJECT-OVERVIEW.md:67`, `:202` | "40-60% smaller than equivalent YAML" (`:67` is phrased as a design goal, `:202` as a result) | **Corrected 2026-08-06** |
+| `site/learn.njk:377`, `docs/product-owner/PROJECT-OVERVIEW.md:237` | ">90% LLM-generates-valid-Satsuma" — a future target in a success-metrics list | **Pulled from the site 2026-08-06**, per open decision 6 |
 
 `README.md:179` is the worst of the set and should be corrected **immediately,
 not in Phase 4**: it asserts that tests exist. They do not — there is no eval code
 anywhere in the repo, which is why this feature exists. Every other line above is
 an unsourced claim; that one is a false statement about our own repository.
+
+**Discharged for the static-compactness half, 2026-08-06.** The YAML and JSON
+claims now state the measured figures from
+[`reference/static-compactness.md`](../../reference/static-compactness.md): a
+median **9%** smaller than YAML and **36%** smaller than JSON across the 21 specs
+in `examples/`, under `o200k_base`. The **spreadsheet** claim was removed rather
+than restated, because no spreadsheet arm has run — arms X, M and C still need
+`MappingIntent`, and re-stating a multiple we have not measured is the same error
+in a smaller font. `site/learn.njk` was also caught, which the table above had
+missed: it carried the `>90%` claim the list attributed only to
+`PROJECT-OVERVIEW.md`.
+
+The commitment held in the direction that matters. The measured reduction is
+roughly a tenth, not a half — the published range overstated it by a factor of
+5 to 25 — and the site now says so.
 
 The `>90%` figure is either measured or removed. (`site/_site/` is generated
 output — only the `.njk` sources need editing.)

@@ -35,9 +35,13 @@ order. The language itself is the artifact, not the tooling around it.
 
 What you keep without the CLI:
 
-- **Token efficiency.** Satsuma specs are 3–8x more compact than equivalent
-  spreadsheets, YAML, or free-form docs. That means LLMs can consume and reason
-  about larger mapping inventories within their context windows.
+- **Token efficiency.** Measured across the 21 specs in `examples/`, a `.stm`
+  file is a median 9% smaller than the same mapping written as YAML and 36%
+  smaller than JSON, carrying identical information — see
+  [`reference/static-compactness.md`](../reference/static-compactness.md). A real
+  but modest win, so more of a mapping inventory fits in a context window.
+  Note the figure is artifact size only; it says nothing about what an agent
+  actually consumes completing a task, which is a different quantity.
 - **Version control.** `.stm` files are plain text. They diff cleanly, merge
   naturally, and integrate with any Git workflow.
 - **Unambiguous structure.** Schemas, mappings, arrows, metadata, and
