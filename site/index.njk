@@ -255,8 +255,8 @@ permalink: index.html
           <div class="w-12 h-12 bg-gradient-to-br from-orange to-green rounded-xl flex items-center justify-center mb-4">
             <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
           </div>
-          <h3 class="text-lg font-bold text-charcoal mb-2">40-60% Smaller</h3>
-          <p class="text-warm-gray text-sm leading-relaxed">More concise than equivalent YAML or JSON specs, and <bold>3-8x less token usage</bold> than mapping spreadsheets. Less noise, more signal.</p>
+          <h3 class="text-lg font-bold text-charcoal mb-2">Measurably Leaner</h3>
+          <p class="text-warm-gray text-sm leading-relaxed">Across our 21 example specs, a <code>.stm</code> file is a median <bold>9% smaller than the equivalent YAML</bold> and <bold>36% smaller than JSON</bold>, carrying identical information. Less noise, more signal.</p>
         </div>
       </div>
     </div>
@@ -521,7 +521,7 @@ permalink: index.html
           <div class="space-y-4 mb-8">
             <div class="flex items-start gap-3 text-warm-gray">
               <svg class="w-5 h-5 text-green flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-              <span><strong class="text-charcoal">Token-efficient specs</strong> &mdash; 3&ndash;8x more compact than spreadsheets. Fits in any LLM context window.</span>
+              <span><strong class="text-charcoal">Token-efficient specs</strong> &mdash; measurably leaner than the same mapping as YAML or JSON, so more of your mapping inventory fits in an LLM context window.</span>
             </div>
             <div class="flex items-start gap-3 text-warm-gray">
               <svg class="w-5 h-5 text-green flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
@@ -652,7 +652,8 @@ permalink: index.html
             <svg class="w-5 h-5 text-warm-gray flex-shrink-0 transition-transform group-open:rotate-45" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v12m6-6H6"/></svg>
           </summary>
           <div class="px-6 pb-5 text-warm-gray leading-relaxed">
-            <p>YAML and JSON are verbose &mdash; a simple field mapping that takes one line in Satsuma becomes 5&ndash;7 lines of YAML. Spreadsheets are worse: inconsistent layouts, no version control, and AI tools struggle to parse free-form cell formats reliably. Satsuma is purpose-built for data mappings, so it's 40&ndash;60% smaller than YAML, diffs cleanly in Git, and gives both humans and AI a format that's unambiguous by design.</p>
+            <p><strong>Not mainly for size.</strong> We measured it: against a deliberately terse, hand-designed YAML encoding of the same facts, a <code>.stm</code> file is a median 9% smaller across our 21 example specs (36% against JSON). That is a real but modest win, and we would rather publish the number than the impression.</p>
+            <p>The reasons that do hold up are about <em>structure</em>. Satsuma's shape is fixed by a grammar, so an agent never has to infer one author's column conventions from another's &mdash; a cost YAML and spreadsheets pay per document. And there is an oracle: <code>satsuma validate</code> and <code>satsuma lint</code> tell you whether a spec is structurally right, which no YAML or markdown mapping document can do at any price. Spreadsheets add their own problems: inconsistent layouts, no clean diffs, and semantics hidden in cell colour and comments.</p>
           </div>
         </details>
 

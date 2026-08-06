@@ -26,14 +26,23 @@ measured baselines are in `reference/token-costs.md`. So the probe epic
 (`sl-qz3v`) is unblocked, and `sl-jdho` (author the scenario and answer keys) is
 ready work; `sl-x9m1` and `sl-3yzd` follow it in sequence.
 
-**Also in flight, out of PRD order:** the static-compactness half of the
-measurement (arms S/Y/J — `.stm` against equivalent YAML and JSON) has been
-pulled forward out of Phase 2. It needs no `MappingIntent` and no model spend,
-because YAML and JSON are mechanical re-serialisations of the same content rather
-than independently authored artifacts, so the pairing machinery the spreadsheet
-and markdown arms require does not apply to them. It is the shortest path to
-replacing the live "40-60% smaller than YAML" claim with a measured figure. Arms
-X, M and C still wait for `MappingIntent`.
+**Done, out of PRD order:** the static-compactness half of the measurement
+(arms S/Y/J — `.stm` against equivalent YAML and JSON) was pulled forward out of
+Phase 2 and has landed. It needed no `MappingIntent` and no model spend, because
+YAML and JSON are mechanical re-serialisations of the same content rather than
+independently authored artifacts, so the pairing machinery the spreadsheet and
+markdown arms require does not apply to them. Arms X, M and C still wait for
+`MappingIntent`.
+
+**The measured result contradicts the published claim.** Across the 21 specs in
+`examples/`, a `.stm` file is a median **9% smaller than the equivalent YAML**
+(range 2.5–22.1%) and **36% smaller than JSON**. The site said 40–60%, which
+needs a ratio of 1.67×–2.50×; the measured range is 1.03×–1.28×. Satsuma does
+win on every spec, by roughly a tenth rather than a half. The site copy has been
+corrected to the measured figures and the unmeasured spreadsheet multiple removed
+rather than restated. See [`reference/static-compactness.md`](../../reference/static-compactness.md)
+for the numbers and `evals/static-compactness/SERIALISATION-DESIGN.md` for the
+YAML design they are measured against, which was committed before the run.
 
 **Next step is deliberately cheap:** Phase 0.5 is a ~$8 hand-graded probe that
 returns a directional effect size _before_ the `MappingIntent` machinery, the

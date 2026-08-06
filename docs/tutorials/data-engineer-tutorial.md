@@ -365,7 +365,7 @@ You might ask: why not just give the AI a well-structured YAML file, a JSON sche
 
 **Version control.** `.stm` files diff cleanly. When a spec changes, you can see exactly which arrows, metadata, or transforms were modified. An AI agent reviewing a PR can compare the old and new specs and flag implementation code that needs updating. Try doing that with an Excel file.
 
-**Token efficiency.** Satsuma specs are 3-8x more compact than equivalent spreadsheets or YAML documents. This means larger mapping inventories fit within an AI model's context window, enabling cross-mapping analysis, lineage tracing, and consistency checking that would exceed token limits with verbose formats.
+**Token efficiency.** Measured across the 21 specs in `examples/`, a `.stm` file is a median 9% smaller than the same mapping written as YAML and 36% smaller than JSON (see [`reference/static-compactness.md`](../../reference/static-compactness.md)). That is a modest saving on artifact size, and it helps larger mapping inventories fit within an AI model's context window for cross-mapping analysis, lineage tracing, and consistency checking.
 
 ---
 
