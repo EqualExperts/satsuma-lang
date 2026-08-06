@@ -22,7 +22,7 @@
  * - `includeDeclaration` must toggle exactly the declaration site and nothing
  *   else.
  *
- * Ground truth comes from `support/scenario-usage-sites.js`, which reads scenario
+ * Ground truth comes from `@satsuma/scenario-gen`'s `ground-truth.js`, which reads scenario
  * data only. Nothing below derives an expectation by asking the LSP.
  *
  * Every property here asks the **whole-folder index**, which is the state a
@@ -45,18 +45,15 @@ const assert = require("node:assert/strict");
 const fc = require("fast-check");
 const {
   GENERATED_PROPERTY_PARAMETERS,
-  endpoint,
-  leafNames,
-  mapArrow,
-  mappingDecl,
+  USAGE_KIND,
+  bareNamespacedWorkspaceArbitrary,
   metricWorkspaceArbitrary,
   multiFileWorkspaceArbitrary,
   multiSourceWorkspaceArbitrary,
   namespacedWorkspaceArbitrary,
-  scalarField,
-  scenarioFile,
-  scenarioWorkspace,
-  schemaDecl,
+  scenarioDeclaredEntities,
+  scenarioDeclaredUsageSites,
+  scenarioEntityKeyForRef,
   workspaceScenarioArbitrary,
 } = require("@satsuma/scenario-gen");
 const { initTestParser } = require("./helper");
@@ -68,13 +65,27 @@ const {
   indexGeneratedWorkspace,
   indexedReferenceSites,
 } = require("./support/generated-workspace");
-const {
-  RESOLVABLE_USAGE_KINDS,
-  USAGE_KIND,
-  declaredEntities,
-  declaredUsageSites,
-  entityKeyForRef,
-} = require("./support/scenario-usage-sites");
+
+/**
+ * The usage kinds the LSP's definition provider resolves back to a declaration
+ * today.
+ *
+ * `metric_source` and `arrow` are absent because the provider answers nothing at
+ * either: `findNodeContext` has no case for a metadata value, and an arrow path's
+ * first segment is looked up as a *field* of the mapping's schemas, which a
+ * schema name never is. Both are pinned by their own tests at the end of this
+ * file rather than quietly skipped, so the day either is fixed a test says so.
+ *
+ * This list stays here rather than moving to `@satsuma/scenario-gen` with the
+ * rest of the oracle (`gpt-l9rp`): it is a statement about what *this* LSP does
+ * today, not ground truth a scenario declares.
+ */
+const RESOLVABLE_USAGE_KINDS = Object.freeze([
+  USAGE_KIND.source,
+  USAGE_KIND.target,
+  USAGE_KIND.spread,
+  USAGE_KIND.import,
+]);
 
 before(async () => {
   await initTestParser();
@@ -126,8 +137,8 @@ function indexWithGroundTruth(workspace) {
     `generated workspace does not parse cleanly:\n${indexed.sources}`,
   );
 
-  const entities = declaredEntities(workspace);
-  const expected = declaredUsageSites(workspace);
+  const entities = scenarioDeclaredEntities(workspace);
+  const expected = scenarioDeclaredUsageSites(workspace);
   const siteCount = [...expected.values()].reduce((total, sites) => total + sites.length, 0);
   assert.ok(
     siteCount > 0,
@@ -136,52 +147,6 @@ function indexWithGroundTruth(workspace) {
 
   return { indexed, entities, expected };
 }
-
-// ── A domain where the reference key is not the authored spelling ───────────
-
-/**
- * A chain of schemas inside one namespace, every reference authored **bare**.
- *
- * `namespacedWorkspaceArbitrary` always writes a namespaced reference out in
- * full (`ns_a::s0`), so the reference key and the authored spelling coincide and
- * a query that used the spelling directly would still pass. This domain is the
- * shape where they differ: `source { s0 }` inside `namespace ns_a` binds to
- * `ns_a::s0`, which is what `resolveReferenceKey` exists to work out, and what
- * `sl-p256` was.
- *
- * Built here from the generator's constructors rather than added to the shared
- * package: the arbitraries in `@satsuma/scenario-gen` are consumed by other
- * packages' ground truth, which reads an authored ref as canonical, so changing
- * one to author bare refs would silently move their expectations too.
- */
-const bareNamespacedWorkspaceArbitrary = fc
-  .record({
-    namespace: fc.constantFrom("ns_a", "ns_b"),
-    /** Hops in the chain; one is enough for a reference, more vary the site count. */
-    hops: fc.integer({ min: 1, max: 3 }),
-  })
-  .map(({ namespace, hops }) => {
-    const [leaf] = leafNames(1);
-    const schemaNames = Array.from({ length: hops + 1 }, (_, index) => `s${index}`);
-    return scenarioWorkspace([
-      scenarioFile({
-        path: "entry.stm",
-        schemas: schemaNames.map((name) =>
-          schemaDecl({ name, namespace, fields: [scalarField(leaf)] }),
-        ),
-        mappings: schemaNames.slice(1).map((target, hop) =>
-          mappingDecl({
-            name: `m${hop}`,
-            namespace,
-            // Bare on purpose: the whole point of the domain.
-            sources: [schemaNames[hop]],
-            targets: [target],
-            arrows: [mapArrow([endpoint(schemaNames[hop], leaf)], endpoint(target, leaf))],
-          }),
-        ),
-      }),
-    ]);
-  });
 
 // ── The four checks, each usable against any domain ────────────────────────
 
@@ -360,7 +325,10 @@ function assertIncludeDeclarationTogglesOnlyTheDeclaration(workspace) {
 function resolvableProbeSites(indexed, declaredKeys) {
   return indexedReferenceSites(indexed)
     .filter((site) => RESOLVABLE_USAGE_KINDS.includes(site.kind))
-    .map((site) => ({ site, entityKey: entityKeyForRef(site.key, site.namespace, declaredKeys) }))
+    .map((site) => ({
+      site,
+      entityKey: scenarioEntityKeyForRef(site.key, site.namespace, declaredKeys),
+    }))
     .filter(({ entityKey }) => declaredKeys.has(entityKey));
 }
 
@@ -481,7 +449,7 @@ describe("includeDeclaration toggles exactly the declaration site", () => {
 // should do. They exist because the properties above exclude these usage kinds,
 // and an exclusion nobody can see is how a gap becomes permanent. Each will go
 // red the moment its gap is fixed — at which point delete the pin and remove the
-// exclusion from RESOLVABLE_USAGE_KINDS (or from declaredEntities, for the
+// exclusion from RESOLVABLE_USAGE_KINDS (or from scenarioDeclaredEntities, for the
 // namespace case). All four were found by this suite while implementing gpt-21jp;
 // none is endorsed here. They are filed as:
 //

@@ -14,6 +14,7 @@
  * | {@link cyclicWorkspaceArbitrary} | a closed loop | non-termination, duplicate entries |
  * | {@link multiFileWorkspaceArbitrary} | files plus `import` | the LSP's cross-file model merge |
  * | {@link namespacedWorkspaceArbitrary} | namespaces | endpoint resolution's namespace branch |
+ * | {@link bareNamespacedWorkspaceArbitrary} | bare refs inside a namespace | reference keys that differ from the authored spelling (`sl-p256`) |
  * | {@link containerWorkspaceArbitrary} | `each` / `flatten` | dropped edges (`3cdd-yavi`, `sl-l7u0`) |
  * | {@link nlRefWorkspaceArbitrary} | NL `@ref` text | phantom source edges (`cbh-y5og`) |
  * | {@link computedArrowWorkspaceArbitrary} | sourceless arrows | `from: null` handling |
@@ -279,6 +280,51 @@ export const namespacedWorkspaceArbitrary = fc
         return { workspace: singleFile({ schemas, mappings }), namespaces };
       }),
   );
+
+/**
+ * A chain of schemas inside one namespace, every reference authored **bare**.
+ *
+ * {@link namespacedWorkspaceArbitrary} always writes a namespaced reference out
+ * in full (`ns_a::s0`), so the reference key and the authored spelling coincide
+ * and a query that used the spelling directly would still pass. This domain is
+ * the shape where they differ: `source { s0 }` inside `namespace ns_a` binds to
+ * `ns_a::s0`, which is what the workspace index's `resolveReferenceKey` exists to
+ * work out, and what `sl-p256` was.
+ *
+ * **Deliberately outside {@link workspaceScenarioArbitrary}.** The edge oracles
+ * in `ground-truth.js` canonicalise an authored ref through `canonicalEntityRef`,
+ * which reads a bare ref as file-scope unconditionally — right for every other
+ * domain, wrong here. Folding this domain into the shared default would therefore
+ * move the expectations of every package that consumes those oracles. A property
+ * about reference *keys* names this arbitrary directly instead;
+ * `scenarioDeclaredUsageSites` resolves the binding correctly through
+ * `scenarioEntityKeyForRef`.
+ */
+export const bareNamespacedWorkspaceArbitrary = fc
+  .record({
+    namespace: fc.constantFrom("ns_a", "ns_b"),
+    /** Hops in the chain; one is enough for a reference, more vary the site count. */
+    hops: fc.integer({ min: 1, max: MAX_CHAIN_LENGTH }),
+  })
+  .map(({ namespace, hops }) => {
+    const [leaf] = leafNames(1);
+    const schemaNames = Array.from({ length: hops + 1 }, (_, index) => schemaName(index));
+    return singleFile({
+      schemas: schemaNames.map((name) =>
+        schemaDecl({ name, namespace, fields: [scalarField(leaf)] }),
+      ),
+      mappings: schemaNames.slice(1).map((target, hop) =>
+        mappingDecl({
+          name: `m${hop}`,
+          namespace,
+          // Bare on purpose: the whole point of the domain.
+          sources: [schemaNames[hop]],
+          targets: [target],
+          arrows: [mapArrow([endpoint(schemaNames[hop], leaf)], endpoint(target, leaf))],
+        }),
+      ),
+    });
+  });
 
 // ── Container blocks ───────────────────────────────────────────────────────
 
