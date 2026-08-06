@@ -690,7 +690,8 @@ export class SzMappingDetail extends LitElement {
               ? html`
                   <div class="mapping-meta-row">
                     <span class="meta-tag wrap"
-                      ><span class="label">join</span> ${sb.joinDescription}</span
+                      ><span class="label">join</span>
+                      ${unsafeHTML(highlightAtRefs(sb.joinDescription))}</span
                     >
                   </div>
                 `
@@ -699,7 +700,9 @@ export class SzMappingDetail extends LitElement {
           ${(sb?.filters ?? []).map(
             (f) => html`
               <div class="mapping-meta-row">
-                <span class="meta-tag wrap"><span class="label">filter</span> ${f}</span>
+                <span class="meta-tag wrap"
+                  ><span class="label">filter</span> ${unsafeHTML(highlightAtRefs(f))}</span
+                >
               </div>
             `,
           )}

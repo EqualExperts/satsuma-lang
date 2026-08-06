@@ -1,6 +1,6 @@
 ---
 id: sl-yhlj
-status: open
+status: closed
 deps: []
 links: []
 created: 2026-08-05T09:25:20Z
@@ -18,4 +18,20 @@ Screenshot: bug-reports/atrefs-in-join-not-highlighted.png
 ## Acceptance Criteria
 
 Join and filter descriptions render @refs through highlightAtRefs, consistent with NL transform text and arrow notes. Add a fixture/unit test covering a join description containing an @ref.
+
+## Notes
+
+**2026-08-06T13:34:00Z**
+
+Cause: `sz-mapping-detail.ts` interpolated `sb.joinDescription` and each filter
+string directly into the Lit template instead of routing them through
+`unsafeHTML(highlightAtRefs(...))`, the pipeline every other @ref-bearing
+surface (NL transform text, arrow notes) already used.
+Fix: wrapped both the join-description and filter render paths in
+`unsafeHTML(highlightAtRefs(...))`; added a unit suite
+(`mapping-detail-join-filter-refs.test.js`) that resolves the `unsafeHTML`
+directive to prove the join/filter markup actually contains
+`<span class="at-ref">`, and extended the existing Playwright "completed
+orders (multi-source join)" test to assert a rendered `span.at-ref` inside the
+join row (commit immediately after 15d143ee).
 
