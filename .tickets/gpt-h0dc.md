@@ -1,6 +1,6 @@
 ---
 id: gpt-h0dc
-status: open
+status: closed
 deps: []
 links: []
 created: 2026-08-06T13:54:33Z
@@ -22,3 +22,24 @@ Add to tooling/satsuma-core/test/generated-format-properties.test.js, driven thr
 
 Mutation check: make format() drop the trailing source of a multi-source arrow (a change the CST-preservation and idempotence properties both survive) and confirm the semantic property fails, with the counterexample naming the arrow. Run and recorded in the closing note. A second mutation check on a shape-only defect (e.g. altered indentation) must NOT fail this property — it belongs to the existing idempotence test, and a property that fires on both is testing the wrong thing.
 
+
+## Notes
+
+**2026-08-06T14:27:40Z**
+
+**2026-08-06T00:00:00Z**
+
+Cause: generated-format-properties.test.js asserted only shape (idempotence, CST-structure preservation, recovery-free reparse), and every one of those properties ran over `semanticScenarioArbitrary` alone — a domain with no multi-source arrows, containers, namespaces, imports, NL @refs, computed arrows or metric metadata. Nothing stated that formatting preserves *meaning*.
+Fix: added test/support/semantic-index.js (a position-free, layout-free projection of every core extractor) and an `extract(parse(src))` deep-equals `extract(parse(format(src)))` property, including semantic idempotence at the second pass. Restructured the file so all four properties — the three existing shape claims plus the new meaning claim — run over BOTH the single-mapping domain and a new workspace-file domain, reached through a new `parseGeneratedWorkspaceFiles` adapter in test/support/scenario-pipeline.js. Core test count 700 -> 705. (commit immediately after 852449ee)
+
+Mutation checks run, and one contradicted this ticket's stated premise:
+
+1. Required check — break `formatMapArrow` to drop the trailing source of a multi-source arrow. The semantic property FAILS over the workspace domain, naming the arrow. But so does `preserves generated CST structure` over the same domain. The ticket predicted the CST property would survive this break; it does not. `cstStructure` compares the named tree *including named leaf text*, and every extractor is a pure function of exactly that, so identical CST structure implies an identical semantic index. The two properties are not independent for the formatter as it stands. The ticket's premise held only while the shape properties never reached a multi-source arrow at all — which was the real gap, and is now closed.
+
+   The semantic property is kept for reasons of contract rather than extra detection, recorded in the test file's module comment: it states the claim consumers depend on (format composed with every extractor) rather than leaving it inferred from an unwritten purity argument; and it is the claim that must survive if `cstStructure`'s leaf-text inclusion is ever relaxed.
+
+2. Required negative check — set the formatter's INDENT to three spaces. The semantic property stays GREEN (all 8 generated properties pass) while `format.test.js`'s corpus golden tests fail 4 cases. A shape-only defect is therefore caught elsewhere and does not fire this property, which is what makes it a test of meaning.
+
+Both mutations reverted; `format.ts` is byte-identical to `main`. Full core suite green: 705 pass, 0 fail.
+
+One deliberate design point beyond the ticket: `PipeStep.text` is a node's raw text, so a `map { a: 1 }` step carries its own interior spacing, which the formatter is permitted to reflow (sl-dxjh, ADR-033). The projection collapses whitespace runs in step text; comparing it verbatim would have made the property report a legal reflow as a semantic change once the generated domain grows map literals.

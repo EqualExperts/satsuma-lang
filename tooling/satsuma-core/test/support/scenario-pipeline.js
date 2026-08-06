@@ -27,7 +27,7 @@ import {
   getParser,
   makeEntityRefResolver,
 } from "@satsuma/core";
-import { renderScenario } from "@satsuma/scenario-gen";
+import { renderScenario, renderWorkspace } from "@satsuma/scenario-gen";
 
 /**
  * Parse generated source and reject every ERROR or MISSING recovery node.
@@ -38,11 +38,40 @@ import { renderScenario } from "@satsuma/scenario-gen";
  */
 export function parseGeneratedScenario(scenario) {
   const source = renderScenario(scenario);
+  return { source, tree: parseStrictly(source) };
+}
+
+/** Parse one already-rendered source string, rejecting every recovery node. */
+function parseStrictly(source) {
   const tree = getParser().parse(source);
   assert.ok(tree, `generated Satsuma returned no parse tree:\n${source}`);
   const errors = collectParseErrors(tree);
   assert.deepEqual(errors, [], `generated Satsuma must be recovery-free:\n${source}`);
-  return { source, tree };
+  return tree;
+}
+
+/**
+ * Every file of a generated *workspace*, rendered and parsed one file at a time.
+ *
+ * Core is a single-file library — it has no workspace loader, and resolving the
+ * `import` graph is a consumer concern (the CLI's and the LSP's adapters each own
+ * their own). A core-level property that holds per file therefore needs no loader:
+ * the formatter, and the extraction it must not disturb, both operate on one file.
+ *
+ * The workspace domain is worth reaching from core because it is the only place
+ * multi-source arrows, `each`/`flatten` containers, NL `@ref`s, namespaces,
+ * computed arrows and metric metadata are generated — none of which
+ * `semanticScenarioArbitrary`'s single-mapping shapes produce.
+ *
+ * @param {import("@satsuma/scenario-gen").ScenarioWorkspace} workspace
+ * @returns {Array<{ path: string, source: string, tree: import("@satsuma/core").Tree }>}
+ */
+export function parseGeneratedWorkspaceFiles(workspace) {
+  return renderWorkspace(workspace).map(({ path, source }) => ({
+    path,
+    source,
+    tree: parseStrictly(source),
+  }));
 }
 
 /** Project extracted fields onto the deliberately narrow coverage input shape. */
