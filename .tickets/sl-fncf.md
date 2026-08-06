@@ -1,6 +1,6 @@
 ---
 id: sl-fncf
-status: open
+status: closed
 deps: []
 links: []
 created: 2026-08-03T11:29:07Z
@@ -30,3 +30,13 @@ Found during a security review of the agent viz-testing workflow.
 - Playwright suites still pass unchanged: baseURL http://localhost:3333 and http://localhost:3334 resolve to loopback, so no test needs editing.
 - A unit test or assertion covers the bind host so a future edit cannot silently re-widen it.
 
+
+## Notes
+
+**2026-08-06T13:12:53Z**
+
+**2026-08-06T13:20:00Z**
+
+Cause: Both server.ts and serve-playground.mjs called listen(PORT) without a host argument, so Node bound to 0.0.0.0 (all interfaces), exposing ports 3333 and 3334 to any host on the network.
+
+Fix: Added explicit loopback binding: listen(PORT, "127.0.0.1", callback) on both servers, with comments stating the rationale. Added unit tests verifying the bind host and documenting the vulnerability. (commit immediately after 2893e036)
