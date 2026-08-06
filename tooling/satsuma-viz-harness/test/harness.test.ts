@@ -67,6 +67,17 @@ const governanceUri = libraryUri("filter-flatten-governance/governance.stm");
  * plus 2 downstream hops. No other fixture in the harness reaches this shape.
  */
 const nsMergingUri = libraryUri("namespaces/ns-merging.stm");
+/**
+ * Two schemas mapped into each other in both directions (sv-embb) — the only
+ * fixture in the corpus whose lineage graph is a genuine cycle, adapted from
+ * `tooling/satsuma-cli/test/fixtures/lineage-cycle.stm`. Tracing `cycle_a.id`
+ * confirmed via `satsuma field-lineage cycle_a.id
+ * examples/lineage-cycle/pipeline.stm --json` terminates at depth 1 in both
+ * directions: `upstream: [{ field: cycle_b.id, via_mapping: b_to_a }]`,
+ * `downstream: [{ field: cycle_b.id, via_mapping: a_to_b }]` — the shape
+ * these tests pin for the browser-rendered chain.
+ */
+const cycleUri = libraryUri("lineage-cycle/pipeline.stm");
 
 /**
  * Open a specific named mapping by clicking its overview mapping card.
@@ -84,6 +95,16 @@ async function openMappingByName(
   const detail = page.locator(`[data-testid='mapping-detail-${mappingId}']`).first();
   await expect(detail).toBeVisible({ timeout: 10_000 });
   return detail;
+}
+
+/** Expand an overview card and return its field-row test-id prefix. */
+async function expandOverviewCard(page: Page, qualifiedIdTestSegment: string): Promise<string> {
+  const cardPrefix = `overview-schema-card-${qualifiedIdTestSegment}`;
+  await page
+    .locator(`sz-schema-card[data-testid^='${cardPrefix}']`)
+    .locator(".header-toggle")
+    .click();
+  return cardPrefix;
 }
 
 /**
@@ -1081,16 +1102,6 @@ test.describe("Coverage overlay toggle", () => {
 // `satsuma field-lineage reporting::dept_budget_vs_actual.actual_spend
 // examples/namespaces/ns-merging.stm --json` before writing these assertions.
 test.describe("Field chain view", () => {
-  /** Expand a namespaced overview card and return its field-row test-id prefix. */
-  async function expandOverviewCard(page: Page, qualifiedIdTestSegment: string): Promise<string> {
-    const cardPrefix = `overview-schema-card-${qualifiedIdTestSegment}`;
-    await page
-      .locator(`sz-schema-card[data-testid^='${cardPrefix}']`)
-      .locator(".header-toggle")
-      .click();
-    return cardPrefix;
-  }
-
   test("tracing a field with multiple upstream and downstream mappings opens a chain view with nl-derived hops, including a collapsed namespace fan", async ({
     page,
   }) => {
@@ -1288,6 +1299,71 @@ test.describe("Field chain view", () => {
     }
     expect(connectorBox.x).toBeGreaterThanOrEqual(upstreamBox.x + upstreamBox.width - 1);
     expect(connectorBox.x + connectorBox.width).toBeLessThanOrEqual(focusBox.x + 1);
+  });
+});
+
+// sv-embb: sz-chain-view.test.js proves a hand-built cyclic FieldChainModel
+// renders without duplicate cards, but that model is authored by the test,
+// not produced by tracing a real cyclic mapping graph end to end through
+// @satsuma/viz-backend and the harness's host wiring. This test is the one
+// place that full path is exercised against an actual cycle: a hung Promise
+// or an infinite render loop here would time out the test rather than pass
+// silently, and the exact hop shown on each side is asserted against the
+// CLI's own `field-lineage --json` output for the same fixture (see the
+// `cycleUri` doc comment above), so a regression that broke cycle detection
+// but still terminated would still be caught.
+test.describe("Field chain view — cycle detection (sv-embb)", () => {
+  test("tracing a field in a two-schema mapping cycle terminates with one hop per direction", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    await page.waitForFunction(() => {
+      const harness = window.__satsumaHarness;
+      if (!harness?.setViewMode) return false; // app.js not evaluated yet
+      harness.setViewMode("single");
+      return true;
+    });
+    await loadFixture(page, cycleUri);
+
+    const cardPrefix = await expandOverviewCard(page, "cycle-a");
+    // This fixture's two-schema graph is small enough that expanding a card
+    // can leave its field row outside the SVG canvas's current pan/zoom
+    // viewBox — a transform Playwright's DOM-level "scroll into view" cannot
+    // follow, unlike the richer fixtures the sibling tests above use. Re-fit
+    // before clicking, exactly as a human would with the toolbar's own button.
+    await page.locator("[data-testid='toolbar-fit']").click();
+    await page.locator(`[data-testid='${cardPrefix}-field-id-lineage']`).click({ force: true });
+
+    await expect(page.locator("[data-testid='viz-root']")).toHaveAttribute(
+      "data-view-mode",
+      "chain",
+      { timeout: 10_000 },
+    );
+    const focus = page.locator("[data-testid='chain-focus']");
+    await expect(focus).toContainText("cycle_a");
+    await expect(focus).toContainText("id");
+
+    // Exactly one hop card on each side — the cycle closes back onto the
+    // focus field after one step in either direction, and core's
+    // visited-field BFS must not walk around it a second time.
+    const upstreamHops = page.locator("[data-testid^='chain-hop-upstream-1-cycle-b']");
+    const downstreamHops = page.locator("[data-testid^='chain-hop-downstream-1-cycle-b']");
+    await expect(upstreamHops).toHaveCount(1);
+    await expect(downstreamHops).toHaveCount(1);
+
+    // Each side names the mapping that actually points that way around the
+    // cycle: b_to_a feeds cycle_a from upstream, a_to_b carries it onward.
+    await expect(
+      page.locator("[data-testid^='chain-hop-mapping-upstream-1-cycle-b']"),
+    ).toContainText("b_to_a");
+    await expect(
+      page.locator("[data-testid^='chain-hop-mapping-downstream-1-cycle-b']"),
+    ).toContainText("a_to_b");
+
+    // No further columns: a genuine second hop would put a
+    // chain-column-*-2 on the rail, which the cycle must never reach.
+    await expect(page.locator("[data-testid='chain-column-upstream-2']")).toHaveCount(0);
+    await expect(page.locator("[data-testid='chain-column-downstream-2']")).toHaveCount(0);
   });
 });
 

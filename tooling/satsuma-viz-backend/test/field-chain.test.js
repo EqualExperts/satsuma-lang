@@ -108,6 +108,59 @@ mapping bc { source { b } target { c } id -> id }
   });
 });
 
+describe("field-chain unknown-field resolution (sv-embb)", () => {
+  it("marks the chain unresolved when the focus field names no declared schema", () => {
+    // A typo'd or renamed schema must not be reported the same way as a
+    // resolved field with genuinely empty lineage — the CLI throws
+    // EXIT_NOT_FOUND for this case, so the browser/LSP builder must at least
+    // flag it distinctly rather than returning a look-alike empty chain.
+    const result = chainFrom("schema a { id string }", "nonexistent.id");
+
+    assert.equal(result.resolved, false);
+    assert.deepEqual(result.upstream, []);
+    assert.deepEqual(result.downstream, []);
+    assert.equal(result.field, "::nonexistent.id");
+  });
+
+  it("marks the chain unresolved when the schema exists but the field path does not", () => {
+    const result = chainFrom("schema a { id string }", "a.nonexistent");
+
+    assert.equal(result.resolved, false);
+    assert.deepEqual(result.upstream, []);
+    assert.deepEqual(result.downstream, []);
+  });
+
+  it("leaves the chain resolved (the key omitted) when the field genuinely has no lineage", () => {
+    // The positive case this feature must not regress: a real, declared field
+    // with no arrows touching it is "resolved, empty" — not "not found".
+    const result = chainFrom("schema a { id string }", "a.id");
+
+    assert.equal(result.resolved, undefined);
+    assert.deepEqual(result.upstream, []);
+    assert.deepEqual(result.downstream, []);
+  });
+
+  it("resolves a focus field that only exists because a fragment spread materialised it", () => {
+    // Spread expansion is not optional here: without it, every field a
+    // fragment contributes would be misreported as "not found" even though
+    // `satsuma coverage` and the schema card both already treat it as real.
+    const result = chainFrom(
+      `
+fragment address_fields { street string city string }
+schema tgt { id string address record { ...address_fields } }
+schema src { raw_city string }
+mapping load { source { src } target { tgt } raw_city -> address.city }
+`,
+      "tgt.address.city",
+    );
+
+    assert.equal(result.resolved, undefined);
+    assert.deepEqual(result.upstream, [
+      { field: "::src.raw_city", via_mapping: "::load", classification: "none", depth: 1 },
+    ]);
+  });
+});
+
 describe("field-chain CLI parity golden", () => {
   it("matches checked-in field-lineage --json output byte-for-value", () => {
     // The golden is regenerated explicitly by scripts/regenerate-field-chain-golden.mjs.

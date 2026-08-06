@@ -13,6 +13,7 @@ The CLI requires a `.stm` file entry point (not a directory). The workspace is d
 | [`edi-to-json/`](edi-to-json/) | `pipeline.stm` | EDI 856 ASN fixed-length messages to MFCS JSON for warehouse ingestion |
 | [`filter-flatten-governance/`](filter-flatten-governance/) | `filter-flatten-governance.stm` | Scalar lists, filter/flatten, and governance metadata annotations |
 | [`json-api-to-parquet/`](json-api-to-parquet/) | `pipeline.stm` | Commerce REST API order responses to Lakehouse Parquet |
+| [`lineage-cycle/`](lineage-cycle/) | `pipeline.stm` | Two schemas mapped into each other in both directions — a demo fixture proving field-lineage tracing terminates on a cycle, not a plausible pipeline |
 | [`merge-strategies/`](merge-strategies/) | `pipeline.stm` | All four merge strategies (upsert, append, soft delete, full refresh) |
 | [`metrics-platform/`](metrics-platform/) | `metrics.stm` | Business metrics (MRR, CLV, churn, conversion) as schema blocks with `(metric, ...)` metadata |
 | [`multi-hop-lineage/`](multi-hop-lineage/) | `pipeline.stm` | Artificial 7-schema, 6-hop chain with varying record nesting — a demo fixture for the field-chain viz, not a plausible pipeline |

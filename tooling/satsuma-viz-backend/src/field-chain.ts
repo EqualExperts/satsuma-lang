@@ -16,16 +16,21 @@
 
 import {
   buildFieldEdges,
+  collectFieldNames,
   createAuthoredFieldRef,
   createCanonicalFieldEndpoint,
   extractArrowRecords,
   extractMappings,
   extractNLRefData,
+  fieldEndpointPath,
+  fieldEndpointSchema,
+  findFieldByPath,
   resolveAllNLRefs,
   resolveFieldEndpoint,
   traceFieldLineage,
 } from "@satsuma/core";
 import type {
+  CanonicalEntityRef,
   CanonicalFieldEndpoint,
   FieldArrowLike,
   FieldLineageDirection,
@@ -38,7 +43,10 @@ import { buildInMemoryWorkspace } from "./in-memory-workspace";
 import type { SourceDocument } from "./in-memory-workspace";
 import { createScopedIndex, getImportReachableUris, resolveDefinition } from "./workspace-index";
 import type { WorkspaceIndex } from "./workspace-index";
-import { createWorkspaceDefinitionLookup } from "./workspace-definition-lookup";
+import {
+  createWorkspaceDefinitionLookup,
+  resolveSchemaFields,
+} from "./workspace-definition-lookup";
 
 /** Returns a parse tree for a URI, from whichever source the host has, or null/undefined when unavailable. */
 export type TreeLoader = (uri: string) => Tree | null | undefined;
@@ -146,6 +154,35 @@ function collectChainInputs(
   return { arrows, mappings, nlRefData };
 }
 
+/** The WorkspaceIndex key a canonical entity ref denotes: `::x` names the global entry `x`. */
+function indexKeyOfSchema(schema: CanonicalEntityRef): string {
+  return schema.startsWith("::") ? schema.slice(2) : schema;
+}
+
+/**
+ * Whether `field` names a schema (and, if given, a field path within it) that
+ * `workspace` actually declares.
+ *
+ * Mirrors the CLI's `field-lineage` not-found check — schema lookup, then a
+ * dotted-path lookup with the same nested-leaf-name fallback
+ * `collectFieldNames` provides — so a browser or LSP host can tell "this
+ * field does not exist" apart from "this field exists but has no lineage"
+ * (sv-embb), the distinction `traceFieldLineage` alone cannot make: it walks
+ * edges from whatever endpoint it is given and has no notion of whether that
+ * endpoint was ever declared.
+ */
+function focusFieldIsDeclared(field: CanonicalFieldEndpoint, workspace: WorkspaceIndex): boolean {
+  const schemaKey = indexKeyOfSchema(fieldEndpointSchema(field));
+  const path = fieldEndpointPath(field);
+  if (path === null) {
+    return workspace.definitions.get(schemaKey)?.some((d) => d.kind === "schema") ?? false;
+  }
+
+  const fields = resolveSchemaFields(workspace, schemaKey);
+  if (!fields) return false;
+  return findFieldByPath(fields, path) !== null || collectFieldNames(fields).includes(path);
+}
+
 /**
  * Build a CLI-compatible field chain from an already-built workspace index.
  *
@@ -158,6 +195,12 @@ function collectChainInputs(
  * matching `satsuma coverage`'s and `vizFullLineage`'s scoping rule: "the
  * workspace" means the entry file's transitive import closure, not every file
  * a host happens to have loaded.
+ *
+ * `resolved` is omitted (meaning true) whenever `focusField` was actually
+ * found; it is `false`, with empty upstream/downstream, when the entry file
+ * cannot be loaded at all or `focusField` cannot be resolved against the
+ * traced workspace — the two cases a host cannot otherwise distinguish from a
+ * field that legitimately has no lineage.
  */
 export function buildFieldChainFromWorkspace(
   entryUri: string,
@@ -168,10 +211,16 @@ export function buildFieldChainFromWorkspace(
 ): FieldChainModel {
   const field = canonicalFocusField(focusField);
   const maxDepth = options.depth ?? DEFAULT_FIELD_CHAIN_DEPTH;
-  if (!loadTree(entryUri)) return { field, maxDepth, upstream: [], downstream: [] };
+  if (!loadTree(entryUri)) {
+    return { field, maxDepth, upstream: [], downstream: [], resolved: false };
+  }
 
   const reachableUris = getImportReachableUris(entryUri, workspace);
   const scoped = createScopedIndex(workspace, reachableUris);
+  if (!focusFieldIsDeclared(field, scoped)) {
+    return { field, maxDepth, upstream: [], downstream: [], resolved: false };
+  }
+
   const inputs = collectChainInputs(reachableUris, loadTree, scoped);
   const lookup = createWorkspaceDefinitionLookup(scoped, (key) => inputs.mappings.get(key) ?? null);
   const nlRefs = resolveAllNLRefs(inputs.nlRefData, lookup);

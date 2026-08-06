@@ -90,6 +90,10 @@ const metricsUri = libraryUri("metrics-platform/metrics.stm");
 const reportsUri = libraryUri("reports-and-models/pipeline.stm");
 const ffgUri = libraryUri("filter-flatten-governance/filter-flatten-governance.stm");
 const sapUri = libraryUri("sap-po-to-mfcs/pipeline.stm");
+// The richest chain in the corpus: multiple upstream/downstream mappings,
+// nl-derived hops, and a collapsed namespace-fan chip all in one trace (see
+// harness.test.ts's "Field chain view" describe for the confirmed shape).
+const nsMergingUri = libraryUri("namespaces/ns-merging.stm");
 
 async function loadFixture(page: Page, fixtureUri: string): Promise<void> {
   await page.locator("#fixture-picker-btn").click();
@@ -122,6 +126,36 @@ async function openMapping(page: Page, mappingId: string): Promise<void> {
     .locator(`[data-testid='mapping-detail-${mappingId}']`)
     .first()
     .waitFor({ state: "visible", timeout: 10_000 });
+}
+
+/** Expand an overview card and return its field-row test-id prefix (mirrors harness.test.ts). */
+async function expandOverviewCard(page: Page, qualifiedIdTestSegment: string): Promise<string> {
+  const cardPrefix = `overview-schema-card-${qualifiedIdTestSegment}`;
+  await page
+    .locator(`sz-schema-card[data-testid^='${cardPrefix}']`)
+    .locator(".header-toggle")
+    .click();
+  return cardPrefix;
+}
+
+/** Open the field-chain view for one field, via its overview card's lineage icon. */
+async function openFieldChain(
+  page: Page,
+  qualifiedIdTestSegment: string,
+  fieldTestSegment: string,
+): Promise<void> {
+  const cardPrefix = await expandOverviewCard(page, qualifiedIdTestSegment);
+  await page
+    .locator(`[data-testid='${cardPrefix}-field-${fieldTestSegment}-lineage']`)
+    .click({ force: true });
+  await page.locator("[data-testid='viz-root']").waitFor({ state: "attached" });
+  await page.waitForFunction(
+    () =>
+      document.querySelector("[data-testid='viz-root']")?.getAttribute("data-view-mode") ===
+      "chain",
+    null,
+    { timeout: 10_000 },
+  );
 }
 
 async function waitForReady(page: Page): Promise<void> {
@@ -318,6 +352,25 @@ for (const theme of THEMES) {
         theme,
         uiState: "detail:order-line-facts",
         step: `filter-flatten-detail-order-line-facts-${theme}`,
+      });
+    });
+
+    test(`namespaces-chain-view-${theme}`, async ({ page }) => {
+      // sv-embb: the field-chain view (PRD 36 R4) had no light/dark review
+      // shot at all — this fixture is the corpus's richest chain (multi-hop
+      // upstream/downstream, nl-derived hops, a collapsed namespace-fan chip),
+      // matching harness.test.ts's "Field chain view" describe.
+      await page.goto(`/?theme=${theme}`);
+      await setSingleFileMode(page);
+      await loadFixture(page, nsMergingUri);
+      await openFieldChain(page, "reporting-dept-budget-vs-actual", "actual-spend");
+      await capture(page, {
+        file: `namespaces-chain-view-${theme}.png`,
+        fixture: "namespaces/ns-merging.stm",
+        viewMode: "single",
+        theme,
+        uiState: "chain:reporting::dept_budget_vs_actual.actual_spend",
+        step: `namespaces-chain-view-${theme}`,
       });
     });
 

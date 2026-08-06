@@ -1,0 +1,26 @@
+// Deliberately artificial: two schemas mapped into each other in both
+// directions, so tracing either field's lineage walks straight into a cycle.
+// Exists only to prove the field-chain viz (and the CLI it mirrors) detects
+// the cycle and terminates instead of recursing forever — not a plausible
+// real-world pipeline. Adapted from
+// tooling/satsuma-cli/test/fixtures/lineage-cycle.stm (sv-embb).
+
+schema cycle_a {
+  id  INTEGER
+}
+
+schema cycle_b {
+  id  INTEGER
+}
+
+mapping a_to_b {
+  source { cycle_a }
+  target { cycle_b }
+  id -> id
+}
+
+mapping b_to_a {
+  source { cycle_b }
+  target { cycle_a }
+  id -> id
+}

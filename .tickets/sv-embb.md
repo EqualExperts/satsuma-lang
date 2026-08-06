@@ -1,6 +1,6 @@
 ---
 id: sv-embb
-status: open
+status: closed
 deps: []
 links: []
 created: 2026-08-06T13:20:10Z
@@ -22,3 +22,10 @@ A Playwright spec in harness.test.ts opens the chain view against a cyclic fixtu
 The chain view is captured light and dark in screenshots.spec.ts.
 Full harness Playwright suite green via the watch-and-test.sh sentinel protocol; run-repo-checks.sh green.
 
+
+## Notes
+
+**2026-08-06T14:01:09Z**
+
+Cause: buildFieldChainFromWorkspace/buildFieldChainFromSources returned an identical empty {upstream:[], downstream:[]} FieldChainModel whether the focus field's schema/path was genuinely undeclared or resolved fine with no lineage, so sz-chain-view (and any host) could not render the two cases differently, unlike the CLI's field-lineage.ts which throws EXIT_NOT_FOUND for the former.
+Fix: added an optional `resolved` flag to FieldChainModel (absent = true, matching every CLI-derived payload since the CLI never emits JSON for an unresolved field); buildFieldChainFromWorkspace now checks schema+field declaration (via a new spread-aware resolveSchemaFields in workspace-definition-lookup.ts, mirroring the CLI's expandEntityFields check) before tracing, returning resolved:false with empty upstream/downstream when the entry file can't load or the focus field can't be resolved; sz-chain-view renders a distinct "chain-unknown-field" state for resolved:false. Added unit tests for both new resolution branches (viz-backend, LSP), a hand-built-cyclic-model render test and an unknown-field render test in sz-chain-view.test.js, a new examples/lineage-cycle/pipeline.stm fixture (adapted from tooling/satsuma-cli/test/fixtures/lineage-cycle.stm) with a Playwright spec in harness.test.ts proving the cycle terminates with the CLI's own confirmed one-hop-per-direction shape, and light/dark chain-view screenshots in screenshots.spec.ts. Also fixed two pre-existing viz-harness Playwright flakes (openEmailChain in view-persistence.test.ts and the new cycle test itself) where a just-expanded schema card's field-lineage button sat outside the SVG canvas's current pan/zoom viewBox on small graphs — DOM-level "scroll into view" can't follow an SVG transform, so both now click the toolbar's Fit button first. (commit immediately after 15d143ee)
