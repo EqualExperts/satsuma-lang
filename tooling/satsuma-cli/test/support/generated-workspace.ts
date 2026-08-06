@@ -27,7 +27,7 @@ import { buildWorkspaceGraph } from "#src/commands/graph-builder.js";
 import { buildFullGraph } from "#src/schema-graph.js";
 import { createFieldEdgeSource } from "#src/field-edge-source.js";
 import type { WorkspaceGraph, GraphBuildOpts } from "#src/commands/graph-builder.js";
-import type { ExtractedWorkspace } from "#src/types.js";
+import type { ExtractedWorkspace, ParsedFile } from "#src/types.js";
 import { buildFieldEdges } from "@satsuma/core";
 
 /** A generated workspace materialised on disk and loaded by the CLI's own loader. */
@@ -40,6 +40,16 @@ export interface LoadedGeneratedWorkspace {
   sources: string;
   /** The extracted index, as any command would see it. */
   index: ExtractedWorkspace;
+  /**
+   * Every file the loader parsed, with its CST.
+   *
+   * Kept because a diagnostic's *position* can only be judged against the
+   * declaration it sits inside, and no extracted record carries a declaration's
+   * end row — only its start (`SchemaRecord.row` and friends). The CST does, so a
+   * property that asserts containment rather than an exact line reads it from
+   * here. See `generated-diagnostic-properties.test.ts`.
+   */
+  parsed: ParsedFile[];
   /** How many files the loader actually reached by following imports. */
   fileCount: number;
   /** Total tree-sitter ERROR/MISSING recovery nodes across every loaded file. */
@@ -71,6 +81,7 @@ export async function loadRenderedFiles(
     root,
     sources: files.map((file) => `── ${file.path}\n${file.source}`).join("\n"),
     index,
+    parsed: loaded,
     fileCount: loaded.length,
     parseErrorCount: loaded.reduce((total, file) => total + file.errorCount, 0),
   };
