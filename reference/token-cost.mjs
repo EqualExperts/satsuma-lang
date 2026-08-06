@@ -33,3 +33,54 @@ function encoding() {
 export function countTokens(text) {
   return encoding().encode(text).length;
 }
+
+// ── The second tokenizer: Anthropic's, via the count-tokens endpoint ────────
+//
+// o200k_base is a real frontier tokenizer — it is what OpenAI's current models
+// use — but it is only one, and Anthropic's is proprietary with no offline
+// implementation. Any measurement reported as a *ratio* between two texts wants
+// more than one tokenizer behind it, because vocabularies differ most exactly
+// where this repo's inputs live: dense punctuation and identifiers. Reported
+// per tokenizer and never averaged, so a difference between them stays visible.
+
+/** Identifier used for the Anthropic figures in committed reports. */
+export const ANTHROPIC_TOKENIZER_ID = "anthropic-claude-sonnet-4-5";
+
+const ANTHROPIC_COUNT_TOKENS_URL = "https://api.anthropic.com/v1/messages/count_tokens";
+// Any current Claude model reports the same tokenizer's count for a given
+// string; the choice of model here does not change the number.
+const ANTHROPIC_COUNT_TOKENS_MODEL = "claude-sonnet-4-5";
+
+/**
+ * Counts `text`'s tokens via the Anthropic API, or returns `null` when no API
+ * key is configured or the call fails.
+ *
+ * Returning `null` rather than throwing is deliberate: this tokenizer needs a
+ * network call and a key, so its absence must narrow which tokenizers a report
+ * carries, never fail the measurement. Callers check for `null` and say so in
+ * their output rather than silently reporting one tokenizer as if it were all
+ * of them.
+ */
+export async function countAnthropicTokens(text) {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) return null;
+  try {
+    const response = await fetch(ANTHROPIC_COUNT_TOKENS_URL, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01",
+      },
+      body: JSON.stringify({
+        model: ANTHROPIC_COUNT_TOKENS_MODEL,
+        messages: [{ role: "user", content: text }],
+      }),
+    });
+    if (!response.ok) return null;
+    const { input_tokens } = await response.json();
+    return input_tokens ?? null;
+  } catch {
+    return null;
+  }
+}

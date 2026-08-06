@@ -16,6 +16,22 @@ Every ratio below is therefore a **lower bound** on Satsuma's advantage.
 
 Corpus: 21 specs under `examples/`.
 
+## Which tokenizers these figures carry
+
+Reported per tokenizer and never averaged: `o200k_base`.
+Different tokenizers give materially different ratios on dense punctuation and
+identifiers, which is exactly what a `.stm` file is, so a single averaged number
+would hide that.
+
+`o200k_base` is a real frontier tokenizer — it is what OpenAI's current models
+use — but it is only one, and Anthropic's is proprietary with no offline
+implementation. **Set `ANTHROPIC_API_KEY` and rerun** to add a second,
+independently-built tokenizer to this report.
+
+Until then the character counts below are the cross-check: they involve no
+tokenizer at all, so a conclusion that holds in both is not an artifact of one
+vendor's vocabulary.
+
 ## What the reference overhead is
 
 An agent reading YAML needs no help. An agent reading `.stm` needs the agent
@@ -77,4 +93,16 @@ Stated plainly: **static compactness is not a claim Satsuma can make against YAM
 That is a finding about artifact size only. It says nothing about what an agent
 *consumes* completing a task, which is a different quantity, dominated by agent
 loops rather than file size, and measured by this feature's behavioural arms.
+
+## Characters — the tokenizer-free cross-check
+
+Counted in characters rather than tokens, so no vocabulary is involved. If the
+token headline were an artifact of one tokenizer, these would disagree with it.
+
+### Corpus summary
+
+- Median reduction vs YAML: **7.7%**
+- Median reduction vs JSON (2-space): **38.7%**
+- Median reduction vs YAML using the file as authored: **-1.7%**
+
 

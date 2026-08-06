@@ -34,7 +34,12 @@ import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { Command } from "commander";
 import { composeFull, composeProfile, loadSections } from "../reference/compose.mjs";
-import { countTokens, TOKENIZER_ID } from "../reference/token-cost.mjs";
+import {
+  countTokens,
+  TOKENIZER_ID,
+  countAnthropicTokens,
+  ANTHROPIC_TOKENIZER_ID,
+} from "../reference/token-cost.mjs";
 import { PROFILES } from "../reference/manifest.mjs";
 import { FRONTMATTER as SKILL_FRONTMATTER } from "./regenerate-satsuma-language-skill.mjs";
 
@@ -124,43 +129,6 @@ async function loadMcpToolSchemas() {
   return schemas;
 }
 
-// ── Optional second tokenizer: the Anthropic count-tokens endpoint ──
-
-const ANTHROPIC_COUNT_TOKENS_URL = "https://api.anthropic.com/v1/messages/count_tokens";
-// Any current Claude model reports the same tokenizer's count for a given
-// string; the choice of model here does not change the number.
-const ANTHROPIC_COUNT_TOKENS_MODEL = "claude-sonnet-4-5";
-
-/**
- * Counts `text`'s tokens via the Anthropic API, or returns `null` if no API
- * key is configured or the call fails. This tokenizer is a nice-to-have per
- * the PRD ("too, if ANTHROPIC_API_KEY is available") — its absence must
- * never fail the measurement, only narrow which tokenizers get reported.
- */
-async function countAnthropicTokens(text) {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) return null;
-  try {
-    const response = await fetch(ANTHROPIC_COUNT_TOKENS_URL, {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01",
-      },
-      body: JSON.stringify({
-        model: ANTHROPIC_COUNT_TOKENS_MODEL,
-        messages: [{ role: "user", content: text }],
-      }),
-    });
-    if (!response.ok) return null;
-    const { input_tokens } = await response.json();
-    return input_tokens ?? null;
-  } catch {
-    return null;
-  }
-}
-
 // ── Assembling the report ──
 
 /**
@@ -243,10 +211,10 @@ async function main() {
         "reporting o200k_base only, per the PRD's 'if available' requirement.",
     );
   } else {
-    tokenizers["anthropic-claude-sonnet-4-5"] = {
+    tokenizers[ANTHROPIC_TOKENIZER_ID] = {
       ...(await measureReferenceContent(sections, countAnthropicTokens)),
     };
-    tokenizers["anthropic-claude-sonnet-4-5"].envelopes = await measureEnvelopes(
+    tokenizers[ANTHROPIC_TOKENIZER_ID].envelopes = await measureEnvelopes(
       { wholeDocument: anthropicWholeDoc, skillBody, mcpSchemas },
       countAnthropicTokens,
     );

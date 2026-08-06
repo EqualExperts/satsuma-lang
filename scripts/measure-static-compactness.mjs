@@ -38,7 +38,12 @@ import { readFileSync, writeFileSync, readdirSync, statSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import { initParser, getParser, isSatsumaFilePath } from "@satsuma/core";
-import { countTokens, TOKENIZER_ID } from "../reference/token-cost.mjs";
+import {
+  countTokens,
+  TOKENIZER_ID,
+  countAnthropicTokens,
+  ANTHROPIC_TOKENIZER_ID,
+} from "../reference/token-cost.mjs";
 import { projectSpec, stripPlainComments } from "./static-compactness-model.mjs";
 import { renderYaml, renderJson } from "./static-compactness-render.mjs";
 
@@ -115,7 +120,11 @@ function discoverCorpus() {
  * render the projection of those same files, so all three carry identical
  * facts by construction.
  */
-function measureSpec(spec, count) {
+/**
+ * Renders one spec's three arms once, so every tokenizer measures the same
+ * bytes rather than re-parsing and re-rendering per tokenizer.
+ */
+function renderSpecArms(spec) {
   const documents = spec.files.map((file) => {
     const source = readFileSync(file, "utf8");
     const root = getParser().parse(source).rootNode;
@@ -126,25 +135,37 @@ function measureSpec(spec, count) {
       model: projectSpec(root),
     };
   });
+  return {
+    // The like-for-like Satsuma arm: comment-free, as both other arms are.
+    S: documents.map((d) => d.sourceWithoutComments).join("\n"),
+    // The same file as authored, comments and all — reported alongside so the
+    // comment policy is visible rather than an unstated thumb on the scale.
+    Sauthored: documents.map((d) => d.source).join("\n"),
+    Y: renderYaml(documents),
+    J: renderJson(documents),
+  };
+}
 
-  const stmText = documents.map((d) => d.source).join("\n");
-  const stmTextBare = documents.map((d) => d.sourceWithoutComments).join("\n");
-  const yamlText = renderYaml(documents);
-  const jsonText = renderJson(documents);
-
+/**
+ * Measures one spec's already-rendered arms under one tokenizer.
+ *
+ * `count` may be sync (`o200k_base`) or async (the Anthropic endpoint); both
+ * are awaited uniformly. A `count` that returns `null` for any arm means that
+ * tokenizer is unavailable, and the caller drops it rather than reporting a
+ * partial section.
+ */
+async function measureSpec(spec, texts, count) {
+  const arms = {};
+  for (const [arm, text] of Object.entries(texts)) {
+    const measured = await count(text);
+    if (measured === null || measured === undefined) return null;
+    arms[arm] = measured;
+  }
   return {
     name: spec.name,
     fileCount: spec.files.length,
-    lineCount: stmText.split("\n").length,
-    arms: {
-      // The like-for-like Satsuma arm: comment-free, as both other arms are.
-      S: count(stmTextBare),
-      // The same file as authored, comments and all — reported alongside so the
-      // comment policy is visible rather than an unstated thumb on the scale.
-      Sauthored: count(stmText),
-      Y: count(yamlText),
-      J: count(jsonText),
-    },
+    lineCount: texts.Sauthored.split("\n").length,
+    arms,
   };
 }
 
@@ -182,7 +203,7 @@ function deriveRatios(measured) {
  * is explicit that different tokenizers give materially different ratios on
  * dense-punctuation input, and a single averaged number would hide that.
  */
-function renderReport({ tokenizers, referenceOverhead, corpusSize }) {
+function renderReport({ tokenizers, characters, referenceOverhead, corpusSize }) {
   const lines = [
     "# Static compactness — `.stm` against equivalent YAML and JSON",
     "",
@@ -202,6 +223,28 @@ function renderReport({ tokenizers, referenceOverhead, corpusSize }) {
     "",
     `Corpus: ${corpusSize} specs under \`examples/\`.`,
     "",
+    "## Which tokenizers these figures carry",
+    "",
+    `Reported per tokenizer and never averaged: ${Object.keys(tokenizers)
+      .map((id) => `\`${id}\``)
+      .join(", ")}.`,
+    "Different tokenizers give materially different ratios on dense punctuation and",
+    "identifiers, which is exactly what a `.stm` file is, so a single averaged number",
+    "would hide that.",
+    "",
+    ...(Object.keys(tokenizers).length === 1
+      ? [
+          "`o200k_base` is a real frontier tokenizer — it is what OpenAI's current models",
+          "use — but it is only one, and Anthropic's is proprietary with no offline",
+          "implementation. **Set `ANTHROPIC_API_KEY` and rerun** to add a second,",
+          "independently-built tokenizer to this report.",
+          "",
+          "Until then the character counts below are the cross-check: they involve no",
+          "tokenizer at all, so a conclusion that holds in both is not an artifact of one",
+          "vendor's vocabulary.",
+          "",
+        ]
+      : []),
     "## What the reference overhead is",
     "",
     "An agent reading YAML needs no help. An agent reading `.stm` needs the agent",
@@ -230,6 +273,16 @@ function renderReport({ tokenizers, referenceOverhead, corpusSize }) {
     }
     lines.push("", ...renderCorpusSummary(specs, referenceOverhead), "");
   }
+
+  lines.push(
+    "## Characters — the tokenizer-free cross-check",
+    "",
+    "Counted in characters rather than tokens, so no vocabulary is involved. If the",
+    "token headline were an artifact of one tokenizer, these would disagree with it.",
+    "",
+    ...renderCorpusSummary(characters, referenceOverhead).slice(0, 6),
+    "",
+  );
 
   return lines.join("\n") + "\n";
 }
@@ -293,20 +346,46 @@ async function main() {
   const referenceOverhead = readReferenceOverheadTokens();
   const corpus = discoverCorpus();
 
-  const measured = corpus.map((spec) => {
-    const result = measureSpec(spec, countTokens);
-    return { ...result, ratios: deriveRatios(result) };
-  });
+  // Render every arm once; each tokenizer then measures the same bytes.
+  const rendered = corpus.map((spec) => ({ spec, texts: renderSpecArms(spec) }));
 
-  const tokenizers = { [TOKENIZER_ID]: measured };
+  const measureAll = async (count) => {
+    const specs = [];
+    for (const { spec, texts } of rendered) {
+      const result = await measureSpec(spec, texts, count);
+      if (result === null) return null;
+      specs.push({ ...result, ratios: deriveRatios(result) });
+    }
+    return specs;
+  };
+
+  const tokenizers = { [TOKENIZER_ID]: await measureAll(countTokens) };
+
+  // A second, independently-built tokenizer is what stops the headline resting
+  // on one vendor's vocabulary. It needs a key and a network call, so its
+  // absence narrows the report rather than failing it — and the report says
+  // which tokenizers it actually carries.
+  const anthropic = await measureAll(countAnthropicTokens);
+  if (anthropic === null) {
+    console.log(
+      "measure-static-compactness: ANTHROPIC_API_KEY not set (or the call failed) — " +
+        `reporting ${TOKENIZER_ID} only. Set the key and rerun for a second tokenizer.`,
+    );
+  } else {
+    tokenizers[ANTHROPIC_TOKENIZER_ID] = anthropic;
+  }
+
+  // Characters involve no tokenizer at all, so they are the cheapest check that
+  // the headline is not an artifact of one vendor's vocabulary.
+  const characters = await measureAll((text) => text.length);
 
   writeFileSync(
     join(repoRoot, "reference", "static-compactness.json"),
-    JSON.stringify({ referenceOverhead, tokenizers }, null, 2) + "\n",
+    JSON.stringify({ referenceOverhead, tokenizers, characters }, null, 2) + "\n",
   );
   writeFileSync(
     join(repoRoot, "reference", "static-compactness.md"),
-    renderReport({ tokenizers, referenceOverhead, corpusSize: corpus.length }),
+    renderReport({ tokenizers, characters, referenceOverhead, corpusSize: corpus.length }),
   );
 
   console.log(
