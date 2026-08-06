@@ -199,7 +199,12 @@ function textAt(indexed, uri, range) {
  * it from the same index the answer came from would compare the toolchain with
  * itself. A generated declaration is always `<keyword> <name>` at the start of a
  * line, optionally indented inside a namespace and optionally followed by a
- * metadata block, so one anchored pattern locates it.
+ * metadata block, so scanning for that prefix locates it.
+ *
+ * Matched by string operations rather than a pattern built from `entity`: a
+ * `RegExp` assembled from a value is a ReDoS surface Semgrep blocks
+ * (`detect-non-literal-regexp`), and escaping the name to make it safe would be
+ * more code than the two comparisons this needs.
  *
  * @param {IndexedGeneratedWorkspace} indexed
  * @param {{ file: string, name: string, keyword: string }} entity
@@ -208,26 +213,47 @@ function textAt(indexed, uri, range) {
 function declarationSite(indexed, entity) {
   const uri = documentUri(indexed, entity.file);
   const lines = documentAt(indexed, uri).source.split("\n");
-  // The trailing lookahead stops `s1` from matching the start of `s10`.
-  const declaration = new RegExp(
-    `^\\s*${entity.keyword}\\s+${escapeForRegExp(entity.name)}(?![\\w-])`,
-  );
 
   for (let line = 0; line < lines.length; line += 1) {
-    const match = declaration.exec(lines[line]);
-    if (match) {
-      return { uri, line, character: match[0].length - entity.name.length };
-    }
+    const character = declarationColumn(lines[line], entity);
+    if (character !== null) return { uri, line, character };
   }
   throw new Error(
     `no '${entity.keyword} ${entity.name}' declaration in ${entity.file}:\n${indexed.sources}`,
   );
 }
 
-/** Escape a name for literal use inside a regular expression. */
-function escapeForRegExp(text) {
-  return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+/**
+ * The column `entity.name` starts at on one line, if that line declares it.
+ *
+ * A declaration line is leading whitespace, the keyword, one or more spaces, then
+ * the name. The character *after* the name must not continue an identifier, which
+ * is what stops `s1` from matching the start of `s10`.
+ *
+ * @returns {number | null} the 0-indexed column, or null if this is not the line
+ */
+function declarationColumn(line, { keyword, name }) {
+  const indent = line.length - line.trimStart().length;
+  const afterKeyword = indent + keyword.length;
+  if (line.slice(indent, afterKeyword) !== keyword) return null;
+
+  // At least one space must separate the keyword from the name, or `schemas s1`
+  // would read as the keyword `schema` followed by the name `s`.
+  const gap = line.slice(afterKeyword).length - line.slice(afterKeyword).trimStart().length;
+  if (gap === 0) return null;
+
+  const nameStart = afterKeyword + gap;
+  if (line.slice(nameStart, nameStart + name.length) !== name) return null;
+
+  const following = line.charAt(nameStart + name.length);
+  return following === "" || !IDENTIFIER_CHARACTER.test(following) ? nameStart : null;
 }
+
+/**
+ * Characters that continue a Satsuma identifier, so a name followed by one of
+ * them is a *different, longer* name rather than a match.
+ */
+const IDENTIFIER_CHARACTER = /[\w-]/;
 
 /**
  * One reported or indexed reference to an entity.
