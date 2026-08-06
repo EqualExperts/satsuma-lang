@@ -710,6 +710,16 @@ test.describe("Mapping detail — completed orders (multi-source join)", () => {
     // user-authored and not stable enough for a separate testid hook.
     await expect(detail).toContainText("WHERE @order_events.order_status = completed");
 
+    // sl-yhlj: the join description's @refs (@order_events.customer.customer_id,
+    // @customer_profiles.customer_id, @order_events.order_status) must render
+    // through the same highlightAtRefs pipeline as NL transform text, not as
+    // plain unstyled text. Locate the join row by its distinguishing text and
+    // assert at least one <span class="at-ref"> landed inside it.
+    const joinRow = detail
+      .locator(".mapping-meta-row")
+      .filter({ hasText: "WHERE @order_events.order_status = completed" });
+    expect(await joinRow.locator("span.at-ref").count()).toBeGreaterThanOrEqual(1);
+
     // NOTE: as of sl-ny3r the mapping detail header does not render
     // MappingBlock.notes — only schema notes and arrow notes are rendered.
     // The mapping-level note remains an open viz gap (tracked separately);
