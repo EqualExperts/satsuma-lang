@@ -273,7 +273,9 @@ async function main(): Promise<void> {
   const fixturesByUri = new Map(fixtures.map((f) => [f.uri, f]));
 
   const server = http.createServer(makeHandler(fixtures, fixturesByUri));
-  server.listen(PORT, () => {
+  // Bind to loopback only: the harness is a single-machine test/dev tool.
+  // Ports 3333 and 3334 serve fixture content and compiled UI; they have no reason to be off-box.
+  server.listen(PORT, "127.0.0.1", () => {
     console.log(`[harness] ready at http://localhost:${PORT}`);
   });
 }

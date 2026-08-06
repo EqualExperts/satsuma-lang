@@ -66,6 +66,8 @@ createServer(async (req, res) => {
     res.writeHead(404, { "Content-Type": "text/plain" });
     res.end("Not found");
   }
-}).listen(PORT, () => {
+  // Bind to loopback only: the playground is a single-machine dev tool.
+  // Port 3334 serves the assembled static bundle; it has no reason to be off-box.
+}).listen(PORT, "127.0.0.1", () => {
   console.log(`[playground-static] serving ${ROOT} at http://localhost:${PORT}${BASE_PATH}`);
 });
