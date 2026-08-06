@@ -1,6 +1,6 @@
 ---
 id: vnm-kisd
-status: open
+status: closed
 deps: []
 links: [vnm-bak4]
 created: 2026-08-06T17:23:11Z
@@ -38,3 +38,25 @@ Related: sl-1gqw introduced the shaded field-note row.
 - A rendered multi-line note does not overlap adjacent cards or break the ELK layout's card-height assumption.
 - Playwright harness coverage in `tooling/satsuma-viz-harness/test/harness.test.ts` asserts the rendered DOM of a Markdown field note (e.g. a `<ul>`/`<strong>` inside `.field-note`, not the literal `**`). There is no existing `describe` block for note rendering at all and no fixture with a Markdown field note — both need adding. Per AGENTS.md, this is painted output: a unit test on the converter proves the string transform, only a rendered browser proves the field row shows it.
 
+
+## Notes
+
+**2026-08-06T18:15:18Z**
+
+**2026-08-06T18:20:00Z**
+
+Cause: `renderMarkdown` was wired only to entity-level schema notes and file
+notes; field notes (sz-schema-card), fragment-card and metric-card notes
+interpolated `${n.text}` raw. A second, deeper cause surfaced during the fix:
+note bodies keep their source indentation by design (SATSUMA-V2-SPEC.md:43),
+and every block rule in the converter anchors at line start — so simply wiring
+`renderMarkdown` in still rendered the spec's own PHONE_NBR example as one flat
+paragraph. This also silently affected the file-level notes that already used
+`renderMarkdown`.
+Fix: added `dedentNoteBody` (trims the first line, whose indentation the
+delimiter consumed, then strips the common indent from the rest) and composed
+`@ref` marking into the Markdown inline pipeline; extracted the four duplicated
+copies of the notes section into `satsuma-viz/src/notes.ts` so the drift that
+caused this cannot recur; gave `.field-note` card-scale Markdown child styles.
+Verified in a real browser — new "Note rendering" Playwright suite, 136 passed.
+(commit immediately after 3bbbcb0b)

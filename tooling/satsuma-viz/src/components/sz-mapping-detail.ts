@@ -8,6 +8,7 @@ import type {
   EachBlock,
   FlattenBlock,
   NestedArrowBlock,
+  NoteBlock,
 } from "../model.js";
 import { SzNavigateEvent, SzFieldHoverEvent } from "../satsuma-viz.js";
 import {
@@ -17,7 +18,8 @@ import {
   scopeWithin,
 } from "../field-coverage.js";
 import type { ContainerScope, MappingArrowVisit } from "../field-coverage.js";
-import { highlightAtRefs } from "../markdown.js";
+import { highlightAtRefs, renderMarkdown } from "../markdown.js";
+import { noteSectionStyles, renderNotesSection } from "../notes.js";
 import { qualifyChildArrowPath } from "@satsuma/core/extract";
 import { extractAtRefs } from "@satsuma/core/nl-ref";
 import type { SchemaCoverage } from "../field-coverage.js";
@@ -47,6 +49,28 @@ function sanitizeTestIdSegment(value: string): string {
 }
 
 /**
+ * Metadata key carrying note text. A `note` may be written either as a
+ * structural `note { }` block or as a `( note "..." )` metadata entry
+ * (SATSUMA-V2-SPEC.md:225 and :242); the two are the same thing to a reader,
+ * so both render in the notes section and neither renders as a metadata pill.
+ */
+const NOTE_METADATA_KEY = "note";
+
+/**
+ * Adapt a mapping's `( note "..." )` metadata entries into note blocks so they
+ * render beside the structural `note { }` blocks.
+ *
+ * `isMultiline` is false because a metadata note is written inline; the
+ * mapping's own location is reused since a `MetadataEntry` carries none, and
+ * the notes section does not navigate.
+ */
+function metadataNotesAsBlocks(m: MappingBlock): NoteBlock[] {
+  return (m.metadata ?? [])
+    .filter((entry) => entry.key === NOTE_METADATA_KEY)
+    .map((entry) => ({ text: entry.value, isMultiline: false, location: m.location }));
+}
+
+/**
  * Three-column mapping detail view.
  *
  * Left:   source schema cards (full fields)
@@ -58,287 +82,349 @@ function sanitizeTestIdSegment(value: string): string {
  */
 @customElement("sz-mapping-detail")
 export class SzMappingDetail extends LitElement {
-  static override styles = css`
-    :host {
-      display: block;
-      font-family: var(--sz-font-sans);
-    }
+  static override styles = [
+    noteSectionStyles,
+    css`
+      :host {
+        display: block;
+        font-family: var(--sz-font-sans);
+      }
 
-    .layout {
-      display: grid;
-      grid-template-columns: max-content max-content max-content;
-      gap: 16px;
-      align-items: start;
-      width: max-content;
-      min-width: 100%;
-    }
+      .layout {
+        display: grid;
+        grid-template-columns: max-content max-content max-content;
+        gap: 16px;
+        align-items: start;
+        width: max-content;
+        min-width: 100%;
+      }
 
-    /* Let schema cards grow to their content width instead of truncating to the viewport. */
-    .column sz-schema-card {
-      --sz-card-max-width: none;
-      width: max-content;
-      box-sizing: border-box;
-    }
+      /* Let schema cards grow to their content width instead of truncating to the viewport. */
+      .column sz-schema-card {
+        --sz-card-max-width: none;
+        width: max-content;
+        box-sizing: border-box;
+      }
 
-    .column {
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-      width: max-content;
-      min-width: 280px;
-    }
+      .column {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        width: max-content;
+        min-width: 280px;
+      }
 
-    .column-header {
-      font-size: 10px;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-      color: var(--sz-text-muted);
-      padding: 0 4px 4px;
-      border-bottom: 1px solid var(--sz-card-border);
-    }
+      .column-header {
+        font-size: 10px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--sz-text-muted);
+        padding: 0 4px 4px;
+        border-bottom: 1px solid var(--sz-card-border);
+      }
 
-    /* Mapping header */
-    .mapping-header {
-      background: var(--sz-card-bg);
-      border: 1px solid var(--sz-card-border);
-      border-radius: var(--sz-card-radius);
-      box-shadow: var(--sz-card-shadow);
-      overflow: hidden;
-      width: max-content;
-      min-width: 100%;
-    }
+      /* Mapping header */
+      .mapping-header {
+        background: var(--sz-card-bg);
+        border: 1px solid var(--sz-card-border);
+        border-radius: var(--sz-card-radius);
+        box-shadow: var(--sz-card-shadow);
+        overflow: hidden;
+        width: max-content;
+        min-width: 100%;
+      }
 
-    .mapping-title {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      padding: 10px 12px;
-      background: var(--sz-orange);
-      color: var(--sz-text-on-accent);
-      font-size: 14px;
-      font-weight: 600;
-      cursor: pointer;
-    }
+      .mapping-title {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 12px;
+        background: var(--sz-orange);
+        color: var(--sz-text-on-accent);
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+      }
 
-    .mapping-title:hover {
-      filter: brightness(0.95);
-    }
+      .mapping-title:hover {
+        filter: brightness(0.95);
+      }
 
-    .mapping-meta {
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-      padding: 8px 12px;
-      border-bottom: 1px solid var(--sz-card-border);
-    }
+      .mapping-meta {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        padding: 8px 12px;
+        border-bottom: 1px solid var(--sz-card-border);
+      }
 
-    .mapping-meta-row {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 6px;
-      align-items: flex-start;
-    }
+      .mapping-meta-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        align-items: flex-start;
+      }
 
-    .meta-tag {
-      font-size: 11px;
-      padding: 2px 8px;
-      border-radius: 4px;
-      background: var(--sz-badge-bg);
-      color: var(--sz-text-muted);
-      max-width: 100%;
-    }
+      .meta-tag {
+        font-size: 11px;
+        padding: 2px 8px;
+        border-radius: 4px;
+        background: var(--sz-badge-bg);
+        color: var(--sz-text-muted);
+        max-width: 100%;
+      }
 
-    .meta-tag .label {
-      color: var(--sz-orange-dark);
-      font-weight: 500;
-    }
+      .meta-tag .label {
+        color: var(--sz-orange-dark);
+        font-weight: 500;
+      }
 
-    .meta-tag.wrap {
-      max-width: 600px;
-      white-space: normal;
-      word-break: break-word;
-      overflow-wrap: anywhere;
-    }
+      .meta-tag.wrap {
+        max-width: 600px;
+        white-space: normal;
+        word-break: break-word;
+        overflow-wrap: anywhere;
+      }
 
-    /* Arrow table */
-    .arrow-table {
-      width: max-content;
-      min-width: 100%;
-      border-collapse: collapse;
-    }
+      /* Arrow table */
+      .arrow-table {
+        width: max-content;
+        min-width: 100%;
+        border-collapse: collapse;
+      }
 
-    .arrow-table th {
-      font-size: 10px;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-      color: var(--sz-text-muted);
-      text-align: left;
-      padding: 6px 12px;
-      border-bottom: 2px solid var(--sz-card-border);
-    }
+      .arrow-table th {
+        font-size: 10px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--sz-text-muted);
+        text-align: left;
+        padding: 6px 12px;
+        border-bottom: 2px solid var(--sz-card-border);
+      }
 
-    /* Stated empty state for a mapping with no field arrows (sl-jetk). Muted
+      /* Stated empty state for a mapping with no field arrows (sl-jetk). Muted
        and italic so it reads as an explanation, not as table content. */
-    .arrow-table-empty {
-      padding: 10px 12px;
-      font-size: 12px;
-      font-style: italic;
-      line-height: 1.5;
-      color: var(--sz-text-muted);
-    }
+      .arrow-table-empty {
+        padding: 10px 12px;
+        font-size: 12px;
+        font-style: italic;
+        line-height: 1.5;
+        color: var(--sz-text-muted);
+      }
 
-    .arrow-table td {
-      padding: 5px 12px;
-      border-bottom: 1px solid var(--sz-card-border);
-      font-size: 12px;
-      vertical-align: top;
-    }
+      .arrow-table td {
+        padding: 5px 12px;
+        border-bottom: 1px solid var(--sz-card-border);
+        font-size: 12px;
+        vertical-align: top;
+      }
 
-    .arrow-table tr {
-      cursor: pointer;
-      transition:
-        opacity 0.15s ease,
-        background 0.15s ease;
-    }
+      .arrow-table tr {
+        cursor: pointer;
+        transition:
+          opacity 0.15s ease,
+          background 0.15s ease;
+      }
 
-    .arrow-table tr:hover {
-      background: var(--sz-row-hover-bg);
-    }
+      .arrow-table tr:hover {
+        background: var(--sz-row-hover-bg);
+      }
 
-    /* Cross-highlighting on arrow rows */
-    :host([has-highlight]) .arrow-table tr.arrow-row {
-      opacity: 0.5;
-    }
+      /* Cross-highlighting on arrow rows */
+      :host([has-highlight]) .arrow-table tr.arrow-row {
+        opacity: 0.5;
+      }
 
-    :host([has-highlight]) .arrow-table tr.arrow-row.hl {
-      opacity: 1;
-      background: var(--sz-accent-wash);
-    }
+      :host([has-highlight]) .arrow-table tr.arrow-row.hl {
+        opacity: 1;
+        background: var(--sz-accent-wash);
+      }
 
-    :host([has-highlight]) .arrow-table tr.arrow-row.hl .field-ref {
-      font-weight: 700;
-    }
+      :host([has-highlight]) .arrow-table tr.arrow-row.hl .field-ref {
+        font-weight: 700;
+      }
 
-    .field-ref {
-      font-family: var(--sz-font-mono, monospace);
-      font-size: 12px;
-      font-weight: 500;
-      color: var(--sz-text);
-      white-space: normal;
-      word-break: break-word;
-      overflow-wrap: anywhere;
-    }
+      .field-ref {
+        font-family: var(--sz-font-mono, monospace);
+        font-size: 12px;
+        font-weight: 500;
+        color: var(--sz-text);
+        white-space: normal;
+        word-break: break-word;
+        overflow-wrap: anywhere;
+      }
 
-    .source-ref-list {
-      display: flex;
-      flex-direction: column;
-      align-items: flex-start;
-      gap: 2px;
-      max-width: 280px;
-    }
+      .source-ref-list {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 2px;
+        max-width: 280px;
+      }
 
-    .source-ref-item {
-      display: block;
-    }
+      .source-ref-item {
+        display: block;
+      }
 
-    /* Marker for an arrow with no source field (sl-k7i4). Deliberately not a
+      /* Marker for an arrow with no source field (sl-k7i4). Deliberately not a
        .field-ref: sans-serif, italic and muted so it cannot be misread as a
        field path, and so highlight styling for real paths never applies to it. */
-    .source-derived {
-      font-family: var(--sz-font-sans);
-      font-size: 11px;
-      font-style: italic;
-      color: var(--sz-text-muted);
-    }
+      .source-derived {
+        font-family: var(--sz-font-sans);
+        font-size: 11px;
+        font-style: italic;
+        color: var(--sz-text-muted);
+      }
 
-    .transform-cell {
-      width: 400px;
-      max-width: 400px;
-      min-width: 320px;
-      text-align: left;
-    }
+      .transform-cell {
+        width: 400px;
+        max-width: 400px;
+        min-width: 320px;
+        text-align: left;
+      }
 
-    .transform-nl {
-      display: inline-block;
-      font-style: italic;
-      font-size: 11px;
-      color: var(--sz-green);
-      max-width: 400px;
-      white-space: normal;
-      word-break: break-word;
-      overflow-wrap: anywhere;
-      text-align: left;
-    }
+      .transform-nl {
+        display: inline-block;
+        font-style: italic;
+        font-size: 11px;
+        color: var(--sz-green);
+        max-width: 400px;
+        white-space: normal;
+        word-break: break-word;
+        overflow-wrap: anywhere;
+        text-align: left;
+      }
 
-    .transform-bare {
-      font-size: 11px;
-      color: var(--sz-text-muted);
-    }
+      .transform-bare {
+        font-size: 11px;
+        color: var(--sz-text-muted);
+      }
 
-    /* @ref highlights inside NL transform text */
-    .at-ref {
-      font-weight: 600;
-      font-style: normal;
-      color: var(--sz-at-ref);
-    }
+      /* @ref highlights inside NL transform text */
+      .at-ref {
+        font-weight: 600;
+        font-style: normal;
+        color: var(--sz-at-ref);
+      }
 
-    .arrow-icon {
-      color: var(--sz-text-muted);
-      font-size: 11px;
-    }
+      .arrow-icon {
+        color: var(--sz-text-muted);
+        font-size: 11px;
+      }
 
-    /* Note row displayed beneath an arrow that carries a (note "...") tag. */
-    .arrow-note-row td {
-      padding: 0 12px 6px;
-    }
+      /* Note row displayed beneath an arrow that carries a (note "...") tag. */
+      .arrow-note-row td {
+        padding: 0 12px 6px;
+      }
 
-    .arrow-note {
-      font-family: var(--sz-font-sans);
-      font-size: 11px;
-      font-style: italic;
-      color: var(--sz-text-muted);
-      line-height: 1.4;
-      padding: 2px 8px;
-      background: var(--sz-row-hover-bg);
-      border-radius: 3px;
-      max-width: 400px;
-      word-break: break-word;
-    }
+      .arrow-note {
+        font-family: var(--sz-font-sans);
+        font-size: 11px;
+        font-style: italic;
+        color: var(--sz-text-muted);
+        line-height: 1.4;
+        padding: 2px 8px;
+        background: var(--sz-row-hover-bg);
+        border-radius: 3px;
+        max-width: 400px;
+        word-break: break-word;
+      }
 
-    /* Scope sections (each/flatten) */
-    .scope-section {
-      margin: 4px 0;
-    }
+      /*
+       * An arrow note's body is Markdown like any other note (vnm-bak4), so the
+       * block elements renderMarkdown emits need spacing tuned for a row
+       * squeezed between two arrows. Margins are tighter than .note-content's
+       * for that reason, and the last child drops its margin so a one-line note
+       * — by far the common case — keeps the compact single-line row it had
+       * before Markdown rendering was wired up.
+       */
+      .arrow-note p {
+        margin: 0 0 4px;
+      }
 
-    .scope-label {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      padding: 6px 12px;
-      font-size: 11px;
-      font-weight: 600;
-      color: var(--sz-text-muted);
-      background: var(--sz-namespace-bg);
-      border-top: 1px dashed var(--sz-card-border);
-    }
+      .arrow-note p:last-child,
+      .arrow-note ul:last-child,
+      .arrow-note ol:last-child {
+        margin-bottom: 0;
+      }
 
-    .scope-label .scope-tag {
-      font-family: var(--sz-font-mono);
-      font-size: 10px;
-      padding: 1px 6px;
-      border-radius: 3px;
-      background: var(--sz-orange-dark);
-      color: var(--sz-text-on-accent);
-    }
+      .arrow-note h1,
+      .arrow-note h2,
+      .arrow-note h3 {
+        font-size: 11px;
+        font-weight: 700;
+        font-style: normal;
+        margin: 4px 0 2px;
+      }
 
-    .scope-fields {
-      font-family: var(--sz-font-mono);
-      font-size: 11px;
-      color: var(--sz-text);
-    }
-  `;
+      .arrow-note ul,
+      .arrow-note ol {
+        margin: 0 0 4px;
+        padding-left: 16px;
+      }
+
+      .arrow-note li {
+        margin: 1px 0;
+      }
+
+      .arrow-note code {
+        font-family: var(--sz-font-mono);
+        font-style: normal;
+        font-size: 10px;
+        background: var(--sz-row-active-bg);
+        padding: 1px 4px;
+        border-radius: 3px;
+      }
+
+      .arrow-note strong {
+        font-weight: 700;
+        color: var(--sz-text);
+      }
+
+      /* The mapping-level notes section sits under the mapping header, so it
+         needs the card border treatment the shared styles assume plus a
+         background matching the surrounding mapping column. */
+      .mapping-notes {
+        background: var(--sz-card-bg);
+        border-bottom: 1px solid var(--sz-card-border);
+      }
+
+      /* Scope sections (each/flatten) */
+      .scope-section {
+        margin: 4px 0;
+      }
+
+      .scope-label {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 12px;
+        font-size: 11px;
+        font-weight: 600;
+        color: var(--sz-text-muted);
+        background: var(--sz-namespace-bg);
+        border-top: 1px dashed var(--sz-card-border);
+      }
+
+      .scope-label .scope-tag {
+        font-family: var(--sz-font-mono);
+        font-size: 10px;
+        padding: 1px 6px;
+        border-radius: 3px;
+        background: var(--sz-orange-dark);
+        color: var(--sz-text-on-accent);
+      }
+
+      .scope-fields {
+        font-family: var(--sz-font-mono);
+        font-size: 11px;
+        color: var(--sz-text);
+      }
+    `,
+  ];
 
   @property({ type: Object })
   mapping: MappingBlock | null = null;
@@ -382,6 +468,17 @@ export class SzMappingDetail extends LitElement {
   /** Schema ID of the card whose field is hovered. */
   @state()
   private _hoveredCardSchema: string | null = null;
+
+  /**
+   * Whether the mapping-level notes section is expanded.
+   *
+   * Defaults to open, matching `sz-schema-card` rather than the fragment and
+   * metric cards: a mapping's `note { }` block is the context a reader needs
+   * *before* reading its arrows, and it is the entity-level documentation for
+   * the thing the whole view is about.
+   */
+  @state()
+  private _notesExpanded = true;
 
   override connectedCallback() {
     super.connectedCallback();
@@ -629,7 +726,8 @@ export class SzMappingDetail extends LitElement {
 
         <div class="column" data-testid=${`${this.testIdPrefix}-mapping-column`}>
           <div class="column-header">Mapping</div>
-          ${this._renderMappingHeader(m)} ${this._renderArrowTable(m)}
+          ${this._renderMappingHeader(m)} ${this._renderMappingNotes(m)}
+          ${this._renderArrowTable(m)}
         </div>
 
         <div class="column" data-testid=${`${this.testIdPrefix}-target-column`}>
@@ -706,21 +804,67 @@ export class SzMappingDetail extends LitElement {
               </div>
             `,
           )}
-          ${m.metadata.map(
-            (entry) => html`
-              <div
-                class="mapping-meta-row"
-                data-testid=${`${this.testIdPrefix}-meta-${sanitizeTestIdSegment(entry.key)}`}
-              >
-                <span class="meta-tag wrap"
-                  ><span class="label">${entry.key}</span> ${entry.value}</span
-                >
-              </div>
-            `,
-          )}
+          ${
+            // `note` is withheld here and rendered by _renderMappingNotes
+            // instead — the same dedupe the schema card applies to its own
+            // note metadata, and the reason a `( note """...""" )` no longer
+            // shows as a raw multi-line blob inside a pill (vnm-bak4).
+            (m.metadata ?? [])
+              .filter((entry) => entry.key !== NOTE_METADATA_KEY)
+              .map(
+                (entry) => html`
+                  <div
+                    class="mapping-meta-row"
+                    data-testid=${`${this.testIdPrefix}-meta-${sanitizeTestIdSegment(entry.key)}`}
+                  >
+                    <span class="meta-tag wrap"
+                      ><span class="label">${entry.key}</span> ${entry.value}</span
+                    >
+                  </div>
+                `,
+              )
+          }
         </div>
       </div>
     `;
+  }
+
+  /**
+   * The mapping's own notes, rendered between the header and the arrow table.
+   *
+   * Two sources reach the reader here (vnm-bak4):
+   *   - `note { }` blocks in the mapping body or on the mapping itself, which
+   *     the backend collects into `MappingBlock.notes`
+   *   - a `note "..."` entry in the mapping's `( )` metadata block, which
+   *     {@link _renderMappingHeader} deliberately withholds from its pill row
+   *     so the two render in one place instead of two
+   *
+   * Renders nothing at all when the mapping carries no notes — an empty
+   * toggle would take vertical space from the arrow table for no information.
+   */
+  private _renderMappingNotes(m: MappingBlock) {
+    // Tolerate models serialized before MappingBlock carried notes (older LSP
+    // servers, cached webview payloads) — render no notes, don't take the
+    // whole detail view down with a spread over undefined. Same defence
+    // `sz-schema-card` applies to a field's metadata.
+    const notes = [...(m.notes ?? []), ...metadataNotesAsBlocks(m)];
+    if (notes.length === 0) return nothing;
+
+    return html`
+      <div class="mapping-notes">
+        ${renderNotesSection({
+          notes,
+          expanded: this._notesExpanded,
+          onToggle: (e: Event) => this._toggleNotes(e),
+          testIdPrefix: this.testIdPrefix,
+        })}
+      </div>
+    `;
+  }
+
+  private _toggleNotes(e: Event) {
+    e.stopPropagation();
+    this._notesExpanded = !this._notesExpanded;
   }
 
   /**
@@ -839,7 +983,7 @@ export class SzMappingDetail extends LitElement {
         noteEntry
           ? html`<tr class="arrow-note-row" data-testid=${`${rowTestId}-note`}>
               <td colspan="4">
-                <span class="arrow-note">${unsafeHTML(highlightAtRefs(noteEntry.value))}</span>
+                <div class="arrow-note">${unsafeHTML(renderMarkdown(noteEntry.value))}</div>
               </td>
             </tr>`
           : ""

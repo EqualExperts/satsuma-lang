@@ -129,7 +129,17 @@ mapping `customer migration` {
   COMPANY_NM -> company_name { trim | null_if_empty }
 
   // --- Contact ---
-  EMAIL_ADDR -> email { trim | lowercase | validate_email | null_if_invalid }
+  EMAIL_ADDR -> email (note """
+    Applied **in order**, and a failure is never fatal:
+    - `trim` — leading and trailing whitespace only
+    - `lowercase` — domains are case-insensitive
+    - rows failing `validate_email` become NULL, they are not dropped
+    """) {
+    trim
+    | lowercase
+    | validate_email
+    | null_if_invalid
+  }
 
   PHONE_NBR -> phone {
     "Extract all digits. If 11 digits starting with 1, treat as US.
