@@ -216,14 +216,15 @@ describe("strict mode precedence", () => {
 // ── Registration of the core-detected rules ─────────────────────────────────
 
 describe("structural rules registration", () => {
-  it("lists both structural rules in --rules", async () => {
-    // `--rules` is the discoverability surface, and the same list validates
-    // --select/--ignore/lint.suppress ids — a rule missing from the registry
-    // would make its own id a typo.
-    const { stdout } = await run(CLI, "lint", "--rules");
-    assert.match(stdout, /type-mismatch-direct-arrow/);
-    assert.match(stdout, /lineage-cycle/);
-  });
+  // Registration itself is no longer asserted here. `docs.test.ts`'s lint-registry
+  // suite (gpt-o0fk) pins the printed list against both the engine's `RULES` and
+  // `SATSUMA-CLI.md`'s rule table as *set equality in both directions*, which
+  // subsumes the two `assert.match` calls this block used to make — and unlike
+  // them, it also fails when a rule is registered and left undocumented. Keeping a
+  // weaker duplicate of a stronger check is what AGENTS.md's "no redundant tests"
+  // rule is about. `type-mismatch-direct-arrow` and `lineage-cycle` stay pinned via
+  // their rows in that table, which is what makes the two constant-registered rules
+  // (core's `TYPE_MISMATCH_RULE_ID` and `LINEAGE_CYCLE_RULE_ID`) auditable at all.
 
   it("aligns every --rules description at the same column, including the longest id", async () => {
     // The id column width is derived from the registry, so registering a rule
