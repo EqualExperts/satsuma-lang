@@ -62,10 +62,10 @@ shown to fail against a deliberately broken implementation, with the
 counterexample naming the defect. A property that passes both before and after
 the break proves nothing.
 
-**Open for the project owner:** should the diagnostic properties assert
-positions to the exact line, or only to the mutated construct? Exact lines make
-the properties sensitive to renderer layout choices that `scenario-gen`
-deliberately owns. The PRD assumes the weaker claim.
+**Decided 2026-08-06:** diagnostic properties assert positions to the mutated
+construct, not to an exact line — an exact line would couple them to renderer
+layout choices that `scenario-gen` deliberately owns. Nothing is open for the
+project owner.
 
 **Source:** `features/46-generated-property-expansion/PRD.md` (epic `gpt-uazn`)
 

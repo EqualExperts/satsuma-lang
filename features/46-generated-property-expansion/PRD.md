@@ -63,8 +63,7 @@ The diagnostic surface that is therefore fixture-only:
 |---|---|
 | `satsuma-core/src/validate.ts` | `duplicate-definition`, `undefined-ref`, `field-not-in-schema`, `unresolved-nl-ref`, `nl-ref-not-in-source`, `constraint-in-type-args`, `namespace-metadata-conflict` |
 | `satsuma-core/src/import-reachability.ts` | import-scope violations (ADR-022 selective transitive reachability), with a caller-supplied rule/message policy |
-| `satsuma-cli/src/lint-engine.ts` `RULES` | `hidden-source-in-nl`, `unresolved-nl-ref`, `duplicate-definition`, `unenumerated-record-target` |
-| `satsuma-core/src/lint-lineage-cycle.ts`, `lint-type-mismatch.ts` | `lineage-cycle`, `type-mismatch-direct-arrow` |
+| `satsuma-cli/src/lint-engine.ts` `RULES` | `hidden-source-in-nl`, `unresolved-nl-ref`, `duplicate-definition`, `unenumerated-record-target`, `type-mismatch-direct-arrow`, `lineage-cycle` — the last two registered through the `TYPE_MISMATCH_RULE_ID` and `LINEAGE_CYCLE_RULE_ID` constants core exports, so all six are reachable from `satsuma lint` |
 
 The bug history is concentrated here and has the shape a generator finds cheaply:
 `sl-rw3e` (duplicates reported at one site but not the other), `sl-padl` and
@@ -131,7 +130,8 @@ same rule the package already has, and for the same cycle reason.
 Initial set, one per rule the mutation can reach: delete a field a target arrow
 names; duplicate an entity into a second file; duplicate an entity within one
 file; break an `import`; reference an undefined entity; point an NL `@ref` at a
-name no source declares; introduce a lineage cycle; add a second declaration of a
+name no source declares; introduce a lineage cycle; change a field's declared
+type so a bare arrow connects mismatched types; add a second declaration of a
 namespace-level metadata tag with a conflicting value.
 
 Also deliver **null mutators** — changes that must produce no new diagnostic at
@@ -244,17 +244,19 @@ genuinely different pipelines — `sl-rw3e` exists because they scope duplicates
 differently — so sharing an adapter would hide exactly the class of defect this
 feature targets.
 
-**3. `lint-lineage-cycle` and `lint-type-mismatch` are in scope for R1's mutators
-but not for R2's engine properties.** Both live in `satsuma-core` and are exported
-from its index, but neither appears in `satsuma-cli/src/lint-engine.ts`'s `RULES`.
-Whether that is deliberate is a question for the R1 ticket to answer and, if it is
-not, to raise as a bug rather than to fix here.
+**3. All six lint rules are in scope for R2, including `lineage-cycle` and
+`type-mismatch-direct-arrow`.** An earlier draft of this PRD claimed those two
+were exported from core but never registered with the CLI's engine. That was
+wrong: `lint-engine.ts` registers them through the `TYPE_MISMATCH_RULE_ID` and
+`LINEAGE_CYCLE_RULE_ID` constants rather than as literal id strings, and
+`lint-command.test.ts` already drives both end to end. Nothing is missing, and no
+bug arises from this. It is recorded here because a rule registered through a
+constant is easy to miss when auditing the registry by eye — including for the
+R1 mutator set, which must cover all six.
 
-## Open for the project owner
-
-**Should R2 assert positions to the line, or only to the construct?** Asserting a
-line number makes the properties sensitive to the renderer's layout choices, and
-`scenario-gen` deliberately owns rendering. The PRD assumes "inside the mutated
-construct" as the weaker and more stable claim. If diagnostic positions are
-considered part of the public contract, that assumption should be tightened, and
-R1's `expected` entries need a position the renderer can guarantee.
+**4. R2 asserts diagnostic positions to the mutated construct, not to the exact
+line.** Confirmed by the project owner, 2026-08-06. An exact line number couples
+the properties to the renderer's layout choices, and `scenario-gen` deliberately
+owns rendering. `WorkspaceDefect.expected` therefore carries a position only as a
+hint for failure messages; the assertion is containment. If diagnostic positions
+later become part of the public contract, this is the decision to revisit.
