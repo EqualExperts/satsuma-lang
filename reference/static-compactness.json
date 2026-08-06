@@ -1,0 +1,364 @@
+{
+  "referenceOverhead": 6813,
+  "tokenizers": {
+    "o200k_base": [
+      {
+        "name": "cobol-to-avro",
+        "fileCount": 1,
+        "lineCount": 158,
+        "arms": {
+          "S": 1268,
+          "Sauthored": 1292,
+          "Y": 1464,
+          "J": 2119
+        },
+        "ratios": {
+          "vsYaml": 13.4,
+          "vsJson": 40.2,
+          "authoredVsYaml": 11.7,
+          "savingVsYaml": 196
+        }
+      },
+      {
+        "name": "contracts",
+        "fileCount": 1,
+        "lineCount": 78,
+        "arms": {
+          "S": 433,
+          "Sauthored": 569,
+          "Y": 464,
+          "J": 678
+        },
+        "ratios": {
+          "vsYaml": 6.7,
+          "vsJson": 36.1,
+          "authoredVsYaml": -22.6,
+          "savingVsYaml": 31
+        }
+      },
+      {
+        "name": "db-to-db",
+        "fileCount": 1,
+        "lineCount": 212,
+        "arms": {
+          "S": 1742,
+          "Sauthored": 1877,
+          "Y": 1845,
+          "J": 2560
+        },
+        "ratios": {
+          "vsYaml": 5.6,
+          "vsJson": 32,
+          "authoredVsYaml": -1.7,
+          "savingVsYaml": 103
+        }
+      },
+      {
+        "name": "edi-to-json",
+        "fileCount": 1,
+        "lineCount": 172,
+        "arms": {
+          "S": 1240,
+          "Sauthored": 1431,
+          "Y": 1337,
+          "J": 1743
+        },
+        "ratios": {
+          "vsYaml": 7.3,
+          "vsJson": 28.9,
+          "authoredVsYaml": -7,
+          "savingVsYaml": 97
+        }
+      },
+      {
+        "name": "filter-flatten-governance",
+        "fileCount": 2,
+        "lineCount": 482,
+        "arms": {
+          "S": 3746,
+          "Sauthored": 3962,
+          "Y": 4109,
+          "J": 5618
+        },
+        "ratios": {
+          "vsYaml": 8.8,
+          "vsJson": 33.3,
+          "authoredVsYaml": 3.6,
+          "savingVsYaml": 363
+        }
+      },
+      {
+        "name": "json-api-to-parquet",
+        "fileCount": 1,
+        "lineCount": 189,
+        "arms": {
+          "S": 1552,
+          "Sauthored": 1590,
+          "Y": 1849,
+          "J": 2678
+        },
+        "ratios": {
+          "vsYaml": 16.1,
+          "vsJson": 42,
+          "authoredVsYaml": 14,
+          "savingVsYaml": 297
+        }
+      },
+      {
+        "name": "lib",
+        "fileCount": 2,
+        "lineCount": 102,
+        "arms": {
+          "S": 670,
+          "Sauthored": 718,
+          "Y": 785,
+          "J": 1185
+        },
+        "ratios": {
+          "vsYaml": 14.6,
+          "vsJson": 43.5,
+          "authoredVsYaml": 8.5,
+          "savingVsYaml": 115
+        }
+      },
+      {
+        "name": "lineage-cycle",
+        "fileCount": 1,
+        "lineCount": 27,
+        "arms": {
+          "S": 67,
+          "Sauthored": 159,
+          "Y": 79,
+          "J": 141
+        },
+        "ratios": {
+          "vsYaml": 15.2,
+          "vsJson": 52.5,
+          "authoredVsYaml": -101.3,
+          "savingVsYaml": 12
+        }
+      },
+      {
+        "name": "lookups",
+        "fileCount": 1,
+        "lineCount": 10,
+        "arms": {
+          "S": 59,
+          "Sauthored": 69,
+          "Y": 64,
+          "J": 92
+        },
+        "ratios": {
+          "vsYaml": 7.8,
+          "vsJson": 35.9,
+          "authoredVsYaml": -7.8,
+          "savingVsYaml": 5
+        }
+      },
+      {
+        "name": "merge-strategies",
+        "fileCount": 1,
+        "lineCount": 188,
+        "arms": {
+          "S": 1403,
+          "Sauthored": 1488,
+          "Y": 1519,
+          "J": 2102
+        },
+        "ratios": {
+          "vsYaml": 7.6,
+          "vsJson": 33.3,
+          "authoredVsYaml": 2,
+          "savingVsYaml": 116
+        }
+      },
+      {
+        "name": "metrics-platform",
+        "fileCount": 2,
+        "lineCount": 364,
+        "arms": {
+          "S": 2293,
+          "Sauthored": 2616,
+          "Y": 2496,
+          "J": 3516
+        },
+        "ratios": {
+          "vsYaml": 8.1,
+          "vsJson": 34.8,
+          "authoredVsYaml": -4.8,
+          "savingVsYaml": 203
+        }
+      },
+      {
+        "name": "multi-hop-lineage",
+        "fileCount": 1,
+        "lineCount": 89,
+        "arms": {
+          "S": 295,
+          "Sauthored": 403,
+          "Y": 355,
+          "J": 590
+        },
+        "ratios": {
+          "vsYaml": 16.9,
+          "vsJson": 50,
+          "authoredVsYaml": -13.5,
+          "savingVsYaml": 60
+        }
+      },
+      {
+        "name": "multi-source",
+        "fileCount": 3,
+        "lineCount": 449,
+        "arms": {
+          "S": 2935,
+          "Sauthored": 3151,
+          "Y": 3010,
+          "J": 4174
+        },
+        "ratios": {
+          "vsYaml": 2.5,
+          "vsJson": 29.7,
+          "authoredVsYaml": -4.7,
+          "savingVsYaml": 75
+        }
+      },
+      {
+        "name": "namespaces",
+        "fileCount": 3,
+        "lineCount": 560,
+        "arms": {
+          "S": 3736,
+          "Sauthored": 4054,
+          "Y": 4105,
+          "J": 5973
+        },
+        "ratios": {
+          "vsYaml": 9,
+          "vsJson": 37.5,
+          "authoredVsYaml": 1.2,
+          "savingVsYaml": 369
+        }
+      },
+      {
+        "name": "nested-iteration",
+        "fileCount": 1,
+        "lineCount": 106,
+        "arms": {
+          "S": 638,
+          "Sauthored": 727,
+          "Y": 787,
+          "J": 1125
+        },
+        "ratios": {
+          "vsYaml": 18.9,
+          "vsJson": 43.3,
+          "authoredVsYaml": 7.6,
+          "savingVsYaml": 149
+        }
+      },
+      {
+        "name": "protobuf-to-parquet",
+        "fileCount": 1,
+        "lineCount": 148,
+        "arms": {
+          "S": 1071,
+          "Sauthored": 1095,
+          "Y": 1237,
+          "J": 1776
+        },
+        "ratios": {
+          "vsYaml": 13.4,
+          "vsJson": 39.7,
+          "authoredVsYaml": 11.5,
+          "savingVsYaml": 166
+        }
+      },
+      {
+        "name": "reports-and-models",
+        "fileCount": 1,
+        "lineCount": 157,
+        "arms": {
+          "S": 1194,
+          "Sauthored": 1247,
+          "Y": 1259,
+          "J": 1683
+        },
+        "ratios": {
+          "vsYaml": 5.2,
+          "vsJson": 29.1,
+          "authoredVsYaml": 1,
+          "savingVsYaml": 65
+        }
+      },
+      {
+        "name": "sap-po-to-mfcs",
+        "fileCount": 1,
+        "lineCount": 180,
+        "arms": {
+          "S": 1477,
+          "Sauthored": 1510,
+          "Y": 1629,
+          "J": 2183
+        },
+        "ratios": {
+          "vsYaml": 9.3,
+          "vsJson": 32.3,
+          "authoredVsYaml": 7.3,
+          "savingVsYaml": 152
+        }
+      },
+      {
+        "name": "seabird-colony-lineage",
+        "fileCount": 4,
+        "lineCount": 87,
+        "arms": {
+          "S": 408,
+          "Sauthored": 461,
+          "Y": 524,
+          "J": 807
+        },
+        "ratios": {
+          "vsYaml": 22.1,
+          "vsJson": 49.4,
+          "authoredVsYaml": 12,
+          "savingVsYaml": 116
+        }
+      },
+      {
+        "name": "sfdc-to-snowflake",
+        "fileCount": 1,
+        "lineCount": 104,
+        "arms": {
+          "S": 768,
+          "Sauthored": 812,
+          "Y": 814,
+          "J": 1153
+        },
+        "ratios": {
+          "vsYaml": 5.7,
+          "vsJson": 33.4,
+          "authoredVsYaml": 0.2,
+          "savingVsYaml": 46
+        }
+      },
+      {
+        "name": "xml-to-parquet",
+        "fileCount": 1,
+        "lineCount": 186,
+        "arms": {
+          "S": 1508,
+          "Sauthored": 1544,
+          "Y": 1794,
+          "J": 2627
+        },
+        "ratios": {
+          "vsYaml": 15.9,
+          "vsJson": 42.6,
+          "authoredVsYaml": 13.9,
+          "savingVsYaml": 286
+        }
+      }
+    ]
+  }
+}

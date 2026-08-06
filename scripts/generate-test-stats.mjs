@@ -41,12 +41,37 @@ const NODE_TEST_SUMMARY_PATTERN = /^(?:ℹ|#)\s+tests\s+(\d+)\s*$/m;
 /** tree-sitter's `test --wasm` ends every run with this exact summary line. */
 const CORPUS_SUMMARY_PATTERN = /Total parses:\s*(\d+);/;
 
+/**
+ * SGR escape sequences, as written by Node's test reporter and replayed
+ * verbatim into Turborepo's per-task logs.
+ *
+ * These have to come out before matching. Node colourises its summary, so the
+ * line in `tooling/<pkg>/.turbo/turbo-test.log` reads
+ * `\x1b[34mℹ tests 7\x1b[39m` — and {@link NODE_TEST_SUMMARY_PATTERN} is
+ * anchored to the start and end of the line, precisely so that a test *named*
+ * "tests" cannot be mistaken for the summary. The anchors and the escapes are
+ * both wanted; stripping is what lets them coexist.
+ *
+ * The failure this prevents is confusing out of proportion to its size: it
+ * appears only when a task actually executes, because a Turborepo *cache hit*
+ * replays a log captured earlier without a TTY and therefore without colour.
+ * So the stats step passes run after run and fails the first time an unrelated
+ * dependency change invalidates the cache.
+ */
+// eslint-disable-next-line no-control-regex -- matching escape sequences is the point
+const ANSI_ESCAPE_PATTERN = /\x1b\[[0-9;]*m/g;
+
+/** Removes SGR escapes so a colourised log matches the same patterns a plain one does. */
+function withoutAnsi(output) {
+  return output.replace(ANSI_ESCAPE_PATTERN, "");
+}
+
 /** Commander auto-appends this to every program's command list; it isn't a Satsuma CLI command. */
 const COMMANDER_HELP_ENTRY_PATTERN = /^help\s/;
 
 /** Extracts the test count from a package's `node --test` output. Throws on unrecognized output rather than silently recording zero. */
 export function parseNodeTestCount(output) {
-  const match = output.match(NODE_TEST_SUMMARY_PATTERN);
+  const match = withoutAnsi(output).match(NODE_TEST_SUMMARY_PATTERN);
   if (!match) {
     throw new Error("Could not find a node --test summary line ('tests N') in the given output");
   }
@@ -55,7 +80,7 @@ export function parseNodeTestCount(output) {
 
 /** Extracts the corpus test count from tree-sitter's `test --wasm` output. */
 export function parseCorpusTestCount(output) {
-  const match = output.match(CORPUS_SUMMARY_PATTERN);
+  const match = withoutAnsi(output).match(CORPUS_SUMMARY_PATTERN);
   if (!match) {
     throw new Error(
       "Could not find tree-sitter's 'Total parses: N' summary line in the given output",
@@ -66,7 +91,7 @@ export function parseCorpusTestCount(output) {
 
 /** Same as parseCorpusTestCount, but returns null instead of throwing — for callers with a fallback. */
 export function tryParseCorpusTestCount(output) {
-  const match = output.match(CORPUS_SUMMARY_PATTERN);
+  const match = withoutAnsi(output).match(CORPUS_SUMMARY_PATTERN);
   return match ? Number(match[1]) : null;
 }
 

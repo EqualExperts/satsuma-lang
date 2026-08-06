@@ -42,6 +42,17 @@ test("throws rather than silently recording zero when the summary line is missin
   assert.throws(() => parseNodeTestCount("some unrelated output\n"), /summary line/);
 });
 
+test("reads the summary line out of a colourised log, as Turborepo records one", () => {
+  // Node colourises its summary, so a task that actually *executes* writes
+  // "\x1b[34mℹ tests 7\x1b[39m" into tooling/<pkg>/.turbo/turbo-test.log. The
+  // summary pattern is anchored to the line, so the escapes made it unmatchable
+  // and the pre-commit hook failed with "Could not find a node --test summary
+  // line". It stayed hidden because a Turborepo *cache hit* replays a log
+  // captured without a TTY, and therefore without colour — so the step passed
+  // every run until an unrelated dependency change invalidated the cache.
+  assert.equal(parseNodeTestCount("[34mℹ tests 7[39m\n"), 7);
+});
+
 test("reads tree-sitter's 'Total parses' summary line", () => {
   const output =
     "    318. ✓ Two map entries on one line still require a comma\n\n" +

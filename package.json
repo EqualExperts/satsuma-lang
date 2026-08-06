@@ -73,6 +73,7 @@
     "regenerate:agent-reference": "node scripts/regenerate-agent-reference.mjs",
     "regenerate:satsuma-language-skill": "node scripts/regenerate-satsuma-language-skill.mjs",
     "measure:agent-reference-tokens": "node scripts/measure-agent-reference-tokens.mjs",
+    "measure:static-compactness": "node scripts/measure-static-compactness.mjs",
     "test:coverage": "turbo run test:coverage"
   },
   "overrides": {
@@ -97,6 +98,7 @@
     "prettier": "^3.9.6",
     "turbo": "2.10.8",
     "typescript": "^6.0.3",
-    "typescript-eslint": "^8.65.0"
+    "typescript-eslint": "^8.65.0",
+    "yaml": "^2.9.0"
   }
 }
