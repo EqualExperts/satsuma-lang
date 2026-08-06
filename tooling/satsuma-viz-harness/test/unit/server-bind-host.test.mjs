@@ -14,12 +14,10 @@ describe("Harness server bind host", () => {
   it("server.ts listen(PORT, '127.0.0.1') pattern binds to loopback", () => {
     // Mimic the actual server.ts listen call: server.listen(PORT, "127.0.0.1", callback)
     const server = createServer();
-    let boundAddress = null;
 
     return new Promise((resolve) => {
       server.listen(0, "127.0.0.1", () => {
         const addr = server.address();
-        boundAddress = addr;
         assert.equal(addr.address, "127.0.0.1", "server must bind to loopback");
         assert.ok(addr.port > 0, "server must be assigned a valid port");
         server.close(resolve);
