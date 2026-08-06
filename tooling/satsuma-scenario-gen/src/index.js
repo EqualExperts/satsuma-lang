@@ -71,9 +71,13 @@ export { renderWorkspace } from "./workspace-render.js";
 // waits on.
 
 export {
+  USAGE_KIND,
   scenarioAncestorsWithin,
+  scenarioDeclaredEntities,
   scenarioDeclaredFieldPaths,
+  scenarioDeclaredUsageSites,
   scenarioDescendantsWithin,
+  scenarioEntityKeyForRef,
   scenarioFieldEdges,
   scenarioSchemaEdges,
   scenarioSchemaProjection,
@@ -128,6 +132,7 @@ export {
 } from "./mutators.js";
 
 export {
+  bareNamespacedWorkspaceArbitrary,
   chainWorkspaceArbitrary,
   computedArrowWorkspaceArbitrary,
   containerWorkspaceArbitrary,

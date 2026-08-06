@@ -43,9 +43,21 @@
  * `@satsuma/core`. It is also why this file is `.js` rather than the `.ts` the
  * ticket named: a TypeScript support module would never be loaded at all.
  *
+ * ## Why this adapter stays in the LSP while the oracle did not
+ *
+ * The scenario-derived expectations this file used to sit beside now live in
+ * `@satsuma/scenario-gen`'s `ground-truth.js` (`gpt-l9rp`), because what a
+ * workspace declares and where it names it follows from the scenario and every
+ * package needs the same answer. **The adapter is the opposite case and must not
+ * be shared.** The CLI's equivalent writes files to disk and loads an import
+ * graph; this one indexes in-memory documents the way an editor does. `sl-rw3e`
+ * exists precisely because those two scope duplicates differently, so a single
+ * shared adapter would erase the distinction the properties are there to test
+ * (Feature 46 PRD, decision 2).
+ *
  * Owns: rendering a scenario to documents, building the index, and locating a
  * declaration or a usage site. Does not own: expected values (that is
- * `scenario-usage-sites.js`) or any assertion.
+ * `@satsuma/scenario-gen`'s `ground-truth.js`) or any assertion.
  */
 
 const { collectParseErrors } = require("@satsuma/core");
@@ -269,7 +281,7 @@ const IDENTIFIER_CHARACTER = /[\w-]/;
  *
  * `kind` is the index's `ReferenceEntry.context` — `"source"`, `"target"`,
  * `"spread"`, `"import"`, `"metric_source"`, `"arrow"` or `"nl"` — which is the
- * vocabulary `scenario-usage-sites.js` states its expectations in. `text` is the
+ * vocabulary `ground-truth.js`'s `USAGE_KIND` states its expectations in. `text` is the
  * source the range covers, so a failure names the token a reader can search for.
  */
 

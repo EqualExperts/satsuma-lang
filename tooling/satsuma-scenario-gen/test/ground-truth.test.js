@@ -28,9 +28,13 @@ import {
 } from "../src/workspace-model.js";
 import { renderWorkspace } from "../src/workspace-render.js";
 import {
+  USAGE_KIND,
   scenarioAncestorsWithin,
+  scenarioDeclaredEntities,
   scenarioDeclaredFieldPaths,
+  scenarioDeclaredUsageSites,
   scenarioDescendantsWithin,
+  scenarioEntityKeyForRef,
   scenarioFieldEdges,
   scenarioSchemaEdges,
   scenarioSchemaProjection,
@@ -337,5 +341,195 @@ describe("renderWorkspace guards against unrenderable scenarios", () => {
       ],
     });
     assert.throws(() => renderWorkspace(workspace), /not under block path 'lines'/);
+  });
+});
+
+// ── Declared entities and usage sites (gpt-l9rp) ───────────────────────────
+
+/** Compact `kind@file` form, sorted, so a failure names the site that moved. */
+function sitesOf(usageSites, key) {
+  return usageSites
+    .get(key)
+    .map((site) => `${site.kind}@${site.file}`)
+    .sort();
+}
+
+describe("scenarioDeclaredEntities", () => {
+  it("keys a namespaced declaration by ns::name while keeping the authored label", () => {
+    // The distinction the LSP's reference queries turn on: the index files a
+    // namespaced schema under `ns_a::s0`, but the text at the declaration site
+    // reads `schema s0`. An oracle that conflated the two would make a query for
+    // the wrong key look like a missing reference.
+    const workspace = oneFile({
+      schemas: [schemaDecl({ name: "s0", namespace: "ns_a", fields: [scalarField("f")] })],
+      mappings: [],
+    });
+
+    assert.deepEqual(scenarioDeclaredEntities(workspace), [
+      { key: "ns_a::s0", name: "s0", namespace: "ns_a", keyword: "schema", file: "entry.stm" },
+    ]);
+  });
+
+  it("declares mappings, which nothing may reference", () => {
+    // Included on purpose: "this entity has no usage sites" is the assertion that
+    // catches an invented reference, and it needs the entity to be listed.
+    const workspace = oneFile({
+      schemas: [
+        schemaDecl({ name: "s0", fields: [scalarField("f")] }),
+        schemaDecl({ name: "s1", fields: [scalarField("f")] }),
+      ],
+      mappings: [mappingDecl({ name: "m0", sources: ["s0"], targets: ["s1"], arrows: [] })],
+    });
+
+    const usageSites = scenarioDeclaredUsageSites(workspace);
+    assert.deepEqual(usageSites.get("m0"), []);
+  });
+});
+
+describe("scenarioDeclaredUsageSites", () => {
+  it("records the same entity twice when two mappings both name it", () => {
+    // Sites are a multiset. Collapsing them to a set would hide a reference the
+    // toolchain dropped whenever some other mapping happened to name it too.
+    const schemas = ["s0", "s1", "s2"].map((name) =>
+      schemaDecl({ name, fields: [scalarField("f")] }),
+    );
+    const workspace = oneFile({
+      schemas,
+      mappings: [
+        mappingDecl({ name: "m0", sources: ["s0"], targets: ["s1"], arrows: [] }),
+        mappingDecl({ name: "m1", sources: ["s0"], targets: ["s2"], arrows: [] }),
+      ],
+    });
+
+    assert.deepEqual(sitesOf(scenarioDeclaredUsageSites(workspace), "s0"), [
+      "source@entry.stm",
+      "source@entry.stm",
+    ]);
+  });
+
+  it("counts the schema prefix of a qualified arrow path, but not a bare one", () => {
+    // The renderer writes an endpoint bare when its side of the mapping declares
+    // exactly that one schema, and `schema.path` when the side has several. Only
+    // the second spelling puts the schema name in the text, and only that one is
+    // a site a rename has to rewrite.
+    const schemas = ["s0", "s1", "s2"].map((name) =>
+      schemaDecl({ name, fields: [scalarField("f")] }),
+    );
+    const workspace = oneFile({
+      schemas,
+      mappings: [
+        mappingDecl({
+          name: "m0",
+          // Two source schemas, so both source endpoints are written qualified;
+          // the single target is written bare.
+          sources: ["s0", "s1"],
+          targets: ["s2"],
+          arrows: [mapArrow([endpoint("s0", "f"), endpoint("s1", "f")], endpoint("s2", "f"))],
+        }),
+      ],
+    });
+
+    const usageSites = scenarioDeclaredUsageSites(workspace);
+    assert.deepEqual(sitesOf(usageSites, "s0"), ["arrow@entry.stm", "source@entry.stm"]);
+    assert.deepEqual(sitesOf(usageSites, "s2"), ["target@entry.stm"]);
+  });
+
+  it("counts the import statement the renderer derives for a cross-file reference", () => {
+    // A scenario never authors its imports — `workspace-render.js` derives them
+    // from usage — but an imported name is a reference site, and most of what the
+    // multi-file domain exists to exercise. This is the one rule the oracle
+    // restates from the renderer, so it needs its own case.
+    const workspace = scenarioWorkspace([
+      scenarioFile({
+        path: "entry.stm",
+        schemas: [schemaDecl({ name: "s1", fields: [scalarField("f")] })],
+        mappings: [mappingDecl({ name: "m0", sources: ["s0"], targets: ["s1"], arrows: [] })],
+      }),
+      scenarioFile({
+        path: "part1.stm",
+        schemas: [schemaDecl({ name: "s0", fields: [scalarField("f")] })],
+        mappings: [],
+      }),
+    ]);
+
+    assert.deepEqual(sitesOf(scenarioDeclaredUsageSites(workspace), "s0"), [
+      "import@entry.stm",
+      "source@entry.stm",
+    ]);
+  });
+
+  it("omits the import site for a reference the scenario deliberately withholds", () => {
+    // `withheldImports` is the renderer's one hole in the derivation, and it is
+    // how R1's `withhold-spread-import` mutator reaches ADR-022's import-scope
+    // check. Honouring it keeps the defect reported as the missing *import
+    // statement* it is, rather than as a find-references failure against a site
+    // the file never wrote.
+    const workspace = scenarioWorkspace([
+      scenarioFile({
+        path: "entry.stm",
+        schemas: [schemaDecl({ name: "s1", fields: [scalarField("f")] })],
+        mappings: [mappingDecl({ name: "m0", sources: ["s0"], targets: ["s1"], arrows: [] })],
+        withheldImports: ["s0"],
+      }),
+      scenarioFile({
+        path: "part1.stm",
+        schemas: [schemaDecl({ name: "s0", fields: [scalarField("f")] })],
+        mappings: [],
+      }),
+    ]);
+
+    assert.deepEqual(sitesOf(scenarioDeclaredUsageSites(workspace), "s0"), ["source@entry.stm"]);
+  });
+
+  it("refuses a scenario that references an entity it never declares", () => {
+    // A malformed scenario, not a toolchain failure. Failing loudly beats
+    // silently dropping the site and letting a property read the gap as a
+    // missing reference.
+    const workspace = oneFile({
+      schemas: [schemaDecl({ name: "s1", fields: [scalarField("f")] })],
+      mappings: [mappingDecl({ name: "m0", sources: ["nowhere"], targets: ["s1"], arrows: [] })],
+    });
+
+    assert.throws(() => scenarioDeclaredUsageSites(workspace), /'nowhere' .* names no declared/);
+  });
+});
+
+describe("scenarioEntityKeyForRef", () => {
+  it("binds a bare reference to the enclosing namespace when that namespace declares it", () => {
+    // Satsuma's scoping rule (spec §5.3), and the reason
+    // `bareNamespacedWorkspaceArbitrary` is a domain of its own: `source { s0 }`
+    // inside `namespace ns_a` names `ns_a::s0`, not the file-scope `s0`. Getting
+    // this right here and wrong in `resolveReferenceKey` is `sl-p256`.
+    const declared = new Set(["s0", "ns_a::s0"]);
+
+    assert.equal(scenarioEntityKeyForRef("s0", "ns_a", declared), "ns_a::s0");
+    assert.equal(scenarioEntityKeyForRef("s0", null, declared), "s0");
+  });
+
+  it("falls back to file scope for a bare reference the namespace does not declare", () => {
+    // A namespace that declares no `s0` does not capture the reference — it binds
+    // outward to the file-scope declaration.
+    assert.equal(scenarioEntityKeyForRef("s0", "ns_a", new Set(["s0"])), "s0");
+  });
+
+  it("leaves a qualified reference alone whatever namespace it sits in", () => {
+    // `::` names the entity outright, so the enclosing block cannot rebind it.
+    assert.equal(scenarioEntityKeyForRef("ns_b::s0", "ns_a", new Set(["ns_b::s0"])), "ns_b::s0");
+  });
+});
+
+describe("USAGE_KIND", () => {
+  it("spells every kind exactly as the workspace index's ReferenceEntry.context", () => {
+    // These strings are compared with observed values as plain strings, with no
+    // translation layer. A rename on either side has to break something, and this
+    // is the case that breaks.
+    assert.deepEqual(Object.values(USAGE_KIND).sort(), [
+      "arrow",
+      "import",
+      "metric_source",
+      "source",
+      "spread",
+      "target",
+    ]);
   });
 });
