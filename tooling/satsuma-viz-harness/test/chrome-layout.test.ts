@@ -115,22 +115,27 @@ test.describe("Namespaced compact card corners when expanded (sl-yedr)", () => {
       await expect(card).toHaveAttribute("compact-expanded", "");
 
       // The pill row is the top of the card, so it is the element whose corners
-      // a reader sees. Assert both halves of that claim: it sits flush with the
-      // card's top edge, and it paints the card radius rather than 0.
+      // a reader sees. Assert both halves of that claim: it sits at the very top
+      // of the card's content box, and it paints the card radius rather than 0.
       const geometry = await card.evaluate((host) => {
         const row = host.shadowRoot?.querySelector<HTMLElement>("[data-testid$='-namespace-pill']");
         if (!row) throw new Error("namespace pill row not rendered");
         const style = getComputedStyle(row);
+        const hostStyle = getComputedStyle(host);
         return {
-          cardTop: host.getBoundingClientRect().top,
-          rowTop: row.getBoundingClientRect().top,
+          // The row starts inside the host's 1px border, so the offset to compare
+          // against is the border width — not zero.
+          topOffset:
+            row.getBoundingClientRect().top -
+            host.getBoundingClientRect().top -
+            parseFloat(hostStyle.borderTopWidth),
           topLeft: style.borderTopLeftRadius,
           topRight: style.borderTopRightRadius,
-          cardRadius: getComputedStyle(host).getPropertyValue("--sz-card-radius").trim(),
+          cardRadius: hostStyle.getPropertyValue("--sz-card-radius").trim(),
         };
       });
 
-      expect(geometry.rowTop).toBeCloseTo(geometry.cardTop, 0);
+      expect(geometry.topOffset).toBeCloseTo(0, 0);
       // Equal to the shared card-radius token, not merely non-zero: that is what
       // "matching non-namespaced cards" means, and it fails loudly if the token
       // and the fallback rule ever diverge.

@@ -1,6 +1,6 @@
 ---
 id: sl-jetk
-status: open
+status: closed
 deps: []
 links: []
 created: 2026-08-03T12:30:45Z
@@ -24,3 +24,12 @@ Root cause: satsuma-viz/src/components/sz-mapping-detail.ts _renderArrowTable (l
 - A test covers the empty case using a minimal report/model mapping snippet (not the whole example file).
 - The non-empty case is unchanged.
 
+
+## Notes
+
+**2026-08-06T12:42:27Z**
+
+**2026-08-06T12:42:00Z**
+
+Cause: `_renderArrowTable` always emitted `<thead>` and its four column headers, and `<tbody>` received nothing when arrows, eachBlocks, flattenBlocks and nestedArrows were all empty — the legitimate report/model consumer shape.
+Fix: an `_hasNoArrows` branch renders a stated empty state ('This mapping declares no field-level arrows — it maps whole schemas only') and no table at all. Covered by render-output tests in @satsuma/viz and by the reports-and-models consumers in the harness; note that EVERY mapping in that fixture is arrow-free, so the control case uses sfdc's opportunity-ingestion (commit immediately after 5f59ffc6).
