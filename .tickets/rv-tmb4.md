@@ -1,6 +1,6 @@
 ---
 id: rv-tmb4
-status: open
+status: closed
 deps: []
 links: []
 created: 2026-08-05T15:56:27Z
@@ -25,3 +25,14 @@ Options: (a) have release.yml dispatch deploy-site.yml directly as a final step,
 - Verified against a real release, not just by reading the workflow
 - The dead 'release: published' trigger is either made to work or removed, so the workflow does not claim a trigger it never receives
 
+
+## Notes
+
+**2026-08-06T14:57:11Z**
+
+## Notes
+
+**2026-08-06T14:58:00Z**
+
+Cause: release.yml creates every release using GITHUB_TOKEN, and GitHub deliberately never raises a 'release: published' event for a release created by GITHUB_TOKEN (anti-recursion protection), so deploy-site.yml's on:release trigger never fires.
+Fix: added an unconditional 'gh workflow run deploy-site.yml' step to release.yml's release job (with actions: write added to its permissions) so the site deploy is dispatched directly after every release, tagged or latest; removed the dead on:release trigger from deploy-site.yml since nothing in this repo publishes a release any other way; updated CI-WORKFLOWS.md's Deploy Site section and trigger-summary diagram to match (commit immediately after fba794db).
