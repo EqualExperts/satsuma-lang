@@ -96,6 +96,12 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      # Needed to dispatch deploy-site.yml below. GitHub never raises a
+      # 'release: published' event for a release created by GITHUB_TOKEN
+      # (anti-recursion protection), so deploy-site.yml's own 'on: release'
+      # trigger never fires and the dispatch below is the only thing that
+      # deploys the site after a release (rv-tmb4).
+      actions: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
@@ -175,3 +181,14 @@ jobs:
             satsuma-cli-latest.tgz \
             satsuma-lsp-latest.tgz \
             vscode-satsuma-latest.vsix
+
+      # deploy-site.yml's 'release: published' trigger never fires for a
+      # release this job just created (see the 'actions: write' comment
+      # above), so we dispatch it directly instead of relying on that event.
+      # Runs unconditionally: exactly one of the two release-creation steps
+      # above executes per trigger, and the site should redeploy after either.
+      - name: Deploy the site for this release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+        run: gh workflow run deploy-site.yml --ref "${{ github.ref_name }}"

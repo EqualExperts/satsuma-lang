@@ -1,8 +1,11 @@
 name: Deploy Site
 
 on:
-  release:
-    types: [published]
+  # release.yml dispatches this workflow directly after every release,
+  # because GitHub never raises 'release: published' for a release created
+  # with GITHUB_TOKEN (anti-recursion protection) — every release in this
+  # repo is created that way, so an 'on: release' trigger here would never
+  # fire (rv-tmb4).
   workflow_dispatch:
 
 permissions:

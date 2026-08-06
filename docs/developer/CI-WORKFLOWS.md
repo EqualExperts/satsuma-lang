@@ -13,7 +13,7 @@ Four workflows cover the full delivery pipeline:
 | [CI](#ci-workflow) | `ci.yml` | Push / PR → `main` |
 | [Release](#release-workflow) | `release.yml` | Push → `main` · `workflow_dispatch` |
 | [Security](#security-workflow) | `security.yml` | Push / PR → `main` · called by Release |
-| [Deploy Site](#deploy-site-workflow) | `deploy-site.yml` | GitHub release published · `workflow_dispatch` |
+| [Deploy Site](#deploy-site-workflow) | `deploy-site.yml` | `workflow_dispatch` — auto-dispatched by Release, or manual |
 
 CI and Release both fire on every push to `main`. CI validates the code;
 Release builds and publishes the distributable artifacts (CLI tarball and VS
@@ -342,8 +342,12 @@ commit, so exactly one configuration is ever written to `main`. See sl-1wtv.
 
 **File:** `.github/workflows/deploy-site.yml`
 **Triggers:**
-- A GitHub release is **published** (includes both tagged and latest releases)
-- `workflow_dispatch` (manual trigger)
+- `workflow_dispatch` — either dispatched manually, or automatically by the
+  `release` job in `release.yml` after every release (tagged or the rolling
+  `latest` pre-release). There is no `on: release` trigger: GitHub never
+  raises that event for a release created with `GITHUB_TOKEN`, so it would
+  never fire in this repo (rv-tmb4) — the direct dispatch is what actually
+  deploys the site.
 
 ### Job graph
 
@@ -365,9 +369,9 @@ flowchart TD
   otherwise falls back to the most recent `v*` git tag.
 - The `pages` concurrency group prevents overlapping deployments; in-progress
   deploys are not cancelled if a new one is queued.
-- The deploy-site workflow fires on **every** published release, including the
-  rolling `latest` pre-release that the Release workflow creates on each push
-  to `main`.
+- The Release workflow dispatches this workflow after **every** release,
+  including the rolling `latest` pre-release it creates on each push to
+  `main`, so the site never lags behind the most recent release.
 
 ---
 
@@ -378,7 +382,6 @@ flowchart LR
     push["push → main"]
     pr["pull_request → main"]
     dispatch["workflow_dispatch"]
-    release_pub["release published"]
 
     push --> CI
     pr --> CI
@@ -386,8 +389,8 @@ flowchart LR
     dispatch --> Release
     push --> Security
     pr --> Security
-    release_pub --> DeploySite
     dispatch --> DeploySite
+    Release -->|"dispatches after release"| DeploySite
     Release -->|"calls as gate"| Security
 ```
 
