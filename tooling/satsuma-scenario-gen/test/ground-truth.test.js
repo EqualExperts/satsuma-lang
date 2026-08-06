@@ -30,6 +30,7 @@ import { renderWorkspace } from "../src/workspace-render.js";
 import {
   USAGE_KIND,
   scenarioAncestorsWithin,
+  scenarioChangedDeclarations,
   scenarioDeclaredEntities,
   scenarioDeclaredFieldPaths,
   scenarioDeclaredUsageSites,
@@ -531,5 +532,78 @@ describe("USAGE_KIND", () => {
       "spread",
       "target",
     ]);
+  });
+});
+
+describe("scenarioChangedDeclarations", () => {
+  const schemasNamed = (names, extra = {}) =>
+    names.map((name) => schemaDecl({ name, fields: [scalarField("f")], ...extra }));
+
+  it("names a declaration whose body changed, and no other", () => {
+    // The oracle for diff: it answers "which entities may the delta legitimately
+    // mention". Reporting an unchanged neighbour would let a diff that
+    // over-reports pass, which is the failure a reader would never notice.
+    const before = oneFile({ schemas: schemasNamed(["s0", "s1"]), mappings: [] });
+    const after = oneFile({
+      schemas: [schemaDecl({ name: "s0", fields: [] }), ...schemasNamed(["s1"])],
+      mappings: [],
+    });
+
+    assert.deepEqual(scenarioChangedDeclarations(before, after), ["s0"]);
+  });
+
+  it("names a declaration that exists on one side only", () => {
+    // Added and removed are both changes. A one-sided walk would miss one of
+    // the two directions, and which one it missed would depend on argument order.
+    const before = oneFile({ schemas: schemasNamed(["s0"]), mappings: [] });
+    const after = oneFile({ schemas: schemasNamed(["s0", "s1"]), mappings: [] });
+
+    assert.deepEqual(scenarioChangedDeclarations(before, after), ["s1"]);
+    assert.deepEqual(scenarioChangedDeclarations(after, before), ["s1"]);
+  });
+
+  it("keys a namespaced declaration by ns::name, which is what diff reports", () => {
+    // A bare key would make `ns_a::s0` and a file-scope `s0` the same
+    // declaration, so a change to one would excuse a delta mentioning the other.
+    const before = oneFile({ schemas: schemasNamed(["s0"], { namespace: "ns_a" }), mappings: [] });
+    const after = oneFile({
+      schemas: [schemaDecl({ name: "s0", namespace: "ns_a", fields: [] })],
+      mappings: [],
+    });
+
+    assert.deepEqual(scenarioChangedDeclarations(before, after), ["ns_a::s0"]);
+  });
+
+  it("sees no change when a declaration is merely duplicated", () => {
+    // Every extractor in the toolchain merges a duplicate declaration, so a
+    // workspace with one and a workspace with two are structurally the same and
+    // `diff` is right to stay silent. Feature 46 R1's duplicate mutators depend
+    // on this reading: they produce a diagnostic, not a delta.
+    const before = oneFile({ schemas: schemasNamed(["s0"]), mappings: [] });
+    const after = oneFile({ schemas: schemasNamed(["s0", "s0"]), mappings: [] });
+
+    assert.deepEqual(scenarioChangedDeclarations(before, after), []);
+  });
+
+  it("sees no change when declarations are only reordered or moved between files", () => {
+    // Order and file placement are not structure. This is the invariant the
+    // `reverse-declaration-order` and `split-across-files` null mutators rest on.
+    const before = oneFile({ schemas: schemasNamed(["s0", "s1"]), mappings: [] });
+    const after = scenarioWorkspace([
+      scenarioFile({
+        path: "entry.stm",
+        fragments: [],
+        schemas: schemasNamed(["s1"]),
+        mappings: [],
+      }),
+      scenarioFile({
+        path: "part1.stm",
+        fragments: [],
+        schemas: schemasNamed(["s0"]),
+        mappings: [],
+      }),
+    ]);
+
+    assert.deepEqual(scenarioChangedDeclarations(before, after), []);
   });
 });

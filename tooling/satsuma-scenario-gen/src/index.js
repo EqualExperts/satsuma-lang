@@ -73,6 +73,7 @@ export { renderWorkspace } from "./workspace-render.js";
 export {
   USAGE_KIND,
   scenarioAncestorsWithin,
+  scenarioChangedDeclarations,
   scenarioDeclaredEntities,
   scenarioDeclaredFieldPaths,
   scenarioDeclaredUsageSites,
