@@ -1,6 +1,6 @@
 ---
 id: gpt-8izj
-status: open
+status: closed
 deps: [gpt-21jp]
 links: []
 created: 2026-08-06T13:44:45Z
@@ -64,3 +64,98 @@ Assert all four: the workspace still validates clean; the declared edge set is i
 ## Mutation check this ticket must run and record
 
 Drop the cross-file edits from the rename `WorkspaceEdit` — the property must fail with a surviving old-name occurrence or a broken edge. Run it serially with nothing else running against this worktree, and revert before committing.
+
+**2026-08-06T18:49:57Z**
+
+Cause: not a defect — R4 delivers the rename round-trip the PRD asks for. Rename
+is the only LSP feature that writes and the only one whose failure is silent: a
+missed occurrence leaves a workspace that still parses.
+Fix: added `tooling/satsuma-lsp/test/generated-rename-roundtrip.test.js` (6
+cases, LSP 317 -> 323) — three round-trip properties, the collision case, and
+two pinned gaps. (commit immediately after b314445a)
+
+## The index question, answered deliberately
+
+**The properties compute the rename against the whole-folder index, and the
+scoped behaviour is pinned instead.** Both defensible options were on the table
+(see this ticket's handover note). This one was chosen because the properties
+then state what a correct rename must achieve, while the pin states what today's
+server achieves — and `gpt-bc1x`'s own acceptance criterion is satisfied either
+way, since it asks that R4 *state which index it asks* and that the real
+server's behaviour be held to something falsifiable. Asserting the round trip
+against the scoped index today would have made the whole file fail for one known
+reason, which is a worse way to record one known reason. The file's header says
+all of this out loud, as the handover demanded.
+
+The pin measures it rather than describing it: over a two-file chain where `s0`
+is declared downstream and used upstream, the scoped rename produces strictly
+fewer edits than the whole-folder one, and applying what the server would
+actually send leaves `import { s0 } from "./part1.stm"` naming a schema nothing
+declares.
+
+## Mutation check: run and recorded
+
+Dropping every edit outside the invoking file (`delete changes[key]` for
+`key !== _uri` at the end of `computeRename`) fails two of the three round-trip
+properties immediately, with the surviving old name in the message:
+
+    renaming schema 's1' to 'renamed_s1' broke the workspace:
+    -- entry.stm
+    import { s1 } from "./part1.stm"
+    ...
+      target { s1 }
+
+Reverted. **A trap worth recording: `npm run build` in satsuma-lsp is esbuild's
+bundle, and the per-module `dist/*.js` the tests `require` come from
+`npm run compile` (tsc).** The first mutation run appeared to *pass* — the
+property did not fail — purely because `turbo run build --filter=@satsuma/lsp`
+never rebuilt the file under test. A mutation check that mysteriously fails to
+fail is the signal to check what the test actually loaded.
+
+## Two bugs found, both filed and both pinned
+
+**`gpt-fjo7` — rename does not rewrite NL `@ref` mentions.** Renaming schema
+`s0` leaves `@s0.field_1` inside a transform body naming a schema that no longer
+exists. The workspace still parses; `satsuma validate` reports
+`unresolved-nl-ref` on it. Mechanism: the index files an `@ref` under the field
+path it names (`s0.field_1`, context `nl`), not under the schema, so
+`findReferences(index, "s0")` never reaches it. The properties exclude entities
+an NL `@ref` mentions — computed from the scenario by
+`entitiesMentionedByNlRefs`, never by noticing the toolchain got it wrong — and
+the gap has its own pinned test on a minimal fixture.
+
+**`gpt-68ka` — the LSP reports no `unresolved-nl-ref` at all**, so the editor
+does not show the damage `gpt-fjo7` causes. Cause is already documented in code:
+`semantic-diagnostics.ts`'s `buildSemanticIndex` carries
+`nlRefData: not available (LSP does not extract NL ref data)`, and core's
+`checkNLRefs` iterates exactly that field.
+
+## One correction to my own first draft, worth not repeating
+
+The collision case initially renamed a schema onto *any* other schema's bare
+name and expected a refusal. It failed — correctly. A file-scope `staged` and a
+`warehouse::staged` are two different entities, so renaming `raw` to `staged`
+beside a `warehouse::staged` is legal and the server rightly allows it. The case
+now picks two schemas sharing a namespace, and counts how many samples actually
+reached a collision so it cannot pass vacuously.
+
+## What the round trip asserts
+
+All four the ticket names, in one walk per entity because they share the edit:
+the workspace still validates clean (via the real
+`computeSemanticValidationDiagnostics`, unioned over every document); every
+entity's usage sites equal `scenarioDeclaredUsageSites` with the renamed key
+swapped; no reference to the old key or old text survives in the re-indexed
+result; and no unrelated entity's sites changed — the last folded into the same
+comparison, since "an unrelated entity changed" and "the renamed entity lost a
+site" are one check against different keys.
+
+Three domains, named separately so a counterexample is the shape under test:
+the shared domain, `multiFileWorkspaceArbitrary` (the cross-file half), and
+`bareNamespacedWorkspaceArbitrary` (where the key is not the text at the
+cursor — `sl-p256` in its writing form).
+
+The adapter gained `renameEdit`, `renameEditInImportScope`,
+`applyWorkspaceEdit` and `semanticProblems`. None reimplements anything:
+`computeRename` is the production function and applying a `WorkspaceEdit` is
+what any client does with one.
