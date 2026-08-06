@@ -1,21 +1,42 @@
 # Feature 40 — Shared Field Lineage View
 
-> **Status: PROPOSED** (raised 2026-08-03) — found while assessing whether the
-> viz harness can visually exercise the four viz surfaces (overview, mapping
-> detail, coverage, field lineage). The first three are reachable from the
-> harness. Field lineage is not reachable from anywhere that can be tested.
+> **Status: SUPERSEDED** by Feature 36, closed 2026-08-06. Raised 2026-08-03
+> against `main` at `dd5ac032`, before Feature 36's field chain view
+> (`sz-chain-view`) existed. By the time this feature's own tickets were
+> picked up, Feature 36 had independently delivered everything this PRD asked
+> for, through a different named component and design (a left-to-right rail,
+> not a `sz-field-lineage` panel):
 >
-> **State this PRD was checked against:** `main` at `dd5ac032`.
+> - The traversal extraction (this PRD's Design §1) shipped as `sl-prlp`:
+>   `traceFieldLineage`/`buildFieldEdges` in `@satsuma/core`, no Node built-ins,
+>   consumed by both the CLI and `satsuma-viz-backend`'s
+>   `buildFieldChainFromWorkspace` — one copy, not two.
+> - The shared renderer (§2) shipped as `sl-4czz`'s `sz-chain-view` in
+>   `satsuma-viz`, and `sl-iwlv` deleted the VS Code-only 560-line renderer,
+>   284-line panel, and 330-line CSS this PRD's Background section measured —
+>   `FieldLineagePanel` now renders `sz-chain-view` from a host-computed
+>   `FieldChainModel`.
+> - The harness surfacing (§3) shipped as `sl-nswc`: the harness's
+>   `field-lineage` listener calls the traversal in-browser and renders
+>   `sz-chain-view`, with seven Playwright specs, all through the
+>   zero-network-request path this PRD required.
 >
-> **Recommendation.** Proceed. The traversal moves to a browser-portable
-> package, the view becomes one component in `satsuma-viz`, and both hosts
-> render it. This is a consolidation, not new product surface: it deletes a
-> duplicate rendering path and a subprocess round-trip rather than adding
-> features.
+> Verified by reading the shipped code and running the existing test suites,
+> not just by ticket status. This feature's own tickets (`sl-v3w5`, `sl-7ind`,
+> `sl-hhdk`, epic `sl-12kz`) were closed as superseded rather than implemented,
+> to avoid building a second lineage renderer alongside `sz-chain-view`.
 >
-> **What this feature is not.** It changes no Satsuma syntax, adds no new
-> lineage semantics, and does not alter what `satsuma field-lineage` prints.
-> The CLI's observable output is a fixed contract here.
+> **Two genuine gaps survived the supersession** and were carried forward as
+> `sv-embb`, because Feature 36's acceptance criteria never covered them: (1)
+> an unresolvable field is not distinguished from a resolved field with empty
+> lineage anywhere above the CLI, unlike the CLI's own
+> `EXIT_NOT_FOUND` behaviour; (2) a cyclic chain is proven cycle-safe at the
+> core traversal layer but was never rendered through `sz-chain-view` in a
+> unit or Playwright test.
+>
+> The rest of this document is preserved as-written for historical context —
+> it describes the problem accurately; only the proposed solution shape (a new
+> `sz-field-lineage` component) was overtaken by events.
 
 ## Goal
 

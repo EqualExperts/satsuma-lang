@@ -1,6 +1,6 @@
 ---
 id: sl-12kz
-status: open
+status: closed
 deps: []
 links: []
 created: 2026-08-03T12:24:14Z
@@ -70,3 +70,12 @@ commands/lineage.ts only, so the field traversal still has the first-visit-wins 
 that truncates subtrees reachable within depth via a shorter path. It cannot ride in
 sl-prlp (byte-identical output) and Feature 41 R4 asserts depth exactness, so the
 chain is now sl-prlp -> spr-w98t -> sl-jsyn.
+
+**2026-08-06T13:20:35Z**
+
+## Notes
+
+**2026-08-06T00:00:00Z**
+
+Cause: Feature 40's stated outcome -- one browser-portable traversal, one shared component rendered by both VS Code and the harness, with Playwright coverage -- was independently delivered by Feature 36 (sl-4czz's sz-chain-view, sl-prlp's core traversal extraction, sl-iwlv's VS Code repoint, sl-nswc's harness wiring + Playwright suite) before this epic's own children were picked up. Verified by reading the actual current code and tests, not just ticket status: no duplicate traversal exists, the old VS Code-only renderer is deleted, and the harness click path is Playwright-tested end to end.
+Fix: closing epic as superseded rather than completed via its own children (sl-v3w5, sl-7ind, sl-hhdk each closed with the same finding). features/40-shared-field-lineage-view/PRD.md marked Status: SUPERSEDED and moved to archive/features/; docs/product-owner/ROADMAP.md updated. Two genuine residual gaps found while verifying parity (unknown-field render state, cyclic-chain rendering coverage) filed as sv-embb. (commit immediately after 9fe61674)
