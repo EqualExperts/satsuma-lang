@@ -2,7 +2,7 @@
 id: gpt-pwze
 status: open
 deps: []
-links: []
+links: [gpt-uazn, gpt-o0fk]
 created: 2026-08-06T13:44:10Z
 type: task
 priority: 1

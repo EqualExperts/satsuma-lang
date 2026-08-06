@@ -2,7 +2,7 @@
 id: gpt-uazn
 status: open
 deps: []
-links: []
+links: [gpt-pwze, gpt-o0fk]
 created: 2026-08-06T13:43:52Z
 type: epic
 priority: 1
@@ -15,7 +15,7 @@ Deliver Feature 46 from features/46-generated-property-expansion/PRD.md: close t
 
 ## Acceptance Criteria
 
-R1-R6 are delivered through linked child tickets with their PRD acceptance tests passing; every requirement is accepted by a mutation check that shows the property failing against a deliberately broken implementation, with the counterexample naming the defect; every child records its cause/fix note and passing relevant automated tests before closure; the PRD ticket map and status are reconciled when the epic closes; no diagnostic semantics, rule severities or command output change.
+R1-R7 are delivered through linked child tickets with their PRD acceptance tests passing; every requirement is accepted by a mutation check that shows the property failing against a deliberately broken implementation, with the counterexample naming the defect; every child records its cause/fix note and passing relevant automated tests before closure; the PRD ticket map and status are reconciled when the epic closes; no diagnostic semantics, rule severities or command output change.
 
 
 ## Notes
