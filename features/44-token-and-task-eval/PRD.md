@@ -841,13 +841,28 @@ is cheap, and precisely why it must not be allowed to grow.
 **Its three outputs.**
 
 1. A **go/no-go on building Phases 1–3**, against thresholds written before the
-   run:
-   - S+ ≥ 0.85 × M on tokens **and** no quality separation on T5 → **stop.** The
-     effect is inside run-to-run noise and no amount of harness rescues it. The
-     honest follow-up is to correct the site copy downward without a full study.
-   - S+ ≤ 0.6 × M → **build the full protocol.**
-   - In between → build Phases 1–2, then re-probe before committing the primary
-     slice.
+   run. The thresholds are stated against **arm X**, because X is the anchor arm,
+   `tokens(X) / tokens(S+)` is this study's primary statistic, and the published
+   claim the whole feature exists to defend — "3–8× less token usage than mapping
+   spreadsheets" — is an X-relative claim. Anchoring the gate to the claim under
+   test is what makes the gate mean something. Settled 2026-08-06; see
+   [Open decisions](#open-decisions-for-the-project-owner), item 7.
+   - S+ ≥ 0.5 × X on tokens (less than a 2× advantage) **and** no quality
+     separation on T5 → **stop.** The published 3–8× claim is not
+     recoverable at any *n*, and the honest follow-up is to correct the site copy
+     downward without a full study.
+   - S+ ≤ 0.33 × X — at least the bottom of the published claim — → **build the
+     full protocol.**
+   - In between (0.33–0.5 × X) → build Phases 1–2, then re-probe before committing
+     the primary slice.
+
+   **Arm M is reported alongside, and is not a gate.** The registered prediction
+   is that a total field-level markdown table lands near parity with `.stm` on
+   tokens, with the advantage appearing in *quality* instead. That prediction is
+   one of this protocol's more credible features and must survive the change of
+   gate: the probe still reports S+/M, and a near-parity result is still recorded
+   as the PRD predicted it. What changed is only that markdown no longer decides
+   whether the machinery gets built.
 2. A directional effect size per arm pair, used to **size *n*** for the full run.
    The current *n* = 5 is a guess; the probe replaces it with an estimate.
 3. A list of protocol bugs found cheaply: does the S+ agent actually *use* the
@@ -1022,8 +1037,30 @@ disliking the answer, and quietly keeping the old number.
    registered prediction is that it lands near parity on static size with the
    advantage showing up in *quality* instead. Publishing it prominently is the
    honest choice and makes the whole write-up harder to dismiss; it also means the
-   site can no longer imply compactness-over-prose. Recommend headline.
+   site can no longer imply compactness-over-prose. Recommend headline. Note this
+   is a question about *reporting prominence* and is unaffected by item 7, which
+   is about *gating*.
 6. **Whether the `>90% valid Satsuma` claim gets measured here or just pulled.**
    Measuring it is a different experiment (generation validity, not
    comprehension cost) and would need its own arms. Recommend pulling it from
    the site in Phase 4 and giving it its own feature if it's wanted back.
+7. ~~**Which arm the Phase 0.5 kill thresholds are stated against.**~~
+   **Settled 2026-08-06: arm X.** As first written, the probe's thresholds were
+   stated against arm M while every other part of this document treats arm X as
+   the anchor and `tokens(X) / tokens(S+)` as the primary statistic. The
+   consequence was perverse: a probe in which S+ comfortably beat spreadsheets but
+   landed near parity with markdown would have triggered **stop**, killing the
+   study on a comparison the site makes no claim about — and near-parity with
+   markdown is exactly what this PRD *predicts*, so the gate was set to fire on its
+   own registered prediction.
+
+   The thresholds are now stated against arm X and pinned to the published claim:
+   stop below a 2× advantage, build at or above the claim's own lower bound of 3×.
+   Arm M continues to be measured and reported as a secondary ratio, and its
+   near-parity prediction stands unchanged.
+
+   **This is a pre-registration, not a post-hoc adjustment.** It was settled on
+   2026-08-06, before `sl-jdho` authored any scenario and before any episode ran.
+   The change was made because the thresholds contradicted the protocol's own
+   framing, not because any number was known — no probe data existed at the time,
+   and none could have informed it.
