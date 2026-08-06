@@ -32,6 +32,9 @@ or a rename that corrupts a workspace fails a test instead of shipping.
 3. `references`, `definition` and `rename` agree with the declared usage sites of
    a workspace whose shape the test chose.
 4. A rename is proved to preserve the workspace, not assumed to.
+5. The formatter is proved to preserve meaning, not only shape (R7 — adjacent to
+   the goal rather than part of it, and included because the property is one
+   test against machinery that already exists).
 
 ## Background — measured state
 
@@ -194,6 +197,24 @@ states. For every declared field, `where-used` must return exactly the arrows
 `scenarioFieldEdges` says touch it. Cheap once R3 has shown the pattern; listed
 last because the commands are read-only and their blast radius is smallest.
 
+### R7 — The formatter preserves semantics, not just shape
+
+`generated-format-properties.test.js` proves the formatter is idempotent,
+preserves CST structure, and reparses without recovery nodes. All three are
+claims about *shape*. Nothing proves the formatter preserves *meaning*.
+
+A formatter that dropped the trailing source of a multi-source arrow, or
+re-associated a pipe chain, would keep the CST well-formed and pass every
+property in that file. The missing property spans the whole pipeline the
+formatter can damage:
+
+`extract(parse(src))` deep-equals `extract(parse(format(src)))`, compared over
+the extracted semantic index rather than over text or CST.
+
+No new oracle is needed — `test/support/scenario-pipeline.js` already drives
+parse and extract. Independent of R1's mutators and R3's adapter, so it is
+unblocked today.
+
 ## Ticket map
 
 Epic: **`gpt-uazn`**.
@@ -206,8 +227,19 @@ Epic: **`gpt-uazn`**.
 | R4 | `gpt-8izj` | rename round-trip | `gpt-21jp` |
 | R5 | `gpt-ocmp` | `diff` algebra and mutation oracle | `gpt-pwze` |
 | R6 | `gpt-clpj` | inverse-relation properties for `where-used`/`find`/`arrows` | — |
+| R7 | `gpt-h0dc` | the formatter preserves semantics, not just shape | — |
 
-R1, R3 and R6 are unblocked today.
+R1, R3, R6 and R7 are unblocked today.
+
+One ticket outside the requirement set, raised by this feature's own planning
+rather than by its goal:
+
+| Ticket | Title |
+|---|---|
+| `gpt-o0fk` | pin the registered lint rule set against the docs, like `docs.test.ts` does for commands |
+
+See decision 3 for why. It is linked to the epic rather than parented to it: the
+epic's acceptance is R1–R7, and this is hygiene the feature happened to expose.
 
 ## Acceptance tests
 
@@ -224,6 +256,12 @@ nothing.
 | R4 | drop the cross-file edits from the rename `WorkspaceEdit` | a surviving old-name occurrence, or a broken edge |
 | R5 | make `diff` compare formatted text rather than structure | a non-empty diff for a reformat null mutation |
 | R6 | drop NL-derived edges from `where-used` | a declared arrow missing for an `@ref`-touched field |
+| R7 | make `format` drop the trailing source of a multi-source arrow | the semantic property failing, naming the arrow — while the existing CST-preservation and idempotence properties both still pass |
+
+R7 additionally needs the **negative** half of its mutation check: a shape-only
+defect, such as altered indentation, must *not* fail the semantic property. That
+belongs to the existing idempotence test, and a property that fires on both is
+not testing what it claims to.
 
 Every property carries a purpose comment naming the invariant or defect class it
 defends, and failures report the seed, the mutation and the shrunk Satsuma source
@@ -253,6 +291,13 @@ wrong: `lint-engine.ts` registers them through the `TYPE_MISMATCH_RULE_ID` and
 bug arises from this. It is recorded here because a rule registered through a
 constant is easy to miss when auditing the registry by eye — including for the
 R1 mutator set, which must cover all six.
+
+The near-miss is worth one cheap test, raised as **`gpt-o0fk`**: nothing pins
+the registered rule set. `lint-command.test.ts`'s `--rules` case asserts only
+that two named rules appear, not that the printed list *is* the registry, and
+nothing checks it against `SATSUMA-CLI.md`'s rule table. `docs.test.ts` already
+does exactly this for commands (`sl-w1dr`), so the pattern and the home both
+exist. That ticket makes the registry auditable; it does not restyle it.
 
 **4. R2 asserts diagnostic positions to the mutated construct, not to the exact
 line.** Confirmed by the project owner, 2026-08-06. An exact line number couples

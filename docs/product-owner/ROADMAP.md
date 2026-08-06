@@ -48,10 +48,19 @@ and the LSP's mirror of both — is still proved by hand-written fixtures; and
 `definition` and `rename` are inverse relations over ground truth the generator
 already states.
 
-**Ready now:** three of the six tickets. `gpt-pwze` (R1, the defect-mutator
-layer in `scenario-gen`), `gpt-21jp` (R3, the LSP scenario adapter) and
-`gpt-clpj` (R6, inverse-relation properties for the query commands). R2 and R5
-wait on R1's mutators; R4 waits on R3's adapter.
+A seventh requirement rides along because the property is one test against
+machinery that already exists: the formatter is proved idempotent and
+CST-preserving, but nothing proves it preserves *meaning* — a formatter that
+dropped the trailing source of a multi-source arrow would pass every property
+in the file.
+
+**Ready now:** four of the seven tickets. `gpt-pwze` (R1, the defect-mutator
+layer in `scenario-gen`), `gpt-21jp` (R3, the LSP scenario adapter),
+`gpt-clpj` (R6, inverse-relation properties for the query commands) and
+`gpt-h0dc` (R7, formatter semantics). R2 and R5 wait on R1's mutators; R4 waits
+on R3's adapter. `gpt-o0fk` sits outside the requirement set — the feature's own
+planning misread the lint rule registry, which turns out to be pinned by nothing,
+so it applies `docs.test.ts`'s command-coverage pattern to lint rules.
 
 **Suggested order:** R3 first. It is the cheapest of the three and proves the
 adapter pattern in a third package, and its oracle already exists. R1 is the
