@@ -1,10 +1,38 @@
 # Feature 46 — Generated-Input Confidence for Diagnostics and Editor Intelligence
 
-> **Status: PROPOSED** (raised 2026-08-06) — raised while assessing where else
-> the generated-property machinery from Features 39 and 41 pays off, now that
-> `@satsuma/scenario-gen` is a package every suite can reach.
+> **Status: DELIVERED** (raised 2026-08-06, delivered 2026-08-06) — every
+> requirement R1–R7 has shipped on `feat/generated-property-testing`, each with
+> its mutation check run and recorded on its ticket. Raised while assessing
+> where else the generated-property machinery from Features 39 and 41 pays off,
+> now that `@satsuma/scenario-gen` is a package every suite can reach.
 >
 > **State this PRD was checked against:** `main` at `15d143ee`.
+>
+> **What shipped, and what it found.** Test counts moved: core 703 → 708,
+> CLI 1074 → 1157, LSP 303 → 323, scenario-gen 30 → 47. Seven bugs were found by
+> the new properties and filed rather than fixed under this feature, as the
+> "what this feature is not" note below requires — `gpt-bc1x`, `gpt-qhfo`,
+> `gpt-i1uv`, `gpt-jwek`, `gpt-4p1z`, and (from R4) `gpt-fjo7` and `gpt-68ka`.
+> Each is pinned by a test asserting today's behaviour, so its fix turns that
+> test red.
+>
+> **Three design points the requirements got wrong, corrected in delivery.**
+> Each is argued at length in the header of the file that carries it, and on its
+> ticket:
+>
+> - **R2's set comparison must be a multiset** — one defect can predict two
+>   diagnostics agreeing on `(rule, file, entity)` — and predictions pair with
+>   observations by maximum bipartite matching, because an entity is only
+>   observable as a _substring_ of a message and substring containment is not
+>   one-to-one.
+> - **R4 states which index it asks.** The round trip is computed against the
+>   whole-folder index, and the import-scoped behaviour the real server uses is
+>   pinned as `gpt-bc1x` rather than asserted. Decision 5 below.
+> - **R5's "`diff` is empty across every null mutation" is false**, and rightly:
+>   `rename-entity-consistently` changes structure, so `diff` reports it. The
+>   null mutators preserve meaning for the _diagnostic_ surface, not entity
+>   identity. R5's reformat step is also property-local rather than a mutator,
+>   since `scenario-gen` may not depend on core to reach a formatter.
 >
 > **Recommendation.** Proceed, in the order R1 → R2 → R3 → R4 → R5 → R6. Two
 > structural gaps are worth closing and the rest is opportunistic. The first gap
@@ -40,33 +68,33 @@ or a rename that corrupts a workspace fails a test instead of shipping.
 
 ### What generated suites cover today
 
-| Package | Suite | What it proves |
-|---|---|---|
-| `satsuma-core` | `generated-coverage-oracle`, `generated-coverage-properties` | coverage semantics against an independent oracle (Feature 39 R4) |
-| `satsuma-core` | `generated-format-properties` | formatter idempotence, CST preservation, no recovery nodes |
-| `satsuma-cli` | `generated-workspace` | every generated workspace parses and validates clean |
-| `satsuma-cli` | `generated-edge-invariants` | nothing invented, nothing dropped, order-invariance |
-| `satsuma-cli` | `field-lineage-reachability` | upstream/downstream is reachability over declared edges |
-| `satsuma-viz` | `generated-edge-completeness` | the layout draws every declared arrow |
-| `integration-tests` | `field-edge-parity` | the CLI and the VizModel agree about edges |
+| Package             | Suite                                                        | What it proves                                                   |
+| ------------------- | ------------------------------------------------------------ | ---------------------------------------------------------------- |
+| `satsuma-core`      | `generated-coverage-oracle`, `generated-coverage-properties` | coverage semantics against an independent oracle (Feature 39 R4) |
+| `satsuma-core`      | `generated-format-properties`                                | formatter idempotence, CST preservation, no recovery nodes       |
+| `satsuma-cli`       | `generated-workspace`                                        | every generated workspace parses and validates clean             |
+| `satsuma-cli`       | `generated-edge-invariants`                                  | nothing invented, nothing dropped, order-invariance              |
+| `satsuma-cli`       | `field-lineage-reachability`                                 | upstream/downstream is reachability over declared edges          |
+| `satsuma-viz`       | `generated-edge-completeness`                                | the layout draws every declared arrow                            |
+| `integration-tests` | `field-edge-parity`                                          | the CLI and the VizModel agree about edges                       |
 
-Every row asserts a property of the form *"the tool accepts this valid input and
-returns the right answer"*.
+Every row asserts a property of the form _"the tool accepts this valid input and
+returns the right answer"_.
 
 ### Gap 1 — the negative surface is entirely hand-picked
 
 `workspace-arbitraries.js` builds well-formed workspaces on purpose: Feature 41
 needed input the toolchain accepts, and `generated-workspace.test.ts` asserts
 exactly that ("produces no semantic diagnostic for any generated workspace").
-Nothing generates input the toolchain should *reject*.
+Nothing generates input the toolchain should _reject_.
 
 The diagnostic surface that is therefore fixture-only:
 
-| Site | Rules |
-|---|---|
-| `satsuma-core/src/validate.ts` | `duplicate-definition`, `undefined-ref`, `field-not-in-schema`, `unresolved-nl-ref`, `nl-ref-not-in-source`, `constraint-in-type-args`, `namespace-metadata-conflict` |
-| `satsuma-core/src/import-reachability.ts` | import-scope violations (ADR-022 selective transitive reachability), with a caller-supplied rule/message policy |
-| `satsuma-cli/src/lint-engine.ts` `RULES` | `hidden-source-in-nl`, `unresolved-nl-ref`, `duplicate-definition`, `unenumerated-record-target`, `type-mismatch-direct-arrow`, `lineage-cycle` — the last two registered through the `TYPE_MISMATCH_RULE_ID` and `LINEAGE_CYCLE_RULE_ID` constants core exports, so all six are reachable from `satsuma lint` |
+| Site                                      | Rules                                                                                                                                                                                                                                                                                                          |
+| ----------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `satsuma-core/src/validate.ts`            | `duplicate-definition`, `undefined-ref`, `field-not-in-schema`, `unresolved-nl-ref`, `nl-ref-not-in-source`, `constraint-in-type-args`, `namespace-metadata-conflict`                                                                                                                                          |
+| `satsuma-core/src/import-reachability.ts` | import-scope violations (ADR-022 selective transitive reachability), with a caller-supplied rule/message policy                                                                                                                                                                                                |
+| `satsuma-cli/src/lint-engine.ts` `RULES`  | `hidden-source-in-nl`, `unresolved-nl-ref`, `duplicate-definition`, `unenumerated-record-target`, `type-mismatch-direct-arrow`, `lineage-cycle` — the last two registered through the `TYPE_MISMATCH_RULE_ID` and `LINEAGE_CYCLE_RULE_ID` constants core exports, so all six are reachable from `satsuma lint` |
 
 The bug history is concentrated here and has the shape a generator finds cheaply:
 `sl-rw3e` (duplicates reported at one site but not the other), `sl-padl` and
@@ -117,7 +145,7 @@ Two design rules make this honest rather than circular:
 
 **The predicted set is complete, not minimal.** One defect can legitimately
 cascade — deleting a field breaks every arrow that names it. An "exactly one
-diagnostic" oracle would be wrong, so a mutator must enumerate *all* the
+diagnostic" oracle would be wrong, so a mutator must enumerate _all_ the
 diagnostics it causes. A mutator that cannot predict its own full consequence set
 does not belong in this package.
 
@@ -174,7 +202,7 @@ not use, apply the `WorkspaceEdit`, then reparse:
 
 - The workspace still validates clean.
 - The declared edge set is identical modulo the rename.
-- No occurrence of the old name survives, and no occurrence of an *unrelated*
+- No occurrence of the old name survives, and no occurrence of an _unrelated_
   entity's name changed.
 
 The fresh-name choice belongs to the property, not the arbitrary: renaming onto an
@@ -201,7 +229,7 @@ last because the commands are read-only and their blast radius is smallest.
 
 `generated-format-properties.test.js` proves the formatter is idempotent,
 preserves CST structure, and reparses without recovery nodes. All three are
-claims about *shape*. Nothing proves the formatter preserves *meaning*.
+claims about _shape_. Nothing proves the formatter preserves _meaning_.
 
 A formatter that dropped the trailing source of a multi-source arrow, or
 re-associated a pipe chain, would keep the CST well-formed and pass every
@@ -219,24 +247,42 @@ unblocked today.
 
 Epic: **`gpt-uazn`**.
 
-| Req | Ticket | Title | Depends on |
-|---|---|---|---|
-| R1 | `gpt-pwze` | defect mutators and the `WorkspaceDefect` contract | — |
-| R2 | `gpt-vq0r` | validate and lint properties over mutated workspaces | `gpt-pwze` |
-| R3 | `gpt-21jp` | LSP scenario adapter; definition/references duality | — |
-| R4 | `gpt-8izj` | rename round-trip | `gpt-21jp` |
-| R5 | `gpt-ocmp` | `diff` algebra and mutation oracle | `gpt-pwze` |
-| R6 | `gpt-clpj` | inverse-relation properties for `where-used`/`find`/`arrows` | — |
-| R7 | `gpt-h0dc` | the formatter preserves semantics, not just shape | — |
+| Req | Ticket     | Title                                                        | Depends on | Status |
+| --- | ---------- | ------------------------------------------------------------ | ---------- | ------ |
+| R1  | `gpt-pwze` | defect mutators and the `WorkspaceDefect` contract           | —          | closed |
+| R2  | `gpt-vq0r` | validate and lint properties over mutated workspaces         | `gpt-pwze` | closed |
+| R3  | `gpt-21jp` | LSP scenario adapter; definition/references duality          | —          | closed |
+| R4  | `gpt-8izj` | rename round-trip                                            | `gpt-21jp` | closed |
+| R5  | `gpt-ocmp` | `diff` algebra and mutation oracle                           | `gpt-pwze` | closed |
+| R6  | `gpt-clpj` | inverse-relation properties for `where-used`/`find`/`arrows` | —          | closed |
+| R7  | `gpt-h0dc` | the formatter preserves semantics, not just shape            | —          | closed |
 
-R1, R3, R6 and R7 are unblocked today.
+Tickets outside the requirement set, raised by this feature's planning or by its
+own review rather than by its goal:
 
-One ticket outside the requirement set, raised by this feature's own planning
-rather than by its goal:
+| Ticket     | Title                                                                                    | Status                                                                       |
+| ---------- | ---------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| `gpt-o0fk` | pin the registered lint rule set against the docs, like `docs.test.ts` does for commands | closed                                                                       |
+| `gpt-l9rp` | move the LSP's declared-usage-site oracle into `scenario-gen`'s `ground-truth.js`        | closed                                                                       |
+| `gpt-ek0e` | export the owning-schema split for a canonical field endpoint                            | open — the helper turns out to already exist; see the ticket's findings note |
+| `gpt-l0nz` | no generated workspace declares a `transform` block                                      | open                                                                         |
 
-| Ticket | Title |
-|---|---|
-| `gpt-o0fk` | pin the registered lint rule set against the docs, like `docs.test.ts` does for commands |
+### Bugs these properties found
+
+Filed, not fixed — each is pinned by a test asserting today's behaviour, so the
+fix turns that test red. That is this feature's contract with itself: a property
+failing against current behaviour is a bug ticket, never a licence to change the
+behaviour under cover of a test change.
+
+| Ticket     | Found by | What it is                                                                               |
+| ---------- | -------- | ---------------------------------------------------------------------------------------- |
+| `gpt-bc1x` | R3/R4    | a rename from a downstream declaration leaves upstream imports naming the old symbol     |
+| `gpt-qhfo` | R6       | `arrows --as-source` on a nested path returns a different field's arrow                  |
+| `gpt-i1uv` | R1       | `unenumerated-record-target` is unreachable for spread-bearing schemas                   |
+| `gpt-jwek` | R3       | go-to-definition answers nothing at three usage kinds find-references reports            |
+| `gpt-4p1z` | R6       | `arrows --json` prints prose and exits 1 with no matches, while `find --json` emits `[]` |
+| `gpt-fjo7` | R4       | rename leaves NL `@ref` mentions of the renamed schema dangling                          |
+| `gpt-68ka` | R4       | the LSP never reports `unresolved-nl-ref`, so it under-reports against the CLI           |
 
 See decision 3 for why. It is linked to the epic rather than parented to it: the
 epic's acceptance is R1–R7, and this is hygiene the feature happened to expose.
@@ -248,18 +294,18 @@ to fail against a deliberately broken implementation, and the counterexample mus
 name the defect. A property that passes both before and after the break proves
 nothing.
 
-| Req | Break this | The property must fail with |
-|---|---|---|
-| R2 | suppress the `duplicate-definition` push in `validate.ts` `checkDuplicates` | the missing rule and the duplicated entity |
-| R2 | make `checkDuplicates` fire on same-name entities in unrelated entry files | a spurious diagnostic, on a null mutation |
-| R3 | make `resolveReferenceKey` return the authored spelling instead of the canonical name | a namespaced usage site missing from `references` |
-| R4 | drop the cross-file edits from the rename `WorkspaceEdit` | a surviving old-name occurrence, or a broken edge |
-| R5 | make `diff` compare formatted text rather than structure | a non-empty diff for a reformat null mutation |
-| R6 | drop NL-derived edges from `where-used` | a declared arrow missing for an `@ref`-touched field |
-| R7 | make `format` drop the trailing source of a multi-source arrow | the semantic property failing, naming the arrow — while the existing CST-preservation and idempotence properties both still pass |
+| Req | Break this                                                                            | The property must fail with                                                                                                      |
+| --- | ------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| R2  | suppress the `duplicate-definition` push in `validate.ts` `checkDuplicates`           | the missing rule and the duplicated entity                                                                                       |
+| R2  | make `checkDuplicates` fire on same-name entities in unrelated entry files            | a spurious diagnostic, on a null mutation                                                                                        |
+| R3  | make `resolveReferenceKey` return the authored spelling instead of the canonical name | a namespaced usage site missing from `references`                                                                                |
+| R4  | drop the cross-file edits from the rename `WorkspaceEdit`                             | a surviving old-name occurrence, or a broken edge                                                                                |
+| R5  | make `diff` compare formatted text rather than structure                              | a non-empty diff for a reformat null mutation                                                                                    |
+| R6  | drop NL-derived edges from `where-used`                                               | a declared arrow missing for an `@ref`-touched field                                                                             |
+| R7  | make `format` drop the trailing source of a multi-source arrow                        | the semantic property failing, naming the arrow — while the existing CST-preservation and idempotence properties both still pass |
 
 R7 additionally needs the **negative** half of its mutation check: a shape-only
-defect, such as altered indentation, must *not* fail the semantic property. That
+defect, such as altered indentation, must _not_ fail the semantic property. That
 belongs to the existing idempotence test, and a property that fires on both is
 not testing what it claims to.
 
@@ -294,7 +340,7 @@ R1 mutator set, which must cover all six.
 
 The near-miss is worth one cheap test, raised as **`gpt-o0fk`**: nothing pins
 the registered rule set. `lint-command.test.ts`'s `--rules` case asserts only
-that two named rules appear, not that the printed list *is* the registry, and
+that two named rules appear, not that the printed list _is_ the registry, and
 nothing checks it against `SATSUMA-CLI.md`'s rule table. `docs.test.ts` already
 does exactly this for commands (`sl-w1dr`), so the pattern and the home both
 exist. That ticket makes the registry auditable; it does not restyle it.
@@ -305,3 +351,16 @@ the properties to the renderer's layout choices, and `scenario-gen` deliberately
 owns rendering. `WorkspaceDefect.expected` therefore carries a position only as a
 hint for failure messages; the assertion is containment. If diagnostic positions
 later become part of the public contract, this is the decision to revisit.
+
+**5. R4's rename round trip asks the whole-folder index, and the scoped
+behaviour is pinned.** Decided in delivery, 2026-08-06. Every real rename
+request goes through `server.ts`'s per-document `scopeIndex(uri)`, and import
+reachability points one way — so a rename driven from a declaration in a
+downstream file cannot see the upstream files that import it (`gpt-bc1x`).
+Two options were open: assert the round trip against the scoped index and block
+R4 on that bug, or assert it against the whole-folder index and pin the scoped
+behaviour. The second was chosen, so the properties state what a correct rename
+must achieve while the pin measures what today's server achieves. Asserting
+against the scoped index would have made the whole file fail for one known
+reason, which is a worse way to record one known reason. When `gpt-bc1x` is
+fixed the pin turns red and the properties move onto the scoped index unchanged.

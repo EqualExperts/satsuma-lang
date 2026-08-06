@@ -21,3 +21,21 @@ Raised by Feature 46 R6's review (gpt-clpj).
 
 One exported helper in @satsuma/core next to resolveFieldEndpoint, taking a CanonicalFieldEndpoint and returning its owning CanonicalEntityRef (and, if callers need it, the schema-local path). The two production call sites and the two CLI test copies use it. scenario-gen's copy is left alone and gains a comment saying why it must stay independent. A test covers the namespaced case that the naive first-dot split gets wrong.
 
+
+## Notes
+
+**2026-08-06T19:02:06Z**
+
+**2026-08-06** — findings note from Feature 46's closing sweep, not a closing note. Four things this ticket gets wrong, each of which changes the work.
+
+**1. The helper already exists, and is already exported.** `fieldEndpointSchema(endpoint)` and `fieldEndpointPath(endpoint)` live in `tooling/satsuma-core/src/reference-stages.ts` beside `fieldEndpointOf`, both exported from core's index, and `fieldEndpointSchema`'s own doc-comment says it "replaces splitting an endpoint string on its first dot at each consumer (`sl-jyee`)". Its private `endpointPathStart` implements exactly the after-the-`::` rule this ticket describes. So the work is *adopt the helper at four call sites*, not *write one*.
+
+**2. There is a fifth copy the ticket does not list**: `tooling/satsuma-cli/src/lint-engine.ts:126`, in the `hidden-source-in-nl` rule. Purely structural, and the closest match to the helper.
+
+**3. `coverage-rollup.ts` is not one of the copies.** The line the ticket cites is `namespaceOf`, which splits a schema id at `::` — a different question. The nearby dot-walking loop enumerates every ancestor path, also different. Nothing in that file needs this helper.
+
+**4. The two production copies do not agree with each other, so this is not a pure refactor.** `validate.ts`'s tries the *longest* prefix that exists in `index.schemas` first and falls back to the structural split; `lint-engine.ts`'s always takes the first dot after `::`. Replacing the first wholesale would change `nl-ref-not-in-source` behaviour, which Feature 46 R2's generated properties now watch — so only its fallback branch may be swapped, and the existence-based loop has to stay ahead of it.
+
+**One further hazard.** The helper takes a *branded* `CanonicalFieldEndpoint`, so a caller holding a plain string must go through `createCanonicalFieldEndpoint`, which validates. Both production sites pass `resolution.resolvedTo.name`, whose canonicality is not established at that point — a bare `s0.field_0` with no `::` may not survive `canonicalNameOf`. Check that before adopting, or the refactor turns a silent wrong answer into a thrown TypeError. The two CLI *test* copies are safe: graph endpoints are canonical (`::s0.field_0`).
+
+Left open deliberately at the end of Feature 46 rather than rushed: it is not a child of the epic and does not block it.
