@@ -185,12 +185,31 @@ const BOTH = [VALIDATE, LINT];
  *
  * `reason` names the shape the mutator needed, so a property that skips a sample
  * can say *why* it skipped rather than silently passing.
+ *
+ * The return type is annotated rather than inferred so that every mutator's own
+ * return type comes out as `MutationResult`. Without it TypeScript widens
+ * `applicable` to `boolean`, the union stops being discriminated, and a
+ * TypeScript consumer cannot reach `.workspace` even after
+ * {@link isWorkspaceDefect}. The same applies to {@link finishDefect} and
+ * {@link nullMutation}.
+ *
+ * @returns {MutationNotApplicable}
  */
 function mutationNotApplicable(kind, reason) {
   return { applicable: false, mutation: { kind, target: null }, reason };
 }
 
-/** True when a mutator produced a defect rather than reporting its precondition. */
+/**
+ * True when a mutator produced a defect rather than reporting its precondition.
+ *
+ * Declared as a *type predicate* because this is how a TypeScript consumer
+ * reaches `.workspace` at all: the two result shapes are plain object literals,
+ * so `applicable` is inferred as `boolean` rather than as `true`/`false` literals
+ * and the union cannot be discriminated on it directly.
+ *
+ * @param {MutationResult} result
+ * @returns {result is WorkspaceDefect}
+ */
 export function isWorkspaceDefect(result) {
   return result.applicable === true;
 }
@@ -201,6 +220,10 @@ export function isWorkspaceDefect(result) {
  * A property drives one command at a time, so it must compare against that
  * command's share of the prediction — `duplicate-definition` appears in both
  * registries and `unenumerated-record-target` in neither of the other's.
+ *
+ * @param {WorkspaceDefect} defect
+ * @param {string} surface — `"validate"` or `"lint"`.
+ * @returns {PredictedDiagnostic[]}
  */
 export function expectedForSurface(defect, surface) {
   return defect.expected.filter((diagnostic) => diagnostic.surfaces.includes(surface));
@@ -223,6 +246,8 @@ function predict({ rule, file, entity, surfaces, locator }) {
  * consuming property to this package's layout choices, which is what PRD decision
  * 4 rules out. `null` means the construct could not be located, which is a
  * degraded failure message and never a wrong assertion.
+ *
+ * @returns {WorkspaceDefect}
  */
 function finishDefect({ workspace, kind, target, expected }) {
   const sources = new Map(renderWorkspace(workspace).map((file) => [file.path, file.source]));
@@ -1207,7 +1232,11 @@ export function targetRecordWithoutChildren(workspace) {
 // text*, not of a scenario, so it cannot be expressed as a workspace-to-workspace
 // function; it belongs to the consumer that has the formatter (R7, gpt-h0dc).
 
-/** Wrap a workspace-to-workspace transformation as a null mutation. */
+/**
+ * Wrap a workspace-to-workspace transformation as a null mutation.
+ *
+ * @returns {MutationResult}
+ */
 function nullMutation(kind, workspace, mutated, target) {
   const before = renderWorkspace(workspace);
   const after = renderWorkspace(mutated);
