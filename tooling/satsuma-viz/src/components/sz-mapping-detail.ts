@@ -179,6 +179,16 @@ export class SzMappingDetail extends LitElement {
       border-bottom: 2px solid var(--sz-card-border);
     }
 
+    /* Stated empty state for a mapping with no field arrows (sl-jetk). Muted
+       and italic so it reads as an explanation, not as table content. */
+    .arrow-table-empty {
+      padding: 10px 12px;
+      font-size: 12px;
+      font-style: italic;
+      line-height: 1.5;
+      color: var(--sz-text-muted);
+    }
+
     .arrow-table td {
       padding: 5px 12px;
       border-bottom: 1px solid var(--sz-card-border);
@@ -231,6 +241,16 @@ export class SzMappingDetail extends LitElement {
 
     .source-ref-item {
       display: block;
+    }
+
+    /* Marker for an arrow with no source field (sl-k7i4). Deliberately not a
+       .field-ref: sans-serif, italic and muted so it cannot be misread as a
+       field path, and so highlight styling for real paths never applies to it. */
+    .source-derived {
+      font-family: var(--sz-font-sans);
+      font-size: 11px;
+      font-style: italic;
+      color: var(--sz-text-muted);
     }
 
     .transform-cell {
@@ -700,7 +720,36 @@ export class SzMappingDetail extends LitElement {
     `;
   }
 
+  /**
+   * True when the mapping declares no field-level arrows in any form.
+   *
+   * Report and model consumers legitimately declare `source {schemas}` and
+   * `target {schema}` and nothing else, so this is a valid mapping shape rather
+   * than a missing-data case — see {@link _renderArrowTable}.
+   */
+  private _hasNoArrows(m: MappingBlock): boolean {
+    return (
+      m.arrows.length === 0 &&
+      m.eachBlocks.length === 0 &&
+      m.flattenBlocks.length === 0 &&
+      m.nestedArrows.length === 0
+    );
+  }
+
   private _renderArrowTable(m: MappingBlock) {
+    // A mapping with no arrows used to render the four column headers over an
+    // empty <tbody>, which reads as a half-loaded panel (sl-jetk). Headers head
+    // rows; with no rows, say what the mapping declares instead.
+    if (this._hasNoArrows(m)) {
+      return html`
+        <div class="mapping-header" style="padding: 0;">
+          <div class="arrow-table-empty" data-testid=${`${this.testIdPrefix}-arrow-table-empty`}>
+            This mapping declares no field-level arrows — it maps whole schemas only.
+          </div>
+        </div>
+      `;
+    }
+
     return html`
       <div class="mapping-header" style="padding: 0;">
         <table class="arrow-table" data-testid=${`${this.testIdPrefix}-arrow-table`}>
@@ -759,11 +808,24 @@ export class SzMappingDetail extends LitElement {
       >
         <td>
           <div class="source-ref-list">
-            ${a.sourceFields.map(
-              (sourceField) => html`
-                <span class="field-ref source-ref-item">${sourceField}</span>
-              `,
-            )}
+            ${
+              a.sourceFields.length === 0
+                ? // A target-only arrow (`-> is_closed { "..." }`) has no source
+                  // field by design. An empty cell was indistinguishable from a
+                  // source path the viz had failed to resolve (sl-k7i4), so name
+                  // the construct instead.
+                  html`<span
+                    class="source-derived"
+                    data-testid=${`${rowTestId}-source-derived`}
+                    title="No source field: this target is derived from the transform"
+                    >derived</span
+                  >`
+                : a.sourceFields.map(
+                    (sourceField) => html`
+                      <span class="field-ref source-ref-item">${sourceField}</span>
+                    `,
+                  )
+            }
           </div>
         </td>
         <td><span class="arrow-icon">&#x2192;</span></td>
