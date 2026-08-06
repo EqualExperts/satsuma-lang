@@ -1,6 +1,6 @@
 ---
 id: sl-zsv6
-status: open
+status: closed
 deps: []
 links: []
 created: 2026-08-03T12:30:34Z
@@ -24,3 +24,12 @@ This is the viz component's own toolbar, so it affects the VS Code webview and t
 - A Playwright assertion covers it: at 1440x900 with the source pane open on ns-platform.stm, the title element's scrollHeight equals a single line height and the last toolbar control's right edge is within the toolbar's client box.
 - Verified in both light and dark themes.
 
+
+## Notes
+
+**2026-08-06T12:42:16Z**
+
+**2026-08-06T12:42:00Z**
+
+Cause: `.toolbar` is a flex row with no wrap, and `.toolbar-title` was the only item that could shrink (buttons and selects are nowrap), so the title wrapped to two lines while the trailing file filter was pushed past the toolbar's right edge.
+Fix: the title takes `white-space: nowrap`, `flex-shrink: 0` and ellipsis truncation capped at the row width; the toolbar takes `flex-wrap: wrap` with a row gap, so overflow becomes a second row rather than a hidden control. Asserted at 1440x900 with the source pane open on ns-platform.stm in both themes (commit immediately after 5f59ffc6).

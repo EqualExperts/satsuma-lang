@@ -1,6 +1,6 @@
 ---
 id: sl-k7i4
-status: open
+status: closed
 deps: []
 links: [lgc-4bxl]
 created: 2026-08-03T12:30:52Z
@@ -24,3 +24,12 @@ Sourceless arrows are a first-class construct, so they deserve a first-class pre
 - A test asserts the marker for a minimal sourceless-arrow snippet.
 - Arrows that do have sources are unchanged.
 
+
+## Notes
+
+**2026-08-06T12:42:27Z**
+
+**2026-08-06T12:42:00Z**
+
+Cause: the Source cell rendered `a.sourceFields.map(...)` unconditionally, so a target-only arrow (empty `sourceFields`) produced an empty cell — visually identical to a source path the viz had failed to resolve.
+Fix: an empty `sourceFields` renders a muted italic 'derived' marker with an explanatory title, carrying its own `.source-derived` class rather than `.field-ref` so it cannot read as a field name or pick up path highlighting. Asserted on sfdc's `is_closed` row in the harness (commit immediately after 5f59ffc6).

@@ -51,9 +51,16 @@ async function loadFixture(page: Page, fixtureUri: string): Promise<void> {
   );
 }
 
-/** Open a mapping's detail view by clicking its overview card. */
+/**
+ * Open a mapping's detail view from its overview card.
+ *
+ * `dispatchEvent` rather than a pointer click, following minimap.test.ts: on
+ * these fixtures the bottom-anchored minimap overlays part of the canvas and
+ * intercepts pointer events on whichever card sits beneath it. Reaching the
+ * detail view is the precondition here, not the subject.
+ */
 async function openMapping(page: Page, mappingId: string) {
-  await page.locator(`[data-testid='overview-mapping-card-${mappingId}']`).click();
+  await page.locator(`[data-testid='overview-mapping-card-${mappingId}']`).dispatchEvent("click");
   const detail = page.locator(`[data-testid='mapping-detail-${mappingId}']`).first();
   await expect(detail).toBeVisible({ timeout: 10_000 });
   return detail;
@@ -76,13 +83,17 @@ test.describe("A consumer mapping with no field arrows (sl-jetk)", () => {
     await expect(detail.locator("[data-testid$='-arrow-table']")).toHaveCount(0);
   });
 
-  test("still renders the full arrow table for a mapping that has arrows", async ({ page }) => {
-    // The same fixture's `_customer_risk_report_pipeline` does declare arrows,
-    // so it proves the empty branch is reached by emptiness and not by the
-    // report/model shape in general.
+  test("still renders the full arrow table for a mapping that does declare arrows", async ({
+    page,
+  }) => {
+    // The control case, and it needs a different fixture: EVERY mapping in
+    // reports-and-models is a whole-schema consumer, so nothing in that file can
+    // show the empty branch being reached by emptiness rather than by the
+    // report/model shape in general. sfdc's opportunity-ingestion is the
+    // canonical arrow-carrying mapping.
     await openHarnessInSingleFileMode(page);
-    await loadFixture(page, reportsUri);
-    const detail = await openMapping(page, "customer-risk-report-pipeline");
+    await loadFixture(page, sfdcUri);
+    const detail = await openMapping(page, "opportunity-ingestion");
 
     await expect(detail.locator("[data-testid$='-arrow-table']")).toBeVisible();
     await expect(detail.locator("[data-testid$='-arrow-table-empty']")).toHaveCount(0);

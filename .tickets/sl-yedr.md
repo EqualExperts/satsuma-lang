@@ -1,6 +1,6 @@
 ---
 id: sl-yedr
-status: open
+status: closed
 deps: []
 links: []
 created: 2026-08-05T09:25:42Z
@@ -21,3 +21,12 @@ Screenshot: bug-reports/namespaced-cards-lose-rounded-corners-on-expand.png
 
 Expanded (compact-expanded) namespaced compact cards keep rounded top corners, matching non-namespaced cards. Playwright/visual test on a namespaced card in the expanded state, both themes.
 
+
+## Notes
+
+**2026-08-06T12:42:05Z**
+
+**2026-08-06T12:42:00Z**
+
+Cause: `.header:first-child` was the only rule giving a compact card its top rounding once `:host([compact-expanded])` drops the host's overflow clip, and a namespaced card's pill row sits above the header, so the header is not first and no rule fired.
+Fix: the pill row's geometry moved from an inline style into a `.namespace-pill-row` class that carries the same top-rounding fallback under `:first-child`; covered in chrome-layout.test.ts in both themes, and proved to fail without the fix (commit immediately after 5f59ffc6).
