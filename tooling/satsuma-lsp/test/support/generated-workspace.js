@@ -73,6 +73,8 @@ const {
 } = require("../../dist/workspace-index");
 const { computeReferences } = require("../../dist/references");
 const { computeDefinition } = require("../../dist/definition");
+const { computeRename } = require("../../dist/rename");
+const { computeSemanticValidationDiagnostics } = require("../../dist/semantic-diagnostics");
 
 /**
  * Directory the generated documents are given URIs under.
@@ -423,8 +425,109 @@ function positionKey(uri, start) {
   return `${uri}:${start.line}:${start.character}`;
 }
 
+// ── Rename: computing an edit, and applying it ─────────────────────────────
+//
+// Rename is the one provider that *writes*, so a property about it needs both
+// halves — the edit the server would send, and the documents a client would be
+// left holding after applying it. Both are simulations of the process boundary
+// and neither reimplements anything: `computeRename` is the production function,
+// and applying a `WorkspaceEdit` is what any LSP client does with one.
+
+/**
+ * The rename edit the server would send for the symbol at `position`.
+ *
+ * Asked against the **whole-folder** index, like every other accessor here. That
+ * is not what `server.ts` does — see {@link renameEditInImportScope} — and the
+ * difference is the whole of `gpt-bc1x`, so the two are separate functions
+ * rather than a flag.
+ *
+ * @returns {import("vscode-languageserver").WorkspaceEdit | null} null when the
+ *   provider refuses: no renameable context at the position, an unchanged name,
+ *   or a collision with a name the workspace already declares.
+ */
+function renameEdit(indexed, position, newName) {
+  return computeRename(
+    treeAt(indexed, position.uri),
+    position.line,
+    position.character,
+    position.uri,
+    indexed.index,
+    newName,
+  );
+}
+
+/** The same request, against the import-reachable index `server.ts` actually uses. */
+function renameEditInImportScope(indexed, position, newName) {
+  const scoped = createScopedIndex(
+    indexed.index,
+    getImportReachableUris(position.uri, indexed.index),
+  );
+  return computeRename(
+    treeAt(indexed, position.uri),
+    position.line,
+    position.character,
+    position.uri,
+    scoped,
+    newName,
+  );
+}
+
+/**
+ * Apply a `WorkspaceEdit` to the rendered documents, as a client would.
+ *
+ * Edits within one document are applied **last position first**, because every
+ * range is stated against the original text and applying an earlier edit would
+ * shift every later one. LSP requires a server's edits for one document to be
+ * non-overlapping, which is what makes a simple reverse sort sufficient.
+ *
+ * @returns {Array<{ path: string, source: string }>} in render order, ready to
+ *   hand back to {@link indexRenderedFiles}
+ */
+function applyWorkspaceEdit(indexed, edit) {
+  const changes = edit?.changes ?? {};
+  return indexed.files.map((file) => {
+    const edits = changes[file.uri] ?? [];
+    const ordered = [...edits].sort(
+      (left, right) =>
+        right.range.start.line - left.range.start.line ||
+        right.range.start.character - left.range.start.character,
+    );
+    const lines = file.source.split("\n");
+    for (const { range, newText } of ordered) {
+      if (range.start.line !== range.end.line) {
+        throw new Error(
+          `rename produced a multi-line edit in ${file.path}, which cannot be a name`,
+        );
+      }
+      const line = lines[range.start.line];
+      lines[range.start.line] =
+        line.slice(0, range.start.character) + newText + line.slice(range.end.character);
+    }
+    return { path: file.path, source: lines.join("\n") };
+  });
+}
+
+/**
+ * Every semantic diagnostic the LSP reports across the whole workspace.
+ *
+ * `computeSemanticValidationDiagnostics` answers per document, because that is
+ * what a client asks; a property asking "did this edit break the workspace"
+ * wants the union, labelled with the file so a failure names where.
+ *
+ * @returns {string[]} one printable line per diagnostic, empty when clean
+ */
+function semanticProblems(indexed) {
+  return indexed.files.flatMap((file) =>
+    computeSemanticValidationDiagnostics(file.uri, indexed.index).map(
+      (diagnostic) =>
+        `${file.path}:${diagnostic.range.start.line + 1} [${diagnostic.code}] ${diagnostic.message}`,
+    ),
+  );
+}
+
 module.exports = {
   UNINDEXED_USAGE_KIND,
+  applyWorkspaceEdit,
   declarationSite,
   definitionSites,
   documentUri,
@@ -434,6 +537,9 @@ module.exports = {
   indexGeneratedWorkspace,
   indexRenderedFiles,
   indexedReferenceSites,
+  renameEdit,
+  renameEditInImportScope,
+  semanticProblems,
   textAt,
   treeAt,
 };
