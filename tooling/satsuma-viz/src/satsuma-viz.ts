@@ -505,6 +505,14 @@ export class SatsumaViz extends LitElement {
       display: flex;
       align-items: center;
       gap: 2px;
+      /* Wrap deliberately rather than overflow. Every control here holds its
+         own width (buttons and selects are nowrap), so a single-line toolbar
+         narrower than its contents pushed the trailing file filter past the
+         right edge and out of reach (sl-zsv6). Wrapping keeps every control
+         inside the toolbar's box at any width; the toolbar simply gets taller,
+         which the flex column below it absorbs. */
+      flex-wrap: wrap;
+      row-gap: 4px;
       padding: 6px 12px;
       background: var(--sz-card-bg);
       border-bottom: 1px solid var(--sz-card-border);
@@ -521,6 +529,18 @@ export class SatsumaViz extends LitElement {
       color: var(--sz-text);
       margin-right: 12px;
       padding: 4px 0;
+      /* The title was the only flex item that could absorb the toolbar's
+         overflow, so it broke onto two lines while the controls kept their
+         width (sl-zsv6). It stays on one line; a title too long for the row
+         ellipsizes instead of wrapping. */
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      /* Never shrink below the title's own width — the controls wrap instead —
+         but never grow past the row either, so a very long mapping id in the
+         detail view ellipsizes rather than widening the toolbar. */
+      flex-shrink: 0;
+      max-width: 100%;
     }
 
     .toolbar-sep {

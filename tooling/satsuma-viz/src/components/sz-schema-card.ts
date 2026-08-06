@@ -146,6 +146,35 @@ export class SzSchemaCard extends LitElement {
       border-radius: var(--sz-card-radius) var(--sz-card-radius) 0 0;
     }
 
+    /* The namespace pill row, when present, is the top of the card — so the
+       header is no longer :first-child and the rule above cannot fire. This
+       row therefore owns the top rounding for a namespaced card; without it
+       such a card's top corners went square the moment compact-expanded
+       dropped the host's clip (sl-yedr). Pinned to the shared
+       NAMESPACE_PILL_HEIGHT the overview layout reserves for this row. */
+    .namespace-pill-row {
+      height: ${NAMESPACE_PILL_HEIGHT}px;
+      box-sizing: border-box;
+      display: flex;
+      align-items: end;
+      padding: 0 12px;
+      background: var(--sz-orange);
+    }
+
+    .namespace-pill-row:first-child {
+      border-radius: var(--sz-card-radius) var(--sz-card-radius) 0 0;
+    }
+
+    .namespace-pill-chip {
+      display: inline-block;
+      font-size: 10px;
+      font-weight: 700;
+      padding: 1px 8px;
+      border-radius: 999px;
+      background: var(--sz-namespace-pill-chip-bg);
+      color: var(--sz-orange-dark);
+    }
+
     .header.report {
       background: var(--sz-report);
     }
@@ -169,6 +198,14 @@ export class SzSchemaCard extends LitElement {
       font-size: 11px;
       opacity: 0.85;
       flex-shrink: 0;
+      /* Part of the toggle's click target, not the navigate target: the arrow
+         glyph alone is a poor Fitts's-law target on a compact overview card
+         (sl-6g23). The count is the one other header element whose meaning is
+         "the fields", so it toggles them; the name and icon still navigate.
+         Padding only — no margin offset — so the header's fixed-height box and
+         every coordinate the ELK layout derives from it stay untouched. */
+      cursor: pointer;
+      padding: 4px 0;
     }
 
     .coverage-badge {
@@ -654,15 +691,15 @@ export class SzSchemaCard extends LitElement {
     // The namespace pill is the only visual marker that distinguishes a
     // namespaced schema card from a vanilla one. Expose a stable test id
     // (sl-3c2w) so Playwright can assert qualified namespace rendering
-    // without text matching against a positioned <span>. The row is pinned
-    // to the shared NAMESPACE_PILL_HEIGHT the layout reserves for it.
+    // without text matching against a positioned <span>. Row geometry and the
+    // top rounding live in `.namespace-pill-row` (see the styles above) rather
+    // than in an inline style, because only a stylesheet rule can react to the
+    // row being :first-child (sl-yedr).
     return html`<div
-      style="height:${NAMESPACE_PILL_HEIGHT}px;box-sizing:border-box;display:flex;align-items:end;padding:0 12px;background:var(--sz-orange);"
+      class="namespace-pill-row"
       data-testid=${`${this.testIdPrefix}-namespace-pill`}
     >
-      <span
-        data-testid=${`${this.testIdPrefix}-namespace-label`}
-        style="display:inline-block;font-size:10px;font-weight:700;padding:1px 8px;border-radius:999px;background:var(--sz-namespace-pill-chip-bg);color:var(--sz-orange-dark);"
+      <span class="namespace-pill-chip" data-testid=${`${this.testIdPrefix}-namespace-label`}
         >${this.namespaceLabel}</span
       >
     </div>`;
@@ -710,6 +747,7 @@ export class SzSchemaCard extends LitElement {
                what is known, where "0/N" would assert completeness nobody
                measured (ADR-042). -->
           <span
+            @click=${this._onToggleClick}
             class="header-count"
             data-testid=${`${this.testIdPrefix}-header-count`}
             data-coverage-available=${coverage !== null}
@@ -1091,6 +1129,7 @@ export class SzSchemaCard extends LitElement {
             >&#9660;</span
           >
           <span
+            @click=${this._onToggleClick}
             class="header-count"
             data-testid=${`${this.testIdPrefix}-header-count`}
             data-coverage-available=${coverage !== null}
@@ -1129,12 +1168,14 @@ export class SzSchemaCard extends LitElement {
   }
 
   // Header clicks carry two distinct intents that used to be conflated on one
-  // handler: the toggle arrow expands/collapses, the rest of the header
-  // navigates to the schema source. Hosts that open documents on navigate
+  // handler: the toggle arrow and the field count expand/collapse, the name and
+  // icon navigate to the schema source. Hosts that open documents on navigate
   // (VS Code) made the combined handler unusable — expanding a card yanked
-  // the editor to the source file and hid the panel (sl-tw0r).
+  // the editor to the source file and hid the panel (sl-tw0r). The two handlers
+  // must therefore stay separate; widening the toggle's hit area (sl-6g23)
+  // means adding elements to THIS handler, never merging the two.
 
-  /** Arrow click: expand/collapse only — never navigate. */
+  /** Arrow or field-count click: expand/collapse only — never navigate. */
   private _onToggleClick(e: Event) {
     // Stop the click before the header's navigate handler sees it.
     e.stopPropagation();
