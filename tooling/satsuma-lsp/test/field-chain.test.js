@@ -85,13 +85,21 @@ describe("satsuma/fieldChain — import graph traversal", () => {
     );
   });
 
-  it("returns an empty chain when the entry file itself cannot be loaded", () => {
+  it("returns an unresolved chain when the entry file itself cannot be loaded", () => {
     // Mirrors computeFullLineage's null-primary contract, adapted to
     // FieldChainModel's shape: no upstream/downstream rather than no model,
     // since a chain always names the focus field even when it finds nothing.
+    // Unresolved (sv-embb), not just empty: an unreadable entry file means the
+    // focus field's existence was never confirmed either.
     const index = createWorkspaceIndex();
     const model = buildFieldChainFromWorkspace("file:///missing.stm", index, () => null, "b.id");
-    assert.deepEqual(model, { field: "::b.id", maxDepth: 10, upstream: [], downstream: [] });
+    assert.deepEqual(model, {
+      field: "::b.id",
+      maxDepth: 10,
+      upstream: [],
+      downstream: [],
+      resolved: false,
+    });
   });
 
   it("forwards depth and direction options to the traversal", () => {

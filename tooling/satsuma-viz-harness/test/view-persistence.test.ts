@@ -197,6 +197,12 @@ test.describe("Chain view persistence across live edits", () => {
   async function openEmailChain(page: Page): Promise<void> {
     const card = page.locator("sz-schema-card[data-testid^='overview-schema-card-stg-customers']");
     await card.locator(".header-toggle").click();
+    // This fixture's small three-schema graph can leave the just-expanded
+    // card's field row outside the SVG canvas's current pan/zoom viewBox — a
+    // transform Playwright's DOM-level "scroll into view" cannot follow
+    // (sv-embb, caught flaking on this exact interaction). Re-fit first,
+    // exactly as a human would with the toolbar's own button.
+    await page.locator("[data-testid='toolbar-fit']").click();
     await page
       .locator("[data-testid='overview-schema-card-stg-customers-field-email-lineage']")
       .click({ force: true });

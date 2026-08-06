@@ -329,6 +329,18 @@ export class SzChainView extends LitElement {
       color: var(--sz-text-muted);
       font-size: 13px;
     }
+
+    /* Unknown-field state (sv-embb): reuses the "warning" palette, like the
+     * depth-limit badge, because it flags a chain the reader should not read
+     * as "no lineage" — the focus field itself could not be resolved. */
+    .chain-unknown {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 24px;
+      color: var(--sz-warning-icon);
+      font-size: 13px;
+    }
   `;
 
   /** The traversal to render, supplied by the host. Null renders nothing but an empty state. */
@@ -347,6 +359,19 @@ export class SzChainView extends LitElement {
   override render() {
     if (!this.chain) {
       return html`<div class="chain-empty" data-testid="chain-empty">No field selected</div>`;
+    }
+
+    if (this.chain.resolved === false) {
+      // Composed as one string before binding: a lit template attribute or
+      // text node mixing literal text with more than one `${}` slot
+      // serializes as separate string/value runs under the tests'
+      // template-flattening helper (see `_renderColumn`'s testId for the same
+      // rule).
+      const parts = splitEndpoint(this.chain.field);
+      const message = `Field not found: ${qualifiedIdOf(parts)}.${parts.fieldPath}`;
+      return html`
+        <div class="chain-unknown" data-testid="chain-unknown-field">&#9888; ${message}</div>
+      `;
     }
 
     // Upstream renders furthest-first so hop distance increases moving away

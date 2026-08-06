@@ -78,6 +78,18 @@ export interface FieldChainModel {
   upstream: FieldChainHop[];
   /** Downstream fields, nearest first, with cycles and depth limits guarded by core. */
   downstream: FieldChainHop[];
+  /**
+   * False when `field`'s schema, or its path within that schema, could not be
+   * resolved against the traced workspace (a typo, a rename, or a field that
+   * never existed) — `upstream`/`downstream` are then always empty, and a
+   * renderer must show a distinct "field not found" state rather than
+   * treating this the same as a resolved field that genuinely has no
+   * lineage. Absent means true: `satsuma field-lineage` never emits a JSON
+   * chain for an unresolved field at all (it exits with `EXIT_NOT_FOUND`
+   * instead), so every payload derived from the CLI's output is resolved by
+   * construction and carries no need to say so.
+   */
+  resolved?: boolean;
 }
 
 // ---------- Top-level document model ----------

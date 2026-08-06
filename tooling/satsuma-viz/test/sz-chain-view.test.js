@@ -94,6 +94,65 @@ describe("sz-chain-view", () => {
     );
   });
 
+  describe("unknown-field state (sv-embb)", () => {
+    it("renders a distinct not-found state, not the empty-lineage rail, when resolved is false", async () => {
+      // sv-embb: a chain whose focus field could not be resolved must not
+      // look like a resolved field with no lineage — the rail (and its
+      // "chain-focus" card) must not render at all here.
+      const mod = await import("../dist/satsuma-viz.js");
+      const view = new mod.SzChainView();
+      view.chain = {
+        field: "::orders.typo_field",
+        maxDepth: 10,
+        upstream: [],
+        downstream: [],
+        resolved: false,
+      };
+      const serialized = serialize(view.render());
+      assert.match(serialized, /chain-unknown-field/);
+      assert.match(serialized, /orders\.typo_field/);
+      assert.doesNotMatch(serialized, /chain-focus/);
+      assert.doesNotMatch(serialized, /chain-rail/);
+    });
+
+    it("renders the ordinary rail when resolved is absent, even for a genuinely empty chain", async () => {
+      // Guards the omitted-means-true convention: a resolved field with no
+      // lineage at all must still render the focus card, not the unknown
+      // state, or every childless field would look like a typo.
+      const mod = await import("../dist/satsuma-viz.js");
+      const view = new mod.SzChainView();
+      view.chain = { field: "::orders.id", maxDepth: 10, upstream: [], downstream: [] };
+      const serialized = serialize(view.render());
+      assert.match(serialized, /chain-focus/);
+      assert.doesNotMatch(serialized, /chain-unknown-field/);
+    });
+  });
+
+  describe("cyclic chain rendering (sv-embb)", () => {
+    it("renders a hand-built cyclic FieldChainModel without duplicate hop cards", async () => {
+      // Core's traceFieldLineage dedupes by visited field before this
+      // component ever sees the result, so a cyclic mapping graph (a -> b ->
+      // a) surfaces as this exact shape: each field appears once, at its
+      // shortest-path depth. This pins that the component renders that shape
+      // as a finite, non-duplicated rail rather than assuming lineage data is
+      // always acyclic and re-walking it.
+      const mod = await import("../dist/satsuma-viz.js");
+      const view = new mod.SzChainView();
+      view.chain = {
+        field: "::cycle_a.id",
+        maxDepth: 10,
+        upstream: [hop("::cycle_b.id", "::b_to_a", "none", 1)],
+        downstream: [hop("::cycle_b.id", "::a_to_b", "none", 1)],
+      };
+      const serialized = serialize(view.render());
+      const hopCards = [...serialized.matchAll(/chain-hop-(?:up|down)stream-1-\S+/g)].map(
+        (m) => m[0],
+      );
+      assert.equal(hopCards.length, 2, "expected exactly one upstream and one downstream card");
+      assert.notEqual(hopCards[0], hopCards[1]);
+    });
+  });
+
   describe("classification badge", () => {
     it("renders no badge for a direct, undeclared-transform hop", async () => {
       const mod = await import("../dist/satsuma-viz.js");
