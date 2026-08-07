@@ -37,7 +37,7 @@ schema claim_header (note "Inbound claim intake from the claims management syste
     make           VARCHAR(40)
     model          VARCHAR(40)
     year           INT
-    damage_extent  VARCHAR(15)   (enum {none, minor, moderate, severe, total})
+    damage_extent  VARCHAR(15)   (enum {none, minor, moderate, severe, total, scratch})
     estimate       DECIMAL(12,2)
 
     photos list_of record {
@@ -174,7 +174,7 @@ mapping party_extract {
 
   claim_id -> claim_key
 
-  each parties -> .rows {
+  each parties -> rows {
     .party_role -> .role { trim | uppercase }
     .name -> .display_name { trim }
     .contact_phone -> .phone_e164 {
@@ -189,7 +189,7 @@ mapping vehicle_extract {
 
   claim_id -> claim_key
 
-  each vehicles -> .rows {
+  each vehicles -> rows {
     .vin -> .vin { uppercase }
     .make -> .description {
       "@vehicles.make || ' ' || @vehicles.model || ' ' || @vehicles.year"
@@ -232,10 +232,8 @@ mapping fraud_assessment {
   target { fraud_flag }
 
   claim_key -> claim_key
-  party_count -> risk_score {
-    "Score from 0-100 based on @claim_fact.party_count and @party_dim role distribution"
-  }
-  -> is_flagged {
-    "True if @risk_score > 70, false otherwise."
+  party_count -> risk_score { multiply 10 }
+  party_count -> is_flagged {
+    "True if @party_count > 7, false otherwise."
   }
 }

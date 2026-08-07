@@ -28,7 +28,7 @@ PRD documents.
   intent record (not the Phase 1 `MappingIntent` schema) carrying every schema,
   mapping, arrow and the four planted ambiguities. Every arm below was derived
   from this.
-- `meridian-claims.stm` — arm S/S+. The Satsuma source.
+- `meridian-claims.stm` — arm S/S+. The Satsuma source. **Note: this arm is two files** — the spec imports `fx_rates` from `lookups/claims_fx.stm`, so `sl-x9m1`'s token accounting for arms S/S+ includes both.
 - `meridian-claims.md` — arm M0. A tidy field-level markdown table.
 - `meridian-claims-P0.xlsx` — arm X-P0. Tidy, adversarially favourable to Excel.
 - `meridian-claims-P2.xlsx` — arm X-P2. P0 plus the messiness primitives:
@@ -39,7 +39,7 @@ PRD documents.
 - `meridian-claims-1-mapping.stm` — the crossover cell. One mapping, one
   minimal claim. The 6813-token agent reference plus per-call CLI round-trips
   are unamortised, so S+ should lose here. Confirming that is the single most
-  credible thing the write-up can contain (PRD line 828).
+  credible thing the write-up can contain (PRD §Phase 0.5, “Include a cell designed to lose”).
 - `generate_probe_spreadsheets.py` — regenerates both `.xlsx` files. Reuses the
   styling primitives from
   `archive/features/04-excel-to-stm-skill/test-data/generate_test_spreadsheets.py`.

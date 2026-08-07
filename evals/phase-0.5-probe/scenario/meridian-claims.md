@@ -24,7 +24,7 @@ mapping, fixed columns, one row per field-level arrow.
 | vehicles[].make | VARCHAR(40) | N | |
 | vehicles[].model | VARCHAR(40) | N | |
 | vehicles[].year | INT | N | |
-| vehicles[].damage_extent | VARCHAR(15) | N | enum: none, minor, moderate, severe, total |
+| vehicles[].damage_extent | VARCHAR(15) | N | enum: none, minor, moderate, severe, total, scratch |
 | vehicles[].estimate | DECIMAL(12,2) | N | |
 | vehicles[].photos | list_of record | N | nested |
 | vehicles[].photos[].photo_id | VARCHAR(36) | Y | |
@@ -188,5 +188,5 @@ Source: claim_fact, party_dim → Target: fraud_flag
 | Source path | Target path | Transform |
 |---|---|---|
 | claim_fact.claim_key | claim_key | direct |
-| claim_fact.party_count | risk_score | Score from 0-100 based on @claim_fact.party_count and @party_dim role distribution |
-| (computed — no source) | is_flagged | True if @risk_score > 70, false otherwise. |
+| claim_fact.party_count | risk_score | multiply 10 |
+| claim_fact.party_count | is_flagged | True if @party_count > 7, false otherwise. |

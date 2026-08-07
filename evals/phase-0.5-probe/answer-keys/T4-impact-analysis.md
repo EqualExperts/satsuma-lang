@@ -1,9 +1,9 @@
 # T4 answer key — Impact analysis
 
-> **Authored before any episode runs.** PRD line 820: "Write the T4 and T5
-> answer keys AT AUTHORING TIME, before any episode runs." This file is that
-> key. Grading is deterministic — set-F1 against the true downstream set — so
-> no judge is involved.
+> **Authored before any episode runs.** PRD §Phase 0.5 (“Why those two tasks”)
+> requires the answer keys be written at authoring time, before any episode runs.
+> This file is that key. Grading is deterministic — set-F1 against the true
+> downstream set — so no judge is involved.
 
 ## The task given to the agent
 
