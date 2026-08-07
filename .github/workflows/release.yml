@@ -191,4 +191,5 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_REPO: ${{ github.repository }}
-        run: gh workflow run deploy-site.yml --ref "${{ github.ref_name }}"
+          REF_NAME: ${{ github.ref_name }}
+        run: gh workflow run deploy-site.yml --ref "$REF_NAME"
