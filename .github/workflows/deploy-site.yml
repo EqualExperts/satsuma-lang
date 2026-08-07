@@ -44,8 +44,9 @@ jobs:
           echo "Resolved version: $TAG"
 
       - name: Write version data for Eleventy
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
         run: |
-          TAG="${{ steps.version.outputs.tag }}"
           echo "{\"version\":\"$TAG\",\"version_tag\":\"$TAG\"}" > site/_data/site.json
 
       - name: Copy test stats for Eleventy

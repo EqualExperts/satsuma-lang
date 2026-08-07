@@ -147,27 +147,27 @@ jobs:
           # Delete existing latest release and tag if present
           gh release delete latest --yes --cleanup-tag 2>/dev/null || true
 
-          cat > notes.md <<'EOF'
-          Auto-built from the latest `main` branch.
+          cat > notes.md <<EOF
+          Auto-built from the latest \`main\` branch.
 
           **Install CLI:**
-          ```bash
-          npm install -g https://github.com/${{ github.repository }}/releases/download/latest/satsuma-cli-latest.tgz
-          ```
+          \`\`\`bash
+          npm install -g https://github.com/$GH_REPO/releases/download/latest/satsuma-cli-latest.tgz
+          \`\`\`
 
           **Install LSP:**
-          ```bash
-          npm install -g https://github.com/${{ github.repository }}/releases/download/latest/satsuma-lsp-latest.tgz
-          ```
+          \`\`\`bash
+          npm install -g https://github.com/$GH_REPO/releases/download/latest/satsuma-lsp-latest.tgz
+          \`\`\`
 
           **Install VS Code Extension:**
-          Download `vscode-satsuma-latest.vsix`, then in VS Code open the Extensions view,
-          choose **Install from VSIX…** from the `···` menu (or run
+          Download \`vscode-satsuma-latest.vsix\`, then in VS Code open the Extensions view,
+          choose **Install from VSIX…** from the \`···\` menu (or run
           **Extensions: Install from VSIX…** from the Command Palette), and select the
           downloaded file. Or from the command line:
-          ```bash
+          \`\`\`bash
           code --install-extension vscode-satsuma-latest.vsix
-          ```
+          \`\`\`
           EOF
 
           cp -f satsuma-cli.tgz satsuma-cli-latest.tgz
