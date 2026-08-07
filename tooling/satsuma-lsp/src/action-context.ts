@@ -116,6 +116,13 @@ function inferSchemaName(ctx: NodeContext): string | null {
     case "arrow_target":
       return inferSchemaFromPath(ctx.mappingTargets ?? [], ctx.rawPath ?? null);
 
+    // The schema prefix of a qualified arrow path (`customers` in
+    // `customers.email`). Which side it belongs to is not carried on the
+    // context — checking both lists together is safe because only the one
+    // schema actually named by `rawPath` can ever match (gpt-jwek).
+    case "arrow_schema":
+      return inferSchemaFromPath(arrowSchemaCandidates(ctx), ctx.rawPath ?? null);
+
     case "nl_ref":
       return inferSchemaFromNlRef(ctx.name);
 
@@ -135,12 +142,23 @@ function inferFieldPath(ctx: NodeContext): string | null {
     case "arrow_target":
       return inferArrowFieldPath(ctx.mappingTargets ?? [], ctx.rawPath ?? null);
 
+    case "arrow_schema":
+      return inferArrowFieldPath(arrowSchemaCandidates(ctx), ctx.rawPath ?? null);
+
     case "nl_ref":
       return ctx.name.includes(".") ? stripPathDecorators(ctx.name) : null;
 
     default:
       return null;
   }
+}
+
+/**
+ * Both of a mapping's schema lists, combined, for a context that names the
+ * qualified prefix of an arrow path without recording which side it is on.
+ */
+function arrowSchemaCandidates(ctx: NodeContext): string[] {
+  return [...(ctx.mappingSources ?? []), ...(ctx.mappingTargets ?? [])];
 }
 
 function inferSchemaFromNlRef(name: string): string | null {
