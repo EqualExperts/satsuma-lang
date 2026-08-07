@@ -1,6 +1,6 @@
 ---
 id: gpt-i1uv
-status: open
+status: closed
 deps: []
 links: []
 created: 2026-08-06T15:20:48Z
@@ -30,3 +30,9 @@ Found while building Feature 46's defect mutators (gpt-pwze). The mutator target
 
 The rule fires for a schema whose spreads all resolve, and stays silent only when a spread cannot be resolved — matching what the doc-comment already claims. A test pins both halves using the differential pair above (same arrow, spread and no spread). Whatever notion of 'unresolved' the fix uses is available to the rule without re-implementing spread expansion; check whether core already exposes it before adding a second mechanism.
 
+
+## Notes
+
+**2026-08-07T11:32:29Z**
+
+Cause: endpointKind in lint-engine.ts skipped any schema with hasSpreads set (extract.ts sets it for every fragment spread regardless of resolution), so unenumerated-record-target went silent for spread-bearing schemas even when the spread fully resolved. Fix: endpointKind now calls core's expandSpreads (via the CLI's spread-expand.ts adapter) to distinguish unresolved from resolved spreads, skipping only the former and, for the latter, judging containerness against the fully expanded field list from expandDeclaredFields instead of the raw unexpanded fields. (commit immediately after 1bf0e046)

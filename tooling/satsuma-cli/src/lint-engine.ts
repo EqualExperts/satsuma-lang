@@ -27,7 +27,7 @@ import type {
   LineageSchemaIdResolver,
   LintFinding,
 } from "@satsuma/core";
-import { expandDeclaredFields } from "./spread-expand.js";
+import { expandDeclaredFields, expandSpreads } from "./spread-expand.js";
 import {
   extractAtRefs,
   computeNLRefPosition,
@@ -606,9 +606,14 @@ function qualifiedMappingKey(arrow: { mapping: string | null; namespace: string 
  * Delegates the two hard parts to core — stripping a schema prefix
  * (`schemaLocalFieldPath`) and walking the field tree (`declaredFieldKind`) — so
  * this rule and coverage cannot disagree about what a path names. A schema with
- * unresolved spreads is skipped: its field list is incomplete, and reporting an
- * arrow as under-specified because a spread has not been expanded would be a
- * false positive.
+ * an *unresolved* spread is skipped: its field list is incomplete, and reporting
+ * an arrow as under-specified because a spread has not been expanded would be a
+ * false positive. A schema whose spreads all resolve has nothing to hide, so its
+ * fields are expanded first (the same field tree coverage sees, via
+ * `expandDeclaredFields`) rather than skipped — gpt-i1uv found this rule going
+ * silent for every spread-bearing schema, resolved or not, because it read
+ * `hasSpreads` (set for any spread at extraction time, see extract.ts) as a proxy
+ * for "unresolved" when the two are not the same thing.
  */
 function endpointKind(
   path: string,
@@ -618,16 +623,35 @@ function endpointKind(
   for (const ref of schemaRefs) {
     const canonicalKey = resolveCanonicalKey(ref);
     const schema = index.schemas.get(canonicalKey);
-    if (!schema || schema.hasSpreads) continue;
+    if (!schema) continue;
+
+    let fields = schema.fields;
+    if (schema.hasSpreads) {
+      // `expandSpreads` walks the same fragment graph `expandDeclaredFields` does
+      // and hands back whether any spread in it failed to resolve — the resolved/
+      // unresolved distinction the doc-comment above promises. Only a genuinely
+      // unresolved spread earns the skip; a resolved one is expanded and judged
+      // on its full field list like any other schema.
+      const namespace = schema.namespace ?? null;
+      const hasUnresolvedSpread = expandSpreads(
+        [canonicalKey],
+        namespace,
+        index,
+        new Set<string>(),
+      );
+      if (hasUnresolvedSpread) continue;
+      fields = expandDeclaredFields(schema, namespace, index);
+    }
+
     const local = schemaLocalFieldPath(
       createContainerQualifiedFieldRef(path),
       createAuthoredEntityRef(ref),
       createCanonicalEntityRef(canonicalKey.includes("::") ? canonicalKey : `::${canonicalKey}`),
       schemaRefs.filter((r) => r !== ref).map(createAuthoredEntityRef),
-      (name) => schema.fields.some((f) => f.name === name),
+      (name) => fields.some((f) => f.name === name),
     );
     if (local === null) continue;
-    const kind = declaredFieldKind(local, schema.fields);
+    const kind = declaredFieldKind(local, fields);
     if (kind) return kind;
   }
   return null;
