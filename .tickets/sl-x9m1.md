@@ -2,7 +2,7 @@
 id: sl-x9m1
 status: open
 deps: [sl-jdho]
-links: []
+links: [tced-ewd4]
 created: 2026-08-05T09:29:28Z
 type: task
 priority: 1
