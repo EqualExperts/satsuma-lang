@@ -50,7 +50,7 @@ PRD documents.
   graded by set-F1. Chosen to exercise a transitive hop through an intermediate
   target, so the interesting failure is stopping at the first hop.
 - `T5-ambiguity-detection.md` — the four planted ambiguities (K=4) and the
-  seventeen unambiguous fields (FPR denominator). Each ambiguity is a genuine
+  twenty-five unambiguous fields (FPR denominator). Each ambiguity is a genuine
   underspecification, not a typo.
 
 ## The four planted ambiguities

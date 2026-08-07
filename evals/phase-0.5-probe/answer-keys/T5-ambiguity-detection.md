@@ -1,7 +1,7 @@
 # T5 answer key — Ambiguity detection
 
 > **Authored before any episode runs.** Grading is deterministic — recall/
-> precision over planted ambiguities, plus a false-positive rate over
+> precision over planted ambiguity sites, plus a false-positive rate over
 > unambiguous fields — so no judge is involved.
 
 ## The task given to the agent
@@ -10,25 +10,42 @@
 > underspecified, and flag it rather than guess. For each, say what is
 > underspecified.
 
-## The planted ambiguities (K = 4)
+## Grading unit: sites, not ambiguity IDs
+
+The spec has **31 leaf arrow targets** (verified via `satsuma graph --json`).
+**6** are planted ambiguity sites; **25** are unambiguous. Precision and recall
+are graded over the same unit (sites), so a complete answer on one ambiguity
+does not inflate precision via a single ID.
+
+- **Recall** = (distinct ambiguities correctly hit) / 4
+- **Precision** = (distinct ambiguities correctly hit) / (distinct ambiguities the agent flagged, capped at 4)
+- **False-positive rate** = |flagged unambiguous sites| / 25
+
+A1 has three sites. Flagging any one of them credits A1 once; the other two
+sites are excluded from the recall denominator (it is 4, the count of
+ambiguities, not 6, the count of sites) so a complete answer is not
+double-rewarded. The FPR denominator is 25, the count of unambiguous sites.
+
+## The planted ambiguities (4 ambiguities, 6 sites)
 
 Each is a genuine underspecification, not a typo (PRD acceptance: underspecified
 rounding, target with no stated source, value map missing a case, implicit
 timezone/country).
 
-| ID | Location | Kind | What an agent should flag |
+| ID | Sites | Kind | What an agent should flag |
 |---|---|---|---|
-| **A1** | `claim_normalisation.loss_usd` (also `status_snapshot.total_exposure`, `payment_extract.paid_amount`) | underspecified rounding | The transforms say `round 2` but none states the rounding mode (half-up vs bankers). An SQL implementation must guess. All three are the same planted ambiguity: rounding mode is left implicit. |
+| **A1** | `claim_normalisation.loss_usd`, `status_snapshot.total_exposure`, `payment_extract.paid_amount` | underspecified rounding | Every `round 2` step says nothing about the rounding mode (half-up vs bankers). An SQL implementation of any of the three must guess. |
 | **A2** | `claim_normalisation.is_open` | target with no stated source | `is_open` is a computed arrow with no `from`. Its rule references `@claim_header.status`, but the binding is inferred, not declared. An agent should flag that the source is implied by prose, not wired structurally. |
 | **A3** | `vehicle_extract.damage_class` | value map missing a case | The damage_class map covers none/minor/moderate/severe/total, but the source enum on `vehicles.damage_extent` also allows `scratch` (see the schema declaration). A value arriving as `scratch` is unhandled. |
 | **A4** | `party_extract.phone_e164` | implicit timezone / country | The phone formatting rule assumes US country code if no `+` prefix. The country is left implicit in the data; an agent should flag the assumption rather than silently apply it. |
 
-## The unambiguous fields (false-positive denominator = 28)
+## The unambiguous fields (false-positive denominator = 25)
 
 These carry a fully-determined transform. An agent that flags any of these is
 over-flagging, and the false-positive rate is what stops "flag everything"
-from being a winning strategy. Every arrow target across all six mappings is
-classified here or in the planted set above — the denominator is exhaustive.
+from being a winning strategy. Every leaf arrow target across all six
+mappings is classified here or in the planted set above — the denominator is
+exhaustive (31 leaf targets = 6 planted + 25 unambiguous).
 
 ```
 claim_normalisation.claim_key
@@ -58,22 +75,12 @@ fraud_assessment.risk_score
 fraud_assessment.is_flagged
 ```
 
-Note: `is_flagged` is structurally similar to A2 (a boolean derived from a
-source field via a quoted rule) but is *not* planted — `party_count > 7` is a
-fully-determined threshold, so flagging it is a false positive. An arm that
-treats "any quoted-rule arrow" as ambiguous will rack up FPR here.
-
-## Grading
-
-- **Recall** = |flagged ∩ {A1,A2,A3,A4}| / 4
-- **Precision** = |flagged ∩ {A1,A2,A3,A4}| / |all flagged|
-- **False-positive rate** = |flagged unambiguous| / 28
-
-An arm that flags everything scores recall 1.0, precision 4/32, FPR 28/28.
-The FPR is the metric that makes that not-a-win, and it is the one a
-"flag-everything" agent would rack up fastest on the spreadsheet arm (whose
-free-text Notes column invites suspicion) and slowest on the `.stm` arm
-(whose grammar-fixed shape makes the four planted gaps structurally visible).
+Note: `fraud_assessment.is_flagged` is structurally similar to A2 (a boolean
+derived from a source field via a quoted rule) but is *not* planted —
+`party_count > 7` is a fully-determined threshold, so flagging it is a false
+positive. An arm that treats "any quoted-rule arrow" as ambiguous will rack up
+FPR here. `fraud_assessment.risk_score` (`multiply 10`) is also deterministic
+and unambiguous.
 
 ## Why these four, and the per-arm visibility
 

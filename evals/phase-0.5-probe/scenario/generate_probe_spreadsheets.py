@@ -292,9 +292,8 @@ def build_p0():
 
 P2_NOTE_FILL = PatternFill("solid", fgColor="FFF2CC")  # "needs review" yellow
 P2_PII_FILL = PatternFill("solid", fgColor="FCE4D6")   # peach = PII
-P2_COMPUTED_FILL = PatternFill("solid", fgColor="E2EFDA")  # green = computed/no-source
-# The load-bearing P2 hazard: this fill carries meaning pandas cannot read.
-P2_AMBIGUITY_FILL = PatternFill("solid", fgColor="D9E1F2")  # blue = ambiguous transform
+# Only PII and "needs review" fills remain. Ambiguity fills were removed —
+# see the comment in build_p2 for why (partial T5 answer-key leak).
 
 
 def build_p2():
@@ -333,18 +332,14 @@ def build_p2():
         excel_row = 7 + i
         for col, val in enumerate(r, 1):
             ws.cell(row=excel_row, column=col, value=val)
-        # Fill-colour semantics (NO legend anywhere in the workbook).
-        target_field = r[2]
-        transform = r[4]
+        # Fill-colour semantics (NO legend anywhere in the workbook). Only PII
+        # and "needs review" rows are coloured — the load-bearing P2 hazard is
+        # that semantics live in a fill colour pandas.read_excel cannot see.
+        # Ambiguity fills were removed: they handed arm X-P2 a partial T5
+        # answer key (A1 blue, A2 green, A3 unmarked, A4 masked by PII), biasing
+        # recall by an unstatable amount. The hazard survives without the leak.
         notes = r[6]
-        if target_field == "is_open":
-            for c in range(1, 8):
-                ws.cell(row=excel_row, column=c).fill = P2_COMPUTED_FILL
-        elif target_field == "loss_usd" or target_field == "total_exposure":
-            # The underspecified-rounding ambiguities — marked by fill only.
-            for c in range(1, 8):
-                ws.cell(row=excel_row, column=c).fill = P2_AMBIGUITY_FILL
-        elif "PII" in notes or "contact_phone" in (r[0] or ""):
+        if "PII" in notes or "contact_phone" in (r[0] or ""):
             for c in range(1, 8):
                 ws.cell(row=excel_row, column=c).fill = P2_PII_FILL
         elif notes:
@@ -361,26 +356,17 @@ def build_p2():
         style_header_row(ws2, 1, len(MAPPING_COLUMNS))
         for r in rows:
             ws2.append(r)
-        # P2 fill semantics, keyed on the full target path so rows[]-prefixed
-        # fields match. Only the planted ambiguities and PII are coloured —
-        # marking unambiguous fields (e.g. estimate_usd) would leak a wrong
-        # answer on T5.
-        P2_ROUND_TARGETS = {"total_exposure", "paid_amount"}  # A1: underspecified rounding
-        P2_PHONE_TARGET = "rows[].phone_e164"                  # A4: implicit country
-        P2_PII_SOURCE = "parties[].contact_phone"
+        # P2 fill: only PII and "needs review" (notes present). No ambiguity
+        # fills — see the comment in build_p2's first loop for why.
         for row in ws2.iter_rows(min_row=2, max_row=ws2.max_row):
-            src = str(row[0].value or "")
-            tgt = str(row[2].value or "")
             notes = str(row[6].value or "")
-            if src == P2_PII_SOURCE or "PII" in notes:
+            src = str(row[0].value or "")
+            if "PII" in notes or "contact_phone" in src:
                 for cell in row:
                     cell.fill = P2_PII_FILL
-            elif tgt == P2_PHONE_TARGET:
+            elif notes:
                 for cell in row:
-                    cell.fill = P2_AMBIGUITY_FILL
-            elif tgt in P2_ROUND_TARGETS:
-                for cell in row:
-                    cell.fill = P2_AMBIGUITY_FILL
+                    cell.fill = P2_NOTE_FILL
         auto_width(ws2)
 
     # A stale "Archived" tab that a tidy author would have deleted.
@@ -408,7 +394,51 @@ def build_p2():
     print(f"Created: {path}")
 
 
+def build_p1():
+    """The 1-mapping crossover cell at X-P0 (tidy)."""
+    wb = openpyxl.Workbook()
+    cover = wb.active
+    cover.title = "README"
+    cover["A1"] = "Meridian Mutual — Claims Mapping (1-mapping crossover, P0)"
+    cover["A1"].font = Font(bold=True, size=14)
+    cover["A3"] = "One mapping, one minimal claim. Designed to make S+ lose."
+    cover.column_dimensions["A"].width = 90
+
+    # The three schemas the 1-mapping variant touches.
+    for name, rows in [
+        ("claim_header (source)", _schema_rows()["claim_header (source)"][:9]),
+        ("fx_rates (lookup)", _schema_rows()["fx_rates (lookup)"]),
+        ("claim_fact (target)", [
+            ("claim_key", "VARCHAR(20)", "N", "PK"),
+            ("policy_ref", "VARCHAR(30)", "N", "indexed"),
+            ("claim_type_code", "VARCHAR(2)", "N", ""),
+            ("reported_date", "TIMESTAMP_NTZ", "N", ""),
+            ("loss_usd", "DECIMAL(14,2)", "Y", ""),
+            ("loss_source", "VARCHAR(10)", "N", ""),
+            ("is_open", "BOOLEAN", "N", ""),
+        ]),
+    ]:
+        ws = wb.create_sheet(name)
+        ws.append(SCHEMA_COLUMNS)
+        style_header_row(ws, 1, len(SCHEMA_COLUMNS))
+        for r in rows:
+            ws.append(r)
+        auto_width(ws)
+
+    ws = wb.create_sheet("claim_normalisation")
+    ws.append(MAPPING_COLUMNS)
+    style_header_row(ws, 1, len(MAPPING_COLUMNS))
+    for r in claim_normalisation_rows()[:7]:  # the seven arrows in the 1-mapping .stm
+        ws.append(r)
+    auto_width(ws)
+
+    path = os.path.join(SCRIPT_DIR, "meridian-claims-1-mapping-P0.xlsx")
+    wb.save(path)
+    print(f"Created: {path}")
+
+
 if __name__ == "__main__":
     build_p0()
     build_p2()
-    print("\nDone — 2 probe workbooks created.")
+    build_p1()
+    print("\nDone — 3 probe workbooks created.")
