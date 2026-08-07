@@ -13,18 +13,34 @@
 ## Grading unit: sites, not ambiguity IDs
 
 The spec has **31 leaf arrow targets** (verified via `satsuma graph --json`).
-**6** are planted ambiguity sites; **25** are unambiguous. Precision and recall
-are graded over the same unit (sites), so a complete answer on one ambiguity
-does not inflate precision via a single ID.
+**6** are planted ambiguity sites; **25** are unambiguous. Every metric below is
+graded over that same unit — an arrow target the agent did or did not flag — so
+numerators and denominators are always counts of the same kind of thing.
 
-- **Recall** = (distinct ambiguities correctly hit) / 4
-- **Precision** = (distinct ambiguities correctly hit) / (distinct ambiguities the agent flagged, capped at 4)
-- **False-positive rate** = |flagged unambiguous sites| / 25
+- **Recall** = |flagged ∩ 6 planted sites| / 6
+- **Precision** = |flagged ∩ 6 planted sites| / |all flagged sites|
+- **False-positive rate** = |flagged ∩ 25 unambiguous sites| / 25
 
-A1 has three sites. Flagging any one of them credits A1 once; the other two
-sites are excluded from the recall denominator (it is 4, the count of
-ambiguities, not 6, the count of sites) so a complete answer is not
-double-rewarded. The FPR denominator is 25, the count of unambiguous sites.
+An arm that flags everything scores recall 1.0, **precision 6/31**, FPR 1.0.
+Precision and FPR are jointly what make that not a winning strategy: precision
+punishes the volume of the over-flagging, FPR punishes its reach across the
+unambiguous set.
+
+**Why sites and not ambiguity IDs.** A1 is one underspecification with three
+sites (`loss_usd`, `total_exposure`, `paid_amount`). Grading over IDs would
+need a rule for what to do with an agent that flags one site but not the other
+two, and any such rule makes recall and precision count different things —
+which is how the metric stops being computable. Grading over sites needs no
+such rule. The cost is that partial credit is genuinely partial: an agent that
+spots the rounding gap on `loss_usd` alone scores 1/6 recall, not 1/4. That is
+the intended reading — the other two sites are separate places an implementer
+must still guess, so missing them is a real miss.
+
+**When reporting, state per-ambiguity coverage alongside the three metrics** —
+which of A1–A4 were hit at all, and at how many of their sites. Site-level
+recall alone cannot distinguish "found three of the four ambiguities" from
+"found A1 everywhere and nothing else", and that distinction is what the
+per-arm predictions below are about.
 
 ## The planted ambiguities (4 ambiguities, 6 sites)
 
