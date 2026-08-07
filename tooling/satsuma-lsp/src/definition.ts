@@ -42,6 +42,9 @@ export interface NodeContext {
     | "arrow_source"
     | "arrow_target"
     | "nl_ref"
+    | "metric_source"
+    | "arrow_schema"
+    | "namespace_name"
     | "unknown";
   name: string;
   namespace: string | null;
@@ -176,8 +179,40 @@ function tryContext(node: SyntaxNode): NodeContext | null {
       };
     }
 
+    // A metric's declared provenance: the value of a `source` tag inside a
+    // metric's metadata block, e.g. `(metric, source fact_orders)`.
+    // `workspace-index` indexes this value_text node as a "metric_source"
+    // reference to the source schema, so find-references already reports
+    // it; go-to-definition had no case for a metadata value at all until
+    // now (gpt-jwek).
+    case "value_text": {
+      const tag = node.parent;
+      if (!tag || tag.type !== "tag_with_value") return null;
+      const key = tag.namedChildren[0];
+      if (key?.text !== "source") return null;
+      const name = node.text;
+      if (!name) return null;
+      return { kind: "metric_source", name, namespace: ns, node };
+    }
+
     // Handle identifiers and backtick_names that are inside source_ref, spread, etc.
-    case "identifier":
+    case "identifier": {
+      // Two reference shapes are plain `identifier` nodes with no dedicated
+      // grammar rule of their own, so they must be detected here before
+      // falling through: the schema prefix of a qualified arrow path
+      // (`s0` in `s0.field_0`) and a namespace's own declared name. Both
+      // are indexed as references elsewhere (rename rewrites the arrow
+      // prefix; find-references lists the namespace) but neither had a
+      // go-to-definition case (gpt-jwek).
+      const namespaceCtx = tryNamespaceNameContext(node);
+      if (namespaceCtx) return namespaceCtx;
+      const arrowSchemaCtx = tryArrowSchemaPrefixContext(node, ns);
+      if (arrowSchemaCtx) return arrowSchemaCtx;
+      // Neither shape matched — let the parent (source_ref, block_label,
+      // src_path, ...) handle it, same as before.
+      return null;
+    }
+
     case "backtick_name":
     case "qualified_name":
     case "nl_string":
@@ -189,6 +224,81 @@ function tryContext(node: SyntaxNode): NodeContext | null {
   }
 }
 
+/**
+ * A `namespace`'s own declared name (`namespace ns_a { ... }`). It is a plain
+ * `identifier` — namespaces use `field("name", $.identifier)`, not the
+ * `block_label` syntax schemas and mappings share — so nothing in
+ * `tryContext`'s other cases ever matched it (gpt-jwek).
+ */
+function tryNamespaceNameContext(identifierNode: SyntaxNode): NodeContext | null {
+  const block = identifierNode.parent;
+  if (!block || block.type !== "namespace_block") return null;
+  // Compared with `.equals()`, not `===` — see the identical note in
+  // tryArrowSchemaPrefixContext.
+  if (!block.childForFieldName("name").equals(identifierNode)) return null;
+  // A namespace_block is never nested (spec: namespaces are flat), so this
+  // name is never itself inside another namespace.
+  return {
+    kind: "namespace_name",
+    name: identifierNode.text,
+    namespace: null,
+    node: identifierNode,
+  };
+}
+
+/**
+ * The schema prefix of a qualified arrow path (`s0` in `s0.field_0`), written
+ * when a mapping's side has more than one schema. `workspace-index` indexes
+ * this identifier as a reference to the schema itself — which is what makes
+ * renaming the schema rewrite the prefix — but the enclosing `src_path`/
+ * `tgt_path` case always treats a path's first segment as a *field* name of
+ * the mapping's schemas, and a schema name never is one (gpt-jwek). Detected
+ * at the identifier itself so a later segment (the real field name) still
+ * falls through unchanged to that case.
+ */
+function tryArrowSchemaPrefixContext(
+  identifierNode: SyntaxNode,
+  ns: string | null,
+): NodeContext | null {
+  const pathNode = identifierNode.parent;
+  if (!pathNode || pathNode.type !== "field_path") return null;
+  // Only a path's first segment can name a schema; later segments are never
+  // this identifier once the length check below passes. Compared with
+  // `.equals()` rather than `===` — web-tree-sitter mints a fresh wrapper
+  // object on every `.namedChildren` access, so two wrappers over the same
+  // underlying node are never reference-equal.
+  const firstSegment = pathNode.namedChildren[0];
+  if (!firstSegment || !firstSegment.equals(identifierNode) || pathNode.namedChildren.length < 2) {
+    return null;
+  }
+
+  const wrapper = pathNode.parent;
+  const isSource = wrapper?.type === "src_path";
+  const isTarget = wrapper?.type === "tgt_path";
+  if (!wrapper || (!isSource && !isTarget)) return null;
+
+  const mapping = findEnclosingMapping(wrapper);
+  const schemas = mapping
+    ? getMappingSchemaRefs(mapping, isSource ? "source_block" : "target_block")
+    : [];
+  const name = identifierNode.text;
+  if (!schemas.includes(name)) return null;
+
+  // Carried alongside the schema name, not used to find it: `action-context.ts`
+  // reads the same `rawPath` + schema-list shape `src_path`/`tgt_path` contexts
+  // carry to keep inferring the full field path (e.g. "customers.email") at
+  // this position, exactly as it did before the prefix had its own case.
+  return {
+    kind: "arrow_schema",
+    name,
+    namespace: ns,
+    node: identifierNode,
+    rawPath: extractPathText(wrapper) ?? undefined,
+    mappingSources: mapping ? getMappingSchemaRefs(mapping, "source_block") : [],
+    mappingTargets: mapping ? getMappingSchemaRefs(mapping, "target_block") : [],
+  };
+}
+
 // ---------- Resolution ----------
 
 function resolveContext(
@@ -198,7 +308,13 @@ function resolveContext(
 ): Location | Location[] | null {
   switch (ctx.kind) {
     case "source_ref":
-    case "target_ref": {
+    case "target_ref":
+    case "metric_source":
+    case "arrow_schema":
+    case "namespace_name": {
+      // A metric's `source` value, an arrow's qualified schema prefix and a
+      // namespace's own name all resolve the same way as a plain source/
+      // target reference: look the name up as a definition directly (gpt-jwek).
       const defs = resolveDefinition(index, ctx.name, ctx.namespace);
       return defsToLocations(defs);
     }

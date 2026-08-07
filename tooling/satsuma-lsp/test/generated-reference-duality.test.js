@@ -30,14 +30,19 @@
  * `scopeIndex(uri)`. The scoping layer changes the answer, so it is a question of
  * its own — see the last pinned test.
  *
- * ## Four gaps this suite pins rather than hides
+ * ## One gap this suite still pins rather than hides
  *
- * `go-to-definition` answers nothing at a metric `source` token, nothing at the
- * schema prefix of a qualified arrow path, and nothing at all at a `namespace`
- * name; and import scope drops every usage in a file the declaring file does not
- * itself import. Each is a real gap and each has a pinned test at the end of this
- * file, so the properties above can exclude them by name instead of quietly
- * narrowing.
+ * Import scope drops every usage in a file the declaring file does not itself
+ * import. That is a real gap (`gpt-bc1x`) and has a pinned test at the end of
+ * this file, so the properties above can exclude it by name instead of
+ * quietly narrowing.
+ *
+ * Three sibling gaps used to live here too: `go-to-definition` answered
+ * nothing at a metric `source` token, at the schema prefix of a qualified
+ * arrow path, or at a `namespace` name. All three are fixed as of `gpt-jwek`
+ * — `findNodeContext`'s case list was narrower than what `workspace-index`
+ * actually indexes as a reference — and the properties above now cover all
+ * three positively instead of excluding them.
  */
 
 const { describe, it, before } = require("node:test");
@@ -47,9 +52,7 @@ const {
   GENERATED_PROPERTY_PARAMETERS,
   USAGE_KIND,
   bareNamespacedWorkspaceArbitrary,
-  metricWorkspaceArbitrary,
   multiFileWorkspaceArbitrary,
-  multiSourceWorkspaceArbitrary,
   namespacedWorkspaceArbitrary,
   scenarioDeclaredEntities,
   scenarioDeclaredUsageSites,
@@ -70,11 +73,11 @@ const {
  * The usage kinds the LSP's definition provider resolves back to a declaration
  * today.
  *
- * `metric_source` and `arrow` are absent because the provider answers nothing at
- * either: `findNodeContext` has no case for a metadata value, and an arrow path's
- * first segment is looked up as a *field* of the mapping's schemas, which a
- * schema name never is. Both are pinned by their own tests at the end of this
- * file rather than quietly skipped, so the day either is fixed a test says so.
+ * `metric_source` and `arrow` joined this list once `findNodeContext` grew a
+ * case for a metric's `source` metadata value and for the schema prefix of a
+ * qualified arrow path (`gpt-jwek`): both are indexed as a reference to a
+ * declared schema, so `resolvableProbeSites` below now probes them like any
+ * other resolvable kind.
  *
  * This list stays here rather than moving to `@satsuma/scenario-gen` with the
  * rest of the oracle (`gpt-l9rp`): it is a statement about what *this* LSP does
@@ -85,6 +88,8 @@ const RESOLVABLE_USAGE_KINDS = Object.freeze([
   USAGE_KIND.target,
   USAGE_KIND.spread,
   USAGE_KIND.import,
+  USAGE_KIND.metricSource,
+  USAGE_KIND.arrow,
 ]);
 
 before(async () => {
@@ -443,87 +448,70 @@ describe("includeDeclaration toggles exactly the declaration site", () => {
   });
 });
 
+describe("a namespace name resolves to its own declaration", () => {
+  it("answers both references and a definition at a namespace name (gpt-jwek)", () => {
+    // A `namespace` name is a plain `identifier`, not a `block_label`
+    // (`namespace_block` declares it via `field("name", $.identifier)`), so
+    // `findNodeContext` used to return nothing there at all — not even the
+    // declaration itself was reachable, the one case in this suite where
+    // *both* providers answered nothing rather than just one.
+    //
+    // This does not reuse `assertReferencesAreTheDeclaredSites` and friends:
+    // those walk `scenarioDeclaredEntities`, which deliberately has no
+    // `namespace` entry (adding one would make `generated-rename-roundtrip
+    // .test.js` try to rename a namespace too, which dangles every `ns::`
+    // qualifier the rename does not know to rewrite — a real gap, but a
+    // separate one from go-to-definition). A namespace also has no usage
+    // site of its own to fold into those properties: Satsuma names one only
+    // as a qualifier on some other entity (`ns_a::s0`), never bare, so the
+    // only thing to check here is the declaration resolving to itself.
+    fc.assert(
+      fc.property(namespacedWorkspaceArbitrary, ({ workspace, namespaces }) => {
+        const { indexed } = indexWithGroundTruth(workspace);
+        // The domain guarantees at least one namespaced schema.
+        const namespace = namespaces.find(Boolean);
+        const site = declarationSite(indexed, {
+          file: indexed.files[0].path,
+          name: namespace,
+          keyword: "namespace",
+        });
+        assert.deepEqual(
+          findReferenceSites(indexed, namespace, site, true).map(positionLabel),
+          [positionLabel(site)],
+          `find-references does not answer with the declaration itself at a namespace ` +
+            `name\n${indexed.sources}`,
+        );
+        assert.deepEqual(
+          definitionSites(indexed, site).map(positionLabel),
+          [positionLabel(site)],
+          `go-to-definition does not resolve a namespace name to its own declaration\n${indexed.sources}`,
+        );
+      }),
+      GENERATED_PROPERTY_PARAMETERS,
+    );
+  });
+});
+
 // ── Pinned gaps ────────────────────────────────────────────────────────────
 //
-// ⚠️ The four tests below assert what the LSP does **today**, not what it
-// should do. They exist because the properties above exclude these usage kinds,
-// and an exclusion nobody can see is how a gap becomes permanent. Each will go
-// red the moment its gap is fixed — at which point delete the pin and remove the
-// exclusion from RESOLVABLE_USAGE_KINDS (or from scenarioDeclaredEntities, for the
-// namespace case). All four were found by this suite while implementing gpt-21jp;
-// none is endorsed here. They are filed as:
+// ⚠️ The test below asserts what the LSP does **today**, not what it should
+// do. It exists because the property above excludes this usage kind, and an
+// exclusion nobody can see is how a gap becomes permanent. It will go red the
+// moment the gap is fixed — at which point delete the pin. Found by this
+// suite while implementing gpt-21jp; not endorsed here. Filed as:
 //
-//   - `gpt-jwek` — the three go-to-definition gaps (metric `source` token, the
-//     schema prefix of a qualified arrow path, a `namespace` name). One cause
-//     seen three times: `findNodeContext`'s case list is narrower than what
-//     `workspace-index` indexes.
 //   - `gpt-bc1x` — the import-scope gap, which is a *rename correctness* bug
 //     rather than a navigation one: rename is scoped identically, so renaming
 //     from a downstream declaration leaves an upstream import naming a symbol
 //     that no longer exists.
+//
+// Three sibling gaps used to live here too — a metric `source` token, the
+// schema prefix of a qualified arrow path, and a `namespace` name all
+// answered nothing at go-to-definition — and are now fixed (`gpt-jwek`,
+// widening `findNodeContext`'s case list) and covered positively above
+// instead of pinned.
 
-describe("gaps these properties therefore exclude", () => {
-  it("answers nothing at a metric `source` token, though find-references reports it", () => {
-    // `findNodeContext` has no case for a metadata value, so a metric's declared
-    // provenance is navigable in one direction only.
-    fc.assert(
-      fc.property(
-        metricWorkspaceArbitrary.map(({ workspace }) => workspace),
-        (workspace) => {
-          const { indexed } = indexWithGroundTruth(workspace);
-          const tokens = indexedReferenceSites(indexed).filter(
-            (site) => site.kind === USAGE_KIND.metricSource,
-          );
-          assert.equal(
-            tokens.length,
-            1,
-            `the metric domain must produce exactly one source token:\n${indexed.sources}`,
-          );
-          assert.deepEqual(
-            definitionSites(indexed, tokens[0]).map(positionLabel),
-            [],
-            `go-to-definition now answers at a metric source token — read this test's ` +
-              `comment before updating it\n${indexed.sources}`,
-          );
-        },
-      ),
-      GENERATED_PROPERTY_PARAMETERS,
-    );
-  });
-
-  it("answers nothing at the schema prefix of a qualified arrow path", () => {
-    // `s0.field_0` on a multi-schema side indexes `s0` as a reference to the
-    // schema — which is what makes renaming the schema rewrite the prefix — but
-    // the definition provider looks the first segment up as a *field* of the
-    // mapping's schemas, and a schema name never is one.
-    fc.assert(
-      fc.property(
-        multiSourceWorkspaceArbitrary.map(({ workspace }) => workspace),
-        (workspace) => {
-          const { indexed, entities } = indexWithGroundTruth(workspace);
-          const keys = new Set(entities.map((entity) => entity.key));
-          const prefixes = indexedReferenceSites(indexed).filter(
-            (site) => site.kind === USAGE_KIND.arrow && keys.has(site.key),
-          );
-          assert.equal(
-            prefixes.length,
-            2,
-            `the multi-source domain must qualify both arrow sources:\n${indexed.sources}`,
-          );
-          for (const site of prefixes) {
-            assert.deepEqual(
-              definitionSites(indexed, site).map(positionLabel),
-              [],
-              `go-to-definition now answers at ${describeSite(site)} — read this test's ` +
-                `comment before updating it\n${indexed.sources}`,
-            );
-          }
-        },
-      ),
-      GENERATED_PROPERTY_PARAMETERS,
-    );
-  });
-
+describe("gaps this property therefore excludes", () => {
   it("loses the usages in an importing file once import scope is applied", () => {
     // The properties above ask the whole-folder index — what a client
     // establishes by opening a folder. Every real request asks
@@ -534,7 +522,7 @@ describe("gaps these properties therefore exclude", () => {
     // `import { s1 }` that made it legal — vanish from the answer. Rename is
     // scoped identically (`server.ts` onRenameRequest), so a rename driven from
     // a declaration leaves that import naming a schema that no longer exists.
-    // Pinned, not endorsed: this is the exclusion the four properties above rely
+    // Pinned, not endorsed: this is the exclusion the properties above rely
     // on, and R4's round-trip has to choose which index it asks.
     fc.assert(
       fc.property(
@@ -572,37 +560,6 @@ describe("gaps these properties therefore exclude", () => {
           }
         },
       ),
-      GENERATED_PROPERTY_PARAMETERS,
-    );
-  });
-
-  it("answers neither references nor a definition at a namespace name", () => {
-    // A `namespace` name is not a `block_label`, so `findNodeContext` returns
-    // nothing there — even `includeDeclaration` cannot report the declaration the
-    // cursor is sitting on.
-    fc.assert(
-      fc.property(namespacedWorkspaceArbitrary, ({ workspace, namespaces }) => {
-        const { indexed } = indexWithGroundTruth(workspace);
-        // The domain guarantees at least one namespaced schema.
-        const namespace = namespaces.find(Boolean);
-        const site = declarationSite(indexed, {
-          file: indexed.files[0].path,
-          name: namespace,
-          keyword: "namespace",
-        });
-        assert.deepEqual(
-          findReferenceSites(indexed, namespace, site, true).map(positionLabel),
-          [],
-          `find-references now answers at a namespace name — read this test's comment ` +
-            `before updating it\n${indexed.sources}`,
-        );
-        assert.deepEqual(
-          definitionSites(indexed, site).map(positionLabel),
-          [],
-          `go-to-definition now answers at a namespace name — read this test's comment ` +
-            `before updating it\n${indexed.sources}`,
-        );
-      }),
       GENERATED_PROPERTY_PARAMETERS,
     );
   });

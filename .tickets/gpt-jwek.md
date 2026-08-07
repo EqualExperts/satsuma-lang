@@ -1,6 +1,6 @@
 ---
 id: gpt-jwek
-status: open
+status: closed
 deps: []
 links: []
 created: 2026-08-06T15:22:41Z
@@ -25,3 +25,9 @@ These are worth one ticket because they are one cause seen three times: `findNod
 
 Each of the three navigates to its declaration. The corresponding pinned test is deleted and the usage kind removed from RESOLVABLE_USAGE_KINDS (or from declaredEntities for the namespace case), so the duality properties then cover it positively rather than excluding it — that widening is the real acceptance signal, not the pins going green.
 
+
+## Notes
+
+**2026-08-07T11:47:17Z**
+
+Cause: findNodeContext's case list was narrower than what workspace-index actually indexes as a reference, so go-to-definition answered nothing at a metric source token (no case for a metadata value), the schema prefix of a qualified arrow path (its first segment was looked up as a field, and a schema name never is one), and a namespace's own name (a plain identifier, not a block_label). Fix: added a value_text case for a metric's source metadata value and two identifier-shape detectors (tryArrowSchemaPrefixContext, tryNamespaceNameContext), all resolving through the existing resolveDefinition path; widened RESOLVABLE_USAGE_KINDS to cover metric_source and arrow, and added a dedicated positive test for the namespace-name self-reference case since a namespace has no scenario-gen usage site to fold into the generic duality properties. (commit immediately after 1bf0e046)
