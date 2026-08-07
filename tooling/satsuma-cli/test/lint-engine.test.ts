@@ -13,8 +13,16 @@ interface MockSchema {
   fields: Array<{ name: string; children?: Array<{ name: string }> }>;
   /** Set when the schema spreads a fragment that has not been expanded — its field list is then incomplete. */
   hasSpreads?: boolean;
+  /** Fragment names this schema spreads (`...name`), resolved against `fragments` passed to makeIndex. */
+  spreads?: string[];
   file?: string;
   row?: number;
+}
+
+/** Shape of a mock fragment passed to makeIndex, resolved by name for a MockSchema's `spreads`. */
+interface MockFragment {
+  name: string;
+  fields: Array<{ name: string; children?: Array<{ name: string }> }>;
 }
 
 /** Shape of a mock mapping passed to makeIndex. */
@@ -62,11 +70,13 @@ function makeIndex({
   mappings = [],
   nlRefData = [],
   arrows = [],
+  fragments = [],
 }: {
   schemas?: MockSchema[];
   mappings?: MockMapping[];
   nlRefData?: MockNLRef[];
   arrows?: MockArrow[];
+  fragments?: MockFragment[];
 } = {}): ExtractedWorkspace {
   const schemaMap = new Map<string, any>();
   for (const s of schemas) {
@@ -76,11 +86,15 @@ function makeIndex({
   for (const m of mappings) {
     mappingMap.set(m.name, { ...m, file: m.file ?? "test.stm", row: m.row ?? 0 });
   }
+  const fragmentMap = new Map<string, any>();
+  for (const f of fragments) {
+    fragmentMap.set(f.name, { ...f, hasSpreads: false, spreads: [], file: "test.stm", row: 0 });
+  }
   return {
     schemas: schemaMap,
     mappings: mappingMap,
     metrics: new Map(),
-    fragments: new Map(),
+    fragments: fragmentMap,
     transforms: new Map(),
     notes: [],
     warnings: [],
@@ -816,7 +830,9 @@ describe("lint: unenumerated-record-target", () => {
 
   it("stays silent when the target schema has unresolved spreads", () => {
     // The field list is incomplete, so "targets a record" cannot be established
-    // — reporting on it would blame the author for an unexpanded fragment.
+    // — reporting on it would blame the author for an unexpanded fragment. This
+    // schema declares `hasSpreads` with no matching fragment registered, the
+    // mock's stand-in for a spread naming a fragment the workspace never defines.
     const index = makeIndex({
       schemas: [
         { name: "src", fields: [{ name: "full_name" }] },
@@ -824,11 +840,57 @@ describe("lint: unenumerated-record-target", () => {
           name: "tgt",
           fields: [{ name: "address", children: [{ name: "line1" }] }],
           hasSpreads: true,
+          spreads: ["missing_fragment"],
         },
       ],
       mappings: [{ name: "load", sources: ["src"], targets: ["tgt"] }],
       arrows: [{ mapping: "load", sources: ["full_name"], target: "address" }],
     });
     assert.deepEqual(run(index), []);
+  });
+
+  // ── gpt-i1uv differential pair ──────────────────────────────────────────
+  //
+  // Two mappings with a byte-identical arrow shape (`full_name -> address`),
+  // differing only in whether the target schema spreads a fragment declared
+  // in the same workspace and fully resolved. The rule must fire for both:
+  // a *resolved* spread leaves nothing hidden about the target's field list,
+  // so it is not the "incomplete field list" case the skip above exists for.
+  // Before the fix, `endpointKind` skipped any schema with `hasSpreads` set —
+  // resolved or not — so the with-spread mapping went unreported.
+
+  const differentialPair = (targetHasSpread: boolean) =>
+    makeIndex({
+      schemas: [
+        { name: "src", fields: [{ name: "full_name" }] },
+        {
+          name: "tgt",
+          fields: [{ name: "address", children: [{ name: "line1" }] }],
+          ...(targetHasSpread ? { hasSpreads: true, spreads: ["audit_fields"] } : {}),
+        },
+      ],
+      fragments: [{ name: "audit_fields", fields: [{ name: "loaded_at" }] }],
+      mappings: [{ name: "load", sources: ["src"], targets: ["tgt"] }],
+      arrows: [{ mapping: "load", sources: ["full_name"], target: "address" }],
+    });
+
+  it("flags an unenumerated record target with no spread", () => {
+    // Control half of the differential pair: same arrow shape as the
+    // spread-bearing case below, minus the spread. Establishes the baseline
+    // the with-spread case must match once the spread resolves.
+    const diags = run(differentialPair(false));
+    assert.equal(diags.length, 1);
+    assert.match(diags[0].message, /targets a record/);
+  });
+
+  it("flags an unenumerated record target whose schema spreads a resolved fragment", () => {
+    // gpt-i1uv: `tgt` spreads `audit_fields`, which is declared and resolves —
+    // the arrow's target path ("address") is a directly-declared field the
+    // spread never touches, so a resolved spread elsewhere in the schema must
+    // not suppress the diagnostic. Before the fix this reported nothing at
+    // all, because `endpointKind` skipped every `hasSpreads` schema outright.
+    const diags = run(differentialPair(true));
+    assert.equal(diags.length, 1);
+    assert.match(diags[0].message, /targets a record/);
   });
 });
