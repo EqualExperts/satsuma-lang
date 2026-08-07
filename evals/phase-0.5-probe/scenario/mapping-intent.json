@@ -1,0 +1,291 @@
+{
+  "$schema": "phase-0.5-probe-mapping-intent-v1",
+  "$comment": "Feature 44 Phase 0.5 probe — hand-authored ground truth. The one source of truth every arm renders from. NOT the Phase 1 MappingIntent schema; this is the minimal shape the probe needs, authored by hand with no totality test. Its arms are not paired to the registered standard (PRD line 836), but they are paired to *each other* by construction, which is the best control available for ~$8.",
+  "domain": "Insurance claims processing — Meridian Mutual (fictional)",
+  "$contaminationNote": "Meridian Mutual, the claims domain, and every entity name below are invented for this probe and absent from examples/ and from the training data of any model we run. The canary probe (PRD line 615) asks each model to reproduce the scenario without being shown it; any model that can is disqualified.",
+  "schemas": [
+    {
+      "name": "claim_header",
+      "namespace": null,
+      "note": "Inbound claim intake from the claims management system",
+      "fields": [
+        { "name": "claim_id",        "type": "VARCHAR(20)",  "isList": false, "metadata": [{"kind": "tag", "tag": "pk"}, {"kind": "tag", "tag": "required"}] },
+        { "name": "policy_no",        "type": "VARCHAR(30)",  "isList": false, "metadata": [{"kind": "tag", "tag": "required"}] },
+        { "name": "claim_type",       "type": "VARCHAR(15)",  "isList": false, "metadata": [{"kind": "tag", "tag": "required"}] },
+        { "name": "reported_at",      "type": "TIMESTAMPTZ",  "isList": false, "metadata": [{"kind": "tag", "tag": "required"}] },
+        { "name": "incident_at",      "type": "TIMESTAMPTZ",  "isList": false, "metadata": [] },
+        { "name": "loss_amount",      "type": "DECIMAL(14,2)","isList": false, "metadata": [] },
+        { "name": "currency",         "type": "CHAR(3)",      "isList": false, "metadata": [{"kind": "tag", "tag": "default", "value": "USD"}] },
+        { "name": "adjuster_id",      "type": "VARCHAR(20)",  "isList": false, "metadata": [] },
+        { "name": "status",          "type": "VARCHAR(20)",  "isList": false, "metadata": [{"kind": "tag", "tag": "required"}] },
+        { "name": "vehicles",        "type": "record",       "isList": true,  "metadata": [],
+          "children": [
+            { "name": "vin",          "type": "VARCHAR(17)",  "isList": false, "metadata": [{"kind": "tag", "tag": "required"}] },
+            { "name": "make",         "type": "VARCHAR(40)",  "isList": false, "metadata": [] },
+            { "name": "model",        "type": "VARCHAR(40)",  "isList": false, "metadata": [] },
+            { "name": "year",         "type": "INT",          "isList": false, "metadata": [] },
+            { "name": "damage_extent","type": "VARCHAR(15)",  "isList": false, "metadata": [{"kind": "tag", "tag": "enum", "values": ["none","minor","moderate","severe","total"]}]},
+            { "name": "estimate",    "type": "DECIMAL(12,2)","isList": false, "metadata": [] },
+            { "name": "photos",       "type": "record",       "isList": true,  "metadata": [],
+              "children": [
+                { "name": "photo_id",  "type": "VARCHAR(36)", "isList": false, "metadata": [{"kind": "tag", "tag": "required"}] },
+                { "name": "angle",     "type": "VARCHAR(10)", "isList": false, "metadata": [{"kind": "tag", "tag": "enum", "values": ["front","rear","left","right","interior"]}]}
+              ]
+            }
+          ]
+        },
+        { "name": "parties",         "type": "record",       "isList": true,  "metadata": [],
+          "children": [
+            { "name": "party_role",   "type": "VARCHAR(20)",  "isList": false, "metadata": [{"kind": "tag", "tag": "required"}] },
+            { "name": "name",         "type": "VARCHAR(120)", "isList": false, "metadata": [] },
+            { "name": "contact_phone","type": "VARCHAR(20)",  "isList": false, "metadata": [{"kind": "tag", "tag": "pii"}] }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "policy_dim",
+      "namespace": null,
+      "note": "Policy master record (lookup target)",
+      "fields": [
+        { "name": "policy_no",        "type": "VARCHAR(30)",  "isList": false, "metadata": [{"kind": "tag", "tag": "pk"}, {"kind": "tag", "tag": "required"}] },
+        { "name": "product_code",      "type": "VARCHAR(10)",  "isList": false, "metadata": [{"kind": "tag", "tag": "required"}] },
+        { "name": "policyholder_id",  "type": "VARCHAR(20)",  "isList": false, "metadata": [{"kind": "tag", "tag": "required"}] },
+        { "name": "effective_date",   "type": "DATE",         "isList": false, "metadata": [] },
+        { "name": "expiry_date",       "type": "DATE",         "isList": false, "metadata": [] },
+        { "name": "territory",        "type": "VARCHAR(10)",  "isList": false, "metadata": [] }
+      ]
+    },
+    {
+      "name": "fx_rates",
+      "namespace": null,
+      "note": "Daily FX spot rates for multi-currency claims",
+      "fields": [
+        { "name": "currency",         "type": "CHAR(3)",      "isList": false, "metadata": [{"kind": "tag", "tag": "pk"}] },
+        { "name": "rate_to_usd",       "type": "DECIMAL(10,6)","isList": false, "metadata": [{"kind": "tag", "tag": "required"}] }
+      ]
+    },
+    {
+      "name": "claim_fact",
+      "namespace": null,
+      "note": "Analytics-ready claim fact (target of the main mapping)",
+      "fields": [
+        { "name": "claim_key",         "type": "VARCHAR(20)",  "isList": false, "metadata": [{"kind": "tag", "tag": "pk"}] },
+        { "name": "policy_ref",        "type": "VARCHAR(30)",  "isList": false, "metadata": [{"kind": "tag", "tag": "indexed"}] },
+        { "name": "claim_type_code",   "type": "VARCHAR(2)",   "isList": false, "metadata": [] },
+        { "name": "reported_date",      "type": "TIMESTAMP_NTZ","isList": false, "metadata": [] },
+        { "name": "loss_usd",          "type": "DECIMAL(14,2)","isList": false, "metadata": [{"kind": "tag", "tag": "required"}] },
+        { "name": "loss_source",        "type": "VARCHAR(10)",  "isList": false, "metadata": [] },
+        { "name": "vehicle_count",       "type": "INT",          "isList": false, "metadata": [] },
+        { "name": "party_count",         "type": "INT",          "isList": false, "metadata": [] },
+        { "name": "max_damage",         "type": "VARCHAR(15)",  "isList": false, "metadata": [] },
+        { "name": "photos",            "type": "record",       "isList": true,  "metadata": [],
+          "children": [
+            { "name": "photo_ref",  "type": "VARCHAR(36)",  "isList": false, "metadata": [{"kind": "tag", "tag": "required"}] },
+            { "name": "view",       "type": "VARCHAR(10)",  "isList": false, "metadata": [] }
+          ]
+        },
+        { "name": "adjuster_ref",       "type": "VARCHAR(20)",  "isList": false, "metadata": [] },
+        { "name": "is_open",          "type": "BOOLEAN",      "isList": false, "metadata": [] }
+      ]
+    },
+    {
+      "name": "party_dim",
+      "namespace": null,
+      "note": "One row per party on a claim (target of the party-extract mapping)",
+      "fields": [
+        { "name": "claim_key",         "type": "VARCHAR(20)",  "isList": false, "metadata": [{"kind": "tag", "tag": "required"}] },
+        { "name": "role",             "type": "VARCHAR(20)",  "isList": false, "metadata": [{"kind": "tag", "tag": "required"}] },
+        { "name": "display_name",      "type": "VARCHAR(120)", "isList": false, "metadata": [] },
+        { "name": "phone_e164",        "type": "VARCHAR(20)",  "isList": false, "metadata": [] }
+      ]
+    },
+    {
+      "name": "vehicle_dim",
+      "namespace": null,
+      "note": "One row per vehicle on a claim (target of the vehicle-extract mapping)",
+      "fields": [
+        { "name": "claim_key",         "type": "VARCHAR(20)",  "isList": false, "metadata": [{"kind": "tag", "tag": "required"}] },
+        { "name": "vin",              "type": "VARCHAR(17)",  "isList": false, "metadata": [{"kind": "tag", "tag": "required"}] },
+        { "name": "description",       "type": "VARCHAR(100)","isList": false, "metadata": [] },
+        { "name": "damage_class",      "type": "VARCHAR(15)", "isList": false, "metadata": [] },
+        { "name": "estimate_usd",      "type": "DECIMAL(12,2)","isList": false, "metadata": [] }
+      ]
+    },
+    {
+      "name": "claim_status_snapshot",
+      "namespace": null,
+      "note": "A small downstream summary table used to exercise multi-hop lineage for T4",
+      "fields": [
+        { "name": "claim_key",         "type": "VARCHAR(20)",  "isList": false, "metadata": [{"kind": "tag", "tag": "pk"}, {"kind": "tag", "tag": "ref", "value": "claim_fact.claim_key"}] },
+        { "name": "open_flag",         "type": "BOOLEAN",      "isList": false, "metadata": [] },
+        { "name": "total_exposure",    "type": "DECIMAL(14,2)","isList": false, "metadata": [] }
+      ]
+    },
+    {
+      "name": "payment_fact",
+      "namespace": null,
+      "note": "One row per claim payment — downstream of claim_fact for T4",
+      "fields": [
+        { "name": "payment_id",        "type": "VARCHAR(36)",  "isList": false, "metadata": [{"kind": "tag", "tag": "pk"}] },
+        { "name": "claim_key",         "type": "VARCHAR(20)",  "isList": false, "metadata": [{"kind": "tag", "tag": "ref", "value": "claim_fact.claim_key"}] },
+        { "name": "paid_amount",       "type": "DECIMAL(14,2)","isList": false, "metadata": [] },
+        { "name": "paid_at",           "type": "TIMESTAMP_NTZ","isList": false, "metadata": [] }
+      ]
+    },
+    {
+      "name": "fraud_flag",
+      "namespace": null,
+      "note": "Downstream fraud indicator — longest T4 chain",
+      "fields": [
+        { "name": "claim_key",         "type": "VARCHAR(20)",  "isList": false, "metadata": [{"kind": "tag", "tag": "pk"}, {"kind": "tag", "tag": "ref", "value": "claim_fact.claim_key"}] },
+        { "name": "risk_score",        "type": "INT",          "isList": false, "metadata": [] },
+        { "name": "is_flagged",        "type": "BOOLEAN",      "isList": false, "metadata": [] }
+      ]
+    }
+  ],
+  "mappings": [
+    {
+      "name": "claim_normalisation",
+      "sources": ["claim_header", "policy_dim", "fx_rates"],
+      "target": "claim_fact",
+      "note": "The main mapping. Normalises currency, derives the open flag, and flattens vehicles + parties into counts. Carries two planted ambiguities: the round-2-on-loss is underspecified, and is_open's logic is a computed arrow with no source.",
+      "arrows": [
+        { "target": "claim_key",           "from": "claim_header.claim_id" },
+        { "target": "policy_ref",          "from": "claim_header.policy_no" },
+        { "target": "claim_type_code",     "from": "claim_header.claim_type", "transform_raw": "map { auto: AU, home: HO, life: LI, health: HE }", "steps": [{"text": "map { auto: AU, home: HO, life: LI, health: HE }"}], "values": {"auto":"AU","home":"HO","life":"LI","health":"HE"} },
+        { "target": "reported_date",        "from": "claim_header.reported_at", "transform_raw": "to_utc", "steps": [{"text":"to_utc"}] },
+        { "target": "loss_usd",             "from": "claim_header.loss_amount", "transform_raw": "\"Convert to USD using @fx_rates lookup on @claim_header.currency, then round\"\n| round 2", "steps": [{"text": "\"Convert to USD using @fx_rates lookup on @claim_header.currency, then round\""}, {"text":"round 2"}], "rule": "Convert to USD using @fx_rates lookup on @claim_header.currency, then round" },
+        { "target": "loss_source",         "from": "claim_header.loss_amount", "transform_raw": "coalesce 0", "steps": [{"text":"coalesce 0"}] },
+        { "target": "vehicle_count",        "from": "claim_header.vehicles", "transform_raw": "count", "steps": [{"text":"count"}] },
+        { "target": "party_count",          "from": "claim_header.parties", "transform_raw": "count", "steps": [{"text":"count"}] },
+        { "target": "max_damage",           "from": "claim_header.vehicles.damage_extent", "transform_raw": "\"Pick the worst damage across all vehicles on the claim\"", "rule": "Pick the worst damage across all vehicles on the claim" },
+        { "target": "photos",               "kind": "flatten", "from": "claim_header.vehicles.photos", "enumeratesChildren": true,
+            "children": [
+              { "target": "photos.photo_ref", "from": "vehicles.photos.photo_id", "transform_raw": "trim", "steps": [{"text":"trim"}] },
+              { "target": "photos.view",      "from": "vehicles.photos.angle", "transform_raw": "lowercase", "steps": [{"text":"lowercase"}] }
+            ]
+        },
+        { "target": "adjuster_ref",         "from": "claim_header.adjuster_id", "transform_raw": "trim", "steps": [{"text":"trim"}] },
+        { "target": "is_open",             "kind": "computed", "transform_raw": "\"True if @claim_header.status is 'open' or 'under_review', false otherwise.\"", "rule": "True if @claim_header.status is 'open' or 'under_review', false otherwise." }
+      ]
+    },
+    {
+      "name": "party_extract",
+      "sources": ["claim_header"],
+      "target": "party_dim",
+      "note": "Iterates the parties list on each claim. Exercises nested each.",
+      "arrows": [
+        { "target": "claim_key",     "from": "claim_header.claim_id" },
+        { "target": "role",         "from": "parties.party_role", "kind": "each", "iterates": "claim_header.parties", "enumeratesChildren": true,
+            "children": [
+              { "target": "role",       "from": "parties.party_role", "transform_raw": "trim | uppercase", "steps": [{"text":"trim"},{"text":"uppercase"}] },
+              { "target": "display_name","from": "parties.name", "transform_raw": "trim", "steps": [{"text":"trim"}] },
+              { "target": "phone_e164", "from": "parties.contact_phone", "transform_raw": "\"Format to E.164, assuming US country code if no + prefix\"", "rule": "Format to E.164, assuming US country code if no + prefix" }
+            ]
+        }
+      ]
+    },
+    {
+      "name": "vehicle_extract",
+      "sources": ["claim_header"],
+      "target": "vehicle_dim",
+      "note": "Iterates the vehicles list. One row per vehicle. Carries the third planted ambiguity: the value map missing a case for 'scratch' damage.",
+      "arrows": [
+        { "target": "claim_key",     "from": "claim_header.claim_id" },
+        { "target": "vin",          "from": "vehicles.vin", "kind": "each", "iterates": "claim_header.vehicles", "enumeratesChildren": true,
+            "children": [
+              { "target": "vin",            "from": "vehicles.vin", "transform_raw": "uppercase", "steps": [{"text":"uppercase"}] },
+              { "target": "description",    "from": "vehicles.make", "transform_raw": "\"@vehicles.make || ' ' || @vehicles.model || ' ' || @vehicles.year\"", "rule": "@vehicles.make || ' ' || @vehicles.model || ' ' || @vehicles.year" },
+              { "target": "damage_class",   "from": "vehicles.damage_extent", "transform_raw": "map { none: N, minor: M, moderate: M, severe: S, total: T }", "steps":[{"text":"map { none: N, minor: M, moderate: M, severe: S, total: T }"}], "values": {"none":"N","minor":"M","moderate":"M","severe":"S","total":"T"} },
+              { "target": "estimate_usd",    "from": "vehicles.estimate", "transform_raw": "round 2", "steps": [{"text":"round 2"}] }
+            ]
+        }
+      ]
+    },
+    {
+      "name": "status_snapshot",
+      "sources": ["claim_fact"],
+      "target": "claim_status_snapshot",
+      "note": "Downstream of claim_fact, so T4's impact analysis traverses two hops. Carries the fourth planted ambiguity: total_exposure's rounding is left implicit (no round step).",
+      "arrows": [
+        { "target": "claim_key",       "from": "claim_fact.claim_key" },
+        { "target": "open_flag",       "from": "claim_fact.is_open" },
+        { "target": "total_exposure", "from": "claim_fact.loss_usd", "transform_raw": "\"Sum exposure across all open claims for the same policy\"", "rule": "Sum exposure across all open claims for the same policy" }
+      ]
+    },
+    {
+      "name": "payment_extract",
+      "sources": ["claim_fact"],
+      "target": "payment_fact",
+      "note": "Downstream of claim_fact — a second branch in the T4 lineage chain from loss_amount.",
+      "arrows": [
+        { "target": "claim_key",   "from": "claim_fact.claim_key" },
+        { "target": "paid_amount", "from": "claim_fact.loss_usd", "transform_raw": "round 2", "steps": [{"text":"round 2"}] },
+        { "target": "paid_at",     "from": "claim_fact.reported_date", "transform_raw": "to_utc", "steps": [{"text":"to_utc"}] }
+      ]
+    },
+    {
+      "name": "fraud_assessment",
+      "sources": ["claim_fact", "party_dim"],
+      "target": "fraud_flag",
+      "note": "Downstream of claim_fact and party_dim. Carries a second computed arrow (is_flagged).",
+      "arrows": [
+        { "target": "claim_key",   "from": "claim_fact.claim_key" },
+        { "target": "risk_score",  "from": "claim_fact.party_count", "transform_raw": "\"Score from 0-100 based on @claim_fact.party_count and @party_dim role distribution\"", "rule": "Score from 0-100 based on @claim_fact.party_count and @party_dim role distribution" },
+        { "target": "is_flagged",  "kind": "computed", "transform_raw": "\"True if @risk_score > 70, false otherwise.\"", "rule": "True if @risk_score > 70, false otherwise." }
+      ]
+    }
+  ],
+  "ambiguities": {
+    "$comment": "The K planted ambiguities and the unambiguous fields used for T5's false-positive rate. Authored before any episode runs (PRD line 820). Each ambiguity is a genuine underspecification, not a typo (PRD acceptance: underspecified rounding, target with no stated source, value map missing a case, implicit timezone).",
+    "planted": [
+      { "id": "A1", "location": "claim_normalisation.loss_usd", "kind": "underspecified_rounding", "description": "The round step says 'round 2' but does not state the rounding mode (half-up vs bankers). An author implementing this in SQL must guess." },
+      { "id": "A2", "location": "claim_normalisation.is_open", "kind": "target_no_stated_source", "description": "is_open is a computed arrow with no source field — its rule references @claim_header.status but there is no `from`. An agent should flag that the binding is inferred, not declared." },
+      { "id": "A3", "location": "vehicle_extract.damage_class", "kind": "value_map_missing_case", "description": "The damage_class map covers none/minor/moderate/severe/total but the source enum also allows 'scratch' (omitted in this scenario's map; in the real artefact the source enum will include it). A value arriving as 'scratch' is unhandled." },
+      { "id": "A4", "location": "party_extract.phone_e164", "kind": "implicit_timezone_and_country", "description": "The phone formatting rule assumes US country code if no + prefix. The timezone/country is left implicit in the data; an agent should flag the assumption rather than silently apply it." }
+    ],
+    "unambiguousFields": [
+      "claim_normalisation.claim_key",
+      "claim_normalisation.policy_ref",
+      "claim_normalisation.claim_type_code",
+      "claim_normalisation.reported_date",
+      "claim_normalisation.loss_source",
+      "claim_normalisation.vehicle_count",
+      "claim_normalisation.party_count",
+      "claim_normalisation.adjuster_ref",
+      "party_extract.claim_key",
+      "party_extract.role",
+      "party_extract.display_name",
+      "vehicle_extract.claim_key",
+      "vehicle_extract.vin",
+      "vehicle_extract.description",
+      "vehicle_extract.estimate_usd",
+      "status_snapshot.claim_key",
+      "status_snapshot.open_flag"
+    ]
+  },
+  "t4AnswerKey": {
+    "$comment": "T4 task: 'If claim_header.loss_amount changes type, what breaks?' Graded by set-F1 against the true downstream set. The true downstream set is computed by hand from the lineage: loss_amount feeds loss_usd and loss_source (mapping 1); loss_usd feeds total_exposure (mapping 4) and paid_amount (mapping 5). So the downstream target-field set is {claim_fact.loss_usd, claim_fact.loss_source, claim_status_snapshot.total_exposure, payment_fact.paid_amount}.",
+    "queryField": "claim_header.loss_amount",
+    "taskPhrasing": "If the type of claim_header.loss_amount changes from DECIMAL(14,2) to a STRING, which downstream target fields are affected and would need to be reviewed?",
+    "trueDownstreamSet": [
+      "claim_fact.loss_usd",
+      "claim_fact.loss_source",
+      "claim_status_snapshot.total_exposure",
+      "payment_fact.paid_amount"
+    ],
+    "$commentGrading": "Set-F1: precision = |predicted ∩ true| / |predicted|, recall = |predicted ∩ true| / |true|, F1 = harmonic mean. A prediction that includes claim_fact.loss_usd only misses loss_source and total_exposure (recall 0.33). A prediction that includes every field in claim_fact is over-broad (low precision). The interesting failure mode is stopping at the first hop (loss_usd, loss_source) and missing the transitive hop to total_exposure."
+  },
+  "t5AnswerKey": {
+    "$comment": "T5 task: 'List every field in this spec where the transformation is ambiguous or underspecified, and flag it rather than guess.' Graded by recall/precision over the planted ambiguities, plus the false-positive rate over the unambiguous fields.",
+    "trueAmbiguousSet": ["A1","A2","A3","A4"],
+    "falsePositiveDenominator": 17,
+    "$commentGrading": "Recall = |flagged ∩ true| / |true|. Precision = |flagged ∩ true| / |all flagged|. False-positive rate = |flagged unambiguous| / |unambiguous fields|. An arm that flags everything has recall 1.0 and precision 4/21 — the FPR is what stops that being a winning strategy."
+  },
+  "oneMappingVariant": {
+    "$comment": "The cell designed to make S+ lose (PRD line 828). A single mapping with the reference overhead (6813 tokens) and per-call round-trips unamortised. Use the first mapping only: claim_normalisation alone, against a single-row claim_header. This is the crossover check — confirming S+ loses at the small end is the single most credible thing the write-up can contain.",
+    "mapping": "claim_normalisation",
+    "expected": "S+ loses to X-P0 and M0 on total tokens, because the 6813-token reference plus CLI round-trips exceeds the cost of reading one small spreadsheet or markdown table."
+  }
+}
