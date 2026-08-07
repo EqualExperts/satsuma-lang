@@ -435,6 +435,39 @@ describe("scenarioDeclaredUsageSites", () => {
     assert.deepEqual(sitesOf(usageSites, "s2"), ["target@entry.stm"]);
   });
 
+  it("counts the schema an NL @ref mentions, even though the ref names one of its fields (gpt-fjo7)", () => {
+    // `@s0.other` is textually a reference to the field `s0.other`, but the
+    // workspace index files it under the schema key too, specifically so a
+    // rename of `s0` reaches it. The oracle must agree, or the rename
+    // round-trip property (which asks the oracle, not the toolchain, what a
+    // rename should touch) would expect less than the fix actually does.
+    const schemas = ["s0", "s1"].map((name) =>
+      schemaDecl({ name, fields: [scalarField("id"), scalarField("other")] }),
+    );
+    const workspace = oneFile({
+      schemas,
+      mappings: [
+        mappingDecl({
+          name: "m0",
+          sources: ["s0"],
+          targets: ["s1"],
+          arrows: [
+            mapArrow(
+              [endpoint("s0", "id")],
+              endpoint("s1", "id"),
+              nlTransform("Combine.", [endpoint("s0", "other")]),
+            ),
+          ],
+        }),
+      ],
+    });
+
+    assert.deepEqual(sitesOf(scenarioDeclaredUsageSites(workspace), "s0"), [
+      "nl@entry.stm",
+      "source@entry.stm",
+    ]);
+  });
+
   it("counts the import statement the renderer derives for a cross-file reference", () => {
     // A scenario never authors its imports — `workspace-render.js` derives them
     // from usage — but an imported name is a reference site, and most of what the
@@ -528,6 +561,7 @@ describe("USAGE_KIND", () => {
       "arrow",
       "import",
       "metric_source",
+      "nl",
       "source",
       "spread",
       "target",

@@ -1,6 +1,6 @@
 ---
 id: gpt-fjo7
-status: open
+status: in_progress
 deps: []
 links: []
 created: 2026-08-06T18:45:19Z
@@ -35,3 +35,12 @@ Note the editor does not even show the damage afterwards, because the LSP report
 
 Renaming a schema rewrites the schema segment of every NL @ref that names one of its fields, in every file. The round-trip property in tooling/satsuma-lsp/test/generated-rename-roundtrip.test.js stops excluding entities an NL @ref mentions, and the pinned test recording today's behaviour is removed. Renaming a schema whose fields no @ref mentions is unaffected. Decide explicitly whether a @ref naming a *field* that is itself renamed is in scope, or a separate ticket.
 
+
+## Notes
+
+**2026-08-07T10:20:41Z**
+
+**2026-08-07T10:20:32Z**
+
+Cause: The workspace index filed a field-naming NL @ref (`@s0.field_1`) only under the full name it names ("s0.field_1", context "nl") — never under the schema key alone ("s0") — so `findReferences`/rename queried by the schema's key never saw it, and a schema rename left the @ref pointing at a name that no longer existed.
+Fix: Added core's `splitRefSchemaKey()` to isolate the schema segment of a dotted @ref (honouring backtick quoting and the grammar's "::"-before-first-"." guarantee), and used it in the workspace index to file a second "nl" entry under just the schema key with a range narrowed to that segment — so a schema rename now rewrites the schema segment of every such @ref, in every file in scope, while leaving the field part untouched. Renaming a FIELD an @ref names (rather than the schema) is explicitly out of scope: the LSP has no renameable `field_name` context today, through any path. (commit immediately after 02c3cb07)

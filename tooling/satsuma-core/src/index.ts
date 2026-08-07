@@ -220,6 +220,7 @@ export {
   extractAtRefs,
   computeNLRefPosition,
   classifyRef,
+  splitRefSchemaKey,
   resolveRef,
   extractNLRefData,
   resolveAllNLRefs,
@@ -229,6 +230,7 @@ export {
 export type {
   AtRef,
   RefClassification,
+  RefSchemaKeySplit,
   Resolution,
   MappingSourcesTargets,
   DefinitionLookup,

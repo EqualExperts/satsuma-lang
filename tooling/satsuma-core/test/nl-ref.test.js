@@ -13,6 +13,7 @@ import {
   extractNLRefData,
   computeNLRefPosition,
   classifyRef,
+  splitRefSchemaKey,
   resolveRef,
   resolveAllNLRefs,
   stripNLRefScopePrefix,
@@ -272,6 +273,61 @@ describe("classifyRef()", () => {
     assert.equal(classifyRef("crm::`my.schema`"), "namespace-qualified-schema");
     // The separator dot before the literal still makes this a dotted field.
     assert.equal(classifyRef("customers.`tax.rate`"), "dotted-field");
+  });
+});
+
+// ── splitRefSchemaKey ───────────────────────────────────────────────────────
+//
+// Introduced for gpt-fjo7: rename needs the schema segment of a field-naming
+// @ref isolated from the field part, so it can rewrite just that segment.
+
+describe("splitRefSchemaKey()", () => {
+  it("splits a dotted field ref at the first dot", () => {
+    assert.deepEqual(splitRefSchemaKey("schema.field"), { schemaKey: "schema", rawLength: 6 });
+  });
+
+  it("splits a namespace-qualified field ref after the schema, keeping the ns:: prefix", () => {
+    // Grammar guarantee: "::" always precedes the first ".", so the schema key
+    // naturally includes it without special-casing the classification.
+    assert.deepEqual(splitRefSchemaKey("crm::customers.email"), {
+      schemaKey: "crm::customers",
+      rawLength: 14,
+    });
+  });
+
+  it("splits a multi-segment field path at the FIRST dot only", () => {
+    // "address.city.zip" names field "city.zip" on schema "address" — the
+    // schema key must not swallow the extra segment.
+    assert.deepEqual(splitRefSchemaKey("address.city.zip"), {
+      schemaKey: "address",
+      rawLength: 7,
+    });
+  });
+
+  it("returns null for a ref with no field part", () => {
+    // "@schema" and "@ns::schema" already name the schema outright — there is
+    // no split to report, and the caller's existing full-name entry already
+    // is the schema-key entry.
+    assert.equal(splitRefSchemaKey("customers"), null);
+    assert.equal(splitRefSchemaKey("crm::customers"), null);
+  });
+
+  it("treats a backtick-quoted segment's dot as part of the name, not a separator (sl-g6ga)", () => {
+    // "`my.schema`" is one segment naming a schema literally called "my.schema";
+    // the boundary is the FIRST UNQUOTED dot, right after the closing backtick.
+    assert.deepEqual(splitRefSchemaKey("`my.schema`.field"), {
+      schemaKey: "my.schema",
+      rawLength: 11,
+    });
+  });
+
+  it("flattens the returned schemaKey but keeps rawLength measuring the raw (backtick-inclusive) text", () => {
+    // rawLength is how many RAW characters the caller must slice to recover
+    // the authored span, which is longer than schemaKey.length whenever the
+    // schema segment is backtick-quoted.
+    const split = splitRefSchemaKey("`order id`.status");
+    assert.equal(split.schemaKey, "order id");
+    assert.equal(split.rawLength, "`order id`".length);
   });
 });
 

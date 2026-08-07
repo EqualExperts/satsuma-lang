@@ -31,6 +31,7 @@ import {
   extractFieldTree,
   isMetricSchema,
   createAtRefRegex,
+  splitRefSchemaKey,
   renderFieldDeclType,
 } from "@satsuma/core";
 import type { FieldDecl, SatsumaCstType, SatsumaGrammarSymbol } from "@satsuma/core";
@@ -91,7 +92,10 @@ export interface ReferenceEntry {
   name: string;
   /** Semantic usage context for downstream queries. "arrow" marks structural
    *  src/tgt path references; "nl" marks @refs found inside NL prose strings
-   *  (arrow bodies, note tags/blocks, metadata values — sl-ellp). */
+   *  (arrow bodies, note tags/blocks, metadata values — sl-ellp). A
+   *  field-naming @ref (`@schema.field`) files TWO "nl" entries — one under
+   *  the full name for field-level queries, one under just the schema key so
+   *  a schema rename/find-references reaches it too (gpt-fjo7). */
   context: "source" | "target" | "spread" | "import" | "arrow" | "nl" | "metric_source";
   /** Qualified name of the mapping (or metric) whose body contains this
    *  reference. Set for "source"/"target"/"metric_source" contexts; lets
@@ -999,13 +1003,25 @@ function enclosingNamespace(node: SyntaxNode): string | null {
  * structural at_ref nodes that the grammar parses out of bare (unquoted)
  * pipe text — `a -> b { derived from @b }` has no nl_string at all, so a
  * string-only walk missed it entirely (bptar-l6n8).
+ *
+ * A field-naming ref (`@schema.field`, `@ns::schema.field`) is filed under
+ * TWO keys: the full name (`s0.field_1`), which is what field-level queries
+ * (e.g. right-click on a field declaration) look up, and — new for gpt-fjo7 —
+ * the schema key alone (`s0`), with the range narrowed to just that segment.
+ * Without the second entry, `findReferences`/rename for the SCHEMA never see
+ * this ref at all: it is filed only under a key that names a field, not the
+ * schema, so a schema rename left every such @ref pointing at a name that no
+ * longer existed (gpt-fjo7). A ref with no field part (`@s0`, `@ns::s0`) needs
+ * no second entry — its one key already IS the schema key.
  */
 function indexNlRefs(index: WorkspaceIndex, uri: string, node: SyntaxNode): void {
   walkDescendants(node, (n) => {
     if (n.type === "at_ref") {
-      // Strip the leading @ and any backtick delimiters, mirroring the
-      // regex path below.
-      const refName = n.text.slice(1).replace(/`([^`]+)`/g, "$1");
+      // Strip the leading @, keeping backticks for splitRefSchemaKey below;
+      // flatten only for the full-name entry, mirroring the regex path.
+      const rawRef = n.text.slice(1);
+      const refName = rawRef.replace(/`([^`]+)`/g, "$1");
+      const namespace = enclosingNamespace(n);
 
       // As below, the @ sigil stays outside the stored range (sl-xf3f).
       // An at_ref never spans lines, so a simple column bump is safe.
@@ -1019,8 +1035,17 @@ function indexNlRefs(index: WorkspaceIndex, uri: string, node: SyntaxNode): void
         ),
         name: refName,
         context: "nl",
-        namespace: enclosingNamespace(n),
+        namespace,
       });
+
+      addNlRefSchemaKeyEntry(
+        index,
+        uri,
+        rawRef,
+        namespace,
+        n.startPosition.row,
+        n.startPosition.column + 1,
+      );
       return;
     }
 
@@ -1029,6 +1054,7 @@ function indexNlRefs(index: WorkspaceIndex, uri: string, node: SyntaxNode): void
     const text = n.text;
     const startRow = n.startPosition.row;
     const startCol = n.startPosition.column;
+    const namespace = enclosingNamespace(n);
 
     // Index @refs
     NL_AT_REF_RE.lastIndex = 0;
@@ -1048,9 +1074,55 @@ function indexNlRefs(index: WorkspaceIndex, uri: string, node: SyntaxNode): void
         range,
         name: refName,
         context: "nl",
-        namespace: enclosingNamespace(n),
+        namespace,
       });
+
+      // The schema-key entry's range starts at the same offset (right after
+      // the @) but covers only the schema segment — see offsetToRange's
+      // `length` parameter below.
+      const schemaSplit = splitRefSchemaKey(rawRef);
+      if (schemaSplit) {
+        const schemaRange = offsetToRange(
+          text,
+          match.index + 1,
+          schemaSplit.rawLength,
+          startRow,
+          startCol,
+        );
+        addReference(index, schemaSplit.schemaKey, {
+          uri,
+          range: schemaRange,
+          name: schemaSplit.schemaKey,
+          context: "nl",
+          namespace,
+        });
+      }
     }
+  });
+}
+
+/**
+ * The at_ref counterpart of the schema-key entry added for the regex path
+ * above — split out because an at_ref's range comes from raw row/column
+ * arithmetic (it never spans lines) rather than {@link offsetToRange}, but the
+ * entry it produces must be identical in shape.
+ */
+function addNlRefSchemaKeyEntry(
+  index: WorkspaceIndex,
+  uri: string,
+  rawRef: string,
+  namespace: string | null,
+  startRow: number,
+  startCol: number,
+): void {
+  const schemaSplit = splitRefSchemaKey(rawRef);
+  if (!schemaSplit) return;
+  addReference(index, schemaSplit.schemaKey, {
+    uri,
+    range: Range.create(startRow, startCol, startRow, startCol + schemaSplit.rawLength),
+    name: schemaSplit.schemaKey,
+    context: "nl",
+    namespace,
   });
 }
 

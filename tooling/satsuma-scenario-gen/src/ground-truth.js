@@ -368,6 +368,10 @@ export const USAGE_KIND = Object.freeze({
   metricSource: "metric_source",
   /** The schema prefix of a qualified arrow path, e.g. the `s0` of `s0.field`. */
   arrow: "arrow",
+  /** The schema named by an NL `@ref` mentioning one of its fields, e.g. the
+   *  `s0` of `@s0.field_1` — the schema segment the index files separately
+   *  from the field-naming ref so a schema rename reaches it too (gpt-fjo7). */
+  nl: "nl",
 });
 
 /**
@@ -441,13 +445,16 @@ export function scenarioDeclaredEntities(workspace) {
  * from two mappings, and collapsing that to one site would hide a reference the
  * toolchain dropped.
  *
- * Two things are deliberately *not* sites. A `namespace` block is not one: the
- * scenario model has no namespace declaration to name, and a qualified reference
- * is filed under the whole `ns::name` key. Nor is the schema an NL `@ref`
- * mentions: `@raw.field_1` is a reference to the *field* `raw.field_1`, which is
- * how the index files it. The `@ref` still matters here, because a mention of
- * another file's schema is one of the things that forces an `import`, which is a
- * site.
+ * One thing is deliberately *not* a site: a `namespace` block. The scenario
+ * model has no namespace declaration to name, and a qualified reference is
+ * filed under the whole `ns::name` key.
+ *
+ * The schema an NL `@ref` mentions IS a site (`USAGE_KIND.nl`), one per ref,
+ * even though `@raw.field_1` is textually a reference to the *field*
+ * `raw.field_1`: the workspace index files that ref under the schema key too
+ * (`raw`), specifically so that renaming `raw` reaches it (gpt-fjo7) — and a
+ * mention of another file's schema is also one of the things that forces an
+ * `import`, which is a site of its own.
  *
  * Throws when the scenario references something it never declares — that is a
  * malformed scenario, not a toolchain failure, and failing loudly beats silently
@@ -485,6 +492,9 @@ export function scenarioDeclaredUsageSites(workspace) {
       for (const ref of mapping.targets) add(ref, mapping.namespace, file.path, USAGE_KIND.target);
       for (const ref of qualifiedArrowSchemas(mapping)) {
         add(ref, mapping.namespace, file.path, USAGE_KIND.arrow);
+      }
+      for (const ref of nlRefSchemas(mapping)) {
+        add(ref, mapping.namespace, file.path, USAGE_KIND.nl);
       }
     }
     for (const ref of importedRefs(file, workspace)) {
@@ -571,6 +581,21 @@ function sourceEndpointsOf(arrow) {
 /** Mirrors the renderer's `authoredEndpoint`: a side with one matching schema writes the path bare. */
 function namesItsSchema(endpoint, sideSchemas) {
   return !(sideSchemas.length === 1 && sideSchemas[0] === endpoint.schema);
+}
+
+/**
+ * The schemas an NL `@ref` mentions inside a mapping's arrow bodies, one entry
+ * per ref (mirroring `add`'s multiset semantics).
+ *
+ * Unlike {@link qualifiedArrowSchemas}, there is no `insideContainer` case to
+ * exclude: `renderTransform` always spells a ref absolutely (`@schema.path`),
+ * even inside an `each`/`flatten` block whose own arrow paths are written
+ * relative to the container.
+ */
+function nlRefSchemas(mapping) {
+  return flattenArrows(mapping.arrows).flatMap((arrow) =>
+    (arrow.transform?.refs ?? []).map((ref) => ref.schema),
+  );
 }
 
 /**

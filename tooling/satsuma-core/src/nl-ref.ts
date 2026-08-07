@@ -295,6 +295,56 @@ export function classifyRef(ref: string): RefClassification {
   return classificationOf(parseRef(ref).separators);
 }
 
+/** The schema-key portion of a dotted @ref, plus how much of the raw ref text
+ *  it occupies. See {@link splitRefSchemaKey}. */
+export interface RefSchemaKeySplit {
+  /** The schema/fragment/transform key, flattened (backticks stripped) —
+   *  e.g. "s0" for "@s0.field" or "ns::s0" for "@ns::s0.field". */
+  schemaKey: string;
+  /** Length, in characters of the RAW (backtick-preserving) ref text, that the
+   *  schema key occupies — the offset of the "." that starts the field path.
+   *  Consumers slice `raw.slice(0, rawLength)` to recover the exact authored
+   *  span, which may differ from `schemaKey.length` when a segment is
+   *  backtick-quoted. */
+  rawLength: number;
+}
+
+/**
+ * Split a dotted @ref into its schema key and field path, without resolving
+ * either against an index. Returns null when the ref has no field path at all
+ * — a bare name or a namespace-qualified name with no "." names a
+ * schema/fragment/transform directly, and there is nothing to split.
+ *
+ * Grammar guarantee (AT_REF_PATTERN): the optional "::" separator always
+ * precedes the first "." — `ns::schema.field` never puts a "." before the
+ * "::" — so the schema key is exactly the raw text up to (but not including)
+ * the first "." that falls outside a backtick-quoted span (sl-g6ga: "." inside
+ * backticks is part of the name, not a separator). This lets the split be a
+ * single linear scan rather than a full {@link parseRef}.
+ *
+ * Introduced for rename (gpt-fjo7): renaming a schema must rewrite only the
+ * schema segment of a field-naming NL @ref (`@schema.field`), leaving the
+ * field part untouched. Pass the RAW (backtick-preserving) ref text, as with
+ * {@link classifyRef} — flattening first would make a literal name with an
+ * embedded "." indistinguishable from a path.
+ */
+export function splitRefSchemaKey(raw: string): RefSchemaKeySplit | null {
+  let inBacktick = false;
+  for (let i = 0; i < raw.length; i++) {
+    if (raw[i] === "`") {
+      inBacktick = !inBacktick;
+      continue;
+    }
+    if (raw[i] === "." && !inBacktick) {
+      // Flatten backticks the same way extractAtRefs does, so the returned
+      // key matches how the schema is keyed everywhere else in the index.
+      const schemaKey = raw.slice(0, i).replace(/`([^`]+)`/g, "$1");
+      return { schemaKey, rawLength: i };
+    }
+  }
+  return null;
+}
+
 // ── Resolution ────────────────────────────────────────────────────────────────
 
 interface MappingContext {
