@@ -125,13 +125,26 @@ Examples:
               const mapping = index.mappings.get(qMapping);
               if (!mapping) continue;
 
-              // Verify the arrow's source or target field path exists in the queried schema's
-              // field tree. Strip any schema prefix before the lookup.
+              // Verify the arrow's source or target field path belongs to the queried
+              // field. Strip any schema prefix before the comparison.
+              //
+              // A bare (undotted) query is deliberately ambiguous — sl-xj4p's
+              // criterion 2 blesses "does this path exist anywhere in the schema's
+              // field tree" so a leaf name shared by several nested fields still
+              // surfaces every match. A fully qualified nested-path query is NOT
+              // ambiguous, though: the candidate must be the exact path asked for,
+              // not merely some other field that happens to exist in the same
+              // schema. Without this, querying `staged.lines.field_0` would accept
+              // any arrow touching the unrelated top-level `staged.field_0` purely
+              // because a field named `field_0` exists somewhere in `staged` — the
+              // other half of gpt-qhfo (the sibling defect is `arrowPathMatches`'s
+              // over-permissive suffix check below).
               const pathExistsInSchema = (rawPath: string): boolean => {
                 const bare = rawPath.replace(/^\./, "");
                 const path = bare.startsWith(schemaKey + ".")
                   ? bare.slice(schemaKey.length + 1)
                   : bare;
+                if (fieldName.includes(".")) return path === fieldName;
                 return (
                   findFieldByPath(allFields, path) !== null ||
                   collectFieldNames(allFields).includes(path)
@@ -368,23 +381,24 @@ Examples:
 
 /**
  * Check if an arrow's source/target path matches the user's requested nested path.
+ *
  * For example, if the arrow source is "CdtTrfTxInf.DbtrAgt.BIC" and the user
- * requested "CdtTrfTxInf.DbtrAgt.BIC", this returns true.
- * Also matches if the arrow path ends with the requested path (suffix match).
+ * requested "CdtTrfTxInf.DbtrAgt.BIC", this returns true. It also returns true
+ * when the arrow's own path carries a schema prefix the caller has already
+ * resolved away (e.g. arrow path "staged.lines.field_0" against a request of
+ * "lines.field_0") — that is a longer, more-qualified spelling of the same path.
+ *
+ * The reverse is deliberately NOT accepted: a *shorter* arrow path must never
+ * match a *longer* requested path (e.g. arrow path "field_0" against a request
+ * of "lines.field_0"). That direction used to be allowed and let a fully
+ * qualified nested-path query return an unrelated, shallower field's arrow —
+ * gpt-qhfo. A shorter arrow path names a different, less-specific field, not
+ * a looser spelling of the one the user asked for.
  */
 function arrowPathMatches(arrowPath: string | null, requestedPath: string): boolean {
   if (!arrowPath) return false;
   if (arrowPath === requestedPath) return true;
-  // Suffix match: arrow path ends with the requested path
-  if (arrowPath.endsWith(`.${requestedPath}`)) return true;
-  // The requested path ends with the arrow path (arrow has shorter dotted path)
-  if (requestedPath.endsWith(`.${arrowPath}`)) return true;
-  // Exact match on leaf only when the full path also has matching intermediate segments
-  if (requestedPath.endsWith(arrowPath) && arrowPath === requestedPath.split(".").pop()) {
-    // Leaf-only match — only accept if no deeper path was specified
-    return false;
-  }
-  return false;
+  return arrowPath.endsWith(`.${requestedPath}`);
 }
 
 /**
