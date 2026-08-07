@@ -38,8 +38,6 @@ Renaming a schema rewrites the schema segment of every NL @ref that names one of
 
 ## Notes
 
-**2026-08-07T10:20:41Z**
-
 **2026-08-07T10:20:32Z**
 
 Cause: The workspace index filed a field-naming NL @ref (`@s0.field_1`) only under the full name it names ("s0.field_1", context "nl") — never under the schema key alone ("s0") — so `findReferences`/rename queried by the schema's key never saw it, and a schema rename left the @ref pointing at a name that no longer existed.

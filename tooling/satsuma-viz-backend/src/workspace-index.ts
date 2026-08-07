@@ -991,6 +991,9 @@ function enclosingNamespace(node: SyntaxNode): string | null {
   return null;
 }
 
+/** Length in characters of the `@` sigil that precedes every raw ref. */
+const AT_REF_SIGIL_LENGTH = 1;
+
 /**
  * Index every @ref inside NL prose under `node` as an "nl" reference.
  *
@@ -999,10 +1002,82 @@ function enclosingNamespace(node: SyntaxNode): string | null {
  * blocks at any level, and metadata value strings — all of which rename and
  * find-references must reach, or renames leave stale prose behind.
  *
- * Refs come in two CST shapes: regex matches inside quoted NL strings, and
- * structural at_ref nodes that the grammar parses out of bare (unquoted)
- * pipe text — `a -> b { derived from @b }` has no nl_string at all, so a
- * string-only walk missed it entirely (bptar-l6n8).
+ * Refs come in two CST shapes, handled by the two branches below: regex
+ * matches inside quoted NL strings, and structural at_ref nodes that the
+ * grammar parses out of bare (unquoted) pipe text — `a -> b { derived from
+ * @b }` has no nl_string at all, so a string-only walk missed it entirely
+ * (bptar-l6n8). Both branches delegate the actual entry-filing to
+ * {@link addNlRefEntries}, which is what decides how many keys a ref is
+ * filed under.
+ */
+function indexNlRefs(index: WorkspaceIndex, uri: string, node: SyntaxNode): void {
+  walkDescendants(node, (n) => {
+    if (n.type === "at_ref") {
+      indexAtRefNode(index, uri, n);
+      return;
+    }
+    if (n.type === "nl_string" || n.type === "multiline_string") {
+      indexNlStringRefs(index, uri, n);
+    }
+  });
+}
+
+/**
+ * File the reference entries for a structural at_ref node — the shape the
+ * grammar parses out of bare (unquoted) pipe text, e.g. `derived from @b`.
+ * An at_ref never spans lines, so its own text can stand in directly for the
+ * "text plus offset" that {@link addNlRefEntries} otherwise recovers from an
+ * nl_string via {@link offsetToRange}.
+ */
+function indexAtRefNode(index: WorkspaceIndex, uri: string, atRef: SyntaxNode): void {
+  // Strip the leading @, keeping backticks for splitRefSchemaKey inside
+  // addNlRefEntries; it flattens them itself for the full-name entry.
+  const rawRef = atRef.text.slice(1);
+  addNlRefEntries(
+    index,
+    uri,
+    rawRef,
+    enclosingNamespace(atRef),
+    atRef.text,
+    AT_REF_SIGIL_LENGTH,
+    atRef.startPosition.row,
+    atRef.startPosition.column,
+  );
+}
+
+/**
+ * File the reference entries for every @ref found by regex inside a quoted
+ * NL string (`nl_string`/`multiline_string`). Unlike an at_ref node, this
+ * text can span multiple lines, so each match's document position is
+ * recovered via {@link offsetToRange} rather than simple column arithmetic.
+ */
+function indexNlStringRefs(index: WorkspaceIndex, uri: string, nlString: SyntaxNode): void {
+  const text = nlString.text;
+  const startRow = nlString.startPosition.row;
+  const startCol = nlString.startPosition.column;
+  const namespace = enclosingNamespace(nlString);
+
+  NL_AT_REF_RE.lastIndex = 0;
+  let match: RegExpExecArray | null;
+  while ((match = NL_AT_REF_RE.exec(text)) !== null) {
+    // Strip leading @ and backtick delimiters
+    const rawRef = match[0].slice(1);
+    addNlRefEntries(
+      index,
+      uri,
+      rawRef,
+      namespace,
+      text,
+      match.index + AT_REF_SIGIL_LENGTH,
+      startRow,
+      startCol,
+    );
+  }
+}
+
+/**
+ * File the one or two "nl"-context reference entries a single @ref produces,
+ * shared by both CST shapes {@link indexNlRefs} walks.
  *
  * A field-naming ref (`@schema.field`, `@ns::schema.field`) is filed under
  * TWO keys: the full name (`s0.field_1`), which is what field-level queries
@@ -1013,113 +1088,40 @@ function enclosingNamespace(node: SyntaxNode): string | null {
  * schema, so a schema rename left every such @ref pointing at a name that no
  * longer existed (gpt-fjo7). A ref with no field part (`@s0`, `@ns::s0`) needs
  * no second entry — its one key already IS the schema key.
+ *
+ * `text`/`offset`/`nodeStartRow`/`nodeStartCol` locate `rawRef` (the ref with
+ * its leading @ already stripped) within the source, in the terms
+ * {@link offsetToRange} expects. The @ sigil itself must stay outside every
+ * stored range — rename replaces a range verbatim, and including the sigil
+ * turned "@customers" into "clients", breaking the ref (sl-xf3f) — so callers
+ * pass an `offset` that already points past it.
  */
-function indexNlRefs(index: WorkspaceIndex, uri: string, node: SyntaxNode): void {
-  walkDescendants(node, (n) => {
-    if (n.type === "at_ref") {
-      // Strip the leading @, keeping backticks for splitRefSchemaKey below;
-      // flatten only for the full-name entry, mirroring the regex path.
-      const rawRef = n.text.slice(1);
-      const refName = rawRef.replace(/`([^`]+)`/g, "$1");
-      const namespace = enclosingNamespace(n);
-
-      // As below, the @ sigil stays outside the stored range (sl-xf3f).
-      // An at_ref never spans lines, so a simple column bump is safe.
-      addReference(index, refName, {
-        uri,
-        range: Range.create(
-          n.startPosition.row,
-          n.startPosition.column + 1,
-          n.endPosition.row,
-          n.endPosition.column,
-        ),
-        name: refName,
-        context: "nl",
-        namespace,
-      });
-
-      addNlRefSchemaKeyEntry(
-        index,
-        uri,
-        rawRef,
-        namespace,
-        n.startPosition.row,
-        n.startPosition.column + 1,
-      );
-      return;
-    }
-
-    if (n.type !== "nl_string" && n.type !== "multiline_string") return;
-
-    const text = n.text;
-    const startRow = n.startPosition.row;
-    const startCol = n.startPosition.column;
-    const namespace = enclosingNamespace(n);
-
-    // Index @refs
-    NL_AT_REF_RE.lastIndex = 0;
-    let match: RegExpExecArray | null;
-    while ((match = NL_AT_REF_RE.exec(text)) !== null) {
-      // Strip leading @ and backtick delimiters
-      const rawRef = match[0].slice(1);
-      const refName = rawRef.replace(/`([^`]+)`/g, "$1");
-
-      // The @ sigil is not part of the keyed name, so it must stay outside
-      // the stored range — rename replaces the range verbatim, and including
-      // the sigil turned "@customers" into "clients", breaking the ref
-      // (sl-xf3f). Skip one character past the @.
-      const range = offsetToRange(text, match.index + 1, match[0].length - 1, startRow, startCol);
-      addReference(index, refName, {
-        uri,
-        range,
-        name: refName,
-        context: "nl",
-        namespace,
-      });
-
-      // The schema-key entry's range starts at the same offset (right after
-      // the @) but covers only the schema segment — see offsetToRange's
-      // `length` parameter below.
-      const schemaSplit = splitRefSchemaKey(rawRef);
-      if (schemaSplit) {
-        const schemaRange = offsetToRange(
-          text,
-          match.index + 1,
-          schemaSplit.rawLength,
-          startRow,
-          startCol,
-        );
-        addReference(index, schemaSplit.schemaKey, {
-          uri,
-          range: schemaRange,
-          name: schemaSplit.schemaKey,
-          context: "nl",
-          namespace,
-        });
-      }
-    }
-  });
-}
-
-/**
- * The at_ref counterpart of the schema-key entry added for the regex path
- * above — split out because an at_ref's range comes from raw row/column
- * arithmetic (it never spans lines) rather than {@link offsetToRange}, but the
- * entry it produces must be identical in shape.
- */
-function addNlRefSchemaKeyEntry(
+function addNlRefEntries(
   index: WorkspaceIndex,
   uri: string,
   rawRef: string,
   namespace: string | null,
-  startRow: number,
-  startCol: number,
+  text: string,
+  offset: number,
+  nodeStartRow: number,
+  nodeStartCol: number,
 ): void {
+  const refName = rawRef.replace(/`([^`]+)`/g, "$1");
+  addReference(index, refName, {
+    uri,
+    range: offsetToRange(text, offset, rawRef.length, nodeStartRow, nodeStartCol),
+    name: refName,
+    context: "nl",
+    namespace,
+  });
+
   const schemaSplit = splitRefSchemaKey(rawRef);
   if (!schemaSplit) return;
   addReference(index, schemaSplit.schemaKey, {
     uri,
-    range: Range.create(startRow, startCol, startRow, startCol + schemaSplit.rawLength),
+    // Same start as the full-name entry above, narrowed to just the schema
+    // segment via schemaSplit.rawLength.
+    range: offsetToRange(text, offset, schemaSplit.rawLength, nodeStartRow, nodeStartCol),
     name: schemaSplit.schemaKey,
     context: "nl",
     namespace,
