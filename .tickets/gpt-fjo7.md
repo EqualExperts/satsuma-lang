@@ -1,6 +1,6 @@
 ---
 id: gpt-fjo7
-status: in_progress
+status: closed
 deps: []
 links: []
 created: 2026-08-06T18:45:19Z
