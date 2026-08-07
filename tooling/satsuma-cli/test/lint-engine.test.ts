@@ -893,4 +893,70 @@ describe("lint: unenumerated-record-target", () => {
     assert.equal(diags.length, 1);
     assert.match(diags[0].message, /targets a record/);
   });
+
+  it("recommends one arrow per target leaf for a multi-source arrow, not enumeration or a record source", () => {
+    // sl-3fou: a multi-source arrow can take neither single-source remedy —
+    // spec §4.4 makes its body a transform pipeline, not a nesting scope, so
+    // an arrow written inside it (the "enumerate them" fix) is a parse error,
+    // and when both sources are scalar lists there is no record among them to
+    // map from either. Only "one arrow per target leaf" is something the
+    // author can actually write, so the message must say that and only that.
+    const index = makeIndex({
+      schemas: [
+        { name: "src", fields: [{ name: "species_codes" }, { name: "counts" }] },
+        {
+          name: "tgt",
+          fields: [{ name: "observations", children: [{ name: "species" }, { name: "birds" }] }],
+        },
+      ],
+      mappings: [{ name: "load", sources: ["src"], targets: ["tgt"] }],
+      arrows: [{ mapping: "load", sources: ["species_codes", "counts"], target: "observations" }],
+    });
+    const diags = run(index);
+    assert.equal(diags.length, 1);
+    assert.match(diags[0].message, /one arrow per target leaf/);
+    assert.doesNotMatch(diags[0].message, /Enumerate them/);
+    assert.doesNotMatch(diags[0].message, /map from a record/);
+  });
+});
+
+// ── unenumerated-record-target: recommended remedy must actually parse ──────
+
+describe("lint: unenumerated-record-target multi-source remedy parses", () => {
+  /**
+   * The bug this ticket fixes was a message recommending constructs that do
+   * not parse. Asserting the diagnostic's wording is not enough by itself —
+   * this proves the *suggested fix* ("one arrow per target leaf") is real
+   * Satsuma the parser accepts, using the exact shape from docs/nested-data
+   * §5 ("Scalar lists — address the target leaves directly").
+   */
+  it("parses one arrow per target leaf, the remedy the multi-source message now recommends", async () => {
+    const { parseSource } = await import("#src/parser.js");
+    const source = `schema tablet_v1_export (format json) {
+  transect_ref   STRING(8)       (pk)
+  species_codes  list_of STRING
+  counts         list_of INT
+}
+
+schema portal_transect (format json) {
+  ref  STRING(8)
+
+  observations list_of record {
+    species  STRING
+    birds    INT
+  }
+}
+
+mapping \`v1 transect observations\` {
+  source { tablet_v1_export }
+  target { portal_transect }
+
+  transect_ref -> ref
+  species_codes -> observations.species
+  counts -> observations.birds
+}
+`;
+    const { errorCount } = parseSource(source);
+    assert.equal(errorCount, 0);
+  });
 });

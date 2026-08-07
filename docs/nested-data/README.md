@@ -451,14 +451,19 @@ It parses, but it costs you the coverage and earns a lint warning:
 warning [unenumerated-record-target] Arrow 'species_codes, counts -> observations'
 targets a record, but no source is a record and the body lists no child arrows —
 so which fields of 'observations' it populates is unstated, and coverage counts
-them as gaps. Enumerate them (observations { ... }) or map from a record.
+them as gaps. A multi-source arrow's body is a transform pipeline, not a nesting
+scope (§4.4), so it cannot enumerate children, and none of species_codes, counts
+is a record either — write one arrow per target leaf instead (e.g.
+'species_codes -> observations.<leaf>').
 ```
 
 Which field receives the species and which receives the count is genuinely
-unstated, so coverage is right to withhold it. Use one of the two forms above
-instead. (You cannot fix this arrow by enumerating children: a multi-source
-arrow's body is a transform pipeline, not a nesting scope, so an arrow written
-inside it is a parse error.)
+unstated, so coverage is right to withhold it. The warning names the only
+remedy that actually applies here — one arrow per target leaf, the form shown
+above. (The other two remedies `lint` offers for a single-source arrow do not
+apply to a multi-source one: enumerating children is a parse error, because a
+multi-source arrow's body is a transform pipeline, not a nesting scope, and
+there is no record among the sources to map from either.)
 
 ---
 

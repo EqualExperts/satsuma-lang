@@ -547,8 +547,18 @@ function checkDuplicateDefinition(index: ExtractedWorkspace): LintDiagnostic[] {
  * Coverage reports the number; `lint` says what to change — the split
  * SATSUMA-CLI.md already draws when it puts policy judgements about gaps here.
  *
- * Not fixable: closing it means either enumerating the children or changing the
- * source, and only the author knows which was intended.
+ * **The remedy branches on arrow kind (sl-3fou).** A single-source arrow can
+ * still be enumerated or replaced by a record source, so that wording holds.
+ * A multi-source arrow (`a, b -> tgt`) cannot take either remedy: spec §4.4
+ * makes its body a transform pipeline, not a nesting scope, so an arrow
+ * written inside it is a parse error — and if every source is a scalar list
+ * there is no record to map from either. The only shape that actually parses
+ * and restores coverage is one arrow per target leaf, so that is what the
+ * message for a multi-source arrow recommends instead.
+ *
+ * Not fixable: closing it means either enumerating the children, changing the
+ * source, or splitting the arrow, and only the author knows which was
+ * intended.
  */
 function checkUnenumeratedRecordTarget(index: ExtractedWorkspace): LintDiagnostic[] {
   const diagnostics: LintDiagnostic[] = [];
@@ -569,7 +579,20 @@ function checkUnenumeratedRecordTarget(index: ExtractedWorkspace): LintDiagnosti
     if (arrow.sources.some((s) => endpointKind(s, mapping.sources, index) === "container"))
       continue;
 
+    const isMultiSource = arrow.sources.length > 1;
     const sources = arrow.sources.join(", ");
+
+    // The remedy clause is the part that must branch (sl-3fou): a multi-source
+    // arrow's body is a transform pipeline (spec §4.4), not a nesting scope, so
+    // neither of the single-source remedies (enumerate the body, or supply a
+    // record source) is something the author can actually write. The one shape
+    // that parses and restores coverage is one arrow per target leaf.
+    const remedy = isMultiSource
+      ? `A multi-source arrow's body is a transform pipeline, not a nesting scope (§4.4), so it cannot enumerate children, ` +
+        `and none of ${sources} is a record either — write one arrow per target leaf instead ` +
+        `(e.g. '${arrow.sources[0]} -> ${arrow.target}.<leaf>').`
+      : `Enumerate them (${arrow.target} { ... }) or map from a record.`;
+
     diagnostics.push({
       file: arrow.file,
       line: arrow.line + 1,
@@ -577,9 +600,9 @@ function checkUnenumeratedRecordTarget(index: ExtractedWorkspace): LintDiagnosti
       severity: "warning",
       rule: "unenumerated-record-target",
       message:
-        `Arrow '${sources} -> ${arrow.target}' targets a record, but ${arrow.sources.length > 1 ? "no source is" : "its source is not"} ` +
+        `Arrow '${sources} -> ${arrow.target}' targets a record, but ${isMultiSource ? "no source is" : "its source is not"} ` +
         `a record and the body lists no child arrows — so which fields of '${arrow.target}' it populates is unstated, ` +
-        `and coverage counts them as gaps. Enumerate them (${arrow.target} { ... }) or map from a record.`,
+        `and coverage counts them as gaps. ${remedy}`,
       fixable: false,
     });
   }
