@@ -39,18 +39,18 @@
       {
         "name": "db-to-db",
         "fileCount": 1,
-        "lineCount": 212,
+        "lineCount": 222,
         "arms": {
-          "S": 1742,
-          "Sauthored": 1877,
+          "S": 1811,
+          "Sauthored": 1946,
           "Y": 1845,
           "J": 2560
         },
         "ratios": {
-          "vsYaml": 5.6,
-          "vsJson": 32,
-          "authoredVsYaml": -1.7,
-          "savingVsYaml": 103
+          "vsYaml": 1.8,
+          "vsJson": 29.3,
+          "authoredVsYaml": -5.5,
+          "savingVsYaml": 34
         }
       },
       {
@@ -399,18 +399,18 @@
     {
       "name": "db-to-db",
       "fileCount": 1,
-      "lineCount": 212,
+      "lineCount": 222,
       "arms": {
-        "S": 6348,
-        "Sauthored": 6918,
+        "S": 6612,
+        "Sauthored": 7182,
         "Y": 6474,
         "J": 10050
       },
       "ratios": {
-        "vsYaml": 1.9,
-        "vsJson": 36.8,
-        "authoredVsYaml": -6.9,
-        "savingVsYaml": 126
+        "vsYaml": -2.1,
+        "vsJson": 34.2,
+        "authoredVsYaml": -10.9,
+        "savingVsYaml": -138
       }
     },
     {
