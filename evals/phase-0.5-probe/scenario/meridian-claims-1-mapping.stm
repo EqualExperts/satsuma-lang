@@ -1,6 +1,6 @@
 // Satsuma v2 — Meridian Mutual, 1-mapping variant (Phase 0.5 probe crossover cell)
 //
-// The cell designed to make S+ lose (PRD line 828). One mapping, one minimal
+// The cell designed to make S+ lose (PRD §Phase 0.5, “Include a cell designed to lose”). One mapping, one minimal
 // claim. The 6813-token agent reference plus per-call CLI round-trips are
 // unamortised, so this should cost S+ more than reading the one small
 // spreadsheet or markdown table. Confirming the crossover exists is the single

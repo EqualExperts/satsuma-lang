@@ -33,12 +33,12 @@ HEADER_FONT = Font(bold=True, color="FFFFFF", size=11)
 HEADER_ALIGN = Alignment(horizontal="center", wrap_text=True)
 
 
-def style_header_row(ws, row, ncols):
+def style_header_row(ws, row, ncols, fill_color="1F4E79", font_color="FFFFFF"):
     for col in range(1, ncols + 1):
         cell = ws.cell(row=row, column=col)
-        cell.font = HEADER_FONT
-        cell.fill = HEADER_FILL
-        cell.alignment = HEADER_ALIGN
+        cell.font = Font(bold=True, color=font_color, size=11)
+        cell.fill = PatternFill("solid", fgColor=fill_color)
+        cell.alignment = Alignment(horizontal="center", wrap_text=True)
 
 
 def auto_width(ws):
@@ -76,7 +76,7 @@ def claim_normalisation_rows():
         ("claim_header.vehicles", "list_of record", "vehicle_count", "INT", "count", "N", ""),
         ("claim_header.parties", "list_of record", "party_count", "INT", "count", "N", ""),
         ("claim_header.vehicles.damage_extent", "VARCHAR(15)", "max_damage", "VARCHAR(15)",
-         "Pick the worst damage across all vehicles on the claim", "N", ""),
+         "Pick the worst damage across all vehicles on the claim", "N", "enum: none,minor,moderate,severe,total,scratch"),
         ("claim_header.vehicles.photos", "list_of record", "photos", "list_of record", "flatten", "N", ""),
         ("vehicles.photos.photo_id", "VARCHAR(36)", "photos.photo_ref", "VARCHAR(36)", "trim", "Y", "inside flatten"),
         ("vehicles.photos.angle", "VARCHAR(10)", "photos.view", "VARCHAR(10)", "lowercase", "N", "inside flatten"),
@@ -103,7 +103,7 @@ def vehicle_extract_rows():
         ("vehicles[].make", "VARCHAR(40)", "rows[].description", "VARCHAR(100)",
          "vehicles.make || ' ' || vehicles.model || ' ' || vehicles.year", "N", ""),
         ("vehicles[].damage_extent", "VARCHAR(15)", "rows[].damage_class", "VARCHAR(15)",
-         "Map: none->N, minor->M, moderate->M, severe->S, total->T", "N", ""),
+         "Map: none->N, minor->M, moderate->M, severe->S, total->T (scratch unhandled)", "N", ""),
         ("vehicles[].estimate", "DECIMAL(12,2)", "rows[].estimate_usd", "DECIMAL(12,2)", "round 2", "N", ""),
     ]
 
@@ -119,7 +119,6 @@ def status_snapshot_rows():
 
 def payment_extract_rows():
     return [
-        ("(generated)", "VARCHAR(36)", "payment_id", "VARCHAR(36)", "Generate UUID", "Y", "PK"),
         ("claim_fact.claim_key", "VARCHAR(20)", "claim_key", "VARCHAR(20)", "Direct copy", "Y", "ref claim_fact.claim_key"),
         ("claim_fact.loss_usd", "DECIMAL(14,2)", "paid_amount", "DECIMAL(14,2)", "round 2", "N", ""),
         ("claim_fact.reported_date", "TIMESTAMP_NTZ", "paid_at", "TIMESTAMP_NTZ", "to_utc", "N", ""),
@@ -129,10 +128,9 @@ def payment_extract_rows():
 def fraud_assessment_rows():
     return [
         ("claim_fact.claim_key", "VARCHAR(20)", "claim_key", "VARCHAR(20)", "Direct copy", "Y", "PK, ref claim_fact.claim_key"),
-        ("claim_fact.party_count", "INT", "risk_score", "INT",
-         "Score from 0-100 based on claim_fact.party_count and party_dim role distribution", "N", ""),
-        ("(computed — no source)", "", "is_flagged", "BOOLEAN",
-         "True if risk_score > 70, false otherwise.", "N", ""),
+        ("claim_fact.party_count", "INT", "risk_score", "INT", "multiply 10", "N", ""),
+        ("claim_fact.party_count", "INT", "is_flagged", "BOOLEAN",
+         "True if party_count > 7, false otherwise.", "N", ""),
     ]
 
 
@@ -144,6 +142,121 @@ MAPPINGS = [
     ("payment_extract", payment_extract_rows()),
     ("fraud_assessment", fraud_assessment_rows()),
 ]
+
+
+# ── Schema declarations (so the Excel arms carry what .stm and .md carry) ──
+# The PRD's totality control exists to stop one arm saying less than another.
+# The first version of this generator shipped no schema tabs at all, so the
+# Excel arms could not see types, enums, pk/required/pii metadata, or unmapped
+# fields — confounding the primary statistic and T5 quality. These tabs are
+# the fix. Each schema is one row per field, with the enum stated verbatim.
+
+SCHEMA_COLUMNS = ["Field", "Type", "Required", "Notes"]
+
+
+def _schema_rows():
+    return {
+        "claim_header (source)": [
+            ("claim_id", "VARCHAR(20)", "Y", "PK"),
+            ("policy_no", "VARCHAR(30)", "Y", ""),
+            ("claim_type", "VARCHAR(15)", "Y", "enum: auto, home, life, health"),
+            ("reported_at", "TIMESTAMPTZ", "Y", ""),
+            ("incident_at", "TIMESTAMPTZ", "N", ""),
+            ("loss_amount", "DECIMAL(14,2)", "N", ""),
+            ("currency", "CHAR(3)", "N", "default USD"),
+            ("adjuster_id", "VARCHAR(20)", "N", ""),
+            ("status", "VARCHAR(20)", "Y", ""),
+            ("vehicles", "list_of record", "N", "nested"),
+            ("vehicles[].vin", "VARCHAR(17)", "Y", ""),
+            ("vehicles[].make", "VARCHAR(40)", "N", ""),
+            ("vehicles[].model", "VARCHAR(40)", "N", ""),
+            ("vehicles[].year", "INT", "N", ""),
+            ("vehicles[].damage_extent", "VARCHAR(15)", "N",
+             "enum: none, minor, moderate, severe, total, scratch"),
+            ("vehicles[].estimate", "DECIMAL(12,2)", "N", ""),
+            ("vehicles[].photos", "list_of record", "N", "nested"),
+            ("vehicles[].photos[].photo_id", "VARCHAR(36)", "Y", ""),
+            ("vehicles[].photos[].angle", "VARCHAR(10)", "N",
+             "enum: front, rear, left, right, interior"),
+            ("parties", "list_of record", "N", "nested"),
+            ("parties[].party_role", "VARCHAR(20)", "Y", ""),
+            ("parties[].name", "VARCHAR(120)", "N", ""),
+            ("parties[].contact_phone", "VARCHAR(20)", "N", "PII"),
+        ],
+        "policy_dim (lookup)": [
+            ("policy_no", "VARCHAR(30)", "Y", "PK"),
+            ("product_code", "VARCHAR(10)", "Y", ""),
+            ("policyholder_id", "VARCHAR(20)", "Y", ""),
+            ("effective_date", "DATE", "N", ""),
+            ("expiry_date", "DATE", "N", ""),
+            ("territory", "VARCHAR(10)", "N", ""),
+        ],
+        "fx_rates (lookup)": [
+            ("currency", "CHAR(3)", "Y", "PK"),
+            ("rate_to_usd", "DECIMAL(10,6)", "Y", ""),
+        ],
+        "claim_fact (target)": [
+            ("claim_key", "VARCHAR(20)", "N", "PK"),
+            ("policy_ref", "VARCHAR(30)", "N", "indexed"),
+            ("claim_type_code", "VARCHAR(2)", "N", ""),
+            ("reported_date", "TIMESTAMP_NTZ", "N", ""),
+            ("loss_usd", "DECIMAL(14,2)", "Y", ""),
+            ("loss_source", "VARCHAR(10)", "N", ""),
+            ("vehicle_count", "INT", "N", ""),
+            ("party_count", "INT", "N", ""),
+            ("max_damage", "VARCHAR(15)", "N", ""),
+            ("photos", "list_of record", "N", "nested"),
+            ("photos[].photo_ref", "VARCHAR(36)", "Y", ""),
+            ("photos[].view", "VARCHAR(10)", "N", ""),
+            ("adjuster_ref", "VARCHAR(20)", "N", ""),
+            ("is_open", "BOOLEAN", "N", ""),
+        ],
+        "party_dim (target)": [
+            ("claim_key", "VARCHAR(20)", "Y", ""),
+            ("rows", "list_of record", "N", "nested"),
+            ("rows[].role", "VARCHAR(20)", "Y", ""),
+            ("rows[].display_name", "VARCHAR(120)", "N", ""),
+            ("rows[].phone_e164", "VARCHAR(20)", "N", ""),
+        ],
+        "vehicle_dim (target)": [
+            ("claim_key", "VARCHAR(20)", "Y", ""),
+            ("rows", "list_of record", "N", "nested"),
+            ("rows[].vin", "VARCHAR(17)", "Y", ""),
+            ("rows[].description", "VARCHAR(100)", "N", ""),
+            ("rows[].damage_class", "VARCHAR(15)", "N", ""),
+            ("rows[].estimate_usd", "DECIMAL(12,2)", "N", ""),
+        ],
+        "claim_status_snapshot (target)": [
+            ("claim_key", "VARCHAR(20)", "N", "PK, ref claim_fact.claim_key"),
+            ("open_flag", "BOOLEAN", "N", ""),
+            ("total_exposure", "DECIMAL(14,2)", "N", ""),
+        ],
+        "payment_fact (target)": [
+            ("payment_id", "VARCHAR(36)", "N", "PK"),
+            ("claim_key", "VARCHAR(20)", "N", "ref claim_fact.claim_key"),
+            ("paid_amount", "DECIMAL(14,2)", "N", ""),
+            ("paid_at", "TIMESTAMP_NTZ", "N", ""),
+        ],
+        "fraud_flag (target)": [
+            ("claim_key", "VARCHAR(20)", "N", "PK, ref claim_fact.claim_key"),
+            ("risk_score", "INT", "N", ""),
+            ("is_flagged", "BOOLEAN", "N", ""),
+        ],
+    }
+
+
+def add_schema_tabs(wb):
+    """Add one tab per schema, before the mapping tabs, to either workbook."""
+    schemas = _schema_rows()
+    # Insert after the cover/README tab (index 1) so schemas precede mappings.
+    insert_at = 1 if wb.sheetnames and wb.sheetnames[0] == "README" else 0
+    for offset, (name, rows) in enumerate(schemas.items()):
+        ws = wb.create_sheet(name, index=insert_at + offset)
+        ws.append(SCHEMA_COLUMNS)
+        style_header_row(ws, 1, len(SCHEMA_COLUMNS))
+        for r in rows:
+            ws.append(r)
+        auto_width(ws)
 
 
 # ── X-P0: tidy ─────────────────────────────────────────────────────────────
@@ -166,6 +279,8 @@ def build_p0():
             ws.append(r)
         auto_width(ws)
 
+    add_schema_tabs(wb)
+
     path = os.path.join(SCRIPT_DIR, "meridian-claims-P0.xlsx")
     wb.save(path)
     print(f"Created: {path}")
@@ -184,8 +299,18 @@ P2_AMBIGUITY_FILL = PatternFill("solid", fgColor="D9E1F2")  # blue = ambiguous t
 
 def build_p2():
     wb = openpyxl.Workbook()
+    # Claim the default empty Sheet so P2 ships no stray blank tab, and use it
+    # as the cover/README (P0 has one; P2 must too, or the arms are not paired).
+    cover = wb.active
+    cover.title = "README"
+    cover["A1"] = "Meridian Mutual — Claims Mapping (P2 working draft)"
+    cover["A1"].font = Font(bold=True, size=14)
+    cover["A3"] = "Tabs: schemas first, then mappings. Colour coding is intentional; no legend is provided."
+    cover.column_dimensions["A"].width = 90
 
-    # Tab 1: a multi-row title block — headers are NOT on row 1.
+    add_schema_tabs(wb)
+
+    # Tab: a multi-row title block — headers are NOT on row 1.
     ws = wb.create_sheet("claim_normalisation")
     ws["A1"] = "Meridian Mutual"
     ws["A1"].font = Font(bold=True, size=16)
@@ -236,14 +361,24 @@ def build_p2():
         style_header_row(ws2, 1, len(MAPPING_COLUMNS))
         for r in rows:
             ws2.append(r)
-        # PII rows across all tabs.
+        # P2 fill semantics, keyed on the full target path so rows[]-prefixed
+        # fields match. Only the planted ambiguities and PII are coloured —
+        # marking unambiguous fields (e.g. estimate_usd) would leak a wrong
+        # answer on T5.
+        P2_ROUND_TARGETS = {"total_exposure", "paid_amount"}  # A1: underspecified rounding
+        P2_PHONE_TARGET = "rows[].phone_e164"                  # A4: implicit country
+        P2_PII_SOURCE = "parties[].contact_phone"
         for row in ws2.iter_rows(min_row=2, max_row=ws2.max_row):
-            if "PII" in str(row[6].value or "") or "contact_phone" in str(row[0].value or ""):
+            src = str(row[0].value or "")
+            tgt = str(row[2].value or "")
+            notes = str(row[6].value or "")
+            if src == P2_PII_SOURCE or "PII" in notes:
                 for cell in row:
                     cell.fill = P2_PII_FILL
-            # Ambiguity rows (underspecified rounding / no-source computed).
-            tgt = str(row[2].value or "")
-            if tgt in ("total_exposure", "phone_e164") or "round" in str(row[4].value or "").lower():
+            elif tgt == P2_PHONE_TARGET:
+                for cell in row:
+                    cell.fill = P2_AMBIGUITY_FILL
+            elif tgt in P2_ROUND_TARGETS:
                 for cell in row:
                     cell.fill = P2_AMBIGUITY_FILL
         auto_width(ws2)
@@ -262,7 +397,7 @@ def build_p2():
     # A Changelog tab (matches the multi-tab fixture style).
     ws_log = wb.create_sheet("Changelog")
     ws_log.append(["Date", "Author", "Change"])
-    style_header_row(ws_log, 3, 3, fill_color="808080")
+    style_header_row(ws_log, 1, 3, fill_color="808080")
     ws_log.append(("2025-11-02", "R. Varga", "Initial draft"))
     ws_log.append(("2025-11-20", "R. Varga", "Added party_extract and vehicle_extract tabs"))
     ws_log.append(("2025-12-01", "L. Okafor", "Marked loss_usd rounding as needing review (see fill)"))
@@ -271,14 +406,6 @@ def build_p2():
     path = os.path.join(SCRIPT_DIR, "meridian-claims-P2.xlsx")
     wb.save(path)
     print(f"Created: {path}")
-
-
-def style_header_row(ws, row, ncols, fill_color="1F4E79", font_color="FFFFFF"):
-    for col in range(1, ncols + 1):
-        cell = ws.cell(row=row, column=col)
-        cell.font = Font(bold=True, color=font_color, size=11)
-        cell.fill = PatternFill("solid", fgColor=fill_color)
-        cell.alignment = Alignment(horizontal="center", wrap_text=True)
 
 
 if __name__ == "__main__":
