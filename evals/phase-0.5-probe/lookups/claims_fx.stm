@@ -1,0 +1,8 @@
+// Satsuma v2 — FX rates lookup for the Meridian claims probe
+//
+// Probe fixture only. Not part of examples/.
+
+schema fx_rates (note "Daily FX spot rates for multi-currency claims") {
+  currency    CHAR(3)       (pk)
+  rate_to_usd DECIMAL(10,6) (required)
+}

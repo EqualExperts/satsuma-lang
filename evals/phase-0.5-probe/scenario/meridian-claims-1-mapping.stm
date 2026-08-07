@@ -1,0 +1,54 @@
+// Satsuma v2 — Meridian Mutual, 1-mapping variant (Phase 0.5 probe crossover cell)
+//
+// The cell designed to make S+ lose (PRD line 828). One mapping, one minimal
+// claim. The 6813-token agent reference plus per-call CLI round-trips are
+// unamortised, so this should cost S+ more than reading the one small
+// spreadsheet or markdown table. Confirming the crossover exists is the single
+// most credible thing the write-up can contain.
+
+import { fx_rates } from "../lookups/claims_fx.stm"
+
+schema claim_header (note "Inbound claim intake") {
+  claim_id     VARCHAR(20)   (pk, required)
+  policy_no    VARCHAR(30)   (required)
+  claim_type   VARCHAR(15)   (required)
+  reported_at  TIMESTAMPTZ   (required)
+  loss_amount  DECIMAL(14,2)
+  currency     CHAR(3)       (default USD)
+  status       VARCHAR(20)   (required)
+}
+
+schema claim_fact (note "Analytics-ready claim fact") {
+  claim_key        VARCHAR(20)   (pk)
+  policy_ref       VARCHAR(30)   (indexed)
+  claim_type_code  VARCHAR(2)
+  reported_date    TIMESTAMP_NTZ
+  loss_usd         DECIMAL(14,2) (required)
+  loss_source      VARCHAR(10)
+  is_open          BOOLEAN
+}
+
+mapping claim_normalisation {
+  source { claim_header, fx_rates }
+  target { claim_fact }
+
+  claim_id -> claim_key
+  policy_no -> policy_ref
+
+  claim_type -> claim_type_code {
+    map { auto: AU, home: HO, life: LI, health: HE }
+  }
+
+  reported_at -> reported_date { to_utc }
+
+  loss_amount -> loss_usd {
+    "Convert to USD using @fx_rates lookup on @claim_header.currency, then round"
+    | round 2
+  }
+
+  loss_amount -> loss_source { coalesce 0 }
+
+  -> is_open {
+    "True if @claim_header.status is 'open' or 'under_review', false otherwise."
+  }
+}
