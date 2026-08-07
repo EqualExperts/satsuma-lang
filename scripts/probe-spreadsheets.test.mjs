@@ -64,8 +64,11 @@ test("the committed P0 workbook exists and is a real zip (xlsx)", () => {
   const p0 = join(scenarioDir, "meridian-claims-P0.xlsx");
   assert.ok(existsSync(p0), "committed P0 workbook missing");
   const head = readFileSync(p0).subarray(0, 4);
+  // Every xlsx is a zip archive; the local-file-header magic is PK\x03\x04.
   assert.equal(head[0], 0x50);
   assert.equal(head[1], 0x4b);
+  assert.equal(head[2], 0x03);
+  assert.equal(head[3], 0x04);
 });
 
 test("the committed P2 workbook exists and is a real zip (xlsx)", () => {
@@ -74,6 +77,8 @@ test("the committed P2 workbook exists and is a real zip (xlsx)", () => {
   const head = readFileSync(p2).subarray(0, 4);
   assert.equal(head[0], 0x50);
   assert.equal(head[1], 0x4b);
+  assert.equal(head[2], 0x03);
+  assert.equal(head[3], 0x04);
 });
 
 // ── The generator reproduces the committed workbooks in place ──────────────
