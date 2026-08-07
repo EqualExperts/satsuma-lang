@@ -49,9 +49,11 @@ PRD documents.
 - `T4-impact-analysis.md` — the true downstream set for `claim_header.loss_amount`,
   graded by set-F1. Chosen to exercise a transitive hop through an intermediate
   target, so the interesting failure is stopping at the first hop.
-- `T5-ambiguity-detection.md` — the four planted ambiguities (K=4) and the
-  twenty-five unambiguous fields (FPR denominator). Each ambiguity is a genuine
-  underspecification, not a typo.
+- `T5-ambiguity-detection.md` — the four planted ambiguities, occupying six of
+  the spec's thirty-one leaf arrow targets, and the twenty-five unambiguous
+  targets that form the false-positive denominator. Each ambiguity is a genuine
+  underspecification, not a typo. Every metric is graded over **sites**, so
+  recall, precision and FPR all count the same kind of thing.
 
 ## The four planted ambiguities
 
