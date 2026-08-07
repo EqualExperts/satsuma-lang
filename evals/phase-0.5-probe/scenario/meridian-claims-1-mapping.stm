@@ -11,7 +11,7 @@ import { fx_rates } from "../lookups/claims_fx.stm"
 schema claim_header (note "Inbound claim intake") {
   claim_id     VARCHAR(20)   (pk, required)
   policy_no    VARCHAR(30)   (required)
-  claim_type   VARCHAR(15)   (required)
+  claim_type   VARCHAR(15)   (required, enum {auto, home, life, health})
   reported_at  TIMESTAMPTZ   (required)
   loss_amount  DECIMAL(14,2)
   currency     CHAR(3)       (default USD)

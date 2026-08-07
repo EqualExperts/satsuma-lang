@@ -24,7 +24,7 @@ note {
 schema claim_header (note "Inbound claim intake from the claims management system") {
   claim_id      VARCHAR(20)   (pk, required)
   policy_no     VARCHAR(30)   (required)
-  claim_type    VARCHAR(15)   (required)
+  claim_type    VARCHAR(15)   (required, enum {auto, home, life, health})
   reported_at   TIMESTAMPTZ   (required)
   incident_at   TIMESTAMPTZ
   loss_amount   DECIMAL(14,2)
