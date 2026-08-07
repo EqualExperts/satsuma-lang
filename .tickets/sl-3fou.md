@@ -1,6 +1,6 @@
 ---
 id: sl-3fou
-status: open
+status: closed
 deps: []
 links: [sl-lnbt]
 created: 2026-08-02T21:41:28Z
@@ -34,3 +34,10 @@ Reproduced against tooling/satsuma-cli 0.11.0.
 - A test covers the multi-source case and asserts the recommended remedy actually parses.
 - docs/nested-data/README.md §5 quotes whatever wording ships.
 
+
+## Notes
+
+**2026-08-07T11:32:01Z**
+
+Cause: unenumerated-record-target's remedy clause ("Enumerate them (tgt { ... }) or map from a record") was written for single-source arrows only and fired unchanged on multi-source arrows, where neither remedy is writable — spec S4.4 makes a multi-source arrow's body a transform pipeline (an arrow written inside it is a parse error), and scalar-list sources leave no record to map from.
+Fix: branch the remedy on arrow.sources.length in checkUnenumeratedRecordTarget so a multi-source arrow's message recommends one arrow per target leaf instead, added a test proving the multi-source message and a separate parse test confirming the recommended fixture actually parses, and updated docs/nested-data/README.md S5's quoted warning to the new wording (commit immediately after 1bf0e046).
