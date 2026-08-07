@@ -444,17 +444,23 @@ describe("relative arrow paths resolve against their container (3cdd-yavi)", () 
     assert.deepEqual(resolvedPaths(mapping), ["orders.parcels.sku -> orders.packed.sku"]);
   });
 
-  it("leaves a mapping-level arrow untouched, dot and all", () => {
-    // At mapping-body level there is no container to resolve against, so a
-    // stray leading dot must stay as authored rather than be quietly matched to
-    // a top-level field — nothing may rise on a malformed path.
+  it("resolves a mapping-level arrow's leading dot against the schema root", () => {
+    // Reversed by tced-ewd4, which found `satsuma coverage` crashing on the
+    // dot this used to preserve. At mapping-body level there is no container,
+    // but the frame is the schema root, so `.orders` means `orders` — spec
+    // §4.6, and what `arrows`, `graph` and `field-lineage` already did. The
+    // viz reads the same core rule, so a top-level `each parties -> .rows`
+    // now reaches its coverage lookups and hover highlighting too, instead of
+    // being dropped as unmatchable the way 3cdd-yavi dropped nested paths.
     const mapping = mappingWith({ arrows: [arrow(".orders", ".orders")] });
-    assert.deepEqual(resolvedPaths(mapping), [".orders -> .orders"]);
+    assert.deepEqual(resolvedPaths(mapping), ["orders -> orders"]);
 
-    // And it still resolves to no declared field, which is what keeps it out of
-    // every path-matched surface.
+    // resolveSchemaLocalFieldPath is downstream of that qualification and does
+    // not repeat it: handed a still-dotted path it matches no declared field.
+    // Pinned so the precondition stays visible — callers must qualify first.
     const src = schema("s", [field("orders", [field("id")])]);
     assert.equal(mod.resolveSchemaLocalFieldPath(".orders", src, ["s"]), null);
+    assert.equal(mod.resolveSchemaLocalFieldPath("orders", src, ["s"]), "orders");
   });
 });
 

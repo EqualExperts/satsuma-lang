@@ -81,10 +81,14 @@ export interface CoveredFieldPaths {
  * Each path enters `direct` verbatim, and every proper prefix of it enters
  * `ancestors` — so for `"orders.item_id"`, `direct` gains `"orders.item_id"`
  * and `ancestors` gains `"orders"`. Empty paths (from malformed arrows) are
- * ignored rather than registered as `""`. (A dot-leading path like `".line1"`
- * would still register `""` as an ancestor — harmless, since no declared field
- * has an empty path, and unreachable today because extraction qualifies
- * relative paths before coverage sees them.)
+ * ignored rather than registered as `""`.
+ *
+ * **Callers must pass paths that are already dot-stripped.** A dot-leading
+ * `".line1"` splits to an empty first segment, and branding `""` as a
+ * {@link SchemaLocalPath} throws — so it crashes the caller rather than
+ * registering a harmless empty ancestor, which is what this comment claimed
+ * until tced-ewd4. `qualifyChildArrowPath` in extract.ts is what guarantees
+ * the precondition, for every frame including the mapping root.
  *
  * **Qualified paths only — never bare segments (sl-joeq).** An earlier version
  * also registered each segment on its own (`"city"` for `"address.city"`) so a

@@ -951,6 +951,21 @@ mapping load {
     assertMapped(source, "orders.lines.sku", true);
     assertMapped(source, "orders.lines.qty", false);
   });
+
+  it("reads a top-level dotted each target as the undotted one, not as a stray path", () => {
+    // tced-ewd4. `each items -> .lines` at mapping-body level has no enclosing
+    // block, so the dot's frame is the target schema root and it means `lines`.
+    // Coverage used to keep the dot: the path reached properPrefixesOf as
+    // ".lines", whose empty first segment cannot be branded a SchemaLocalPath,
+    // and the whole command died with "Schema-local path must not be empty".
+    // Asserting against the undotted spelling rather than a literal expectation
+    // pins the property that actually matters — the two are one spec (§4.6),
+    // so no future change may make them diverge in either direction.
+    const dotted = SRC.replace("each items -> lines", "each items -> .lines");
+    assert.notEqual(dotted, SRC, "the dotted variant must differ from SRC");
+
+    assert.deepEqual(coverage(dotted, "load"), coverage(SRC, "load"));
+  });
 });
 
 describe("computeMappingCoverage — flatten blocks", () => {

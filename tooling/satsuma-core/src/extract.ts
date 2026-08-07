@@ -981,6 +981,13 @@ export function extractMappingArrowRecords(
 }
 
 /**
+ * The authored leading dot on a relative path. Spec §4.6: "A leading `.`
+ * documents the relativity, but it does not decide it" — the enclosing frame
+ * does. So the marker never survives into a resolved path.
+ */
+const RELATIVITY_MARKER = /^\./;
+
+/**
  * Make one arrow path absolute against the container it was authored inside.
  *
  * Inside a `nested_arrow`, `each` or `flatten` body, paths are authored
@@ -996,16 +1003,26 @@ export function extractMappingArrowRecords(
  * every relative-path arrow from its coverage lookups, hover highlighting and
  * overview edges until 3cdd-yavi.
  *
+ * At mapping-body level there is no container to prefix, but the dot is still
+ * only a marker: the frame it names is the mapping's own root, so `.rows` and
+ * `rows` are one path (tced-ewd4). This function returned the dot-leading form
+ * untouched until then, on the reasoning that a top-level dot is a typo and
+ * should be left matching nothing. It is not what the spec says, and it left
+ * coverage as the only consumer holding that view — `arrows`, `graph` and
+ * `field-lineage` all resolved `each parties -> .rows` to `tgt.rows` already.
+ * Coverage disagreeing with lineage about one arrow's identity is the failure
+ * ADR-035 exists to prevent, so the outlier moved rather than the majority.
+ *
  * @param path        Path as authored, with or without a leading dot.
  * @param containerPath Absolute path of the enclosing container, or null at
- *                    mapping-body level, where a path is already absolute and
- *                    is returned untouched — dot and all, since a stray leading
- *                    dot there matches no declared field and must not be made
- *                    to look as though it does.
+ *                    mapping-body level, where the mapping root is the frame.
+ * @returns The path relative to the schema root, never dot-leading. An empty
+ *          path stays empty rather than becoming a dangling `container.`.
  */
 export function qualifyChildArrowPath(path: string, containerPath: string | null): string {
-  if (!containerPath || !path) return path;
-  return `${containerPath}.${path.replace(/^\./, "")}`;
+  if (!path) return path;
+  const relativeToFrame = path.replace(RELATIVITY_MARKER, "");
+  return containerPath ? `${containerPath}.${relativeToFrame}` : relativeToFrame;
 }
 
 /**
