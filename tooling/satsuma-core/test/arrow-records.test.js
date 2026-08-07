@@ -160,11 +160,14 @@ describe("extractArrowRecords — nested arrow recursion (sl-zl55)", () => {
 // since the parser never hands extraction a container with no path.
 
 describe("qualifyChildArrowPath()", () => {
-  it("returns the path untouched when there is no container, dot and all", () => {
-    // Mapping-body level. A stray leading dot there names no declared field and
-    // must stay unresolvable: stripping it would make a malformed path match a
-    // top-level field and raise coverage on a broken spec.
-    assert.equal(qualifyChildArrowPath(".orders", null), ".orders");
+  it("strips the relativity marker at mapping-body level, where the frame is the schema root", () => {
+    // Reversed by tced-ewd4. This used to assert ".orders" came back untouched,
+    // on the reasoning that a top-level dot is a typo best left matching
+    // nothing. Spec §4.6 says the opposite — "a leading `.` documents the
+    // relativity, but it does not decide it" — and `arrows`, `graph` and
+    // `field-lineage` all resolved it already, leaving coverage the only
+    // consumer that disagreed about the same arrow's identity.
+    assert.equal(qualifyChildArrowPath(".orders", null), "orders");
     assert.equal(qualifyChildArrowPath("orders.id", null), "orders.id");
   });
 

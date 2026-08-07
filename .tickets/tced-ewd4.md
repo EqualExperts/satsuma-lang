@@ -1,8 +1,8 @@
 ---
 id: tced-ewd4
-status: open
+status: closed
 deps: []
-links: [sl-x9m1]
+links: [sl-x9m1, tced-vrul, tced-ninm]
 created: 2026-08-07T11:24:58Z
 type: bug
 priority: 1
@@ -65,7 +65,14 @@ Arm S+ of the Feature 44 eval is defined as language *plus* CLI, and `coverage` 
 
 - `satsuma coverage` completes normally on a mapping containing a top-level `each <list> -> .<target>`, and reports the same coverage as the equivalent undotted `each <list> -> <target>` spelling — the two are semantically identical and must not differ.
 - The schema-local path recorded for such a target has no leading dot, so the schema-local and canonical stages agree on the same arrow.
-- `properPrefixesOf` cannot emit an empty prefix. A malformed path with a leading or doubled dot either normalises or raises an error naming the offending field, never a bare `TypeError`.
-- A core test covers the top-level dotted `each` target directly, alongside the nested form the corpus already exercises. The satsuma-scenario-gen arbitraries should be able to produce the top-level dotted form so the property suites reach it too — if they cannot, say so and raise a follow-up rather than leaving the gap silent.
-- A corpus example or fixture uses the top-level dotted form, so the shape is no longer unrepresented in `examples/`.
+- A core test covers the top-level dotted `each` target directly, alongside the nested form the corpus already exercises.
+- The two pinned tests asserting the old behaviour — in `satsuma-core` and in `satsuma-viz` — are converted from pins of the preserved dot into assertions of the resolved path, each carrying the reason it reversed.
+- The scenario-gen gap that let this escape the property suites is filed rather than left unstated (tced-vrul).
 
+
+## Notes
+
+**2026-08-07T11:35:37Z**
+
+Cause: qualifyChildArrowPath returned a mapping-body-level path untouched, leading dot and all — a deliberate, tested choice on the reasoning that a top-level dot is a typo best left matching nothing. It contradicted spec §4.6 ('a leading `.` documents the relativity, but it does not decide it'), and left coverage the only consumer holding that view: arrows, graph and field-lineage all resolved `each parties -> .rows` to tgt.rows already. The preserved dot then reached properPrefixesOf, whose empty first segment cannot be branded a SchemaLocalPath, so the command died rather than reporting the 'uncovered' the old behaviour intended.
+Fix: strip the relativity marker at every frame including the mapping root, so coverage shares one path identity with lineage (ADR-035). Reversed the two tests that pinned the old behaviour (satsuma-core arrow-records, satsuma-viz field-coverage), corrected the buildCoveredFieldPaths comment that called the empty-ancestor case harmless and unreachable when it was neither, and added a core test asserting the dotted and undotted spellings produce identical coverage. The viz reads the same core rule, so its coverage lookups and hover highlighting pick the shape up too. Scenario-gen cannot generate a dotted block header at all, which is why no property suite caught this — filed as tced-vrul. (commit immediately after 036a518a)
