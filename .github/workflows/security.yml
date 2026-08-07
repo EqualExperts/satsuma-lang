@@ -84,9 +84,10 @@ jobs:
 
       - name: Run Semgrep
         shell: bash
+        env:
+          ALLOWLISTED: ${{ steps.allowlist.outputs.ids }}
         run: |
           EXCLUDE_ARGS=""
-          ALLOWLISTED="${{ steps.allowlist.outputs.ids }}"
           if [ -n "$ALLOWLISTED" ]; then
             IFS=',' read -ra RULES <<< "$ALLOWLISTED"
             for rule in "${RULES[@]}"; do
