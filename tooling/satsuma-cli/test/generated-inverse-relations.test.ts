@@ -72,16 +72,23 @@
  * - `arrows ::raw.field_0` returning `raw.lines.field_0`'s arrow is criterion 2
  *   applied to a query that *also* names a declared top-level path exactly.
  *   Whether an exact path should beat the leaf fallback is undecided, and nothing
- *   here decides it.
- * - `arrows warehouse::staged.lines.field_0 --as-source` returning
+ *   here decides it. Pinned below by {@link describe} "known behaviour" so it
+ *   cannot change unnoticed.
+ * - `arrows warehouse::staged.lines.field_0 --as-source` used to return
  *   `staged.field_0 → revenue_metric.field_0` — a different field's arrow, and the
- *   *only* answer, since the queried field has no outgoing arrow — contradicts
- *   criterion 1 outright. That one is a defect, filed as `gpt-qhfo`.
+ *   *only* answer, since the queried field has no outgoing arrow. That contradicted
+ *   criterion 1 outright and was filed as `gpt-qhfo`. `warehouse::staged.lines.field_0`
+ *   is a fully qualified nested path, not a bare leaf name, so it was never covered
+ *   by criterion 2's "show all matches" — the fix tightens the `altKey` loop's
+ *   `pathExistsInSchema` guard and `arrowPathMatches`'s suffix check (both in
+ *   `arrows.ts`) to require the exact path when one was given, and the case below
+ *   now asserts the corrected empty answer instead of pinning the old wrong one.
  *
- * Both are pinned below by {@link describe} "known behaviour" so neither can
- * change unnoticed, and the exact-set property skips exactly the affected paths
- * via {@link leafAmbiguousPaths} rather than skipping the workspace that contains
- * them. Every unambiguous path of that same workspace is still asserted.
+ * The exact-set property still skips both affected paths via
+ * {@link leafAmbiguousPaths} rather than skipping the workspace that contains them —
+ * the leaf-name conflation the property sidesteps is itself unchanged by the
+ * `gpt-qhfo` fix, since `field_0` and `lines.field_0` still share a leaf name.
+ * Every unambiguous path of that same workspace is still asserted.
  */
 
 import assert from "node:assert/strict";
@@ -578,15 +585,17 @@ describe("arrows: every declared arrow is reachable from both of its endpoints (
 });
 
 describe("arrows: known behaviour — a shared leaf name merges two paths' arrows", () => {
-  // ⚠️ BOTH CASES BELOW PIN WHAT `arrows` DOES TODAY, not what it should do, so
-  // both go red the moment the leaf-name fallback changes — at which point read
-  // this module's header, re-decide each case against `sl-xj4p`, and remove
+  // ⚠️ THIS CASE PINS WHAT `arrows` DOES TODAY, not what it should do, so it goes
+  // red the moment the leaf-name fallback changes — at which point read this
+  // module's header, re-decide it against `sl-xj4p`, and remove
   // `leafAmbiguousPaths` from the exact-set property above.
   //
-  // The mechanism both share: `raw` declares `field_0` *and* `lines.field_0`, so
-  // after resolving the qualified key `arrows` also looks the bare leaf name up
-  // (`arrows.ts`'s `altKey` loop), and that loop's guard only checks the arrow's
-  // path exists *somewhere* in the queried schema.
+  // The mechanism: `raw` declares `field_0` *and* `lines.field_0`, so after
+  // resolving the qualified key `arrows` also looks the bare leaf name up
+  // (`arrows.ts`'s `altKey` loop), and — for a query with no dotted path of its
+  // own, as `field_0` here — that loop's guard accepts any path that exists
+  // *somewhere* in the queried schema, which is the sl-xj4p criterion-2 fallback
+  // rather than a bug.
   //
   // Pinned rather than skipped: a skipped test proves nothing, and node's JUnit
   // reporter puts a `failure=` attribute on a failing `todo` case, which fails
@@ -611,24 +620,25 @@ describe("arrows: known behaviour — a shared leaf name merges two paths' arrow
       );
     });
   });
+});
 
-  it("answers a nested field's --as-source query with a different field's outgoing arrow", async () => {
-    // The indefensible half, filed as `gpt-qhfo` rather than decided here:
-    // `staged.lines.field_0` is a fully qualified nested path, which
-    // `sl-xj4p`'s criterion 1 says must resolve correctly. It has no outgoing
-    // arrow at all, so the leaf fallback does not merely *add* a wrong answer —
-    // the only arrow reported belongs to `staged.field_0`, one nesting level up.
-    // A reader tracing lineage out of a nested field gets a confident wrong answer.
+describe("arrows: a fully qualified nested-path query is exact (gpt-qhfo)", () => {
+  it("reports no arrows for a nested field with no outgoing arrow, rather than a shallower field's", async () => {
+    // Regression test for gpt-qhfo. `staged.lines.field_0` is a fully qualified
+    // nested path — unlike the bare `field_0` query pinned above, this one names
+    // no ambiguous leaf, so sl-xj4p's criterion 1 ("a deeply nested path resolves
+    // correctly") applies without qualification. `staged` also declares a
+    // top-level `field_0`, which DOES have an outgoing arrow
+    // (`staged.field_0 -> revenue_metric.field_0`); before the fix, the `altKey`
+    // loop's `pathExistsInSchema` guard and `arrowPathMatches`'s suffix check
+    // (both in `arrows.ts`) let that shallower field's arrow satisfy the query
+    // for the nested one. The nested field has no outgoing arrow of its own, so
+    // the correct answer is empty, not a confident wrong one.
     await withGenerated(kitchenSinkWorkspace, async (loaded) => {
       const { edgeKeys } = await arrowEdgesFor(loaded, "warehouse::staged.lines.field_0", [
         "--as-source",
       ]);
-      assert.deepEqual(
-        sortedEdgeKeys(edgeKeys),
-        ["warehouse::staged.field_0 -> ::revenue_metric.field_0 | ::load_metric | none"],
-        `the leaf-name conflation changed shape — read this describe block's comments ` +
-          `before updating the expectation:\n${loaded.sources}`,
-      );
+      assert.deepEqual(edgeKeys, [], `expected no arrows, found:\n${loaded.sources}`);
     });
   });
 });
