@@ -45,18 +45,20 @@
  * reads scenario data only. Nothing here derives an expectation by asking the
  * LSP what it did.
  *
- * ## One gap this file excludes by name
+ * ## gpt-fjo7: fixed for the schema; a field rename is a separate question
  *
- * Renaming a schema does **not** rewrite the `@ref` mentions of it inside NL
- * transform bodies, because the index files an `@ref` under the field path it
- * names (`s0.field_1`) rather than under the schema. The result parses and the
- * editor stays silent, but `satsuma validate` reports `unresolved-nl-ref` on it.
- * That is `gpt-fjo7`, and the reason the editor stays silent is `gpt-68ka`.
+ * Renaming a schema rewrites the schema segment of every NL `@ref` naming one
+ * of its fields (`@s0.field_1` → `@renamed_s0.field_1`): the index now files
+ * that ref under the schema key too, not only under the field path it names,
+ * so `findReferences`/rename for the schema reach it. `entitiesMentionedByNlRefs`
+ * used to compute an exclusion for this; it is kept below only as the
+ * vocabulary the two gpt-68ka/gpt-bc1x pins still need.
  *
- * The properties therefore skip an entity that an NL `@ref` mentions — computed
- * from the scenario by {@link entitiesMentionedByNlRefs}, never by asking the
- * toolchain — and the gap gets its own pinned test on a minimal fixture. When
- * `gpt-fjo7` is fixed, that pin turns red and the skip comes out.
+ * Renaming the FIELD an `@ref` names (rather than the schema) is a different
+ * question this ticket does not attempt: `prepareRename`'s renameable-context
+ * set has no `field_name` case, so the LSP does not offer to rename a field at
+ * all today, through any path. Whether an NL `@ref` should follow a future
+ * field rename is therefore out of scope here, not fixed.
  */
 
 const { describe, it, before } = require("node:test");
@@ -113,44 +115,18 @@ function siteLabels(sites) {
 }
 
 /**
- * The entities an NL `@ref` anywhere in the workspace mentions.
- *
- * Read from the scenario's own transform data, so the exclusion is stated
- * against the input rather than discovered by noticing the toolchain got it
- * wrong. See this file's header: the exclusion exists for `gpt-fjo7` and comes
- * out when that is fixed.
- */
-function entitiesMentionedByNlRefs(workspace) {
-  const mentioned = new Set();
-  const visit = (arrows) => {
-    for (const arrow of arrows) {
-      for (const ref of arrow.transform?.refs ?? []) mentioned.add(ref.schema);
-      if (arrow.children) visit(arrow.children);
-    }
-  };
-  for (const file of workspace.files) {
-    for (const mapping of file.mappings) visit(mapping.arrows);
-  }
-  return mentioned;
-}
-
-/**
  * Every entity of a workspace that this suite renames, with its ground truth.
  *
- * Excludes the NL-`@ref` mentions above, and asserts what is left is non-empty:
- * a sample with nothing to rename would let every property below pass without
- * doing anything.
+ * Used to exclude entities an NL `@ref` mentions, back when renaming such an
+ * entity left the `@ref` dangling (`gpt-fjo7`); now that the fix files the
+ * `@ref` under the schema key too, no exclusion is needed and every declared
+ * entity is fair game. Still asserts the entity list is non-empty: a sample
+ * with nothing to rename would let every property below pass without doing
+ * anything.
  */
 function renameableEntities(workspace, indexed) {
-  const mentioned = entitiesMentionedByNlRefs(workspace);
-  const entities = scenarioDeclaredEntities(workspace).filter(
-    (entity) => !mentioned.has(entity.name) && !mentioned.has(entity.key),
-  );
-  assert.ok(
-    entities.length > 0,
-    `every declared entity is mentioned by an NL @ref, so this sample renames ` +
-      `nothing (see gpt-fjo7):\n${indexed.sources}`,
-  );
+  const entities = scenarioDeclaredEntities(workspace);
+  assert.ok(entities.length > 0, `the workspace declares nothing to rename:\n${indexed.sources}`);
   return entities;
 }
 
@@ -332,18 +308,17 @@ describe("rename onto a name the workspace already declares", () => {
   });
 });
 
-// ── Pinned gaps: today's behaviour, recorded so a fix turns them red ────────
+// ── A fixed gap, kept as a concrete regression case ─────────────────────────
 //
-// Neither case below endorses what it asserts. Each states a defect precisely
-// enough that the day it is fixed, this file fails and says so.
+// This is the exact repro from gpt-fjo7's ticket. The generated properties
+// above now cover the same fix generically (`nlRefWorkspaceArbitrary` is part
+// of `workspaceScenarioArbitrary`, and `renameableEntities` no longer excludes
+// anything), but a minimal, readable case survives as its own test so a
+// regression here fails with a small, specific diff rather than only a fuzzed
+// counterexample.
 
-describe("known gap: rename does not rewrite NL @ref mentions (gpt-fjo7)", () => {
-  // Why this case exists: this is the exclusion the properties above depend on,
-  // so it must be measured rather than assumed. The index files an `@ref` under
-  // the field path it names, so a query for the schema's references never
-  // reaches it, and the rename leaves it pointing at a schema that no longer
-  // exists. The workspace still parses, which is what makes it silent.
-  it("leaves @s0.field_1 naming a schema the rename removed", () => {
+describe("gpt-fjo7: rename rewrites the schema segment of an NL @ref naming its field", () => {
+  it("turns @s0.field_1 into @renamed_s0.field_1 instead of leaving it dangling", () => {
     const workspace = scenarioWorkspace([
       scenarioFile({
         path: "entry.stm",
@@ -371,12 +346,14 @@ describe("known gap: rename does not rewrite NL @ref mentions (gpt-fjo7)", () =>
     const entity = { file: "entry.stm", name: "s0", keyword: "schema", key: "s0", namespace: null };
     const { edited } = renameFromDeclaration(indexed, entity);
 
-    // The declaration and the `source { }` entry were rewritten...
+    // The declaration and the `source { }` entry are rewritten, as before...
     assert.ok(edited.sources.includes("schema renamed_s0"), edited.sources);
     assert.ok(edited.sources.includes("source { renamed_s0 }"), edited.sources);
-    // ...and the @ref was not. `satsuma validate` reports `unresolved-nl-ref`
-    // for exactly this; the LSP reports nothing, which is `gpt-68ka`.
-    assert.ok(edited.sources.includes("@s0.field_1"), edited.sources);
+    // ...and now so is the @ref's schema segment, leaving the field part
+    // ("field_1") untouched: renaming a FIELD is a separate concern this
+    // ticket does not attempt (see this file's header).
+    assert.ok(edited.sources.includes("@renamed_s0.field_1"), edited.sources);
+    assert.ok(!edited.sources.includes("@s0.field_1"), edited.sources);
     assert.deepEqual(semanticProblems(edited), []);
   });
 });

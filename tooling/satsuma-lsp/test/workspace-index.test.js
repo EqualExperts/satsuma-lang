@@ -675,6 +675,75 @@ describe("reference range precision (sl-xf3f)", () => {
     assert.equal(textAt(source, refs[0].range), "customers");
   });
 
+  it("NL @ref naming a field also files a schema-key entry covering just the schema (gpt-fjo7)", () => {
+    // Before this fix, a field-naming @ref was filed only under the full
+    // name ("customers.first_name"), so a query for the SCHEMA's references
+    // (as a rename of `customers` issues) never reached it. The full-name
+    // entry stays, for field-level queries, and a new schema-key entry sits
+    // alongside it with a narrower range.
+    const source = `mapping test {
+  source { customers }
+  target { dim }
+  -> name { "see @customers.first_name here" }
+}`;
+    const idx = buildIndex({ "file:///a.stm": source });
+
+    const fieldRefs = (idx.references.get("customers.first_name") || []).filter(
+      (r) => r.context === "nl",
+    );
+    assert.equal(fieldRefs.length, 1);
+    assert.equal(textAt(source, fieldRefs[0].range), "customers.first_name");
+
+    const schemaRefs = (idx.references.get("customers") || []).filter((r) => r.context === "nl");
+    assert.equal(schemaRefs.length, 1);
+    // A range including ".first_name" would rewrite the field name too when
+    // renaming the schema — exactly the bug the schema-key entry exists for.
+    assert.equal(textAt(source, schemaRefs[0].range), "customers");
+  });
+
+  it("NL @ref schema-key entry keeps the ns:: qualifier the ref was authored with", () => {
+    // Grammar guarantee: "::" always precedes the first "." in an @ref, so the
+    // schema key includes it whenever the ref was written qualified.
+    const source = `mapping test {
+  source { customers }
+  target { dim }
+  -> name { "see @crm::customers.first_name here" }
+}`;
+    const idx = buildIndex({ "file:///a.stm": source });
+    const schemaRefs = (idx.references.get("crm::customers") || []).filter(
+      (r) => r.context === "nl",
+    );
+    assert.equal(schemaRefs.length, 1);
+    assert.equal(textAt(source, schemaRefs[0].range), "crm::customers");
+  });
+
+  it("does not file a schema-key entry for an @ref with no field part", () => {
+    // "@customers" alone already names the schema directly — its one entry
+    // IS the schema-key entry, so splitting would be redundant and would
+    // double the site a rename or find-references sees.
+    const source = `mapping test {
+  source { customers }
+  target { dim }
+  -> name { "see @customers here" }
+}`;
+    const idx = buildIndex({ "file:///a.stm": source });
+    const refs = (idx.references.get("customers") || []).filter((r) => r.context === "nl");
+    assert.equal(refs.length, 1);
+  });
+
+  it("a backtick-quoted schema segment keeps its literal dot out of the split (sl-g6ga)", () => {
+    // splitRefSchemaKey must treat the backtick span as opaque: the "." inside
+    // "my.schema" is part of the name, not the separator that starts the field
+    // path, so the first UNQUOTED "." — the one before "field" — is the real
+    // boundary.
+    const source =
+      'mapping test {\n  source { customers }\n  target { dim }\n  -> name { "see @`my.schema`.field here" }\n}';
+    const idx = buildIndex({ "file:///a.stm": source });
+    const schemaRefs = (idx.references.get("my.schema") || []).filter((r) => r.context === "nl");
+    assert.equal(schemaRefs.length, 1);
+    assert.equal(textAt(source, schemaRefs[0].range), "`my.schema`");
+  });
+
   it("fragment spread range covers only the label, not the ... sigil", () => {
     // sl-kf1r: fragment_spread = "..." + spread_label. A range including the
     // sigil deletes it on rename, leaving an invalid declaration. Covers both
