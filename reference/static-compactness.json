@@ -343,6 +343,23 @@
         }
       },
       {
+        "name": "top-level-dotted-each",
+        "fileCount": 1,
+        "lineCount": 29,
+        "arms": {
+          "S": 98,
+          "Sauthored": 150,
+          "Y": 142,
+          "J": 252
+        },
+        "ratios": {
+          "vsYaml": 31,
+          "vsJson": 61.1,
+          "authoredVsYaml": -5.6,
+          "savingVsYaml": 44
+        }
+      },
+      {
         "name": "xml-to-parquet",
         "fileCount": 1,
         "lineCount": 186,
@@ -700,6 +717,23 @@
         "vsJson": 35.1,
         "authoredVsYaml": -8.4,
         "savingVsYaml": -22
+      }
+    },
+    {
+      "name": "top-level-dotted-each",
+      "fileCount": 1,
+      "lineCount": 29,
+      "arms": {
+        "S": 326,
+        "Sauthored": 543,
+        "Y": 512,
+        "J": 951
+      },
+      "ratios": {
+        "vsYaml": 36.3,
+        "vsJson": 65.7,
+        "authoredVsYaml": -6.1,
+        "savingVsYaml": 186
       }
     },
     {

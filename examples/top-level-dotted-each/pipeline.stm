@@ -1,0 +1,28 @@
+// Minimal fixture: a top-level each block whose header target carries the
+// leading dot.  This shape is semantically identical to the undotted spelling
+// (spec §4.6) but was absent from the corpus until tced-ninm.
+
+schema src {
+  id  VARCHAR(10)  (pk)
+  parties list_of record {
+    party_role  VARCHAR(20)  (required)
+  }
+}
+
+schema tgt {
+  k  VARCHAR(10)  (required)
+  rows list_of record {
+    role  VARCHAR(20)  (required)
+  }
+}
+
+mapping m {
+  source { src }
+  target { tgt }
+
+  id -> k
+
+  each parties -> .rows {
+    .party_role -> .role
+  }
+}

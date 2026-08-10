@@ -51,6 +51,8 @@ const ffgUri = libraryUri("filter-flatten-governance/filter-flatten-governance.s
 const buyToOmUri = libraryUri("contracts/buy-to-om-order.stm");
 /** Nested each/flatten fixture — doubly-nested arrows (sl-rj78). */
 const nestedIterationUri = libraryUri("nested-iteration/pipeline.stm");
+/** Minimal fixture with a top-level dotted each target (tced-ninm). */
+const topLevelDottedEachUri = libraryUri("top-level-dotted-each/pipeline.stm");
 /**
  * Governance fixture's own mapping — a two-source join (crm_customers,
  * finance_transactions) with computed arrows whose NL text names source
@@ -1692,6 +1694,37 @@ test.describe("Hover highlighting between arrows and field rows", () => {
       "[data-testid='mapping-detail-opportunity-ingestion-source-schema-card-sfdc-opportunity-field-amount']",
     );
     await expect(sourceField).toHaveClass(/\bhl\b/);
+  });
+
+  test("hovering a top-level dotted-each arrow row highlights the source and target field rows (tced-ninm)", async ({
+    page,
+  }) => {
+    // The `m` mapping writes `each parties -> .rows` at mapping-body level,
+    // a shape the corpus previously lacked.  The dot is a relativity marker
+    // only; the resolved path is `rows.role`, and the hover highlight must
+    // land on the nested target field row just as it does for the undotted
+    // spelling.
+    await page.goto("/");
+    await page.waitForFunction(() => {
+      const harness = window.__satsumaHarness;
+      if (!harness?.setViewMode) return false;
+      harness.setViewMode("single");
+      return true;
+    });
+    await loadFixture(page, topLevelDottedEachUri);
+    const detail = await openMappingByName(page, "m");
+
+    await detail.locator("[data-testid='mapping-detail-m-arrow-row-each-rows-role']").hover();
+
+    const sourceField = detail.locator(
+      "[data-testid='mapping-detail-m-source-schema-card-src-field-parties-party-role']",
+    );
+    const targetField = detail.locator(
+      "[data-testid='mapping-detail-m-target-schema-card-tgt-field-rows-role']",
+    );
+
+    await expect(sourceField).toHaveClass(/\bhl\b/);
+    await expect(targetField).toHaveClass(/\bhl\b/);
   });
 });
 
