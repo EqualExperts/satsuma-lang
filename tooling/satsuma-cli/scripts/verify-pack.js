@@ -10,6 +10,7 @@ const cliRoot = join(__dirname, "..");
 const tarballPath = join(cliRoot, "satsuma-cli.tgz");
 
 const readManifest = (packageDir) => JSON.parse(readFileSync(join(packageDir, "package.json")));
+const expectedArtifactVersion = process.env.EXPECTED_ARTIFACT_VERSION;
 
 if (!existsSync(tarballPath)) {
   throw new Error(`verify-pack: tarball not found at ${tarballPath}`);
@@ -19,6 +20,20 @@ const contents = execFileSync("tar", ["-tzf", tarballPath], {
   cwd: cliRoot,
   encoding: "utf8",
 });
+
+const packedManifest = JSON.parse(
+  execFileSync("tar", ["-xzOf", tarballPath, "package/package.json"], {
+    cwd: cliRoot,
+    encoding: "utf8",
+  }),
+);
+if (expectedArtifactVersion && packedManifest.version !== expectedArtifactVersion) {
+  throw new Error(
+    `verify-pack: manifest version is ${packedManifest.version}, ` +
+      `expected ${expectedArtifactVersion}`,
+  );
+}
+console.log(`verify-pack: manifest carries build version ${packedManifest.version}`);
 
 // Any tarball entry containing '..' would be rejected by npm at install time with
 // TAR_ENTRY_ERROR. This happens when a file: dependency is bundled as a symlink

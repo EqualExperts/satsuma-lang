@@ -193,7 +193,7 @@
     "validate:grammar": "node -e \"const g=JSON.parse(require('fs').readFileSync('syntaxes/satsuma.tmLanguage.json','utf8')); if(!g.scopeName)throw new Error('missing scopeName'); console.log('grammar OK, scopeName='+g.scopeName)\"",
     "validate": "npm run validate:manifest && npm run validate:grammar",
     "check": "npm run validate && npm test",
-    "package": "npm run build && npx @vscode/vsce package --no-dependencies -o vscode-satsuma.vsix"
+    "package": "node scripts/package.js"
   },
   "dependencies": {
     "@satsuma/core": "*",

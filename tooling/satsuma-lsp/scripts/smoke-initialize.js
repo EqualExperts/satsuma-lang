@@ -4,7 +4,8 @@
  *
  * Spawns the server command given on the command line (defaulting to this
  * package's bin entry), sends an `initialize` request framed per the LSP
- * base protocol, and asserts the response carries server capabilities. This
+ * base protocol, and asserts the response carries server capabilities and the
+ * baked build identity. This
  * is the end-to-end check that a fresh install can actually start: the server
  * loads its WASM assets inside onInitialize, so a broken package (sl-vwpr)
  * passes `npm install` but fails exactly here.
@@ -21,6 +22,7 @@ const path = require("path");
 
 // Allow generous startup time on slow CI runners; WASM compile dominates.
 const TIMEOUT_MS = 30_000;
+const expectedBuildVersion = process.env.EXPECTED_BUILD_VERSION ?? process.env.BUILD_VERSION;
 
 const [command, ...commandArgs] =
   process.argv.length > 2
@@ -83,10 +85,22 @@ server.stdout.on("data", (chunk) => {
     if (!message.result?.capabilities) {
       return fail(`response has no capabilities: ${body}`);
     }
+    if (message.result?.serverInfo?.name !== "satsuma-lsp") {
+      return fail(`response has no satsuma-lsp serverInfo: ${body}`);
+    }
+    const actualBuildVersion = message.result.serverInfo.version;
+    if (typeof actualBuildVersion !== "string") {
+      return fail(`response has no server version: ${body}`);
+    }
+    if (expectedBuildVersion && actualBuildVersion !== expectedBuildVersion) {
+      return fail(`server version is ${actualBuildVersion}, expected ${expectedBuildVersion}`);
+    }
 
     clearTimeout(timer);
     server.removeAllListeners("exit");
-    console.log("smoke-initialize: OK — server initialized with capabilities");
+    console.log(
+      `smoke-initialize: OK — server ${actualBuildVersion} initialized with capabilities`,
+    );
     server.kill();
     process.exit(0);
   }

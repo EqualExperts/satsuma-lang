@@ -34,6 +34,10 @@
     // Baked into a TypeScript module by satsuma-cli's prebuild step, so it is
     // a build input to the CLI even though it lives at the repo root.
     "AI-AGENT-REFERENCE.md",
+    // Together these define the build identity baked into the CLI and LSP.
+    // They sit outside either package, so Turbo would not otherwise see edits.
+    "VERSION",
+    "scripts/release-metadata.mjs",
     // Asserted against by the CLI's command-reference tests.
     "SATSUMA-CLI.md",
     // A shared corpus despite living inside one package: @satsuma/viz's and
@@ -135,19 +139,29 @@
       "outputs": ["tree-sitter-satsuma.wasm", "build/**"]
     },
 
-    // The CLI's prebuild bakes AI-AGENT-REFERENCE.md into src/generated/ (a
-    // gitignored file, so it must be cached to be restorable) alongside the
-    // usual dist/ output.
+    // The CLI's prebuild bakes AI-AGENT-REFERENCE.md and the current commit's
+    // build identity into src/generated/. A commit SHA is not a file input, so
+    // this task cannot safely reuse a prior commit's cache entry: doing so would
+    // make `satsuma --version` report the commit that happened to build first.
     "satsuma-cli#build": {
       "dependsOn": ["^build"],
-      "outputs": ["dist/**", "src/generated/**"]
+      "outputs": ["dist/**", "src/generated/**"],
+      "cache": false
     },
 
-    // The extension bundles the language server into server/dist/ next to its
-    // own client bundle in dist/.
+    // The extension bundles the version-bearing language server. Like the CLI,
+    // it must rebuild for each commit because Git identity is not a file hash.
     "vscode-satsuma#build": {
       "dependsOn": ["^build"],
-      "outputs": ["dist/**", "server/dist/**"]
+      "outputs": ["dist/**", "server/dist/**"],
+      "cache": false
+    },
+
+    // The standalone server advertises its baked version in initialize.
+    "@satsuma/lsp#build": {
+      "dependsOn": ["^build"],
+      "outputs": ["dist/**", "src/generated/**"],
+      "cache": false
     },
 
     // @satsuma/lsp#build and #compile both write into dist/, and both emit a

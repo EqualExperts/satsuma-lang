@@ -36,14 +36,18 @@ import {
   readFileSync,
   renameSync,
   rmSync,
+  writeFileSync,
 } from "fs";
 import { tmpdir } from "os";
 import { dirname, join, relative } from "path";
 import { fileURLToPath } from "url";
+import { resolveBuildVersion } from "../../../scripts/release-metadata.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const cliRoot = join(__dirname, "..");
 const satsumaCoreSource = join(cliRoot, "..", "satsuma-core");
+const repoRoot = join(cliRoot, "..", "..");
+const buildVersion = resolveBuildVersion(repoRoot);
 
 // Two resolution contexts, because a dependency may be hoisted to the workspace
 // root *or* nested inside the package that needs it. Each package's own
@@ -98,7 +102,14 @@ try {
   // `files` in package.json decides what npm pack then takes from this copy.
 
   copyPackage(cliRoot, stagedPackage);
+  const stagedManifest = readManifest(stagedPackage);
+  stagedManifest.version = buildVersion;
+  writeFileSync(
+    join(stagedPackage, "package.json"),
+    `${JSON.stringify(stagedManifest, null, 2)}\n`,
+  );
   console.log(`pack: staged satsuma-cli → ${stagedPackage}`);
+  console.log(`pack: applied artifact version ${buildVersion}`);
 
   // --- Step 2: stage @satsuma/core from the workspace, not from node_modules ---
   // node_modules/@satsuma/core is a symlink into the workspace; npm pack follows
@@ -151,4 +162,8 @@ try {
 
 // --- Step 7: verify the tarball ----------------------------------------------
 
-execFileSync("node", ["scripts/verify-pack.js"], { cwd: cliRoot, stdio: "inherit" });
+execFileSync("node", ["scripts/verify-pack.js"], {
+  cwd: cliRoot,
+  stdio: "inherit",
+  env: { ...process.env, EXPECTED_ARTIFACT_VERSION: buildVersion },
+});

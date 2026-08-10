@@ -6,6 +6,7 @@
  */
 
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -16,9 +17,100 @@ import {
   SITE_DATA_PATH,
   applyVersionBump,
   extractReleaseNotes,
+  injectBuildVersion,
   promoteUnreleased,
+  resolveBuildVersion,
   validateReleaseMetadata,
 } from "./release-metadata.mjs";
+
+test("only the exact release tag receives the clean canonical version", (t) => {
+  // A branch build and a release build may use the same VERSION file, so the
+  // commit's matching tag is the fact that distinguishes their identities.
+  const repoRoot = createFixtureRepo(t);
+  initializeGitRepository(repoRoot);
+
+  const developmentSha = git(repoRoot, "rev-parse", "--short", "HEAD");
+  assert.equal(resolveBuildVersion(repoRoot, { environment: {} }), `0.11.0-dev.${developmentSha}`);
+
+  git(repoRoot, "tag", "v0.11.0");
+  assert.equal(resolveBuildVersion(repoRoot, { environment: {} }), "0.11.0");
+
+  fs.writeFileSync(path.join(repoRoot, "after-release.txt"), "next revision\n");
+  git(repoRoot, "add", "after-release.txt");
+  commit(repoRoot, "Continue development");
+  const nextSha = git(repoRoot, "rev-parse", "--short", "HEAD");
+  assert.equal(resolveBuildVersion(repoRoot, { environment: {} }), `0.11.0-dev.${nextSha}`);
+});
+
+test("workflow dispatch can force the clean version before its tag exists", (t) => {
+  // The tagged workflow creates the tag after building artifacts, so it needs
+  // an explicit release mode instead of pretending HEAD is already tagged.
+  const repoRoot = createFixtureRepo(t);
+  initializeGitRepository(repoRoot);
+
+  assert.equal(resolveBuildVersion(repoRoot, { forceRelease: true, environment: {} }), "0.11.0");
+});
+
+test("git discovery stays scoped to repoRoot when a hook exports repository routing", (t) => {
+  // Git hooks export GIT_DIR and GIT_WORK_TREE. A nested fixture must ignore
+  // those variables or its commits and tags would mutate the calling worktree.
+  const repoRoot = createFixtureRepo(t);
+  initializeGitRepository(repoRoot);
+  const shortSha = git(repoRoot, "rev-parse", "--short", "HEAD");
+
+  const otherRepoRoot = createFixtureRepo(t);
+  initializeGitRepository(otherRepoRoot);
+  git(otherRepoRoot, "tag", "v0.11.0");
+
+  assert.equal(
+    resolveBuildVersion(repoRoot, {
+      environment: {
+        ...process.env,
+        GIT_DIR: path.join(otherRepoRoot, ".git"),
+        GIT_WORK_TREE: otherRepoRoot,
+      },
+    }),
+    `0.11.0-dev.${shortSha}`,
+  );
+});
+
+test("an explicit build version keeps independent package prebuilds identical", (t) => {
+  // CI builds packages in separate commands. The environment override is their
+  // shared contract and must take precedence over local git/tag discovery.
+  const repoRoot = createFixtureRepo(t);
+
+  assert.equal(
+    resolveBuildVersion(repoRoot, { environment: { BUILD_VERSION: "0.11.0-dev.abc1234" } }),
+    "0.11.0-dev.abc1234",
+  );
+});
+
+test("development injection changes only distributable package manifests", (t) => {
+  // Rolling artifacts need versioned manifests, but VERSION, lockfile, site
+  // metadata, and changelog remain release metadata and must not be dirtied.
+  const repoRoot = createFixtureRepo(t);
+  const untouchedPaths = ["VERSION", ROOT_LOCKFILE_PATH, SITE_DATA_PATH, "CHANGELOG.md"];
+  const before = new Map(
+    untouchedPaths.map((relativePath) => [
+      relativePath,
+      fs.readFileSync(path.join(repoRoot, relativePath), "utf8"),
+    ]),
+  );
+
+  const changedPaths = injectBuildVersion(repoRoot, "0.11.0-dev.abc1234");
+
+  assert.deepEqual(changedPaths, RELEASE_PACKAGE_PATHS);
+  for (const packagePath of RELEASE_PACKAGE_PATHS) {
+    assert.equal(readJson(path.join(repoRoot, packagePath)).version, "0.11.0-dev.abc1234");
+  }
+  for (const [relativePath, contents] of before) {
+    assert.equal(
+      fs.readFileSync(path.join(repoRoot, relativePath), "utf8"),
+      contents,
+      relativePath,
+    );
+  }
+});
 
 test("a bump synchronizes every releasable package, including the standalone LSP", (t) => {
   const repoRoot = createFixtureRepo(t);
@@ -195,4 +287,40 @@ function createFixtureRepo(t) {
 
 function readJson(filePath) {
   return JSON.parse(fs.readFileSync(filePath, "utf8"));
+}
+
+function initializeGitRepository(repoRoot) {
+  git(repoRoot, "init", "--quiet");
+  git(repoRoot, "add", ".");
+  commit(repoRoot, "Initial fixture");
+}
+
+function commit(repoRoot, message) {
+  git(
+    repoRoot,
+    "-c",
+    "user.name=Satsuma Tests",
+    "-c",
+    "user.email=tests@satsuma.invalid",
+    "commit",
+    "--quiet",
+    "-m",
+    message,
+  );
+}
+
+function git(repoRoot, ...args) {
+  const environment = { ...process.env };
+  for (const name of [
+    "GIT_ALTERNATE_OBJECT_DIRECTORIES",
+    "GIT_COMMON_DIR",
+    "GIT_DIR",
+    "GIT_INDEX_FILE",
+    "GIT_OBJECT_DIRECTORY",
+    "GIT_PREFIX",
+    "GIT_WORK_TREE",
+  ]) {
+    delete environment[name];
+  }
+  return execFileSync("git", args, { cwd: repoRoot, encoding: "utf8", env: environment }).trim();
 }

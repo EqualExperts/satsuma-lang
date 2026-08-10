@@ -14,6 +14,7 @@ import { fileURLToPath } from "node:url";
 import { dirname, resolve, join } from "node:path";
 import { describe as _describe, it } from "node:test";
 import { run as _run } from "./helpers.js";
+import { BUILD_VERSION } from "../src/generated/build-version.js";
 
 // Run top-level describe blocks concurrently — each test spawns its own
 // CLI subprocess so there are no shared-state conflicts.
@@ -27,6 +28,17 @@ const PLATFORM = resolve(__dirname, "fixtures/platform.stm");
 
 /** Run the CLI with the given arguments and return { stdout, stderr, code }. */
 const run = (...args: string[]) => _run(CLI, ...args);
+
+describe("satsuma build identity", () => {
+  it("reports the version baked by prebuild instead of the tracked release manifest", async () => {
+    // Development manifests intentionally stay at the clean release version;
+    // this catches a regression back to reading package.json at runtime.
+    const { stdout, code } = await run("--version");
+
+    assert.equal(code, 0);
+    assert.equal(stdout.trim(), BUILD_VERSION);
+  });
+});
 
 // ---------------------------------------------------------------------------
 // satsuma summary

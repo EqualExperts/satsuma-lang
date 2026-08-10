@@ -46,6 +46,7 @@ import type { FieldLineageDirection } from "@satsuma/core";
 import { computeMappingCoverage } from "./coverage";
 import { isSatsumaFilePath } from "@satsuma/core";
 import { findSatsumaSourceFiles } from "./source-scan";
+import { BUILD_VERSION } from "./generated/build-version";
 
 // ---------- Connection setup ----------
 
@@ -116,6 +117,10 @@ connection.onInitialize(async (params): Promise<InitializeResult> => {
   }
 
   return {
+    serverInfo: {
+      name: "satsuma-lsp",
+      version: BUILD_VERSION,
+    },
     capabilities: {
       textDocumentSync: {
         openClose: true,

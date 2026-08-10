@@ -15,6 +15,10 @@ npm run build:all             # or: npx turbo run build --filter=satsuma-cli
 npm --prefix tooling/satsuma-cli link    # makes `satsuma` available globally
 ```
 
+`satsuma --version` identifies the artifact, not merely the last release whose
+manifest is tracked in the repository. A tagged release reports `X.Y.Z`; a
+rolling or local non-tagged build reports `X.Y.Z-dev.<short-sha>`.
+
 ## Design Principle
 
 Every CLI command produces **100% deterministically correct results from the parse tree**. If a result's correctness depends on interpreting natural language, that operation does not belong in the CLI — it belongs in the agent that calls the CLI.

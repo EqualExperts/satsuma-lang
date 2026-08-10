@@ -1,11 +1,13 @@
 /**
- * Owns release-version synchronization and changelog promotion.
+ * Owns release-version synchronization, build identity, and changelog promotion.
  *
- * The shell entry point and GitHub release workflow both delegate here so the
- * rules for a valid release are defined once and can be tested without mutating
- * the real repository.
+ * Package prebuilds and the GitHub release workflow delegate here so tagged
+ * releases and development artifacts cannot disagree about the version they
+ * report. Site-version metadata remains part of release bumps only; development
+ * build injection deliberately touches just the three distributable packages.
  */
 
+import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -41,6 +43,113 @@ const SITE_VERSION_KEYS = ["version", "version_tag"];
 const SEMVER_PATTERN = /^\d+\.\d+\.\d+(?:-[A-Za-z0-9.]+)?$/;
 const VERSION_HEADING_PATTERN = /^## v\d+\.\d+\.\d+(?:-[A-Za-z0-9.]+)? — /m;
 const HTML_COMMENT_PATTERN = /<!--[^]*?-->/g;
+
+// Git exports these while running hooks. They override a child command's cwd,
+// so retaining them would make fixture and nested-worktree discovery inspect
+// the caller's repository instead of the repoRoot passed to this module.
+const GIT_REPOSITORY_ENV_NAMES = [
+  "GIT_ALTERNATE_OBJECT_DIRECTORIES",
+  "GIT_COMMON_DIR",
+  "GIT_DIR",
+  "GIT_INDEX_FILE",
+  "GIT_OBJECT_DIRECTORY",
+  "GIT_PREFIX",
+  "GIT_WORK_TREE",
+];
+
+/** Environment override used by CI to keep every package on one build identity. */
+export const BUILD_VERSION_ENV = "BUILD_VERSION";
+
+// ── Build identity ----------------------------------------------------------
+
+/**
+ * Resolves the version baked into CLI/LSP code and distributable manifests.
+ *
+ * An explicit BUILD_VERSION wins so a workflow-dispatched release can request
+ * the clean VERSION before its tag exists. Otherwise only HEAD at the matching
+ * `v<VERSION>` tag is a release; every other revision carries its short SHA.
+ */
+export function resolveBuildVersion(
+  repoRoot,
+  { forceRelease = false, environment = process.env } = {},
+) {
+  const canonicalVersion = fs.readFileSync(path.join(repoRoot, "VERSION"), "utf8").trim();
+  assertVersion(canonicalVersion);
+
+  const override = environment[BUILD_VERSION_ENV];
+  if (override) {
+    assertVersion(override);
+    return override;
+  }
+
+  if (forceRelease || isReleaseRevision(repoRoot, canonicalVersion, environment)) {
+    return canonicalVersion;
+  }
+
+  const shortSha = gitOutput(repoRoot, ["rev-parse", "--short", "HEAD"], environment);
+  return `${canonicalVersion}-dev.${shortSha}`;
+}
+
+/**
+ * Writes a build-only version into the CLI, LSP, and VSIX manifests.
+ *
+ * The caller owns the checkout lifetime: release CI uses this only in its
+ * ephemeral workspace. VERSION, the root lockfile, changelog, and site data are
+ * intentionally untouched because they continue to describe the next release.
+ */
+export function injectBuildVersion(repoRoot, buildVersion) {
+  assertVersion(buildVersion);
+  const changedPaths = [];
+  for (const relativePackagePath of RELEASE_PACKAGE_PATHS) {
+    const packagePath = path.join(repoRoot, relativePackagePath);
+    const packageJson = readJson(packagePath);
+    packageJson.version = buildVersion;
+    fs.writeFileSync(packagePath, formatJson(packageJson));
+    changedPaths.push(relativePackagePath);
+  }
+  return changedPaths;
+}
+
+function isReleaseRevision(repoRoot, canonicalVersion, environment) {
+  try {
+    const tag = execFileSync(
+      "git",
+      ["describe", "--tags", "--exact-match", "--match", `v${canonicalVersion}`, "HEAD"],
+      {
+        cwd: repoRoot,
+        encoding: "utf8",
+        env: environmentForGitCwd(environment),
+        stdio: ["ignore", "pipe", "ignore"],
+      },
+    ).trim();
+    return tag === `v${canonicalVersion}`;
+  } catch {
+    return false;
+  }
+}
+
+function gitOutput(repoRoot, args, environment) {
+  try {
+    return execFileSync("git", args, {
+      cwd: repoRoot,
+      encoding: "utf8",
+      env: environmentForGitCwd(environment),
+    }).trim();
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error);
+    throw new Error(`Cannot derive build version from git: ${detail}`, { cause: error });
+  }
+}
+
+function environmentForGitCwd(environment) {
+  const cleanEnvironment = { ...environment };
+  for (const name of GIT_REPOSITORY_ENV_NAMES) {
+    delete cleanEnvironment[name];
+  }
+  return cleanEnvironment;
+}
+
+// ── Release preparation ----------------------------------------------------
 
 /**
  * Moves the current Unreleased body into a dated version section and leaves a
@@ -231,31 +340,62 @@ function defaultRepoRoot() {
 
 function printUsage() {
   console.error(
-    "Usage: node scripts/release-metadata.mjs bump <version> | validate <tag> | notes <tag>",
+    "Usage: node scripts/release-metadata.mjs " +
+      "build-version [--release] | inject-build-version <version> | " +
+      "bump <version> | validate <tag> | notes <tag>",
   );
 }
 
 function runCli() {
   const [command, value] = process.argv.slice(2);
-  if (!command || !value) {
+  if (!command) {
     printUsage();
     process.exitCode = 1;
     return;
   }
 
   const repoRoot = defaultRepoRoot();
+  if (command === "build-version") {
+    if (value && value !== "--release") {
+      printUsage();
+      process.exitCode = 1;
+      return;
+    }
+    console.log(resolveBuildVersion(repoRoot, { forceRelease: value === "--release" }));
+    return;
+  }
+  if (command === "inject-build-version" && value) {
+    const changedPaths = injectBuildVersion(repoRoot, value);
+    console.log(`Injected ${value} into ${changedPaths.length} distributable package manifests.`);
+    return;
+  }
   if (command === "bump") {
+    if (!value) {
+      printUsage();
+      process.exitCode = 1;
+      return;
+    }
     const date = new Date().toISOString().slice(0, 10);
     const { changes, oldVersion } = applyVersionBump(repoRoot, value, date);
     console.log(`Bumped v${oldVersion} to v${value} across ${changes.size} files.`);
     return;
   }
   if (command === "validate") {
+    if (!value) {
+      printUsage();
+      process.exitCode = 1;
+      return;
+    }
     validateReleaseMetadata(repoRoot, value);
     console.log(`Release metadata is consistent for ${value}.`);
     return;
   }
   if (command === "notes") {
+    if (!value) {
+      printUsage();
+      process.exitCode = 1;
+      return;
+    }
     const notes = validateReleaseMetadata(repoRoot, value);
     process.stdout.write(`${notes}\n`);
     return;
