@@ -382,10 +382,12 @@ jobs:
       # the generator reads those logs directly — so on a commit that changes one
       # package, only that package's suite actually runs and the rest are replayed.
       #
-      # @satsuma/viz-harness is excluded for the same reason `test:all` excludes
-      # it: its `test` is Playwright. tree-sitter-satsuma is *not* excluded here,
-      # unlike in `test:all`, because its corpus summary is where parserCorpusTests
-      # comes from and nothing else in this job would produce it.
+      # @satsuma/viz-harness is excluded here because its `test` is a headless-
+      # Chromium Playwright suite that needs a browser this job does not install
+      # and whose counts already flow through the dedicated viz-harness CI job.
+      # tree-sitter-satsuma is *not* excluded here, unlike in `test:all`, because
+      # its corpus summary is where parserCorpusTests comes from and nothing else
+      # in this job would produce it.
       - name: Build and test the workspace
         run: |
           npx turbo run build compile
@@ -749,6 +751,58 @@ jobs:
           path: |
             tooling/${{ matrix.module }}/coverage/lcov.info
             tooling/${{ matrix.module }}/coverage/coverage-summary.json
+
+  viz-harness:
+    # Headless-Chromium Playwright suite for the `satsuma-viz` component. It
+    # used to run only via the human-in-the-loop sentinel watcher; now that the
+    # suite runs headless Chromium (AGENTS.md, feature 30), it gets a CI job of
+    # its own rather than a row in the tooling-modules matrix, whose shards are
+    # coverage-based and run c8 directly.
+    name: Viz harness (Playwright)
+    needs: install
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: "22"
+
+      - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        with:
+          path: |
+            node_modules
+            tooling/*/node_modules
+            tooling/*/dist
+            tooling/satsuma-cli/src/generated
+            tooling/tree-sitter-satsuma/build
+            tooling/tree-sitter-satsuma/tree-sitter-satsuma.wasm
+          key: workspace-${{ github.sha }}
+          restore-keys: |
+            workspace-
+
+      # Per-job Turborepo cache so the harness's `pretest` rebuild of its deps
+      # is a cache hit rather than a from-scratch build. Restore first from the
+      # install job's just-populated cache (`turbo-install-`), then this job's
+      # own prior runs.
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        with:
+          path: .turbo
+          key: turbo-viz-harness-${{ runner.os }}-${{ github.sha }}
+          restore-keys: |
+            turbo-install-${{ runner.os }}-
+            turbo-viz-harness-${{ runner.os }}-
+
+      # The agent sandbox ships a system Chromium at /usr/bin/chromium, but the
+      # ubuntu runner does not, so install the bundled Playwright browser here
+      # (playwright.config.ts falls back to it when no system binary is found).
+      # --with-deps pulls the system libraries headless Chromium needs.
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Run viz harness Playwright suite
+        working-directory: ${{ github.workspace }}
+        run: npx turbo run test --filter=@satsuma/viz-harness
 
   coverage-report:
     # One shard per module, in parallel. davelosert/vitest-coverage-report-action

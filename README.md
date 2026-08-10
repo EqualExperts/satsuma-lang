@@ -476,35 +476,22 @@ npx turbo run test --filter=@satsuma/lsp      # the language server's own suite
 `check` covers this package's TextMate fixture and golden tests only; the
 language server is a separate package with its own suite.
 
-### Viz harness (local Playwright tests)
+### Viz harness (Playwright tests)
 
 `tooling/satsuma-viz-harness/` is a standalone HTTP server and browser client
 for testing the `<satsuma-viz>` web component against canonical fixtures — without
 VS Code or the LSP in the loop.
 
-This is a **local developer-machine workflow only**. It is not run in CI.
+The Playwright suite runs **headless Chromium**, both locally and in the agent
+sandbox, and in its own CI job. From the repo root:
 
 ```bash
-cd tooling/satsuma-viz-harness
-npm run build             # build server + client bundles
+npx turbo run test --filter=@satsuma/viz-harness
 ```
 
-To run the Playwright test suite, start the sentinel watcher in a separate
-terminal, then trigger a run by touching the sentinel file:
-
-```bash
-# Terminal 1 — leave running
-./watch-and-test.sh
-
-# Terminal 2 — trigger a run
-touch .run-tests
-# Results appear in .playwright-results.txt
-```
-
-The watcher kills any stale server on port 3333, runs `npx playwright test`,
-writes results to `.playwright-results.txt`, and resets the sentinel.
-
-The test suite covers:
+A developer machine without `/usr/bin/chromium` installs the bundled browser
+once: `npx playwright install chromium`. The harness `pretest` rebuilds the
+bundles under test, and the suite is part of `test:all`.The test suite covers:
 - Overview rendering (schema cards, mapping nodes) for the sfdc-to-snowflake fixture
 - Clicking a mapping card to open the detail view
 - Field-hover and navigate event pipeline validation (programmatic dispatch)

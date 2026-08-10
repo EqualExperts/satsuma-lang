@@ -26,6 +26,7 @@ export default [
       "**/bindings/**",
       "**/build/**",
       "**/dist/**",
+      "**/.venv/**",
       "**/*.min.js",
       "site/js/tailwind.js",
       "site/_site/**",

@@ -395,7 +395,9 @@ No CLI or LSP code needs to be imported.
 | `satsuma-viz-backend` | `test/*.test.js` | Unit tests for VizModel builders and shared workspace-index behaviour | Yes — `npm run test:typecheck` |
 | `satsuma-viz-harness` | `tests/*.spec.ts` | Playwright browser tests for the rendered viz component | No — baseline ESLint only |
 
-Browser-level viz harness tests use the sentinel watcher workflow documented in `AGENTS.md`; agents should not run Playwright directly in the sandbox.
+Browser-level viz harness tests run headless Chromium inside the agent sandbox
+and in their own CI job — see the "Viz harness Playwright tests" section in
+`AGENTS.md`. There is no human-in-the-loop watcher anymore.
 
 "Typechecked" here means a dedicated `test:typecheck` script (`tsc --project
 tsconfig.type-tests.json` or equivalent) runs `tsc` over the package's test

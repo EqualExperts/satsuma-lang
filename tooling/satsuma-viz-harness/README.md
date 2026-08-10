@@ -27,8 +27,7 @@ either.
 | `src/client/` | Harness web UI: fixture picker, view-mode toggle, the `<satsuma-viz>` host, and the `window.__satsumaHarness` event recorder. |
 | `test/harness.test.ts` | **Semantic regression suite.** Real-click / real-hover Playwright tests asserting overview rendering, mapping detail content, field coverage, hover highlighting, interaction events, filters, and geometry sanity. |
 | `test/screenshots.spec.ts` | **Screenshot review workflow.** Drives each fixture into a documented UI state and emits a named PNG plus a manifest entry. NOT a golden-baseline suite. |
-| `playwright.config.ts` | Two Playwright projects — `firefox` (semantic suite) and `screenshots` (review artifacts). |
-| `watch-and-test.sh` | Sentinel-file watcher that lets agents trigger Playwright runs without spawning a browser themselves. |
+| `playwright.config.ts` | Three Playwright projects — `chromium` (semantic suite), `screenshots` (review artifacts), and `playground-static` (static bundle smoke + privacy). |
 | `scripts/build-playground.mjs` | Assembles the server-free **"Try it Live!"** bundle (`npm run build:playground` → `dist/playground/`): page, client + viz bundles, both WASM files, and the examples manifest — every asset page-relative so it deploys under a non-root base path (GitHub Pages). |
 
 ---
@@ -64,9 +63,9 @@ automates all of the above, including the agent-sandbox Turborepo env vars
 (see AGENTS.md "Running Turborepo in the agent sandbox") and confirming the
 server actually came up before handing you the URL.
 
-This is unrelated to the sentinel-file Playwright workflow described below —
-that workflow drives an automated headless browser for regression tests, not
-a human-facing preview.
+This is unrelated to the Playwright suite described above — that suite drives
+an automated headless-Chromium browser for regression tests, not a
+human-facing preview.
 
 ---
 
@@ -98,78 +97,51 @@ Three pieces make it work, all shared with the dev-server harness:
 
 ---
 
-## Why Firefox-only and local-only
+## Why Chromium, and where it runs
 
-Playwright in this repo runs **only on a developer machine**, **only in Firefox**,
-and **never in CI** for Feature 30. Two reasons:
+Playwright in this repo targets **Chromium**, runs **headless** both on a
+developer machine and inside the agent sandbox, and runs in its **own CI job**
+(and via `test:all` locally — see the next section). Pinning to a single
+browser keeps the suite reproducible everywhere; the same `satsuma-viz` web
+component code paths are exercised regardless of engine.
 
-- Chromium headless-shell and WebKit both segfault inside SwiftShader on the
-  macOS ARM configurations the team uses. Firefox's headless mode does not depend
-  on SwiftShader and runs reliably.
-- The agent sandbox cannot launch a browser at all (see "Sentinel watcher
-  workflow" below). Pinning to a single browser keeps the suite reproducible
-  for the human-in-the-loop run.
+Chromium is resolved in `playwright.config.ts`: an explicit
+`CHROMIUM_EXECUTABLE_PATH` override wins, then the system Chromium at
+`/usr/bin/chromium` (what the agent sandbox provides), then Playwright's own
+bundled browser (a developer runs `npx playwright install chromium` once). The
+`--no-sandbox` flag is added only when running as root, which the agent sandbox
+does and Chromium otherwise refuses.
 
-Both browsers exercise the same `satsuma-viz` web component code paths, so
-choice of browser does not affect what the tests validate. If a future change
-makes Chromium reliable on ARM macOS we can lift this restriction without
-rewriting tests.
-
-The `firefox` project covers `*.test.ts`; the `screenshots` project covers
-`*.spec.ts`. A bare `npm test` runs both projects.
+The `chromium` project covers `*.test.ts`; the `screenshots` project covers
+`*.spec.ts`; the `playground-static` project covers the static bundle. A bare
+`npm test` runs all three.
 
 ---
 
-## Sentinel watcher workflow (human-in-the-loop)
+## Running the Playwright suite (headless Chromium)
 
-The agent that maintains this suite cannot run `npx playwright test` directly:
-the sandbox blocks browser launches. Instead, the watcher script is run **once
-in a normal terminal by the developer**, and the agent triggers runs via a
-sentinel file:
-
-```text
-agent ──touch .run-tests──▶ watch-and-test.sh
-                                │
-                                ├── kills any stale server on :3333
-                                ├── runs `npm test` — its `pretest` is
-                                │   `turbo run build --filter=@satsuma/viz-harness`,
-                                │   which rebuilds this package and its deps
-                                ├── writes build and test output to .playwright-results.txt
-                                └── removes .run-tests on pickup
-```
-
-### Run the watcher (developer)
+The agent that maintains this suite runs it **directly in the sandbox** — no
+human-in-the-loop watcher and no sentinel file. The sandbox provides a system
+Chromium that `playwright.config.ts` resolves automatically; a developer
+typically uses Playwright's bundled Chromium instead.
 
 ```bash
-/absolute/path/to/your/clone/tooling/satsuma-viz-harness/watch-and-test.sh
+# From the repo root — builds every dependency, then runs all three projects:
+npx turbo run test --filter=@satsuma/viz-harness
+
+# Or, after a workspace build, from inside this directory:
+npm test
 ```
 
-> **Always pass the agent the *full absolute path* to `watch-and-test.sh`.**
-> Agents may be running inside a worktree at a non-obvious location such as
-> `.worktrees/feat/<branch>/...`, and the developer will not know which clone
-> the agent means without the absolute path.
-
-### Trigger a run (agent)
+A full run takes roughly 40–90s. On a developer machine, install the bundled
+browser once first:
 
 ```bash
-touch tooling/satsuma-viz-harness/.run-tests
-# wait for the file to disappear (watcher picks it up within ~1s)
-# then read tooling/satsuma-viz-harness/.playwright-results.txt
+npx playwright install chromium
 ```
 
-A full run takes roughly 30–90 seconds. Results from the previous run remain
-in `.playwright-results.txt` until the next run overwrites them, so always
-check the file timestamp after triggering. The watcher performs the complete
-build itself; its build output in the results file proves the browser received
-fresh harness and viz bundles.
-
-### Run directly (developer, not agent)
-
-```bash
-npm --prefix tooling/satsuma-viz-harness run test         # all projects; pretest rebuilds first
-npx turbo run build --filter=@satsuma/viz-harness \
-  && npm --prefix tooling/satsuma-viz-harness run screenshots   # screenshots have no pretest
-```
+If a run fails with `EADDRINUSE` on :3333/:3334, a stale server is holding the
+port — kill it and rerun: `pkill -f "node dist/server.js"`.
 
 ---
 
@@ -238,8 +210,9 @@ Before pushing changes that touch the harness, viz, or viz-backend, run:
 ```bash
 npx turbo run test --filter=@satsuma/viz --filter=@satsuma/viz-backend
 npx turbo run build --filter=@satsuma/viz-harness
-# Then trigger the watcher and read .playwright-results.txt
+# Then run the Playwright suite directly (headless Chromium):
+npx turbo run test --filter=@satsuma/viz-harness
 ```
 
-The Playwright suite is the only one that requires the human-in-the-loop
-watcher; the others run inside the normal agent sandbox.
+The Playwright suite runs headless Chromium right in the agent sandbox; no
+human-in-the-loop watcher is needed.
