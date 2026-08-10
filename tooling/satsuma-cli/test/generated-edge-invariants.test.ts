@@ -41,6 +41,7 @@ import {
   GENERATED_PROPERTY_PARAMETERS,
   containerWorkspaceArbitrary,
   namespacedWorkspaceArbitrary,
+  renderWorkspace,
   scenarioDeclaredFieldPaths,
   scenarioFieldEdges,
   splitWorkspaceAcrossFiles,
@@ -121,6 +122,55 @@ async function withGraph(
   } finally {
     disposeGeneratedWorkspace(loaded);
   }
+}
+
+/** Like {@link withGraph}, but returns the result of `check` instead of void. */
+async function withGraphReturning<T>(
+  workspace: ScenarioWorkspace,
+  check: (graph: WorkspaceGraph) => T,
+  opts?: Parameters<typeof graphFor>[1],
+): Promise<T> {
+  const loaded = await loadGeneratedWorkspace(workspace);
+  try {
+    return check(graphFor(loaded, opts));
+  } finally {
+    disposeGeneratedWorkspace(loaded);
+  }
+}
+
+/** Rendered sources of a workspace, for inclusion in failure messages. */
+function renderedSources(workspace: ScenarioWorkspace): string {
+  return renderWorkspace(workspace)
+    .map((file) => `── ${file.path}\n${file.source}`)
+    .join("\n");
+}
+
+/**
+ * Flip every container block's `dottedTarget` flag in a deep-cloned workspace.
+ *
+ * `true` becomes `false` and `false` becomes `true`; blocks with no explicit
+ * flag keep their default behaviour and are left untouched.
+ */
+function flipContainerDottedTargets(workspace: ScenarioWorkspace): ScenarioWorkspace {
+  const cloned: ScenarioWorkspace = structuredClone(workspace);
+  for (const file of cloned.files) {
+    for (const mapping of file.mappings) {
+      mapping.arrows = mapping.arrows.map(flipArrowDottedTarget);
+    }
+  }
+  return cloned;
+}
+
+/** Recursively flip `dottedTarget` on every container arrow. */
+function flipArrowDottedTarget(arrow: any): any {
+  const flipped = { ...arrow };
+  if ((arrow.kind === "each" || arrow.kind === "flatten") && arrow.dottedTarget !== undefined) {
+    flipped.dottedTarget = !arrow.dottedTarget;
+  }
+  if (arrow.children) {
+    flipped.children = arrow.children.map(flipArrowDottedTarget);
+  }
+  return flipped;
 }
 
 describe("nothing invented: every emitted endpoint is a declared field (sl-hi0z)", () => {
@@ -248,6 +298,27 @@ describe("nothing dropped: the emitted edge set is exactly the declared one (sl-
             `${kind} nested ${depth} deep lost or invented an edge:\n${sources}`,
           );
         });
+      }),
+      GENERATED_PROPERTY_PARAMETERS,
+    );
+  });
+
+  it("produces the same graph edges whether a container header is dotted or undotted (tced-vrul)", async () => {
+    // Spec §4.6: `sku` and `.sku` inside a block both mean the same thing.
+    // The same applies to container headers: `each src -> tgt` and `each src -> .tgt`
+    // resolve to identical field paths, so the downstream edge set must not move.
+    // This is the property that would have caught tced-ewd4 in a suite rather
+    // than only in a targeted unit test.
+    await fc.assert(
+      fc.asyncProperty(containerWorkspaceArbitrary, async ({ workspace }) => {
+        const flipped = flipContainerDottedTargets(workspace);
+        const originalEdges = await withGraphReturning(workspace, (graph) => edgeKeys(graph.edges));
+        const flippedEdges = await withGraphReturning(flipped, (graph) => edgeKeys(graph.edges));
+        assert.deepEqual(
+          flippedEdges,
+          originalEdges,
+          `flipping dotted targets changed the graph edge set:\nORIGINAL\n${renderedSources(workspace)}\nFLIPPED\n${renderedSources(flipped)}`,
+        );
       }),
       GENERATED_PROPERTY_PARAMETERS,
     );

@@ -345,7 +345,17 @@ export const containerWorkspaceArbitrary = fc
     kind: fc.constantFrom("each", "flatten"),
     depth: fc.integer({ min: 1, max: 2 }),
   })
-  .map(({ kind, depth }) => {
+  .chain(({ kind, depth }) =>
+    // Choose dotted/undotted independently for every block level, so the
+    // generator explores both the top-level dotted form (tced-ewd4) and the
+    // nested undotted form (tced-vrul).
+    fc.array(fc.boolean(), { minLength: depth, maxLength: depth }).map((dottedTargets) => ({
+      kind,
+      depth,
+      dottedTargets,
+    })),
+  )
+  .map(({ kind, depth, dottedTargets }) => {
     // A record chain exactly `depth` levels deep — `group_0 { field_0 }` at depth
     // 1, `group_0 { group_1 { field_0 } }` at depth 2 — list-typed at every level
     // so each iteration really is over something iterable. The leaves must sit at
@@ -373,7 +383,14 @@ export const containerWorkspaceArbitrary = fc
     );
     for (let level = depth - 1; level >= 0; level -= 1) {
       const block = kind === "each" ? eachBlock : flattenBlock;
-      body = [block(endpoint(source, blockPath(level)), endpoint(target, blockPath(level)), body)];
+      body = [
+        block(
+          endpoint(source, blockPath(level)),
+          endpoint(target, blockPath(level)),
+          body,
+          dottedTargets[level],
+        ),
+      ];
     }
 
     return {

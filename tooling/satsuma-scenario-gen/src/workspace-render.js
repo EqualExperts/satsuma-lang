@@ -71,6 +71,29 @@ function relativeEndpoint(child, blockSchema, blockPath) {
   return `.${child.path.slice(blockPath.length + 1)}`;
 }
 
+/**
+ * The relative suffix of a child endpoint under its block path, without the dot.
+ *
+ * Used for container-block headers when `dottedTarget` is false: `sku` instead
+ * of `.sku` inside `each lines -> items` (spec §4.6: the dot documents
+ * relativity but does not decide it).
+ */
+function relativeSuffix(child, blockSchema, blockPath) {
+  if (child.schema !== blockSchema) {
+    throw new Error(
+      `scenario error: arrow inside a block on '${blockSchema}' names schema ` +
+        `'${child.schema}'; Satsuma has no notation for that (spec §4.4)`,
+    );
+  }
+  if (child.path !== blockPath && !child.path.startsWith(`${blockPath}.`)) {
+    throw new Error(
+      `scenario error: '${child.path}' is not under block path '${blockPath}'; ` +
+        `Satsuma has no notation for reaching an ancestor (spec §4.4)`,
+    );
+  }
+  return child.path === blockPath ? "" : child.path.slice(blockPath.length + 1);
+}
+
 // ── Transform bodies ───────────────────────────────────────────────────────
 
 /**
@@ -120,7 +143,41 @@ function renderArrow(arrow, mapping, indent, context) {
     return `${indent}-> ${target(arrow.target)}${body}`;
   }
 
-  const header = `${indent}${arrow.kind} ${source(arrow.source)} -> ${target(arrow.target)}`;
+  // Container-block header target: dotted or undotted, at every nesting level.
+  // The spec says both spellings are identical (spec §4.6); the choice is a
+  // rendering concern and must not change the ground truth.
+  const isContainer = arrow.kind === "each" || arrow.kind === "flatten";
+  const headerTarget = (ep) => {
+    if (!isContainer || arrow.dottedTarget !== true) {
+      return target(ep);
+    }
+    if (context.targetPath === null) {
+      // Mapping level: `.path` documents relativity to the mapping's target root.
+      return `.${ep.path}`;
+    }
+    // Nested: dotted relative form, same as `relativeEndpoint`.
+    return relativeEndpoint(ep, context.targetSchema, context.targetPath);
+  };
+  const headerTargetUndotted = (ep) => {
+    if (!isContainer || arrow.dottedTarget !== false) {
+      return target(ep);
+    }
+    if (context.targetPath === null) {
+      // Mapping level: bare path, same as `authoredEndpoint`.
+      return authoredEndpoint(ep, mapping.targets);
+    }
+    // Nested: undotted relative form.
+    return relativeSuffix(ep, context.targetSchema, context.targetPath);
+  };
+
+  const effectiveTarget = (ep) => {
+    if (!isContainer) return target(ep);
+    if (arrow.dottedTarget === true) return headerTarget(ep);
+    if (arrow.dottedTarget === false) return headerTargetUndotted(ep);
+    return target(ep);
+  };
+
+  const header = `${indent}${arrow.kind} ${source(arrow.source)} -> ${effectiveTarget(arrow.target)}`;
   const nested = arrow.children.map((child) =>
     renderArrow(child, mapping, indent + INDENT, {
       sourceSchema: arrow.source.schema,

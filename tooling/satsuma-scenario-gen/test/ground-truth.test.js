@@ -641,3 +641,127 @@ describe("scenarioChangedDeclarations", () => {
     assert.deepEqual(scenarioChangedDeclarations(before, after), []);
   });
 });
+
+// ── Container header spelling (tced-vrul) ──────────────────────────────────
+
+describe("container header dotted target rendering", () => {
+  it("renders a mapping-level dotted target with a leading dot", () => {
+    const workspace = oneFile({
+      schemas: [
+        schemaDecl({ name: "s0", fields: [listRecordField("lines", [scalarField("sku")])] }),
+        schemaDecl({ name: "s1", fields: [listRecordField("lines", [scalarField("sku")])] }),
+      ],
+      mappings: [
+        mappingDecl({
+          name: "m0",
+          sources: ["s0"],
+          targets: ["s1"],
+          arrows: [
+            eachBlock(
+              endpoint("s0", "lines"),
+              endpoint("s1", "lines"),
+              [mapArrow([endpoint("s0", "lines.sku")], endpoint("s1", "lines.sku"))],
+              true,
+            ),
+          ],
+        }),
+      ],
+    });
+    const source = renderWorkspace(workspace)[0].source;
+    assert.match(source, /each lines -> \.lines \{/);
+  });
+
+  it("renders a nested undotted target without a leading dot", () => {
+    const workspace = oneFile({
+      schemas: [
+        schemaDecl({
+          name: "s0",
+          fields: [listRecordField("group_0", [listRecordField("group_1", [scalarField("sku")])])],
+        }),
+        schemaDecl({
+          name: "s1",
+          fields: [listRecordField("group_0", [listRecordField("group_1", [scalarField("sku")])])],
+        }),
+      ],
+      mappings: [
+        mappingDecl({
+          name: "m0",
+          sources: ["s0"],
+          targets: ["s1"],
+          arrows: [
+            eachBlock(
+              endpoint("s0", "group_0"),
+              endpoint("s1", "group_0"),
+              [
+                eachBlock(
+                  endpoint("s0", "group_0.group_1"),
+                  endpoint("s1", "group_0.group_1"),
+                  [
+                    mapArrow(
+                      [endpoint("s0", "group_0.group_1.sku")],
+                      endpoint("s1", "group_0.group_1.sku"),
+                    ),
+                  ],
+                  false,
+                ),
+              ],
+              true,
+            ),
+          ],
+        }),
+      ],
+    });
+    const source = renderWorkspace(workspace)[0].source;
+    assert.match(source, /each group_0 -> \.group_0 \{/);
+    assert.match(source, /each \.group_1 -> group_1 \{/);
+  });
+
+  it("keeps the ground truth identical whether the header is dotted or not", () => {
+    // Spec §4.6: the dot documents relativity but does not decide it, so the
+    // scenario's own field-edge oracle must not move.
+    const dotted = oneFile({
+      schemas: [
+        schemaDecl({ name: "s0", fields: [listRecordField("lines", [scalarField("sku")])] }),
+        schemaDecl({ name: "s1", fields: [listRecordField("lines", [scalarField("sku")])] }),
+      ],
+      mappings: [
+        mappingDecl({
+          name: "m0",
+          sources: ["s0"],
+          targets: ["s1"],
+          arrows: [
+            eachBlock(
+              endpoint("s0", "lines"),
+              endpoint("s1", "lines"),
+              [mapArrow([endpoint("s0", "lines.sku")], endpoint("s1", "lines.sku"))],
+              true,
+            ),
+          ],
+        }),
+      ],
+    });
+    const undotted = oneFile({
+      schemas: [
+        schemaDecl({ name: "s0", fields: [listRecordField("lines", [scalarField("sku")])] }),
+        schemaDecl({ name: "s1", fields: [listRecordField("lines", [scalarField("sku")])] }),
+      ],
+      mappings: [
+        mappingDecl({
+          name: "m0",
+          sources: ["s0"],
+          targets: ["s1"],
+          arrows: [
+            eachBlock(
+              endpoint("s0", "lines"),
+              endpoint("s1", "lines"),
+              [mapArrow([endpoint("s0", "lines.sku")], endpoint("s1", "lines.sku"))],
+              false,
+            ),
+          ],
+        }),
+      ],
+    });
+    assert.deepEqual(scenarioFieldEdges(dotted), scenarioFieldEdges(undotted));
+    assert.deepEqual(scenarioDeclaredFieldPaths(dotted), scenarioDeclaredFieldPaths(undotted));
+  });
+});
