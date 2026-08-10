@@ -143,13 +143,35 @@ export function computedArrow(target, transform) {
  * (spec §4.4), so a child naming anything else would not be a declared field.
  * {@link renderWorkspace} asserts it rather than emitting invalid Satsuma.
  */
-export function eachBlock(source, target, children) {
-  return { kind: "each", source, target, children };
+/**
+ * `each source -> target { children }`.
+ *
+ * `dottedTarget` chooses whether the header target is written with a leading
+ * dot — `each src -> .tgt` rather than `each src -> tgt`. Both spellings are
+ * semantically identical (spec §4.6), and generating both is what lets property
+ * suites reach the top-level dotted form that tced-ewd4 escaped.
+ *
+ * `undefined` (the default) preserves current behaviour: undotted at mapping
+ * level, dotted when nested. `true` forces dotted; `false` forces undotted.
+ *
+ * Every child endpoint must sit under this block's own paths and name the same
+ * schemas: Satsuma has no notation for reaching an ancestor from inside a block
+ * (spec §4.4), so a child naming anything else would not be a declared field.
+ * {@link renderWorkspace} asserts it rather than emitting invalid Satsuma.
+ */
+export function eachBlock(source, target, children, dottedTarget = undefined) {
+  const block = { kind: "each", source, target, children };
+  if (dottedTarget !== undefined) block.dottedTarget = dottedTarget;
+  return block;
 }
 
-/** `flatten source -> target { children }`; same child rules as {@link eachBlock}. */
-export function flattenBlock(source, target, children) {
-  return { kind: "flatten", source, target, children };
+/**
+ * `flatten source -> target { children }`; same child rules as {@link eachBlock}.
+ */
+export function flattenBlock(source, target, children, dottedTarget = undefined) {
+  const block = { kind: "flatten", source, target, children };
+  if (dottedTarget !== undefined) block.dottedTarget = dottedTarget;
+  return block;
 }
 
 // ── Declarations, files and workspaces ─────────────────────────────────────
