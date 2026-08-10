@@ -14,7 +14,7 @@ The YAML design is deliberately **charitable to YAML** — see
 [evals/static-compactness/SERIALISATION-DESIGN.md](../evals/static-compactness/SERIALISATION-DESIGN.md).
 Every ratio below is therefore a **lower bound** on Satsuma's advantage.
 
-Corpus: 21 specs under `examples/`.
+Corpus: 22 specs under `examples/`.
 
 ## Which tokenizers these figures carry
 
@@ -67,19 +67,20 @@ All three arms are comment-free, so the comparison is like-for-like. The
 | `sap-po-to-mfcs` | 180 | 1477 | 1510 | 1629 | 2183 | 9.3% | 32.3% |
 | `seabird-colony-lineage` | 87 | 408 | 461 | 524 | 807 | 22.1% | 49.4% |
 | `sfdc-to-snowflake` | 104 | 768 | 812 | 814 | 1153 | 5.7% | 33.4% |
+| `top-level-dotted-each` | 29 | 98 | 150 | 142 | 252 | 31% | 61.1% |
 | `xml-to-parquet` | 186 | 1508 | 1544 | 1794 | 2627 | 15.9% | 42.6% |
 
 ### Corpus summary
 
-- Median reduction vs YAML: **9%**
-- Median reduction vs JSON (2-space): **36.1%**
-- Median reduction vs YAML using the file as authored: **1.2%**
+- Median reduction vs YAML: **9.2%**
+- Median reduction vs JSON (2-space): **36.8%**
+- Median reduction vs YAML using the file as authored: **1.1%**
 
 Median of per-spec ratios, not the ratio of corpus totals — the latter lets the
 largest spec set the headline and systematically overstates the effect. The PRD
 calls that the single most common error in published comparisons of this kind.
 
-YAML is **smaller** than `.stm` on 0 of 21 specs.
+YAML is **smaller** than `.stm` on 0 of 22 specs.
 
 ### The agent-reference overhead is never repaid
 
@@ -101,8 +102,8 @@ token headline were an artifact of one tokenizer, these would disagree with it.
 
 ### Corpus summary
 
-- Median reduction vs YAML: **7.7%**
-- Median reduction vs JSON (2-space): **38.7%**
-- Median reduction vs YAML using the file as authored: **-1.7%**
+- Median reduction vs YAML: **8.2%**
+- Median reduction vs JSON (2-space): **39%**
+- Median reduction vs YAML using the file as authored: **-3%**
 
 

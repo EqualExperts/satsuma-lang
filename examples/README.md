@@ -24,6 +24,7 @@ The CLI requires a `.stm` file entry point (not a directory). The workspace is d
 | [`reports-and-models/`](reports-and-models/) | `pipeline.stm` | Reports, dashboards, and ML models as first-class pipeline consumers |
 | [`sap-po-to-mfcs/`](sap-po-to-mfcs/) | `pipeline.stm` | SAP ERP purchase order to Oracle MFCS ingestion contract |
 | [`seabird-colony-lineage/`](seabird-colony-lineage/) | `platform.stm` | Deeply nested field lineage and coverage across files and namespaces |
+| [`top-level-dotted-each/`](top-level-dotted-each/) | `pipeline.stm` | Top-level `each` with a dotted header target — minimal fixture for tced-ninm |
 | [`sfdc-to-snowflake/`](sfdc-to-snowflake/) | `pipeline.stm` | Salesforce Opportunity/Account objects to Snowflake analytics |
 | [`xml-to-parquet/`](xml-to-parquet/) | `pipeline.stm` | Commerce order XML to Lakehouse Parquet |
 
