@@ -1,6 +1,6 @@
 ---
 id: tced-ninm
-status: open
+status: closed
 deps: []
 links: [tced-ewd4]
 created: 2026-08-07T11:36:28Z
@@ -24,4 +24,11 @@ Raised rather than silently reaching for the nearest already-wired fixture, whic
 - A canonical example (or a new one) writes a top-level `each <list> -> .<target>`, so the shape is represented in `examples/` and therefore reachable by the harness.
 - A Playwright case in `harness.test.ts` hovers an arrow row on that mapping and asserts the `.hl` class lands on the expected source and target field rows — extending the existing "Hover highlighting between arrows and field rows" describe block rather than adding a parallel one.
 - Whatever derived artifacts a new corpus file feeds (test-stats.json, the eval static-compactness outputs) are regenerated in the same change.
+
+## Notes
+
+**2026-08-10T11:50:00Z**
+
+Cause: The corpus only wrote a dotted each target nested inside another each; no top-level form existed, so the harness could not exercise hover highlighting on that shape in a real browser.
+Fix: Added `examples/top-level-dotted-each/pipeline.stm` with a top-level `each parties -> .rows`, extended the existing "Hover highlighting between arrows and field rows" Playwright describe block with a case asserting `.hl` lands on `parties.party_role` and `rows.role`, and regenerated static-compactness and test-stats. (commit immediately after 27a6186c)
 
