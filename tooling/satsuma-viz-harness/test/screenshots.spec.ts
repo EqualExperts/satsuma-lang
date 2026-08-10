@@ -20,8 +20,8 @@
  *
  * Run via the screenshots Playwright project:
  *   npx playwright test --project=screenshots
- * In the agent workflow this runs automatically when you trigger the sentinel
- * watcher (watch-and-test.sh runs all projects).
+ * In the agent workflow this runs headless Chromium as one of the projects in
+ * `npm test`, so no separate trigger is needed.
  */
 
 import { test, type Page } from "@playwright/test";
@@ -31,7 +31,7 @@ import { join } from "node:path";
 // ---------- Output paths ----------
 
 // Screenshots and the manifest are written to a sibling directory of the
-// Playwright config so the watcher and contributors can find them in one
+// Playwright config so agents and contributors can find them in one
 // well-known location. The directory is gitignored.
 const SCREENSHOT_DIR = join(__dirname, "..", "screenshots");
 const MANIFEST_PATH = join(SCREENSHOT_DIR, "manifest.json");

@@ -50,4 +50,7 @@ site/playground/
 **/.vscode-test-insiders-explorer
 **/.vscode-test-explorer-insiders       
 
+# Python virtualenv for repo lint tools (ruff, yamllint) — see run-repo-checks.sh
+.venv/
+
 tmp/

@@ -31,7 +31,7 @@ Current per-package test counts and the CLI command count are tracked in [`test-
 - `tooling/satsuma-viz-model/`: the VizModel protocol contract — the payload shape the LSP produces and the viz component consumes, defined once so neither can drift
 - `tooling/satsuma-viz-backend/`: workspace indexing and VizModel assembly shared by the LSP and browser hosts; also computes the field coverage the payload carries (ADR-042)
 - `tooling/satsuma-viz/`: the `satsuma-viz` Lit web component — overview graph and per-mapping detail view, embedded in the VS Code webview and the site playground
-- `tooling/satsuma-viz-harness/`: Playwright harness for the viz component — human-in-the-loop, see [Viz harness Playwright tests](#viz-harness-playwright-tests-human-in-the-loop-workflow)
+- `tooling/satsuma-viz-harness/`: Playwright harness for the viz component — headless Chromium regression suite, see [Viz harness Playwright tests](#viz-harness-playwright-tests)
 - `tooling/vscode-satsuma/`: VS Code extension (LSP client, commands, webview panels) and TextMate grammar; delegates language intelligence to `satsuma-lsp`
 - `tooling/integration-tests/`: **test-only** cross-consumer parity sweeps (CLI vs. the VizModel both the webview and the LSP consume) — the one place both sides are reachable without either package taking on a dependency its own architecture forbids
 
@@ -153,77 +153,50 @@ the response to the user — not silently in your own reasoning:
    happens to be already wired up.
 
 If the answer to (1) is yes and (2) is yes, add the Playwright spec and run it
-through the sentinel workflow below before treating the task as done — do not
+against the headless-Chromium harness ([Viz harness Playwright
+tests](#viz-harness-playwright-tests)) before treating the task as done — do not
 defer it to a follow-up ticket. If (2) is no (the interaction genuinely cannot
 be expressed in the harness, or no fixture reaches the shape and adding one is
 out of scope for the ticket), say so explicitly in the response, and file a
 ticket for the fixture gap rather than letting the limitation go unstated.
 
-### Viz harness Playwright tests (human-in-the-loop workflow)
+### Viz harness Playwright tests
 
-The `tooling/satsuma-viz-harness/` Playwright tests cannot run directly in the
-agent sandbox — Chromium and WebKit headless both crash on ARM macOS (SwiftShader
-SIGSEGV), and even Firefox must be launched from the user's terminal.
+The `tooling/satsuma-viz-harness/` Playwright suite drives the rendered
+`satsuma-viz` component with real clicks and hovers, and runs **headless
+Chromium inside the agent sandbox** — no human-in-the-loop watcher, no sentinel
+file. The sandbox is a Linux/root container with a system Chromium at
+`/usr/bin/chromium`; `playwright.config.ts` resolves that binary, adds
+`--no-sandbox` (required only when running as root), and falls back to
+Playwright's bundled browser on a developer machine. Run the whole suite
+directly:
 
-**How this works:**
+```bash
+npx turbo run test --filter=@satsuma/viz-harness   # builds deps, then runs all projects
+# or, after `npm run build:all`:
+npm --prefix tooling/satsuma-viz-harness test
+```
 
-The harness uses a sentinel-file protocol so the agent can trigger runs and read
-results without shell access to the browser process:
+The suite is included in `test:all`, so it also runs inside
+tooling/satsuma-viz-harness's own CI job and in the pre-commit hook
+(`scripts/run-repo-checks.sh`) — a commit that breaks a hover or a coverage
+indicator is caught before it is pushed, which is precisely the gap sl-rj78 and
+sl-d7fz fell through.
 
-1. The human runs the watcher once in a background terminal (from the harness directory):
-   ```
-   ./tooling/satsuma-viz-harness/watch-and-test.sh &
-   ```
-   The watcher polls for `.run-tests`, runs `npm test` when it appears, and therefore
-   rebuilds the harness and everything it depends on before Playwright starts — the
-   harness's `pretest` is `turbo run build --filter=@satsuma/viz-harness`. It is the
-   only surviving `pretest` in the repo; do not infer that other packages still have
-   build hooks (see [Building and testing](#building-and-testing)). Build and test
-   output is written to `.playwright-results.txt`, then the sentinel is removed.
+Notes:
 
-2. The agent triggers a run by creating the sentinel:
-   ```bash
-   touch tooling/satsuma-viz-harness/.run-tests
-   ```
-
-3. The agent polls until the sentinel is gone (the watcher removes it immediately
-   on pickup), then reads `.playwright-results.txt` for results.
-
-**What to tell the human:**
-
-When you need Playwright test results, tell the user the **full absolute path**
-to the script — do not use a relative path.  You may be running inside a worktree
-at a non-obvious location (e.g. `.worktrees/feat/some-feature/`) and the human
-will not know which directory you mean without the full path.
-
-Example message:
-
-> "Please run this in a terminal if it's not already running:
-> `/path/tp/clone/of/satsuma-lang/.worktrees/feat/viz-harness/tooling/satsuma-viz-harness/watch-and-test.sh`
-> I'll trigger runs by touching `.run-tests` in that same directory and read
-> results from `.playwright-results.txt` there."
-
-Substitute the actual absolute path for your current working directory.  Use
-`pwd` or inspect the path you are already using for file operations — you know
-it.  Never make the human guess where the worktree is.
-
-Then touch the sentinel, wait for it to disappear (the watcher picks it up within
-1 second), and poll `.playwright-results.txt` until it contains `passed` or
-`failed`. A full run takes roughly 30–90 seconds.
-
-**Constraints to remember:**
-
-- **Never** try to run `npx playwright test` directly — it will be blocked or
-  will produce no usable output in the sandbox.
-- **Never** try to start a browser process directly.
-- The watcher rebuilds everything needed by the harness. Do not rebuild by hand
-  before triggering it; confirm the fresh build output in `.playwright-results.txt`.
-- The watcher kills any stale server on port 3333 before each run, so there is
-  no need to manage the server separately.
-- If `.playwright-results.txt` is stale (timestamp older than your sentinel
-  touch), wait longer — the watcher may still be running the suite.
-- Results from a prior run remain in `.playwright-results.txt` until the next
-  run overwrites them. Always check the file timestamp after triggering.
+- `pre`-script: the harness's `pretest` runs `turbo run build
+  --filter=@satsuma/viz-harness`, so a bare `npm test` rebuilds the harness and
+always tests current bundles. It is now the only surviving `pretest` in the
+repo; do not infer that other packages still have build hooks (see
+[Building and testing](#building-and-testing)).
+- A developer machine without `/usr/bin/chromium` needs the bundled browser
+  once: `npx playwright install chromium` (the config falls back to it).
+- If a stale server is occupying :3333/:3334, Playwright's `webServer` will
+  report `EADDRINUSE`; kill it (`pkill -f "node dist/server.js"`) and rerun.
+- If you add a Playwright spec for a visual element only a browser can prove
+  (per the checklist above), it must actually pass here before the task is done —
+  do not defer it to a follow-up ticket.
 
 ## Security
 
@@ -279,6 +252,7 @@ editing a package's `dependencies`/`devDependencies`, nothing else (ADR-049).
 | Coverage for every package that reports it | `npm run test:coverage` |
 | The repo-level scripts' own tests | `npm run test:scripts` |
 | Everything the pre-commit hook runs | `./scripts/run-repo-checks.sh` |
+| Run the viz harness Playwright suite (headless Chromium) | `npx turbo run test --filter=@satsuma/viz-harness`, or `npm --prefix tooling/satsuma-viz-harness test` after `build:all` — see [Viz harness Playwright tests](#viz-harness-playwright-tests) |
 | Preview the current viz UI locally | `npx turbo run build --filter=@satsuma/viz-harness && npm --prefix tooling/satsuma-viz-harness run dev`, then open <http://localhost:3333> — see [tooling/satsuma-viz-harness/README.md](tooling/satsuma-viz-harness/README.md#running-the-dev-server-locally-live-preview-not-playwright). Claude Code users can just run `/viz-dev`. |
 
 `--filter` takes a package's **declared name**, not its directory:
@@ -304,10 +278,12 @@ Two more consequences worth knowing:
   Deleting the cache is not the tool for this: from a linked worktree under
   `.worktrees/`, turbo shares the *primary* worktree's cache and `clean:all`'s
   `.turbo` entry is a no-op.
-- **Two suites are deliberately outside `test:all`.** `@satsuma/viz-harness`'s is
-  Playwright (see below), and `tree-sitter-satsuma`'s shells out to
-  `tree-sitter test --wasm`, which needs its own environment and graceful-skip
-  handling — `scripts/run-repo-checks.sh` runs it separately.
+- **One suite is deliberately outside `test:all`.** `tree-sitter-satsuma`'s `test`
+  shells out to `tree-sitter test --wasm`, which needs its own environment and
+  graceful-skip handling — `scripts/run-repo-checks.sh` runs it separately.
+  `@satsuma/viz-harness`'s Playwright suite runs headless Chromium inside the
+  sandbox and is included in `test:all` like every other package (see
+  [Viz harness Playwright tests](#viz-harness-playwright-tests)).
 
 ## Running Turborepo in the agent sandbox
 

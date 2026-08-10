@@ -4,15 +4,49 @@
  * Runs browser-based end-to-end tests against the harness server.  The server
  * is started automatically via webServer and torn down at the end of the run.
  *
- * Playwright execution is a required local developer-machine workflow for
- * Feature 29.  It is intentionally kept out of CI for this feature (see
- * features/29-viz-harness-and-shared-backend/PRD.md).
+ * Chromium is the single target browser. It runs headless both on a developer
+ * machine (`npx playwright install chromium` on first use) and inside the agent
+ * sandbox, which ships a system Chromium at /usr/bin/chromium. Pinning to one
+ * browser keeps the suite reproducible everywhere; the harness exercises the
+ * same `satsuma-viz` web component regardless of engine.
  *
- * To run:  npx playwright install --with-deps chromium  (first time)
- *          npm test  (subsequent runs)
+ * To run:  npx playwright install chromium   (first time on a dev machine)
+ *          npm test                          (subsequent runs, pretest builds deps)
  */
 
+import { existsSync } from "node:fs";
 import { defineConfig, devices } from "@playwright/test";
+
+/*
+ * Chromium executable resolution.
+ *
+ * Playwright launches its own bundled browser by default, which a developer
+ * obtains with `npx playwright install chromium`. The agent sandbox instead
+ * ships a system Chromium at /usr/bin/chromium and does not download bundled
+ * browsers (PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD), so the resolver prefers an
+ * explicit override, then that well-known system path, and only falls back to
+ * Playwright's bundled browser when neither is present. An env override lets a
+ * host point the suite at any Chrome-family binary it provides.
+ */
+const SYSTEM_CHROMIUM = "/usr/bin/chromium";
+const CHROMIUM_EXECUTABLE_PATH =
+  process.env.CHROMIUM_EXECUTABLE_PATH ??
+  (existsSync(SYSTEM_CHROMIUM) ? SYSTEM_CHROMIUM : undefined);
+
+/*
+ * Chromium refuses to start without --no-sandbox when launched as root, which
+ * is how the agent sandbox runs tests. A normal developer machine does not need
+ * (and should not carry) it, so gate the flag on the effective uid rather than
+ * shipping it unconditionally.
+ */
+const CHROMIUM_ARGS =
+  typeof process.getuid === "function" && process.getuid() === 0 ? ["--no-sandbox"] : [];
+
+/** Shared browser launch options: resolved executable plus root-only sandbox flag. */
+const CHROMIUM_LAUNCH = {
+  executablePath: CHROMIUM_EXECUTABLE_PATH,
+  args: CHROMIUM_ARGS,
+};
 
 export default defineConfig({
   testDir: "./test",
@@ -23,22 +57,20 @@ export default defineConfig({
   /* Reporter: show each test name with status */
   reporter: "list",
   use: {
-    baseURL: "http://localhost:3333",
+    baseURL: "http://127.0.0.1:3333",
     /* Capture trace on failure for debugging */
     trace: "on-first-retry",
   },
   projects: [
     {
-      // Firefox is used because Chromium headless-shell and WebKit both segfault
-      // in SwiftShader on some macOS ARM configurations.  Firefox's headless mode
-      // does not depend on SwiftShader and runs reliably in this environment.
-      // Both browsers exercise the same satsuma-viz web component code paths;
-      // the choice of browser does not affect what the tests validate.
-      name: "firefox",
-      use: { ...devices["Desktop Firefox"] },
-      // Semantic pass/fail suite only — *.test.ts. Screenshot review specs
-      // live in *.spec.ts and run under the dedicated screenshots project so
-      // a contributor can choose to run only one or the other. The static
+      // The semantic pass/fail suite — real clicks, real hovers, and
+      // data-testid selectors, never pixel comparison. Tracks the rendered
+      // `satsuma-viz` component the same way a user would.
+      name: "chromium",
+      use: { ...devices["Desktop Chrome"], launchOptions: CHROMIUM_LAUNCH },
+      // Semantic suite only — *.test.ts. Screenshot review specs live in
+      // *.spec.ts and run under the dedicated screenshots project so a
+      // contributor can choose to run only one or the other. The static
       // playground suite runs against the OTHER server (port 3334), so it is
       // excluded here and owned by the playground-static project below.
       testMatch: /.*\.test\.ts$/,
@@ -50,7 +82,7 @@ export default defineConfig({
       // expansion/PRD.md §"Screenshot artifacts for human and VLM review".
       // Artifacts are review-only, NOT golden baselines (see sl-mm7v).
       name: "screenshots",
-      use: { ...devices["Desktop Firefox"] },
+      use: { ...devices["Desktop Chrome"], launchOptions: CHROMIUM_LAUNCH },
       testMatch: /.*\.spec\.ts$/,
     },
     {
@@ -61,26 +93,29 @@ export default defineConfig({
       // request carry source content.
       name: "playground-static",
       use: {
-        ...devices["Desktop Firefox"],
-        baseURL: "http://localhost:3334/satsuma-lang/playground/",
+        ...devices["Desktop Chrome"],
+        launchOptions: CHROMIUM_LAUNCH,
+        baseURL: "http://127.0.0.1:3334/satsuma-lang/playground/",
       },
       testMatch: /playground-static\.test\.ts$/,
     },
   ],
   /* Start both servers before tests, shut them down after: the Node harness
-   * server (firefox + screenshots projects) and the static playground file
+   * server (chromium + screenshots projects) and the static playground file
    * server (playground-static project). The latter re-assembles the bundle
-   * from the current dist/ first — a fast copy, not a rebuild. */
+   * from the current dist/ first — a fast copy, not a rebuild. The URLs use
+   * 127.0.0.1 because the harness server binds that address, while `localhost`
+   * may resolve to the IPv6 loopback and trip the health check. */
   webServer: [
     {
       command: "node dist/server.js",
-      url: "http://localhost:3333",
+      url: "http://127.0.0.1:3333",
       reuseExistingServer: false,
       timeout: 15_000,
     },
     {
       command: "node scripts/build-playground.mjs && node scripts/serve-playground.mjs",
-      url: "http://localhost:3334/satsuma-lang/playground/index.html",
+      url: "http://127.0.0.1:3334/satsuma-lang/playground/index.html",
       reuseExistingServer: false,
       timeout: 15_000,
     },

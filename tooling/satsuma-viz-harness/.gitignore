@@ -1,9 +1,5 @@
 # Playwright test artifacts — generated locally, not committed
 test-results/
-.playwright-results.txt
-
-# Sentinel file used by watch-and-test.sh to trigger test runs
-.run-tests
 
 # Screenshot review artifacts (sl-mm7v) — produced by the `screenshots`
 # Playwright project for human/VLM review. NOT golden baselines, so they

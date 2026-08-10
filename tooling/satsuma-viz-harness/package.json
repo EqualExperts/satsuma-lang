@@ -10,11 +10,12 @@
     "@satsuma/viz by hand is gone — Turborepo derives that order from this",
     "package's dependencies (feature 42, R4).",
     "",
-    "`pretest` stays, and stays a `pretest` hook, because the Playwright suite is",
-    "driven by a human running plain `npm test` through watch-and-test.sh",
-    "(AGENTS.md): the hook is what guarantees the bundles under test are current.",
-    "It now asks Turborepo for this package's build, which pulls its dependencies'",
-    "builds along with it and skips any whose inputs have not changed."
+    "`pretest` stays, and stays a `pretest` hook, because whatever drives",
+    "`npm test` — the agent sandbox's direct headless-Chromium run, a developer,",
+    "or the dedicated CI job — the hook is what guarantees the bundles under test",
+    "are current. It asks Turborepo for this package's build, which pulls its",
+    "dependencies' builds along with it and skips any whose inputs have not",
+    "changed."
   ],
   "scripts": {
     "build:server": "esbuild src/server.ts --bundle --platform=node --target=node20 --outfile=dist/server.js --sourcemap --banner:js='var __import_meta_url = require(\"url\").pathToFileURL(__filename).href;' --define:import.meta.url=__import_meta_url",
