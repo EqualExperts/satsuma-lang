@@ -39,6 +39,18 @@ jobs:
           RELEASE_TAG: ${{ inputs.version }}
         run: node scripts/release-metadata.mjs validate "$RELEASE_TAG"
 
+      - name: Resolve artifact build version
+        env:
+          RELEASE_BUILD: ${{ github.event_name == 'workflow_dispatch' }}
+        run: |
+          if [ "$RELEASE_BUILD" = "true" ]; then
+            BUILD_VERSION="$(node scripts/release-metadata.mjs build-version --release)"
+          else
+            BUILD_VERSION="$(node scripts/release-metadata.mjs build-version)"
+          fi
+          echo "BUILD_VERSION=$BUILD_VERSION" >> "$GITHUB_ENV"
+          echo "Building Satsuma artifacts as $BUILD_VERSION"
+
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
           node-version: "22"
@@ -60,6 +72,10 @@ jobs:
       - name: Install and build all workspace packages
         run: npm run ci:all
 
+      - name: Inject rolling-build package versions
+        if: github.event_name == 'push'
+        run: node scripts/release-metadata.mjs inject-build-version "$BUILD_VERSION"
+
       - name: Build distributable artifacts
         run: ./scripts/build-artifacts.sh
 
@@ -68,7 +84,9 @@ jobs:
         run: |
           # Install from the just-built tarball and confirm the CLI is functional.
           npm install -g ./tooling/satsuma-cli/satsuma-cli.tgz
-          satsuma --version
+          ACTUAL_CLI_VERSION="$(satsuma --version)"
+          echo "Installed satsuma $ACTUAL_CLI_VERSION"
+          test "$ACTUAL_CLI_VERSION" = "$BUILD_VERSION"
 
           # Install the LSP tarball and drive a real initialize round-trip over
           # stdio. The server loads its WASM assets inside onInitialize, so this

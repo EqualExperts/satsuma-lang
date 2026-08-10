@@ -24,6 +24,10 @@ npm --prefix tooling/vscode-satsuma run package # produces vscode-satsuma.vsix
 code --install-extension tooling/vscode-satsuma/vscode-satsuma.vsix
 ```
 
+The package shown in VS Code's Extensions view is `X.Y.Z` at the exact release
+tag and `X.Y.Z-dev.<short-sha>` everywhere else. Packaging applies that version
+only to a temporary staging manifest; the tracked `package.json` remains clean.
+
 There is no `server/` package to install into: the language server is
 `tooling/satsuma-lsp`, a workspace package this one declares, and the build
 bundles it into `server/dist/`.

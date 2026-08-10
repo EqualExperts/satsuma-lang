@@ -198,11 +198,8 @@ cache.
 flowchart TD
     security["security\n(reusable workflow gate)"]
 
-    security --> build["build\n(pack CLI tarball + smoke test)"]
-    security --> vsix["vsix\n(build .vsix)"]
-
-    build --> release["release\n(create GitHub release)"]
-    vsix --> release
+    security --> artifacts["artifacts\n(resolve version · build all three · smoke test)"]
+    artifacts --> release["release\n(create GitHub release)"]
 
     release -->|"push to main"| latest["Update 'latest' pre-release"]
     release -->|"workflow_dispatch"| tagged["Create tagged release\n(e.g. v0.5.1)"]
@@ -213,27 +210,33 @@ flowchart TD
 #### `security` (reusable)
 
 Calls `.github/workflows/security.yml` as a required gate before any build
-work begins. Both the CLI tarball and the `.vsix` are only built if security
-passes.
+work begins. The CLI tarball, standalone LSP tarball, and `.vsix` are only built
+if security passes.
 
-#### `build`
+#### `artifacts`
 
-Installs all workspace dependencies, builds the WASM parser, and runs `npm
-run pack` to produce `satsuma-cli.tgz`. The `pack` script (in
-`tooling/satsuma-cli/scripts/pack.js`) is the single source of truth for
-tarball creation — it is the same script used locally and in CI. After
-packing, the step installs the tarball globally and runs `satsuma --version`
-as a final smoke test before the artifact is uploaded.
+Resolves one build version before any package is built. A push to `main` uses
+`<VERSION>-dev.<short-sha>` and injects it into the CLI, LSP, and extension
+manifests inside the ephemeral CI checkout. A workflow-dispatched release uses
+the clean `VERSION`; the dispatch is the release signal because the workflow
+creates the tag only after the artifacts pass. Development injection never
+changes `VERSION`, the root lockfile, changelog, or site data.
 
-The tarball artifact is uploaded for consumption by the `release` job.
+The job installs and builds all workspace packages, then
+`scripts/build-artifacts.sh` produces all three distributables. CLI and LSP
+prebuilds bake the same version into their executables, and the VSIX packager
+sets it in a temporary staging manifest so local packaging does not dirty the
+tracked release manifest.
 
-#### `vsix`
+After packing, the job installs the two tarballs. It asserts that `satsuma
+--version` equals the resolved build version and drives a real LSP initialize
+round-trip that checks `serverInfo.version`. The CLI/LSP pack verifiers and
+VSIX staging packager carry that same value into their artifact manifests
+before all three artifacts are uploaded for the `release` job.
 
-Installs all workspace dependencies, builds the WASM parser, builds the
-`satsuma-viz` bundle (needed by the webview), builds the full extension
-bundle (client + server + webview), and packages it as `vscode-satsuma.vsix`
-using `@vscode/vsce`. The `.vsix` artifact is uploaded for consumption by
-the `release` job.
+Local builds follow the same rule without changing tracked package manifests:
+HEAD at the exact matching `v<VERSION>` tag is clean; every other branch or
+worktree build reports `<VERSION>-dev.<short-sha>`.
 
 #### `release`
 
@@ -260,10 +263,12 @@ such as `v0.9.0` for tagged releases):
 | `satsuma-lsp-<tag>.tgz` | `npm install -g <url>` |
 | `vscode-satsuma-<tag>.vsix` | `code --install-extension vscode-satsuma-<tag>.vsix` |
 
-The unsuffixed names (`satsuma-cli.tgz`, `vscode-satsuma.vsix`) exist only as
-local pack outputs and CI workflow artifacts — they are never the download
-filenames on a GitHub release. Install instructions must use the suffixed
-names.
+The unsuffixed names (`satsuma-cli.tgz`, `satsuma-lsp.tgz`, and
+`vscode-satsuma.vsix`) exist only as local pack outputs and CI workflow
+artifacts — they are never the download filenames on a GitHub release. Install
+instructions must use the suffixed names. The filename's `latest` identifies
+the rolling release channel; the version reported by the installed artifact
+identifies its exact source commit.
 
 ### Creating a tagged release
 

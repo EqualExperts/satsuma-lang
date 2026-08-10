@@ -172,7 +172,9 @@ npm install -g https://github.com/EqualExperts/satsuma-lang/releases/download/la
 ```
 
 This gives you the `satsuma` command on your PATH. Run `satsuma --help` to see
-available commands.
+available commands, and `satsuma --version` to identify the build. Rolling
+`latest` packages report `<release>-dev.<commit>`; tagged releases report the
+clean release version.
 
 > **Can't install the CLI or VS Code extension?** Satsuma is still useful
 > without any tooling. LLMs can read and generate `.stm` files directly, and
@@ -449,6 +451,9 @@ To build the distributable tarball (the same way CI and releases do):
 ```bash
 npm run pack              # produces satsuma-cli.tgz, verified and smoke-tested
 ```
+
+When HEAD is not the exact release tag, local CLI/LSP tarballs and the VSIX use
+`<VERSION>-dev.<short-sha>` without changing the tracked package manifests.
 
 See [SATSUMA-CLI.md](SATSUMA-CLI.md) for the full command reference.
 

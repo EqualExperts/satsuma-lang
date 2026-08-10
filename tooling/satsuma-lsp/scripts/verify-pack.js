@@ -14,6 +14,7 @@ const path = require("path");
 
 const lspRoot = path.join(__dirname, "..");
 const tarballPath = path.join(lspRoot, "satsuma-lsp.tgz");
+const expectedArtifactVersion = process.env.EXPECTED_ARTIFACT_VERSION;
 
 if (!existsSync(tarballPath)) {
   throw new Error(`verify-pack: tarball not found at ${tarballPath}`);
@@ -72,6 +73,13 @@ const manifest = JSON.parse(
     encoding: "utf8",
   }),
 );
+
+if (expectedArtifactVersion && manifest.version !== expectedArtifactVersion) {
+  throw new Error(
+    `verify-pack: manifest version is ${manifest.version}, expected ${expectedArtifactVersion}`,
+  );
+}
+console.log(`verify-pack: manifest carries build version ${manifest.version}`);
 
 const unpublishable = Object.keys(manifest.dependencies ?? {}).filter((name) =>
   name.startsWith("@satsuma/"),

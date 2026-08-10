@@ -9,19 +9,16 @@
 
 import type { Command } from "commander";
 import { program } from "commander";
-import { readFileSync } from "fs";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
 import { initParser } from "./parser.js";
 import { COMMAND_MODULES, commandModuleSpecifier } from "./command-loader.js";
+import { BUILD_VERSION } from "./generated/build-version.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
 // Initialise the WASM parser before registering any commands.
 await initParser(join(__dirname, "tree-sitter-satsuma.wasm"));
-const pkg = JSON.parse(readFileSync(join(__dirname, "../package.json"), "utf8")) as {
-  version: string;
-};
 
 program
   .name("satsuma")
@@ -30,7 +27,7 @@ program
       "Extracts structural facts and delivers NL content verbatim. Does not interpret natural language.\n\n" +
       "Run `satsuma <command> --help` for detailed usage, flags, and JSON output shape for each command.",
   )
-  .version(pkg.version)
+  .version(BUILD_VERSION)
   .showHelpAfterError(true);
 
 // Last-resort safety net for promise rejections that escape the runner.

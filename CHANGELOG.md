@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### Rolling builds now identify the exact commit (`sl-13p5`)
+
+CLI, standalone LSP, and VSIX artifacts built from `main` or a local untagged
+revision now carry `<VERSION>-dev.<short-sha>`. `satsuma --version`, the LSP
+initialize response, and VS Code's Extensions view all expose the same identity;
+tagged releases remain clean `X.Y.Z` versions.
+
 ## v0.13.0 — 2026-08-05
 
 ### `agent-reference` can hand an agent one slice instead of the whole document (`arpd-6iis`)
