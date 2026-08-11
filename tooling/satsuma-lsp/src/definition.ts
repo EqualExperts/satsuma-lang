@@ -523,7 +523,8 @@ function findEnclosingMapping(node: SyntaxNode): SyntaxNode | null {
 function extractPathFieldName(pathNode: SyntaxNode): string | null {
   // src_path / tgt_path wraps a _path_expr which can be:
   //   field_path (identifier.identifier...), relative_field_path (.identifier...),
-  //   backtick_path, namespaced_path
+  //   backtick_path, namespaced_path, parent_path (^.identifier...),
+  //   root_path ($.identifier...)
   const text = pathNode.text;
   if (!text) return null;
 
@@ -532,10 +533,17 @@ function extractPathFieldName(pathNode: SyntaxNode): string | null {
     return text.slice(1, -1).split(".")[0] ?? null;
   }
 
+  // Strip the ADR-053 ancestor-escape prefixes so go-to-definition finds the
+  // field the escape points at rather than the `^`/`$` marker. Resolution here
+  // is by field name (the LSP resolves a leaf by name, not by full container
+  // path), so dropping the escape prefix matches how a relative `.field`'s
+  // leading dot is already ignored.
+  const withoutEscape = text.replace(/^(?:\^\.|\$\.)+/, "");
+
   // Handle dotted paths: take the first segment. split() on a non-empty
   // string always yields at least one element (`text` is non-empty per the
   // guard above), so the fallback exists only for noUncheckedIndexedAccess.
-  const firstSegment = text.split(".")[0] ?? "";
+  const firstSegment = withoutEscape.split(".")[0] ?? "";
   // Handle namespaced: ns::field → take field part
   if (firstSegment.includes("::")) {
     return firstSegment.split("::").pop() ?? null;

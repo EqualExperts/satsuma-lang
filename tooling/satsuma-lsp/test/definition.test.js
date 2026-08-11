@@ -262,6 +262,40 @@ mapping \`test\` {
     assert.equal(loc.range.start.line, 4); // email_addr field in tgt schema
   });
 
+  it("jumps from an ancestor-escape source path to the field it points at (ADR-053)", () => {
+    // The `^.` parent escape suppresses the container prefix, so the field the
+    // author reached for is `transect_ref` — go-to-definition must resolve the
+    // field name after the marker, not the marker itself. The LSP resolves a
+    // leaf by name, so stripping the escape prefix is what makes the jump land.
+    const result = definition(
+      {
+        "file:///a.stm": `schema src {
+  transect_ref VARCHAR
+  sightings list_of record {
+    species VARCHAR
+  }
+}
+schema tgt {
+  ref VARCHAR
+}
+mapping \`test\` {
+  source { src }
+  target { tgt }
+  each sightings -> ref {
+    ^.transect_ref -> ref
+  }
+}`,
+      },
+      "file:///a.stm",
+      13,
+      7, // cursor on "transect_ref" in "^.transect_ref -> ref"
+    );
+    assert.ok(result, "Expected definition for ancestor-escape source field");
+    const loc = Array.isArray(result) ? result[0] : result;
+    assert.equal(loc.uri, "file:///a.stm");
+    assert.equal(loc.range.start.line, 1); // transect_ref field in src schema
+  });
+
   it("jumps from @ref in NL string to block definition", () => {
     // Line 6: "  -> display { "Look up @customers table" }"
     const result = definition(

@@ -1175,6 +1175,14 @@
         },
         {
           "type": "SYMBOL",
+          "name": "parent_path"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "root_path"
+        },
+        {
+          "type": "SYMBOL",
           "name": "relative_field_path"
         },
         {
@@ -1264,6 +1272,87 @@
           {
             "type": "STRING",
             "value": "."
+          },
+          {
+            "type": "SYMBOL",
+            "name": "_path_seg"
+          },
+          {
+            "type": "REPEAT",
+            "content": {
+              "type": "SEQ",
+              "members": [
+                {
+                  "type": "IMMEDIATE_TOKEN",
+                  "content": {
+                    "type": "STRING",
+                    "value": "."
+                  }
+                },
+                {
+                  "type": "SYMBOL",
+                  "name": "_path_seg"
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "parent_path": {
+      "type": "PREC_RIGHT",
+      "value": 0,
+      "content": {
+        "type": "SEQ",
+        "members": [
+          {
+            "type": "REPEAT1",
+            "content": {
+              "type": "TOKEN",
+              "content": {
+                "type": "STRING",
+                "value": "^."
+              }
+            }
+          },
+          {
+            "type": "SYMBOL",
+            "name": "_path_seg"
+          },
+          {
+            "type": "REPEAT",
+            "content": {
+              "type": "SEQ",
+              "members": [
+                {
+                  "type": "IMMEDIATE_TOKEN",
+                  "content": {
+                    "type": "STRING",
+                    "value": "."
+                  }
+                },
+                {
+                  "type": "SYMBOL",
+                  "name": "_path_seg"
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "root_path": {
+      "type": "PREC_RIGHT",
+      "value": 0,
+      "content": {
+        "type": "SEQ",
+        "members": [
+          {
+            "type": "TOKEN",
+            "content": {
+              "type": "STRING",
+              "value": "$."
+            }
           },
           {
             "type": "SYMBOL",

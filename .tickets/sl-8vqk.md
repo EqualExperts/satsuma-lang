@@ -1,6 +1,6 @@
 ---
 id: sl-8vqk
-status: open
+status: closed
 deps: []
 links: [sl-kezo]
 created: 2026-08-02T21:42:17Z
@@ -28,3 +28,10 @@ Candidate notations to weigh: a '^.' parent prefix, a '$.' root prefix, or an ex
 - If adopted: grammar, corpus fixture with a parent-to-child-element arrow, extraction, coverage and lineage all resolve it.
 - docs/nested-data/README.md sections 2 and 9 updated.
 
+
+## Notes
+
+**2026-08-11T11:36:51Z**
+
+Cause: There was no notation for reaching an ancestor field from inside an each/flatten block — every path is prefixed with the enclosing container's path, so a parent reference resolved to a non-existent field (transects.sightings.transects.transect_ref) and a nested-each parent-to-child-element arrow could only live in a note.
+Fix: Adopted ADR-053 ancestor-escape prefixes: `^.` pops one container level per occurrence and `$.` resolves absolute from the schema root. Added `parent_path`/`root_path` grammar rules (regenerated parser + CST contract), a single shared resolver `resolveAuthoredPathAgainstContainer` in reference-stages.ts now backing extract.ts's qualifyChildArrowPath, qualifyContainerFieldRef, and nl-ref.ts target qualification, so extraction, coverage, lineage, and the LSP all resolve escapes; added corpus fixtures, core/LSP tests, an examples/ancestor-escape canonical example, and updated the spec §4.4, AI-AGENT-REFERENCE.md, and nested-data README §2/§9. (commit immediately after c11de8c4)

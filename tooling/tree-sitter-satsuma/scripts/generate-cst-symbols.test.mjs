@@ -19,15 +19,17 @@ import {
 const PACKAGE_ROOT = path.resolve(import.meta.dirname, "..");
 const NODE_TYPES_PATH = path.join(PACKAGE_ROOT, "src", "node-types.json");
 
-test("the real grammar exposes the measured 60 named and 39 anonymous symbols", () => {
+test("the real grammar exposes the measured 62 named and 41 anonymous symbols", () => {
   // Feature 39's contract is useful only if it includes anonymous tokens as
-  // well as named nodes; these counts pin the reviewed grammar surface.
+  // well as named nodes; these counts pin the reviewed grammar surface. The
+  // two named nodes (parent_path, root_path) and two anonymous tokens ("^.",
+  // "$.") joined with ADR-053's ancestor escape paths.
   const nodeTypes = JSON.parse(fs.readFileSync(NODE_TYPES_PATH, "utf8"));
 
   const symbols = classifyNodeTypes(nodeTypes);
 
-  assert.equal(symbols.namedKinds.length, 60);
-  assert.equal(symbols.anonymousTokens.length, 39);
+  assert.equal(symbols.namedKinds.length, 62);
+  assert.equal(symbols.anonymousTokens.length, 41);
   assert.deepEqual(
     symbols.anonymousTokens.filter((symbol) =>
       ["record", "list_of", "enum", "slice"].includes(symbol),

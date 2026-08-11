@@ -7,6 +7,7 @@
  */
 
 import { canonicalRef } from "./canonical-ref.js";
+import { resolveAuthoredPathAgainstContainer } from "./reference-stages.js";
 import { classifyTransform, classifyArrow } from "./classify.js";
 import { createScalarTypeExpression } from "./field-decl.js";
 import { extractMetadata } from "./meta-extract.js";
@@ -981,13 +982,6 @@ export function extractMappingArrowRecords(
 }
 
 /**
- * The authored leading dot on a relative path. Spec §4.6: "A leading `.`
- * documents the relativity, but it does not decide it" — the enclosing frame
- * does. So the marker never survives into a resolved path.
- */
-const RELATIVITY_MARKER = /^\./;
-
-/**
  * Make one arrow path absolute against the container it was authored inside.
  *
  * Inside a `nested_arrow`, `each` or `flatten` body, paths are authored
@@ -997,11 +991,18 @@ const RELATIVITY_MARKER = /^\./;
  * a path written without one inside a container is treated identically, since
  * the container is the only frame it can be read in.
  *
- * Exported because every consumer that resolves an arrow against a declared
- * field must apply this rule, and the copies drift when they don't share it:
- * coverage reported nested leaves as gaps until sc-xnxp, and the viz dropped
- * every relative-path arrow from its coverage lookups, hover highlighting and
- * overview edges until 3cdd-yavi.
+ * Two escape prefixes reach an ancestor instead (ADR-053): `^.field` pops one
+ * container level per `^.` and `$.field` resolves absolute from the schema
+ * root. Both keep the existing dot semantics untouched — a bare `field` or
+ * `.field` still receives the container prefix exactly as before.
+ *
+ * The resolution itself lives once in {@link resolveAuthoredPathAgainstContainer}
+ * (reference-stages), which this function delegates to. Exported because every
+ * consumer that resolves an arrow against a declared field must apply this
+ * rule, and the copies drift when they don't share it: coverage reported nested
+ * leaves as gaps until sc-xnxp, and the viz dropped every relative-path arrow
+ * from its coverage lookups, hover highlighting and overview edges until
+ * 3cdd-yavi.
  *
  * At mapping-body level there is no container to prefix, but the dot is still
  * only a marker: the frame it names is the mapping's own root, so `.rows` and
@@ -1013,16 +1014,16 @@ const RELATIVITY_MARKER = /^\./;
  * Coverage disagreeing with lineage about one arrow's identity is the failure
  * ADR-035 exists to prevent, so the outlier moved rather than the majority.
  *
- * @param path        Path as authored, with or without a leading dot.
+ * @param path        Path as authored, with or without a leading dot or an
+ *                    ADR-053 escape prefix.
  * @param containerPath Absolute path of the enclosing container, or null at
  *                    mapping-body level, where the mapping root is the frame.
- * @returns The path relative to the schema root, never dot-leading. An empty
- *          path stays empty rather than becoming a dangling `container.`.
+ * @returns The path relative to the schema root, never dot-leading or carrying
+ *          an escape marker. An empty path stays empty rather than becoming a
+ *          dangling `container.`.
  */
 export function qualifyChildArrowPath(path: string, containerPath: string | null): string {
-  if (!path) return path;
-  const relativeToFrame = path.replace(RELATIVITY_MARKER, "");
-  return containerPath ? `${containerPath}.${relativeToFrame}` : relativeToFrame;
+  return resolveAuthoredPathAgainstContainer(path, containerPath);
 }
 
 /**
