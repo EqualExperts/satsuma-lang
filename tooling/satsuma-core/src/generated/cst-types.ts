@@ -44,6 +44,7 @@ export const SATSUMA_NAMED_KINDS = [
   "note_block",
   "note_tag",
   "number_literal",
+  "parent_path",
   "pipe_chain",
   "pipe_step",
   "pipe_text",
@@ -51,6 +52,7 @@ export const SATSUMA_NAMED_KINDS = [
   "qualified_name",
   "question_comment",
   "relative_field_path",
+  "root_path",
   "schema_block",
   "schema_body",
   "slice_body",
@@ -71,6 +73,7 @@ export const SATSUMA_NAMED_KINDS = [
 
 /** Anonymous grammar tokens that can also appear as concrete CST nodes. */
 export const SATSUMA_ANONYMOUS_TOKENS = [
+  "$.",
   "%",
   "(",
   ")",
@@ -85,6 +88,7 @@ export const SATSUMA_ANONYMOUS_TOKENS = [
   ":",
   "::",
   "@",
+  "^.",
   "_",
   "default",
   "each",

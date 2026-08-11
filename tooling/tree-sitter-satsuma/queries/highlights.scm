@@ -97,6 +97,8 @@
 (namespaced_path (identifier) @module "::" @operator)
 (field_path (identifier) @variable)
 (relative_field_path (identifier) @variable)
+(parent_path (identifier) @variable)
+(root_path (identifier) @variable)
 (backtick_path (backtick_name) @variable)
 
 ; ── Backtick names (field names and references) ───────────────────────────────

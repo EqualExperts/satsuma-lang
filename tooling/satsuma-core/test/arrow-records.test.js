@@ -184,4 +184,96 @@ describe("qualifyChildArrowPath()", () => {
     assert.equal(qualifyChildArrowPath(".sku", "parcels"), "parcels.sku");
     assert.equal(qualifyChildArrowPath("sku", "parcels"), "parcels.sku");
   });
+
+  // ── ADR-053 ancestor escape paths ──────────────────────────────────────────
+  // An escaped path resolves to the absolute path an outside-the-block arrow
+  // would have written, so the arrow is visible to coverage, lineage and
+  // validation instead of vanishing into a `note`.
+
+  it("resolves a parent escape by popping one container level", () => {
+    assert.equal(
+      qualifyChildArrowPath("^.transect_ref", "transects.sightings"),
+      "transects.transect_ref",
+    );
+  });
+
+  it("resolves a repeated parent escape by popping one level per ^.", () => {
+    assert.equal(
+      qualifyChildArrowPath("^.^.survey_id", "transects.sightings.rings"),
+      "transects.survey_id",
+    );
+  });
+
+  it("resolves a root escape absolute from the schema root", () => {
+    assert.equal(qualifyChildArrowPath("$.survey_id", "transects.sightings"), "survey_id");
+  });
+
+  it("resolves a parent escape on the target side against the target container", () => {
+    // The escape applies to both sides of the arrow; the target pops against
+    // the target container, not the source.
+    assert.equal(qualifyChildArrowPath("^.ref", "transects"), "ref");
+    assert.equal(qualifyChildArrowPath("^.ref", "report.transects"), "report.ref");
+  });
+});
+
+describe("extractArrowRecords — ADR-053 ancestor escape paths", () => {
+  // End-to-end through the full extraction walk: the escape resolves on both
+  // sides against the accumulating container prefixes, so the resolved path the
+  // arrow record carries is exactly what a sibling outside-the-block arrow
+  // would have produced.
+
+  it("resolves a parent-to-child-element arrow inside a nested each", () => {
+    // The motivating case: the parent transect's ref populates a field on each
+    // sighting element. Without the escape this was a `note` plus an
+    // `field-not-in-schema` warning; with it the arrow resolves to a declared
+    // field and flows through coverage and lineage.
+    const root = rootOf(`${MAPPING_HEADER}
+  each transects -> transects {
+    each sightings -> .counts {
+      ^.transect_ref -> .parent_ref
+      .species_code -> .species
+    }
+  }
+}`);
+    const records = extractArrowRecords(root);
+    assert.deepEqual(pairs(records), [
+      "transects -> transects",
+      "transects.sightings -> transects.counts",
+      "transects.transect_ref -> transects.counts.parent_ref",
+      "transects.sightings.species_code -> transects.counts.species",
+    ]);
+  });
+
+  it("resolves a root escape from a deeply nested block", () => {
+    const root = rootOf(`${MAPPING_HEADER}
+  each transects -> transects {
+    each sightings -> .counts {
+      each rings -> .rings {
+        $.survey_id -> .survey_id
+      }
+    }
+  }
+}`);
+    const records = extractArrowRecords(root);
+    const deepest = records.find((r) => r.target === "transects.counts.rings.survey_id");
+    assert.equal(deepest?.sources.join(","), "survey_id");
+  });
+
+  it("resolves a parent escape on both sides of the arrow, each against its own container", () => {
+    // The escape pops against the side it is written on: the source against the
+    // source container, the target against the target container, so the two can
+    // reach different ancestors.
+    const root = rootOf(`${MAPPING_HEADER}
+  each transects -> report_transects {
+    each sightings -> .counts {
+      ^.survey_id -> ^.survey_id
+    }
+  }
+}`);
+    const records = extractArrowRecords(root);
+    const escaped = records.find(
+      (r) => r.sources[0] === "transects.survey_id" && r.target === "report_transects.survey_id",
+    );
+    assert.ok(escaped, "the parent escape resolves against each side's own container");
+  });
 });

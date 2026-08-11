@@ -1,0 +1,87 @@
+// Satsuma v2 — Ancestor Escape Paths (ADR-053)
+
+note {
+  """
+  # Ancestor Escape Paths
+
+  Demonstrates the two escape prefixes that reach an ancestor from inside an
+  each/flatten block (ADR-053), where the ordinary dot-prefixing rule would
+  otherwise prefix the block's own path onto a parent reference and produce a
+  field that does not exist:
+
+  1. **Parent escape `^.field`** — pops one enclosing container level per `^.`
+     before the field is appended. Here the parent transect's `transect_ref`
+     is stamped onto each sighting element from inside the inner `each
+     sightings`, so a downstream consumer can group sightings by transect
+     without re-joining.
+  2. **Root escape `$.field`** — resolves absolute from the schema root,
+     ignoring every enclosing container. Here the survey's `survey_id` is
+     carried onto each sighting element from two levels of nesting.
+
+  The existing dot semantics are untouched: `.species_code` inside the inner
+  each still resolves against the current element, exactly as in
+  examples/nested-iteration/pipeline.stm.
+
+  ## Scenario
+  Rangers at the Puffin Point seabird colony walk fixed transects, recording
+  sightings of each species. The analytics lake wants one flat row per
+  sighting, but each row must carry the survey id and the transect ref it
+  came from — fields that live *above* the flattened list, on an ancestor.
+  """
+}
+
+// --- Source ---
+schema colony_survey (format json) {
+  survey_id    UUID         (pk, required)
+  surveyed_at  TIMESTAMPTZ  (required)
+
+  transects list_of record {
+    transect_ref  STRING(8)  (required)
+    length_m      INT
+
+    sightings list_of record {
+      species_code  STRING(6)  (required)
+      adults        INT
+      chicks        INT
+    }
+  }
+}
+
+// --- Target ---
+// One flat list of sightings, each row carrying its survey id and transect
+// ref as ordinary fields so no re-join is needed downstream.
+schema sighting_rows_json (format json) {
+  survey_id     UUID       (required)
+  transect_ref  STRING(8)  (required)
+  species_code  STRING(6)  (required)
+  total_birds   INT
+}
+
+// --- Mapping ---
+mapping `sighting rows with ancestor refs` {
+  note {
+    "Flatten sightings into one row per sighting, stamping the survey id and
+     the parent transect ref onto every row via the ADR-053 escape prefixes.
+     Both escapes resolve against the enclosing containers, so coverage and
+     lineage see ordinary declared fields rather than a path that does not
+     exist."
+  }
+
+  source { colony_survey }
+  target { sighting_rows_json }
+
+  // Root escape: the survey id lives at the schema root, two containers above
+  // the flattened list. $.survey_id resolves to `survey_id` from any depth.
+  $.survey_id -> survey_id
+
+  // One output row per sighting, across all transects.
+  flatten transects.sightings -> sighting_rows_json {
+    // Parent escape: transect_ref lives on the parent transect, one level
+    // above the flattened list. ^.transect_ref pops one level off the
+    // container (transects.sightings -> transects) before appending.
+    ^.transect_ref -> transect_ref
+
+    .species_code -> species_code
+    .adults, .chicks -> total_birds { "Sum adults and chicks" }
+  }
+}

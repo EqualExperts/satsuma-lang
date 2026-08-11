@@ -417,3 +417,58 @@ mapping {
             (tgt_path
               (field_path
                 (identifier)))))))))
+
+================================================================================
+Ancestor escape paths inside a nested each (ADR-053)
+================================================================================
+
+mapping {
+  source { s }
+  target { t }
+  each transects -> transects {
+    each sightings -> .counts {
+      ^.transect_ref -> .parent_ref
+      $.survey_id -> .survey_id
+    }
+  }
+}
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (mapping_block
+    (mapping_body
+      (source_block
+        (source_ref
+          (identifier)))
+      (target_block
+        (source_ref
+          (identifier)))
+      (each_block
+        (src_path
+          (field_path
+            (identifier)))
+        (tgt_path
+          (field_path
+            (identifier)))
+        (each_block
+          (src_path
+            (field_path
+              (identifier)))
+          (tgt_path
+            (relative_field_path
+              (identifier)))
+          (map_arrow
+            (src_path
+              (parent_path
+                (identifier)))
+            (tgt_path
+              (relative_field_path
+                (identifier))))
+          (map_arrow
+            (src_path
+              (root_path
+                (identifier)))
+            (tgt_path
+              (relative_field_path
+                (identifier)))))))))

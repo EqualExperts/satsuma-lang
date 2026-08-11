@@ -25,6 +25,7 @@ export {
   fieldEndpointPath,
   fieldEndpointSchema,
   qualifyContainerFieldRef,
+  resolveAuthoredPathAgainstContainer,
 } from "./reference-stages.js";
 export type {
   AuthoredEntityRef,

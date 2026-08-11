@@ -12,6 +12,7 @@
 import type { FieldDecl, SyntaxNode } from "./types.js";
 import { expandEntityFields } from "./spread-expand.js";
 import type { SpreadEntity, EntityRefResolver, SpreadEntityLookup } from "./spread-expand.js";
+import { resolveAuthoredPathAgainstContainer } from "./reference-stages.js";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -953,13 +954,14 @@ function isRelativeTargetPath(pathNode: SyntaxNode | undefined): boolean {
 
 /**
  * Append a target leaf to the base its enclosing container established,
- * dropping the leading `.` that marks the leaf as element-relative. Returns the
- * base unchanged when the node carries no target (an arrow with no tgt_path).
+ * applying the same ADR-053 path-prefix semantics an arrow's own target uses
+ * (`^.` pops a level, `$.` escapes to the root, `.field`/`field` are prefixed).
+ * Returns the base unchanged when the node carries no target (an arrow with no
+ * tgt_path).
  */
 function qualifyTarget(base: string | null, leaf: string | null): string | null {
   if (leaf === null) return base;
-  const relative = leaf.startsWith(".") ? leaf.slice(1) : leaf;
-  return base ? `${base}.${relative}` : relative;
+  return resolveAuthoredPathAgainstContainer(leaf, base);
 }
 
 /**
