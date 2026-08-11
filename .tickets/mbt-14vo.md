@@ -1,6 +1,6 @@
 ---
 id: mbt-14vo
-status: open
+status: closed
 deps: []
 links: []
 created: 2026-08-04T18:25:23Z
@@ -55,3 +55,11 @@ repo's own entry points do not hit it.
 - The two false-positive shapes are either excluded or shown to be unreachable
 - Every change is mutation-tested: the new detection must fail against a constructed instance of the form it claims to catch, and the suite must stay green without it
 
+
+## Notes
+
+**2026-08-11T10:21:00Z**
+
+Cause: `scripts/workspace-build-graph.test.mjs` could miss real build-graph edges and could misreport non-edges, because its detectors predated several reach/escape spellings and walked untracked build output. None of the forms had a live instance today, so this was hardening, not a bug fix.
+
+Fix: extended `siblingsReachedBy` to catch `require.resolve("pkg")` and `createRequire(...)("pkg")` (form 2) and to exclude a sibling dir-name used as a custom-element tag/selector via a DOM-API lookbehind (FP-B). Added `siblingsReachedByTsconfig`/`siblingsReachedByPaths` to flag a sibling named in a tsconfig `compilerOptions.paths` mapping (form 1), fixing a scoped-name bug the new test surfaced (`@satsuma/core` split to `@satsuma`). Extracted `siblingBuildEscapeIn` to catch the `npm -w`/`--workspace` and subshell `(cd ../sibling ...)` spellings (form 3) while excluding repo-root reaches `--prefix ../..` / `cd ../..` (FP-A). Extended the no-build invariant via `builtEntryWithoutBuildScript` to check `main`/`bin` for `dist/`, not just `exports` (form 4). Switched `codeFilesOf` to scan only `git ls-files`-tracked paths so untracked build output under a scanned subtree can no longer change what the scan sees (FP-C), honouring the committed `satsuma-core/src/generated/` exception. Refactored turbo.json's inline JSONC stripper into a shared `parseJsonc`. Added a `describe` block of 8 constructed-instance unit tests; each new/refined detector was mutation-verified to be load-bearing (reverting it flips the suite from 43 pass to 1 fail). The 35 workspace invariants stay green. (commit immediately after c11de8c4)

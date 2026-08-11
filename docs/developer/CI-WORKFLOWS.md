@@ -8,17 +8,17 @@ other.
 
 Four workflows cover the full delivery pipeline:
 
-| Workflow | File | Triggers |
-|---|---|---|
-| [CI](#ci-workflow) | `ci.yml` | Push / PR → `main` |
-| [Release](#release-workflow) | `release.yml` | Push → `main` · `workflow_dispatch` |
-| [Security](#security-workflow) | `security.yml` | Push / PR → `main` · called by Release |
+| Workflow                             | File              | Triggers                                                    |
+| ------------------------------------ | ----------------- | ----------------------------------------------------------- |
+| [CI](#ci-workflow)                   | `ci.yml`          | Push / PR → `main`                                          |
+| [Release](#release-workflow)         | `release.yml`     | Push → `main` · `workflow_dispatch`                         |
+| [Security](#security-workflow)       | `security.yml`    | Push / PR → `main` · called by Release                      |
 | [Deploy Site](#deploy-site-workflow) | `deploy-site.yml` | `workflow_dispatch` — auto-dispatched by Release, or manual |
 
 CI and Release both fire on every push to `main`. CI validates the code;
-Release builds and publishes the distributable artifacts (CLI tarball and VS
-Code `.vsix`). The Security workflow is also invoked directly by Release as a
-gate — it is not merely a CI concern.
+Release builds and publishes the distributable artifacts (CLI tarball, standalone
+LSP tarball, and VS Code `.vsix`). The Security workflow is also invoked directly
+by Release as a gate — it is not merely a CI concern.
 
 ---
 
@@ -61,6 +61,7 @@ flowchart TD
     install --> smoke["smoke-tests\n(BDD, global CLI install)"]
     install --> stmexcel["stm-to-excel-skill\n(pytest, global CLI install)"]
     install --> modules["tooling-modules\n(matrix: core · viz-model · viz-backend · viz)"]
+    install --> harness["viz-harness\n(headless Chromium Playwright suite)"]
 
     excel["excel-skill\n(pytest, no cache needed)"]
 
@@ -168,6 +169,18 @@ Runs the Python tests for the `excel-to-satsuma` Agent Skill. This job does
 not need the workspace cache — it installs only `pytest` and `openpyxl`
 directly.
 
+#### `viz-harness`
+
+Runs the `@satsuma/viz-harness` Playwright suite against headless Chromium
+(`npx turbo run test --filter=@satsuma/viz-harness`). It used to run only via
+the human-in-the-loop sentinel watcher; now that the suite runs headless
+Chromium (feature 30), it gets a CI job of its own rather than a shard in the
+`tooling-modules` matrix, whose shards are coverage-based and run c8 directly.
+The ubuntu runner has no system Chromium, so the job installs the bundled
+Playwright browser (`npx playwright install --with-deps chromium`);
+`playwright.config.ts` falls back to that same binary on a developer machine
+that lacks `/usr/bin/chromium`.
+
 #### `test-report`
 
 Aggregates JUnit XML artifacts from every job that produces them — `satsuma-cli`,
@@ -188,6 +201,7 @@ cache.
 
 **File:** `.github/workflows/release.yml`
 **Triggers:**
+
 - Push to `main` → updates the rolling `latest` pre-release
 - `workflow_dispatch` with a `version` input (e.g. `v0.5.1`) → creates a
   tagged release with changelog-extracted release notes
@@ -257,10 +271,10 @@ Both release types attach the same three artifacts, renamed with the release
 tag as a suffix (`<tag>` is `latest` for the pre-release, or the version tag
 such as `v0.9.0` for tagged releases):
 
-| Artifact | Install method |
-|---|---|
-| `satsuma-cli-<tag>.tgz` | `npm install -g <url>` |
-| `satsuma-lsp-<tag>.tgz` | `npm install -g <url>` |
+| Artifact                    | Install method                                       |
+| --------------------------- | ---------------------------------------------------- |
+| `satsuma-cli-<tag>.tgz`     | `npm install -g <url>`                               |
+| `satsuma-lsp-<tag>.tgz`     | `npm install -g <url>`                               |
 | `vscode-satsuma-<tag>.vsix` | `code --install-extension vscode-satsuma-<tag>.vsix` |
 
 The unsuffixed names (`satsuma-cli.tgz`, `satsuma-lsp.tgz`, and
@@ -347,6 +361,7 @@ commit, so exactly one configuration is ever written to `main`. See sl-1wtv.
 
 **File:** `.github/workflows/deploy-site.yml`
 **Triggers:**
+
 - `workflow_dispatch` — either dispatched manually, or automatically by the
   `release` job in `release.yml` after every release (tagged or the rolling
   `latest` pre-release). There is no `on: release` trigger: GitHub never

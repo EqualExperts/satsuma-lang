@@ -27,12 +27,33 @@
 
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
+import { execSync } from "node:child_process";
 import { readFileSync, readdirSync, existsSync, statSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const WORKSPACE_ROOT = join(REPO_ROOT, "tooling");
+
+/**
+ * The set of files git tracks, as repo-relative POSIX paths (forward slashes),
+ * or `null` when this is not a git checkout. Used to keep the code scan
+ * independent of build state: `dist/` and the untracked `src/generated/` trees
+ * a build leaves behind would otherwise be walked and read, so what the scan
+ * sees would depend on whether anyone had just built. `git ls-files` honours
+ * `.gitignore` *and* its exceptions, so the committed `satsuma-core/src/generated/`
+ * contract is still scanned while `satsuma-cli/src/generated/` (gitignored)
+ * is not (mbt-14vo, FP-C).
+ */
+function readTrackedFiles() {
+  try {
+    const out = execSync("git ls-files", { cwd: REPO_ROOT, encoding: "utf8" });
+    return new Set(out.split("\n").filter(Boolean));
+  } catch {
+    return null;
+  }
+}
+const TRACKED_FILES = readTrackedFiles();
 
 /**
  * Directories inside a package that hold code capable of reaching a sibling.
@@ -124,7 +145,12 @@ function codeFilesOf(pkg) {
       files.push(path);
     }
   }
-  return files;
+  // Filter out untracked build output (dist/, gitignored src/generated/, etc.)
+  // so a stale build under a scanned subtree cannot change what the scan sees.
+  // See TRACKED_FILES for why this is `git ls-files` rather than a directory-name
+  // denylist (the committed satsuma-core/src/generated/ exception has to survive).
+  if (TRACKED_FILES === null) return files;
+  return files.filter((f) => TRACKED_FILES.has(toPosixPath(relative(REPO_ROOT, f))));
 }
 
 // ── Detecting a reach into a sibling ─────────────────────────────────────────
@@ -169,13 +195,36 @@ function siblingsReachedBy(text, packages, selfName) {
     const directory = escapeForRegExp(dirName);
 
     // 1. Module specifier: the bare name, or the name followed by a subpath.
+    //    Covers `from "@satsuma/core"`, `require("satsuma-cli/x")`, the
+    //    side-effect-only `import "@satsuma/viz"`, and the resolver spellings a
+    //    bare `require()` match misses — `require.resolve("pkg/asset")` (global,
+    //    or aliased to a local also named `require`) and the direct
+    //    `createRequire(import.meta.url)("pkg")` form (mbt-14vo, missed form 2).
+    //    A resolver reached into a sibling's built output needs ordering just as
+    //    a plain import does. An aliased call on a differently-named binding
+    //    (`const r = createRequire(...); r("pkg")`) is not matched: the binding
+    //    name is not visible here, and in this repo those aliases resolve
+    //    third-party packages, never a sibling.
     const specifier = new RegExp(
-      `(?:from|require\\(|import\\(|import)\\s*["']${escapeForRegExp(name)}(?:/[^"']*)?["']`,
+      `(?:from|require\\.resolve\\(|require\\(|import\\(|import|createRequire\\([^)]*\\)\\()\\s*["']${escapeForRegExp(
+        name,
+      )}(?:/[^"']*)?["']`,
     );
     // 2. Relative escape into the sibling, excluding its committed subtrees.
     const intoOutput = new RegExp(`\\.\\./${directory}(?!/(?:${committed})[/"'])(?:["'/]|$)`, "m");
-    // 3. A standalone string literal equal to the sibling's directory name.
-    const bareDirectoryName = new RegExp(`["']${directory}["']`);
+    // 3. A standalone string literal equal to the sibling's directory name,
+    //    which is how a path assembled from segments looks:
+    //    `join(root, "..", "tree-sitter-satsuma")`. Where the assembled path
+    //    lands is not visible here, so the literal counts.
+    //
+    //    A negative lookbehind excludes the one shape that is *not* a reach:
+    //    the sibling's directory name used as a custom-element tag or selector
+    //    (`document.createElement("satsuma-viz")`, `page.locator("satsuma-viz")`).
+    //    Those are DOM API calls, not path assembly, and the packages that write
+    //    the tag are the ones that already import the component (mbt-14vo, FP-B).
+    const bareDirectoryName = new RegExp(
+      `(?<!createElement\\(|querySelector\\(|querySelectorAll\\(|locator\\(|customElements\\.define\\()["']${directory}["']`,
+    );
 
     if (specifier.test(text) || intoOutput.test(text) || bareDirectoryName.test(text)) {
       reached.add(name);
@@ -186,6 +235,107 @@ function siblingsReachedBy(text, packages, selfName) {
 
 function escapeForRegExp(literal) {
   return literal.replace(/[.*+?^${}()|[\]\\/]/g, "\\$&");
+}
+
+/** Repo-relative POSIX path (forward slashes) for matching against `git ls-files`. */
+function toPosixPath(repoRelative) {
+  return repoRelative.split(/[\\/]/).join("/");
+}
+
+/**
+ * Parse JSON with `//` line comments (JSONC), tracking string state so a `//` in
+ * a string value — notably a URL like the `$schema` field — is not mistaken
+ * for a comment. Shared by the turbo.json and tsconfig.json readers. Block
+ * comments are not handled because no file in this repo uses them; if one
+ * appears, `JSON.parse` throws rather than silently mis-parsing.
+ */
+function parseJsonc(source) {
+  let stripped = "";
+  let inString = false;
+  for (let i = 0; i < source.length; i++) {
+    const character = source[i];
+    if (inString) {
+      // A backslash escapes the next character, including a closing quote.
+      if (character === "\\") {
+        stripped += character + (source[i + 1] ?? "");
+        i++;
+        continue;
+      }
+      if (character === '"') inString = false;
+      stripped += character;
+      continue;
+    }
+    if (character === '"') {
+      inString = true;
+      stripped += character;
+      continue;
+    }
+    if (character === "/" && source[i + 1] === "/") {
+      while (i < source.length && source[i] !== "\n") i++;
+      stripped += "\n";
+      continue;
+    }
+    stripped += character;
+  }
+  return JSON.parse(stripped);
+}
+
+/**
+ * Names of sibling packages a package's `tsconfig.json` reaches into through a
+ * `compilerOptions.paths` mapping, *without* that sibling being declared.
+ *
+ * A `paths` key that names a sibling (`"@satsuma/viz-model": [...]`) makes the
+ * sibling resolvable at typecheck time, so its build must be ordered ahead of
+ * this package's `test:typecheck` — and `test:typecheck` orders siblings only
+ * through `^build`, which consults the manifest. The mapping's target decides
+ * whether it is built or committed output, but a sibling resolved by name at
+ * typecheck is a build-graph edge either way; declaring it is always safe, so the
+ * detector flags the name unconditionally. No tsconfig in the repo maps to a
+ * sibling today (the only `paths` keys are a self-alias in satsuma-cli and a
+ * third-party `web-tree-sitter` alias in satsuma-lsp), so this currently catches
+ * nothing — it is hardening against the form the code scan cannot see, because a
+ * tsconfig is JSON, not a CODE_EXTENSIONS file (mbt-14vo, missed form 1).
+ *
+ * @param {{name: string, dir: string}} pkg
+ * @param {Map<string, any>} packages
+ * @returns {Set<string>} sibling package names resolved by `paths` undeclared
+ */
+function siblingsReachedByTsconfig(pkg, packages) {
+  const tsconfigPath = join(pkg.dir, "tsconfig.json");
+  if (!existsSync(tsconfigPath)) return new Set();
+  try {
+    const paths = parseJsonc(readFileSync(tsconfigPath, "utf8"))?.compilerOptions?.paths ?? {};
+    return siblingsReachedByPaths(paths, packages, pkg.name);
+  } catch {
+    // An unparseable tsconfig is out of scope for this graph guard; the
+    // typecheck task itself would fail far more loudly than this test.
+    return new Set();
+  }
+}
+
+/**
+ * Pure core of {@link siblingsReachedByTsconfig}: the sibling package names a
+ * `compilerOptions.paths` mapping resolves. Extracted so the detector can be
+ * mutation-tested against a constructed mapping without writing files.
+ *
+ * @param {Record<string, unknown>} paths  tsconfig `compilerOptions.paths`
+ * @param {Map<string, any>} packages
+ * @param {string} selfName
+ * @returns {Set<string>}
+ */
+function siblingsReachedByPaths(paths, packages, selfName) {
+  const reached = new Set();
+  for (const key of Object.keys(paths)) {
+    // A `paths` key is a module specifier. A scoped package name is
+    // `@scope/name` (optionally `/subpath`), so the leading two segments form
+    // the package name; an unscoped name is the first segment alone. Splitting on
+    // every `/` would reduce `@satsuma/core` to `@satsuma` and miss every
+    // scoped sibling.
+    const segments = key.split("/");
+    const resolved = key.startsWith("@") ? segments.slice(0, 2).join("/") : segments[0];
+    if (packages.has(resolved) && resolved !== selfName) reached.add(resolved);
+  }
+  return reached;
 }
 
 /**
@@ -222,42 +372,11 @@ function committedSiblingPathsReadBy(text, packages, selfName) {
  * turbo.json's `globalDependencies`, parsed.
  *
  * turbo.json is JSONC — Turborepo accepts `//` comments and this repo uses them
- * heavily to explain the task graph. `JSON.parse` cannot read it, and stripping
- * `//` to end-of-line naively would truncate the `$schema` URL, so comments are
- * removed with the string state tracked. Block comments are not handled because
- * the file does not use them; if one appears, `JSON.parse` throws rather than
- * silently mis-parsing.
+ * heavily to explain the task graph — so it goes through `parseJsonc` rather
+ * than `JSON.parse`.
  */
 function readGlobalDependencies(turboJsonPath) {
-  const source = readFileSync(turboJsonPath, "utf8");
-  let stripped = "";
-  let inString = false;
-  for (let i = 0; i < source.length; i++) {
-    const character = source[i];
-    if (inString) {
-      // A backslash escapes the next character, including a closing quote.
-      if (character === "\\") {
-        stripped += character + (source[i + 1] ?? "");
-        i++;
-        continue;
-      }
-      if (character === '"') inString = false;
-      stripped += character;
-      continue;
-    }
-    if (character === '"') {
-      inString = true;
-      stripped += character;
-      continue;
-    }
-    if (character === "/" && source[i + 1] === "/") {
-      while (i < source.length && source[i] !== "\n") i++;
-      stripped += "\n";
-      continue;
-    }
-    stripped += character;
-  }
-  return JSON.parse(stripped).globalDependencies ?? [];
+  return parseJsonc(readFileSync(turboJsonPath, "utf8")).globalDependencies ?? [];
 }
 
 /**
@@ -276,6 +395,52 @@ function coveredByGlobalDependencies(path, globalDependencies) {
 }
 
 // ── The invariants ───────────────────────────────────────────────────────────
+
+/**
+ * The sibling-build escape a script body contains, or `null` if none.
+ *
+ * The R4 chains came in two spellings — `npm --prefix ../sibling run build` and
+ * `cd ../sibling && npm test`. Both are caught by requiring a sibling *name*
+ * after the `../` (so a reach to the repo root, `--prefix ../..` or `cd ../..`,
+ * is not misreported as a sibling escape — mbt-14vo, FP-A). Two more npm
+ * spellings that build a sibling without `--prefix` are also caught: the
+ * workspace flag in either position (`npm -w ../sibling run build`,
+ * `npm run build --workspace=../sibling`) and a subshell `((cd ../sibling &&
+ * ...))` (mbt-14vo, missed form 3).
+ */
+function siblingBuildEscapeIn(scriptBody) {
+  // `--prefix ../<name>` or `--workspace[= ]../<name>` or `-w ../<name>`: a
+  // path flag whose target is a sibling (one level up, then a name — not
+  // `..` again, which is the repo root).
+  const prefix = /(?:--prefix|-w|--workspace)=?\s*\.\.\/(?!\.\.)(?:[A-Za-z0-9_.-]+)/;
+  // `cd ../<name>`: same sibling-vs-root distinction. Anchored to a command
+  // boundary so a `cd` inside prose is not matched.
+  const cdSibling = /(?:^|&&|;|\|\||\||\()\s*cd\s+\.\.\/(?!\.\.)(?:[A-Za-z0-9_.-]+)/;
+  return prefix.exec(scriptBody)?.[0] ?? cdSibling.exec(scriptBody)?.[0] ?? null;
+}
+
+/**
+ * The first manifest entry point that references built output (`dist/`) while
+ * the package has no `build` script, or `null`. A package with no build script
+ * has no output that can go stale — unless one of its entry points points at one,
+ * in which case the missing build script is itself the bug. The check covers
+ * `exports`, `main`, and `bin`: a package can declare its entry via any of the
+ * three, and the original invariant inspected only `exports` (mbt-14vo, missed
+ * form 4).
+ */
+function builtEntryWithoutBuildScript(manifest) {
+  if (manifest.scripts?.build !== undefined) return null;
+  const candidates = [
+    ["exports", JSON.stringify(manifest.exports ?? {})],
+    ["main", typeof manifest.main === "string" ? manifest.main : ""],
+    // `bin` may be a string or a map of name → path; stringify both shapes.
+    ["bin", JSON.stringify(manifest.bin ?? "")],
+  ];
+  for (const [field, serialized] of candidates) {
+    if (/dist\//.test(serialized)) return field;
+  }
+  return null;
+}
 
 const packages = readWorkspacePackages();
 
@@ -300,6 +465,7 @@ describe("the workspace dependency graph Turborepo orders builds by", () => {
       };
 
       record(siblingsReachedBy(scriptText, packages, pkg.name), "its npm scripts");
+      record(siblingsReachedByTsconfig(pkg, packages), "its tsconfig.json paths");
       for (const file of codeFilesOf(pkg)) {
         record(
           siblingsReachedBy(readFileSync(file, "utf8"), packages, pkg.name),
@@ -380,14 +546,15 @@ describe("the workspace dependency graph Turborepo orders builds by", () => {
   // The chains R4 deleted, kept deleted. `npm --prefix ../sibling run build`
   // and `cd ../sibling && npm test` are how the build order came to be written
   // down in eleven places at once; reintroducing one would put a second,
-  // silently divergent copy of the graph back into the repo.
+  // silently divergent copy of the graph back into the repo. The guard also
+  // catches the `npm -w`/`--workspace` spellings and a subshell `(cd ../sibling
+  // && ...)`, and a reach to the repo root (`../..`) is deliberately *not* an
+  // offence — see `siblingBuildEscapeIn`.
   for (const pkg of packages.values()) {
     it(`${pkg.name} has no script that builds or tests a sibling package directly`, () => {
-      const offenders = Object.entries(pkg.manifest.scripts ?? {}).filter(([, body]) =>
-        // `--prefix ..` covers `npm --prefix ../satsuma-core run build`;
-        // `cd ..` covers `cd ../satsuma-lsp && npm test`.
-        /--prefix\s+\.\.|(?:^|&&|;|\|)\s*cd\s+\.\./.test(body),
-      );
+      const offenders = Object.entries(pkg.manifest.scripts ?? {})
+        .filter(([, body]) => siblingBuildEscapeIn(body) !== null)
+        .map(([name, body]) => [name, siblingBuildEscapeIn(body)]);
       assert.deepEqual(
         offenders,
         [],
@@ -399,18 +566,186 @@ describe("the workspace dependency graph Turborepo orders builds by", () => {
   }
 
   // Carried over from prebuild-wiring.test.ts. A package with no `build`
-  // script has no output that can go stale — unless it exports one, in which
-  // case the missing build script is itself the bug, and no amount of
+  // script has no output that can go stale — unless an entry point points at one,
+  // in which case the missing build script is itself the bug, and no amount of
   // dependency declaration will fix it. @satsuma/scenario-gen is deliberately
-  // such a package (sl-puky: plain ESM with JSDoc types, no build step).
+  // such a package (sl-puky: plain ESM with JSDoc types, no build step). The
+  // check covers `exports`, `main`, and `bin` — a package can declare its entry
+  // via any of the three (mbt-14vo, missed form 4).
   for (const pkg of packages.values()) {
     if (pkg.manifest.scripts?.build !== undefined) continue;
-    it(`${pkg.name} has no build script, and exports no built output`, () => {
-      assert.doesNotMatch(
-        JSON.stringify(pkg.manifest.exports ?? {}),
-        /dist\//,
-        `${pkg.name} exports from dist/ but has no build script to produce it (cbdr-xgy5)`,
+    it(`${pkg.name} has no build script, and declares no built entry point`, () => {
+      const offender = builtEntryWithoutBuildScript(pkg.manifest);
+      assert.equal(
+        offender,
+        null,
+        `${pkg.name} declares \`${offender}\` from dist/ but has no build script to produce it (cbdr-xgy5)`,
       );
     });
   }
+});
+
+// ── Detection-form unit tests (mbt-14vo) ─────────────────────────────────────
+// Each new or refined detector is exercised against a constructed instance of
+// the form it claims to catch, so the hardening cannot be silently undone by a
+// future refactor that drops the branch. These do not touch the repo: they call
+// the pure detectors directly with hand-built inputs.
+describe("workspace-build-graph detection forms (mbt-14vo hardening)", () => {
+  // A two-package workspace used by the text-based detectors: `@satsuma/core`
+  // (dir satsuma-core) is a sibling the consumer might reach into.
+  const twoPackages = new Map([
+    [
+      "@satsuma/core",
+      { name: "@satsuma/core", dirName: "satsuma-core", dir: "tooling/satsuma-core" },
+    ],
+    ["@satsuma/viz", { name: "@satsuma/viz", dirName: "satsuma-viz", dir: "tooling/satsuma-viz" }],
+  ]);
+
+  // Missed form 2: resolver spellings a bare `require()` match misses.
+  it("siblingsReachedBy catches require.resolve and createRequire into a sibling", () => {
+    const cases = [
+      `const p = require.resolve("@satsuma/core/asset");`,
+      `const p = require.resolve("@satsuma/core");`,
+      `const r = createRequire(import.meta.url); const m = createRequire(import.meta.url)("@satsuma/core");`,
+    ];
+    for (const text of cases) {
+      assert.deepEqual(
+        [...siblingsReachedBy(text, twoPackages, "@satsuma/viz")],
+        ["@satsuma/core"],
+        `expected resolver form to be detected: ${text}`,
+      );
+    }
+  });
+
+  // Missed form 2, residual gap: a resolver reached through an *alias named
+  // something other than `require`* is not matched — the binding name is not
+  // visible to a text scan. Pinned as the documented boundary of the detector.
+  it("siblingsReachedBy does not match a resolver aliased to a non-require name", () => {
+    const text = `const r = createRequire(import.meta.url); const m = r("@satsuma/core");`;
+    assert.deepEqual(
+      [...siblingsReachedBy(text, twoPackages, "@satsuma/viz")],
+      [],
+      "an aliased resolver call is a known residual gap, not a detected reach",
+    );
+  });
+
+  // FP-B: the sibling's directory name used as a custom-element tag or selector
+  // is a DOM API call, not path assembly, and must not be reported as a reach.
+  it("siblingsReachedBy ignores a sibling dir-name used as a custom-element tag", () => {
+    const cases = [
+      `const el = document.createElement("satsuma-viz");`,
+      `document.querySelector("satsuma-viz");`,
+      `page.locator("satsuma-viz").isVisible();`,
+      `customElements.define("satsuma-viz", SzViz);`,
+    ];
+    for (const text of cases) {
+      assert.deepEqual(
+        [...siblingsReachedBy(text, twoPackages, "@satsuma/core")],
+        [],
+        `DOM usage of the tag should not read as a build-graph reach: ${text}`,
+      );
+    }
+  });
+
+  // FP-B counterpart: the same dir-name as a path-assembly segment *is* a reach.
+  it("siblingsReachedBy still catches a sibling dir-name used as a path segment", () => {
+    const text = `const dir = join(root, "..", "satsuma-core");`;
+    assert.deepEqual(
+      [...siblingsReachedBy(text, twoPackages, "@satsuma/viz")],
+      ["@satsuma/core"],
+      "an assembled path into the sibling must still be detected",
+    );
+  });
+
+  // Missed form 1: a tsconfig `paths` key that names a sibling makes it resolvable
+  // at typecheck time, so the build graph must order it — declare it.
+  it("siblingsReachedByPaths flags a sibling named in tsconfig compilerOptions.paths", () => {
+    const paths = {
+      "@satsuma/core": ["../satsuma-core/src"],
+      "@satsuma/viz-model/*": ["../viz-model/*"],
+    };
+    assert.deepEqual(
+      [...siblingsReachedByPaths(paths, twoPackages, "@satsuma/viz")],
+      ["@satsuma/core"],
+      "a paths key naming a sibling is a build-graph edge the code scan cannot see",
+    );
+  });
+
+  // Missed form 3 / FP-A: the sibling-script guard catches the R4 spellings and
+  // the npm workspace spellings, but not a reach to the repo root.
+  it("siblingBuildEscapeIn catches sibling builds and ignores repo-root reaches", () => {
+    const offenders = [
+      `npm --prefix ../satsuma-core run build`,
+      `cd ../satsuma-lsp && npm test`,
+      `npm -w ../satsuma-core run build`,
+      `npm run build --workspace=../satsuma-core`,
+      `(cd ../satsuma-core && npm test)`,
+    ];
+    for (const body of offenders) {
+      assert.ok(
+        siblingBuildEscapeIn(body) !== null,
+        `expected sibling-build escape to be caught: ${body}`,
+      );
+    }
+    const roots = [
+      `npm --prefix ../.. run build`,
+      `cd ../.. && npm test`,
+      `npm run build --workspace=../..`,
+    ];
+    for (const body of roots) {
+      assert.equal(
+        siblingBuildEscapeIn(body),
+        null,
+        `a reach to the repo root is not a sibling escape: ${body}`,
+      );
+    }
+  });
+
+  // Missed form 4: a package with no build script must not declare a built entry
+  // via exports, main, OR bin.
+  it("builtEntryWithoutBuildScript flags dist in exports, main, or bin", () => {
+    assert.equal(
+      builtEntryWithoutBuildScript({ scripts: {}, main: "./dist/index.js" }),
+      "main",
+      "main pointing at dist/ with no build script is the bug",
+    );
+    assert.equal(
+      builtEntryWithoutBuildScript({ scripts: {}, bin: { satsuma: "./dist/cli.js" } }),
+      "bin",
+      "bin pointing at dist/ with no build script is the bug",
+    );
+    assert.equal(
+      builtEntryWithoutBuildScript({ scripts: {}, exports: { ".": "./dist/index.js" } }),
+      "exports",
+      "exports pointing at dist/ with no build script is the bug",
+    );
+    assert.equal(
+      builtEntryWithoutBuildScript({ scripts: {}, main: "./src/index.js" }),
+      null,
+      "an entry pointing at source is fine without a build script",
+    );
+    assert.equal(
+      builtEntryWithoutBuildScript({ scripts: { build: "tsc" }, main: "./dist/index.js" }),
+      null,
+      "a built entry is fine when a build script exists",
+    );
+  });
+
+  // FP-C: the code scan reads only git-tracked files, so a build that drops
+  // untracked output into a scanned subtree cannot change what the scan sees.
+  it("the code scan ignores untracked build output and honours the committed exception", () => {
+    assert.ok(TRACKED_FILES !== null, "this guard requires a git checkout");
+    // satsuma-cli/src/generated/ is gitignored build output; a build leaves
+    // agent-reference.ts there, and the scan must never read it.
+    assert.ok(
+      !TRACKED_FILES.has("tooling/satsuma-cli/src/generated/agent-reference.ts"),
+      "gitignored build output must not be scanned",
+    );
+    // The committed exception: satsuma-core/src/generated/cst-types.ts IS
+    // tracked, so the scan still sees the contract a build cannot reproduce.
+    assert.ok(
+      TRACKED_FILES.has("tooling/satsuma-core/src/generated/cst-types.ts"),
+      "the committed generated contract must still be scanned",
+    );
+  });
 });
