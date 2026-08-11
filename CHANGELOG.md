@@ -9,6 +9,10 @@ revision now carry `<VERSION>-dev.<short-sha>`. `satsuma --version`, the LSP
 initialize response, and VS Code's Extensions view all expose the same identity;
 tagged releases remain clean `X.Y.Z` versions.
 
+Clean-checkout lint now generates the ignored CLI/LSP build-version modules
+before type-aware ESLint, so CI does not depend on artifacts left by a prior
+local build (`s1cl-gphp`).
+
 ## v0.13.0 — 2026-08-05
 
 ### `agent-reference` can hand an agent one slice instead of the whole document (`arpd-6iis`)
