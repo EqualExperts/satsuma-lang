@@ -325,3 +325,36 @@ mapping {
             (map_literal
               (ERROR
                 (identifier)))))))))
+
+================================================================================
+Escape prefix with no following field is an error (ADR-053)
+================================================================================
+
+mapping {
+  source { s }
+  target { t }
+  $. -> a
+  ^. -> b
+}
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (mapping_block
+    (mapping_body
+      (source_block
+        (source_ref
+          (identifier)))
+      (target_block
+        (source_ref
+          (identifier)))
+      (ERROR)
+      (computed_arrow
+        (tgt_path
+          (field_path
+            (identifier))))
+      (ERROR)
+      (computed_arrow
+        (tgt_path
+          (field_path
+            (identifier)))))))

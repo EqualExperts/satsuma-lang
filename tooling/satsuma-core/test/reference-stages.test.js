@@ -20,6 +20,7 @@ import {
   fieldEndpointPath,
   fieldEndpointSchema,
   qualifyContainerFieldRef,
+  resolveAuthoredPathAgainstContainer,
 } from "@satsuma/core";
 
 describe("reference-stage constructors", () => {
@@ -152,5 +153,98 @@ describe("reference-stage transitions", () => {
     // Branding must not turn a syntactically valid but unresolved name into a
     // canonical identity that does not exist.
     assert.equal(canonicalizeEntityRef(createAuthoredEntityRef("missing"), "crm", new Map()), null);
+  });
+});
+
+describe("resolveAuthoredPathAgainstContainer — ADR-053 escape prefixes", () => {
+  // The ancestor-escape prefixes are the one rule every nested-arrow consumer
+  // shares, so the shared resolver is the place to pin every branch of it. Each
+  // case states the falsifiable property: the resolved path is exactly what the
+  // container-prefixing rule produces, so coverage/lineage/viz all see the same
+  // absolute path an outside-the-block arrow would have written.
+
+  it("prefixes a relative child path and strips the leading dot (unchanged rule)", () => {
+    assert.equal(
+      resolveAuthoredPathAgainstContainer(".species_code", "transects.sightings"),
+      "transects.sightings.species_code",
+    );
+    // A bare path with no leading dot resolves identically — the dot only marks.
+    assert.equal(
+      resolveAuthoredPathAgainstContainer("species_code", "transects.sightings"),
+      "transects.sightings.species_code",
+    );
+  });
+
+  it("pops one container level for a single parent escape", () => {
+    // The parent transect's ref, referenced from inside the sightings each —
+    // the exact gap the ticket was filed against.
+    assert.equal(
+      resolveAuthoredPathAgainstContainer("^.transect_ref", "transects.sightings"),
+      "transects.transect_ref",
+    );
+  });
+
+  it("pops one level per ^., so a grandparent field is reachable from two levels deep", () => {
+    assert.equal(
+      resolveAuthoredPathAgainstContainer("^.^.survey_id", "transects.sightings.rings"),
+      "transects.survey_id",
+    );
+  });
+
+  it("resolves root-relative when the escape pops past the schema root", () => {
+    // Popping is a directional instruction, not a range check; the resolved
+    // path is still validated against the schema downstream.
+    assert.equal(
+      resolveAuthoredPathAgainstContainer("^.^.^.survey_id", "transects.sightings"),
+      "survey_id",
+    );
+    assert.equal(resolveAuthoredPathAgainstContainer("^.foo", null), "foo");
+  });
+
+  it("resolves a root escape absolute from the schema root, ignoring the container", () => {
+    assert.equal(
+      resolveAuthoredPathAgainstContainer("$.survey_id", "transects.sightings.rings"),
+      "survey_id",
+    );
+    // A multi-segment root-absolute path keeps its segments.
+    assert.equal(
+      resolveAuthoredPathAgainstContainer("$.observer.ranger_id", "transects.sightings"),
+      "observer.ranger_id",
+    );
+  });
+
+  it("keeps continuation segments after an escape", () => {
+    assert.equal(
+      resolveAuthoredPathAgainstContainer("^.rings.ring_id", "transects.sightings"),
+      "transects.rings.ring_id",
+    );
+  });
+
+  it("leaves a top-level path with no container at its authored value", () => {
+    assert.equal(resolveAuthoredPathAgainstContainer("survey_id", null), "survey_id");
+    assert.equal(resolveAuthoredPathAgainstContainer("$.survey_id", null), "survey_id");
+  });
+
+  it("returns an empty path unchanged rather than inventing a dangling prefix", () => {
+    assert.equal(resolveAuthoredPathAgainstContainer("", "transects.sightings"), "");
+  });
+
+  it("qualifies an escaped authored ref through the branded transition too", () => {
+    // qualifyContainerFieldRef delegates to the same resolver, so the branded
+    // path an arrow consumer carries already has the escape resolved away.
+    assert.equal(
+      qualifyContainerFieldRef(
+        createAuthoredFieldRef("^.transect_ref"),
+        createContainerQualifiedFieldRef("transects.sightings"),
+      ),
+      "transects.transect_ref",
+    );
+    assert.equal(
+      qualifyContainerFieldRef(
+        createAuthoredFieldRef("$.survey_id"),
+        createContainerQualifiedFieldRef("transects.sightings"),
+      ),
+      "survey_id",
+    );
   });
 });

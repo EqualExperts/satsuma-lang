@@ -8,6 +8,7 @@ The CLI requires a `.stm` file entry point (not a directory). The workspace is d
 
 | Directory | Entry file | Description |
 |-----------|------------|-------------|
+| [`ancestor-escape/`](ancestor-escape/) | `pipeline.stm` | ADR-053 `^.`/`$.` escape prefixes referencing an ancestor field from inside a nested block |
 | [`cobol-to-avro/`](cobol-to-avro/) | `pipeline.stm` | Mainframe COBOL customer master to Avro Kafka events |
 | [`db-to-db/`](db-to-db/) | `pipeline.stm` | Legacy SQL Server to PostgreSQL customer migration (Project Phoenix) |
 | [`edi-to-json/`](edi-to-json/) | `pipeline.stm` | EDI 856 ASN fixed-length messages to MFCS JSON for warehouse ingestion |

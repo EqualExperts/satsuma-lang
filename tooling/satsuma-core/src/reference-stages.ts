@@ -192,19 +192,92 @@ function endpointPathStart(endpoint: CanonicalFieldEndpoint): number {
   return endpoint.indexOf(PATH_SEPARATOR, separator + NAMESPACE_SEPARATOR.length);
 }
 
+// ── Container-relative path resolution (ADR-053) ─────────────────────────────
+//
+// The three path-prefix semantics an authored arrow path can carry, in one
+// place. Every consumer that qualifies a nested arrow calls this — extraction's
+// `qualifyChildArrowPath`, NL-ref target qualification, and the branded
+// transition below — so the rule cannot drift across the four consumers
+// (extraction, coverage, lineage, viz) that rely on it.
+
+/** Root escape prefix: resolve absolute from the schema root, container ignored. */
+const ROOT_ESCAPE = "$.";
+/** Parent escape prefix: one occurrence pops one segment off the container. */
+const PARENT_ESCAPE = "^.";
+
+/** Strip the authored leading-dot relativity marker (spec §4.4). */
+function stripRelativityMarker(path: string): string {
+  return path.replace(/^\./, "");
+}
+
+/**
+ * Resolve an authored arrow path against the container it was written inside.
+ *
+ * Applies the three path-prefix semantics from ADR-053, in order:
+ *
+ *  - `$.field`  — root escape: enclosing containers are ignored; the path is
+ *    taken absolute from the schema root.
+ *  - `^.field`  — parent escape: each `^.` pops one segment off the container
+ *    path before the field is appended. `^.^.field` pops two; popping past the
+ *    root resolves root-relative.
+ *  - `.field` or `field` — the original prefixing rule: the container path is
+ *    prefixed and the leading relativity dot is stripped.
+ *
+ * The escapes are additive: a path either carries one or it does not, and they
+ * never interact with the relativity marker, so the existing dot semantics are
+ * untouched.
+ *
+ * @param path      Path as authored, with or without an escape / relativity
+ *                  marker. An empty path stays empty.
+ * @param container Absolute path of the enclosing container, or null at
+ *                  mapping-body level, where the mapping root is the frame.
+ * @returns The path relative to the schema root, never carrying an escape or
+ *          relativity marker.
+ */
+export function resolveAuthoredPathAgainstContainer(
+  path: string,
+  container: string | null,
+): string {
+  if (!path) return path;
+
+  // Root escape — absolute from the schema root; the container is irrelevant.
+  if (path.startsWith(ROOT_ESCAPE)) {
+    return stripRelativityMarker(path.slice(ROOT_ESCAPE.length));
+  }
+
+  // Parent escape — pop one container segment per `^.`.
+  if (path.startsWith(PARENT_ESCAPE)) {
+    let rest = path;
+    let levels = 0;
+    while (rest.startsWith(PARENT_ESCAPE)) {
+      levels += 1;
+      rest = rest.slice(PARENT_ESCAPE.length);
+    }
+    const relative = stripRelativityMarker(rest);
+    if (!container) return relative;
+    const segments = container.split(".");
+    const popped = segments.slice(0, Math.max(0, segments.length - levels));
+    return popped.length ? `${popped.join(".")}.${relative}` : relative;
+  }
+
+  // Default — the original prefixing rule, relativity marker stripped.
+  const relativeToFrame = stripRelativityMarker(path);
+  return container ? `${container}.${relativeToFrame}` : relativeToFrame;
+}
+
 /**
  * Advance an authored field expression through container qualification.
  *
  * Child paths are relative to the enclosing `each`, `flatten`, or nested-arrow
- * path. Mapping-body paths have no container and retain their string value;
- * their distinct return type records that qualification has still occurred.
+ * path, and may carry an ADR-053 escape prefix (`^.` / `$.`). Mapping-body
+ * paths have no container and retain their string value; their distinct return
+ * type records that qualification has still occurred.
  */
 export function qualifyContainerFieldRef(
   ref: AuthoredFieldRef,
   container: ContainerQualifiedFieldRef | null,
 ): ContainerQualifiedFieldRef {
-  const qualified = container ? `${container}.${ref.replace(/^\./, "")}` : ref;
-  return createContainerQualifiedFieldRef(qualified);
+  return createContainerQualifiedFieldRef(resolveAuthoredPathAgainstContainer(ref, container));
 }
 
 /**

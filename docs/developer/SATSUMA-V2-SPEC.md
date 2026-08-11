@@ -477,8 +477,15 @@ The `each` keyword introduces an iteration over a source list, producing element
 | `.order_no` in `each orders`                       | `orders.order_no`                                     |
 | `.sku` in `each lines` in `each orders`            | `orders.lines.sku`                                    |
 | `orders.order_no` in `each lines` in `each orders` | `orders.lines.orders.order_no` — not a declared field |
+| `^.order_no` in `each lines` in `each orders`      | `orders.order_no` — one level up (ADR-053)            |
+| `$.order_no` in `each lines` in `each orders`      | `order_no` — absolute from the schema root (ADR-053)  |
 
-**There is no notation for reaching an ancestor**, as that last row shows. A field from an enclosing level cannot be referenced from inside a block; write the arrow _outside_ the block, where its path is already absolute. In a `flatten` block that reads naturally, since fields outside the block repeat on every output row (section 4.6).
+**Reaching an ancestor.** The first three rows follow the prefixing rule. The last two are the escape prefixes (ADR-053), which suppress it instead:
+
+- **`^.` — parent escape.** Each `^.` pops one segment off the enclosing container's path before the field is appended, so `^.order_no` inside `each lines` inside `each orders` resolves to `orders.order_no` and `^.^.id` resolves two levels up. This is the structural way to state "the parent's field populates a field on each child element" inside a nested `each` — something that previously had to live in a `note`.
+- **`$.` — root escape.** The enclosing containers are ignored and the path is taken absolute from the schema root, so `$.order_no` resolves to `order_no` from any depth.
+
+Both keep the dot semantics untouched: a bare `field` or `.field` still receives the container prefix exactly as before; only a path carrying an escape prefix resolves differently. Popping past the root resolves root-relative, and whether the result names a declared field is still validated by `field-not-in-schema`, exactly as a mis-typed absolute path would be.
 
 **Correlating two lists declared side by side.** A list is only nested if it is _declared_ nested. Two lists at the schema root are iterated by two sibling `each` blocks, which may write into the same target list; state the correspondence in a `note`, using an `@ref` so it is traceable:
 

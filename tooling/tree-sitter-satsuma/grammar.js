@@ -345,7 +345,14 @@ module.exports = grammar({
     tgt_path: ($) => $._path_expr,
 
     _path_expr: ($) =>
-      choice($.namespaced_path, $.backtick_path, $.relative_field_path, $.field_path),
+      choice(
+        $.namespaced_path,
+        $.backtick_path,
+        $.parent_path,
+        $.root_path,
+        $.relative_field_path,
+        $.field_path,
+      ),
 
     // ns::identifier or ns::identifier.field...
     // token.immediate(".") ensures continuation dots must be adjacent (no
@@ -362,6 +369,20 @@ module.exports = grammar({
     // .field or .field.nested...
     relative_field_path: ($) =>
       prec.right(seq(".", $._path_seg, repeat(seq(token.immediate("."), $._path_seg)))),
+
+    // ^.^...field — each `^.` pops one enclosing container level (ADR-053).
+    // The marker is a single token so a stray `^` is never half-parsed, and
+    // the continuation dots stay immediate so `^.a.b` is one path. A bare `^.`
+    // with no following segment is a parse error — the field is not optional.
+    parent_path: ($) =>
+      prec.right(
+        seq(repeat1(token("^.")), $._path_seg, repeat(seq(token.immediate("."), $._path_seg))),
+      ),
+
+    // $.field — absolute from the schema root, ignoring every enclosing
+    // container (ADR-053). Like the parent escape, `$.` is one token.
+    root_path: ($) =>
+      prec.right(seq(token("$."), $._path_seg, repeat(seq(token.immediate("."), $._path_seg)))),
 
     // field or field.nested...
     field_path: ($) =>

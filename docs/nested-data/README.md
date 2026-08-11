@@ -16,6 +16,7 @@ Satsuma answers them with a small vocabulary:
 | Map a list, keeping the hierarchy          | `each src -> tgt { }`    |
 | Map a list, one output row per element     | `flatten src -> tgt { }` |
 | Address a field inside the current element | `.field`                 |
+| Address a field on an ancestor or the root | `^.field`, `$.field`     |
 
 This guide walks that vocabulary from a two-field record up to a three-level XML
 hierarchy, then explains **how nesting changes what `satsuma coverage` counts** —
@@ -151,17 +152,37 @@ it does not change the result:
 | `each transects` → `each sightings -> .counts` | `.adults`                | `transects.sightings.adults`                    |
 | `flatten transects.sightings -> rows`          | `.species_code`          | `transects.sightings.species_code`              |
 | `flatten transects.sightings -> rows`          | `transects.transect_ref` | `transects.sightings.transects.transect_ref` ❌ |
+| `flatten transects.sightings -> rows`          | `^.transect_ref`         | `transects.transect_ref` — one level up (ADR-053) |
+| `flatten transects.sightings -> rows`          | `$.survey_id`            | `survey_id` — absolute from the schema root (ADR-053) |
 
-That last row is the trap. **There is no notation for escaping outward to an
-ancestor.** A parent field referenced from inside a block gets the block's prefix
-like everything else, producing a path that does not exist:
+The fourth row is the trap: **a parent field referenced from inside a block gets
+the block's prefix like everything else**, producing a path that does not exist:
 
 ```
 warning [field-not-in-schema] Arrow source
 'transects.sightings.transects.transect_ref' not declared in schema 'colony_survey'
 ```
 
-Write the arrow _outside_ the block instead — where its path is already absolute:
+The last two rows are the way out (ADR-053). The escape prefixes suppress the
+prefixing rule:
+
+- **`^.` — parent escape.** Each `^.` pops one segment off the block's path
+  before the field is appended, so `^.transect_ref` inside `flatten
+  transects.sightings` resolves to `transects.transect_ref`. Repeat it to reach a
+  grandparent: `^.^.survey_id` inside `each transects.sightings.rings` resolves
+  to `transects.survey_id`.
+- **`$.` — root escape.** The enclosing blocks are ignored and the path is
+  absolute from the schema root, so `$.survey_id` resolves to `survey_id` from
+  any depth.
+
+Both leave the dot semantics untouched — a bare `field` or `.field` still gets
+the block's prefix exactly as before; only a path carrying an escape resolves
+differently. Popping past the root resolves root-relative, and a mis-aimed
+escape still triggers `field-not-in-schema` against the resolved path, just as a
+mis-typed absolute path would.
+
+For `flatten`, an arrow _outside_ the block is often the more readable form —
+its path is already absolute and the field repeats on every output row:
 
 ```satsuma
 transects.transect_ref -> transect_ref     // ✅ outside the block
@@ -171,10 +192,21 @@ flatten transects.sightings -> sighting_rows_parquet {
 }
 ```
 
-For `flatten` this reads naturally: fields outside the block are the row's
-context and repeat on every output row. For a nested `each` it is a real
-limitation — you cannot state "the parent's transect ref populates a field on
-each child element". Say it in a `note` until the grammar grows an escape.
+Where the escape earns its keep is the **nested `each`**: "the parent's transect
+ref populates a field on each child element" can only be stated structurally
+inside the block, not outside it:
+
+```satsuma
+each transects -> transects {
+  each sightings -> .counts {
+    ^.transect_ref -> .transect_ref     // ✅ the parent transect's ref on each count
+    .species_code -> .species
+  }
+}
+```
+
+Before ADR-053 that had to be a `note`, which lineage and coverage cannot
+follow; now it is an ordinary arrow.
 
 ---
 
@@ -774,8 +806,8 @@ Before you commit a nested mapping:
 - [ ] Lists of primitives use `list_of TYPE` with no braces.
 - [ ] `each` where the target keeps the hierarchy; `flatten` where the target is
       rows.
-- [ ] No path inside a block reaches for an ancestor — those arrows live outside
-      the block.
+- [ ] A path inside a block that reaches for an ancestor uses an escape prefix
+      (`^.field`, `$.field`), or the arrow lives outside the block.
 - [ ] Parallel lists carry a `note` stating the correlation rule and what
       happens when lengths differ.
 - [ ] Format addresses (`xpath`, `jsonpath`) are in metadata; Satsuma paths carry
@@ -791,12 +823,16 @@ rather than debug them. Where a limit is tracked, the ticket is named.
 
 | Limitation                                                                                            | Workaround                                                              | Tracked   |
 | ----------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- | --------- |
-| No way to reference an ancestor field from inside an `each`/`flatten` block                           | Put the arrow outside the block, or describe it in a `note`             | `sl-8vqk` |
 | No way to bind the current element of a _scalar_ list (`each tags -> t { . -> .x }` is a parse error) | Map the list onto the target leaf directly (section 5)                  | `sl-kezo` |
 | No `zip` construct for positionally-correlated lists                                                  | Sibling `each` blocks, or per-leaf arrows, plus a `note`                | `sl-kezo` |
 | A multi-source arrow onto a record cannot enumerate children (its body is a pipeline)                 | Write one arrow per target leaf                                         | `sl-3fou` |
 | A scalar-to-record arrow reports the record's leaves as gaps                                          | Enumerate the leaves; `lint` flags this as `unenumerated-record-target` | by design |
 | An `@ref` to a record in prose confers no coverage on its leaves, and nothing warns                   | Reference the leaves, or add declared arrows                            | `sl-lnbt` |
+
+The ancestor-reference gap that used to head this table is closed: `^.field`
+and `$.field` (ADR-053) escape the prefixing rule so a parent or root field
+can be referenced from inside an `each`/`flatten` block — see [section
+2](#2-addressing-a-nested-field).
 
 ---
 
@@ -811,8 +847,12 @@ rather than debug them. Where a limit is tracked, the ticket is named.
 - [`examples/nested-iteration/`](../../examples/nested-iteration/) and
   [`examples/edi-to-json/`](../../examples/edi-to-json/) — nested iteration and
   positional correlation in the canonical corpus
+- [`examples/ancestor-escape/`](../../examples/ancestor-escape/) — the ADR-053
+  `^.`/`$.` escapes resolving a parent-to-child-element arrow
 - ADRs [034](../../adrs/adr-034-leaf-only-coverage-counting.md),
   [036](../../adrs/adr-036-nl-ref-coverage-tier.md),
   [037](../../adrs/adr-037-container-coverage-and-whole-structure-arrows.md),
   [038](../../adrs/adr-038-whole-structure-expansion-requires-a-container-source.md)
   — why coverage counts nested data the way it does
+- ADR [053](../../adrs/adr-053-ancestor-escape-paths-in-nested-blocks.md) — the
+  `^.`/`$.` ancestor-escape path prefixes
