@@ -78,7 +78,7 @@
     "@satsuma/scenario-gen": "*",
     "@satsuma/viz-backend": "*",
     "@satsuma/viz-model": "*",
-    "@types/node": "^26.1.2",
+    "@types/node": "^26.2.0",
     "satsuma-cli": "*",
     "c8": "^12.0.0",
     "esbuild": "^0.28.1",
