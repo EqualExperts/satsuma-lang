@@ -5,5 +5,5 @@
 # installs let a new ruff release change the enforced rules under us
 # (sl-5kvp). Dependabot's pip ecosystem watches this file and proposes
 # bumps as reviewable PRs.
-ruff==0.16.1
+ruff==0.16.2
 yamllint==1.38.0
