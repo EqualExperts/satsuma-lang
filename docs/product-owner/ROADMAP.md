@@ -54,7 +54,10 @@ site copy downward without running a full study.
 markdown arm is included (~$118). Either drop the harness-invariance slice and run
 markdown at two rungs (~$98), or raise the cap.
 
-**Source:** `features/44-token-and-task-eval/PRD.md`
+**Source:** `docs/PRD.md` in the [`satsuma-eval`](https://github.com/EqualExperts/satsuma-eval)
+repository, where this feature moved on 2026-08-11 so that it measures released
+artifacts rather than a working tree. See
+[`features/44-token-and-task-eval/README.md`](../../features/44-token-and-task-eval/README.md).
 
 ### Feature 46 — Generated-Input Confidence for Diagnostics and Editor Intelligence (delivered)
 
