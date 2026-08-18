@@ -50,7 +50,7 @@
   "dependencies": {
     "@satsuma/core": "*",
     "commander": "^15.0.0",
-    "web-tree-sitter": "^0.26.7"
+    "web-tree-sitter": "^0.26.12"
   },
   "devDependencies": {
     "@satsuma/scenario-gen": "*",

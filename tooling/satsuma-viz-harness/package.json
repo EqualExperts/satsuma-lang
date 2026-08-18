@@ -37,7 +37,7 @@
     "@satsuma/core": "*",
     "@satsuma/viz-backend": "*",
     "@satsuma/viz-model": "*",
-    "web-tree-sitter": "^0.26.7"
+    "web-tree-sitter": "^0.26.12"
   },
   "//devDependencies": [
     "@satsuma/viz and tree-sitter-satsuma are not imported: this package's build",

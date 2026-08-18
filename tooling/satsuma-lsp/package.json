@@ -62,7 +62,7 @@
   "dependencies": {
     "vscode-languageserver": "^10.1.0",
     "vscode-languageserver-textdocument": "^1.0.12",
-    "web-tree-sitter": "^0.26.7"
+    "web-tree-sitter": "^0.26.12"
   },
   "//devDependencies": [
     "satsuma-cli is not imported. It is declared because test/validate-diagnostics",
