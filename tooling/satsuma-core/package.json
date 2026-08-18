@@ -91,7 +91,7 @@
     "test:coverage": "c8 --reporter=text --reporter=lcov --reporter=json-summary --include='dist/**/*.js' --exclude='dist/**/*.d.ts' node --test test/**/*.test.js"
   },
   "dependencies": {
-    "web-tree-sitter": "^0.26.11",
+    "web-tree-sitter": "^0.26.12",
     "yaml": "^2.9.0"
   },
   "//devDependencies": [
