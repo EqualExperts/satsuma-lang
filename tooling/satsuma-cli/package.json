@@ -60,7 +60,7 @@
     "fast-check": "^4.9.0",
     "js-tiktoken": "^1.0.21",
     "tree-sitter-satsuma": "*",
-    "tsx": "^4.23.11",
+    "tsx": "^4.23.12",
     "typescript": "^6.0.3"
   },
   "bundleDependencies": [
