@@ -86,7 +86,7 @@
     "test:coverage": "turbo run test:coverage"
   },
   "overrides": {
-    "smol-toml": "^1.6.1"
+    "smol-toml": "^1.9.0"
   },
   "//devDependencies": [
     "commander is not used by anything at the root. It is declared here purely to",
