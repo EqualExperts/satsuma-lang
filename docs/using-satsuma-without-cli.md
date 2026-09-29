@@ -35,13 +35,9 @@ order. The language itself is the artifact, not the tooling around it.
 
 What you keep without the CLI:
 
-- **Token efficiency.** Measured across the 21 specs in `examples/`, a `.stm`
-  file is a median 9% smaller than the same mapping written as YAML and 36%
-  smaller than JSON, carrying identical information — see
-  [`reference/static-compactness.md`](../reference/static-compactness.md). A real
-  but modest win, so more of a mapping inventory fits in a context window.
-  Note the figure is artifact size only; it says nothing about what an agent
-  actually consumes completing a task, which is a different quantity.
+- **Readability.** A `.stm` file makes sense in any text editor or on GitHub.
+  Arrows show where data goes, notes explain why, and metadata sits in
+  brackets, so a reviewer can follow a mapping without any tooling.
 - **Version control.** `.stm` files are plain text. They diff cleanly, merge
   naturally, and integrate with any Git workflow.
 - **Unambiguous structure.** Schemas, mappings, arrows, metadata, and

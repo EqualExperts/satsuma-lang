@@ -21,9 +21,9 @@ rolling or local non-tagged build reports `X.Y.Z-dev.<short-sha>`.
 
 ## Design Principle
 
-Every CLI command produces **100% deterministically correct results from the parse tree**. If a result's correctness depends on interpreting natural language, that operation does not belong in the CLI — it belongs in the agent that calls the CLI.
+Every CLI command answers **from the parse tree alone**: the same input always gives the same output. If a result's correctness depends on interpreting natural language, that operation does not belong in the CLI — it belongs to whoever reads the output, a person or an AI assistant.
 
-The CLI's role is to make workspace navigation token-efficient: instead of pulling entire files into an agent's context window, the agent makes precise structural queries and gets back exactly the slice it needs. The agent then composes these primitives into higher-level workflows (impact analysis, coverage assessment, audit) where it applies its own reasoning to the NL content the CLI surfaces.
+Each command answers one precise structural question and returns just that part of the workspace. People, CI jobs and AI assistants combine these commands into larger workflows (impact analysis, coverage assessment, audit), applying their own judgement to the natural-language content the CLI surfaces.
 
 ## Commands
 

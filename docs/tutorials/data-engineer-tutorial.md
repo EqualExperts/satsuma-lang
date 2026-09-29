@@ -4,14 +4,14 @@
 
 You have been here before. A business analyst hands you a spreadsheet with 200 rows of source-to-target mappings. Column A is source field, Column B is target field, Column F says "Transform" and contains entries like "clean up and convert" or "see notes tab." The notes tab has 14 rows, three of which are relevant, and two of those contradict each other. You spend two days reverse-engineering intent before writing a single line of code.
 
-Now imagine feeding that spreadsheet to an AI coding agent. The model does its best, but it hallucinates column names, invents join conditions, and guesses at merge strategies because the spreadsheet gave it nothing to anchor on. You spend two more days reviewing and correcting the output. The AI saved you no time at all.
+Now imagine feeding that spreadsheet to an AI coding agent. The model does its best, but it hallucinates column names, invents join conditions, and guesses at merge strategies because the spreadsheet gave it nothing to anchor on. You spend two more days reviewing and correcting the output.
 
-Satsuma fixes both problems by giving you a **constrained, parseable, version-controlled contract** that sits between business requirements and implementation code. It captures what the mapping should do precisely enough that an AI agent can generate correct scaffolding on the first pass, yet readably enough that a BA can review and sign it off.
+Satsuma fixes both problems by giving you a **constrained, parseable, version-controlled contract** that sits between business requirements and implementation code. It captures what the mapping should do precisely enough to build from, whether you write the code or an AI assistant drafts it, and readably enough that a BA can review and sign it off.
 
 For you as a data engineer, the key properties are:
 
 - **Parseable structure.** Schemas, arrows, transforms, and metadata have syntactic boundaries. An AI model does not have to guess where one concept ends and another begins.
-- **Semantic metadata.** Tokens like `(pk)`, `(scd 2)`, `(merge upsert, match_on customer_id)` give an AI agent the precise context it needs to generate correct DDL, merge logic, and test assertions.
+- **Semantic metadata.** Tokens like `(pk)`, `(scd 2)`, `(merge upsert, match_on customer_id)` say exactly what DDL, merge logic and test assertions the mapping needs.
 - **Scoped natural language.** Complex business logic lives in `" "` strings inside the mapping, not in a separate document. The AI knows exactly which arrow the logic belongs to.
 - **Version control.** `.stm` files are plain text. They diff, merge, and review in pull requests like any other code artifact.
 
@@ -41,9 +41,9 @@ The important insight is that you are not asking the AI to *invent* a pipeline f
 
 ## Metadata Conventions as Codegen Hints
 
-This is Satsuma's superpower: the `( )` metadata system accepts *any* vocabulary tokens. They are not reserved keywords. The grammar never changes when you add new patterns. That means **you can teach an AI agent your organisation's entire convention system** by writing tokens into the spec and guidelines that describe how to interpret them.
+The `( )` metadata system accepts *any* vocabulary tokens. They are not reserved keywords, and the grammar never changes when you add new patterns. That means **you can write your organisation's own conventions into the spec**, with guidelines that describe how to interpret them.
 
-Think about what that means in practice. When you write `(merge upsert, match_on customer_id)`, you are not using a feature the Satsuma language designers had to build. You are using a convention that someone documented. You can do the same thing for any pattern your organisation cares about — `(data_domain "finance")`, `(cost_center "CC-4200")`, `(audit_level high)`, `(team_owner "platform-eng")`, `(sla "99.9%")` — and an AI agent that has read your guidelines will know exactly what to generate from each one.
+Think about what that means in practice. When you write `(merge upsert, match_on customer_id)`, you are not using a feature the Satsuma language designers had to build. You are using a convention that someone documented. You can do the same thing for any pattern your organisation cares about — `(data_domain "finance")`, `(cost_center "CC-4200")`, `(audit_level high)`, `(team_owner "platform-eng")`, `(sla "99.9%")` — and anyone who has read your guidelines, including an AI assistant, knows what each one asks for.
 
 This extensibility is what separates Satsuma from rigid schema languages. You are not waiting for a language update to support your use case. You write the token, document what it means, and every AI agent and human reader in your organisation knows how to act on it.
 
@@ -351,21 +351,19 @@ The pattern here is the same as infrastructure-as-code: governance metadata live
 
 ---
 
-## Why Satsuma Produces Better AI Results Than Other Spec Formats
+## Why Satsuma Rather Than Other Spec Formats
 
-You might ask: why not just give the AI a well-structured YAML file, a JSON schema, or a detailed Confluence page? You can, and it will work to some degree. But Satsuma produces consistently better results for several reasons.
+You might ask: why not just give the AI a well-structured YAML file, a JSON schema, or a detailed Confluence page? You can, and it will work to some degree. Satsuma has some properties those formats lack.
 
 **Constrained grammar.** Satsuma has three delimiter types with mutually exclusive roles: `( )` for metadata, `{ }` for structural content, `" "` for natural language. An AI model cannot confuse a business rule with a field name or a comment with a constraint. In YAML or JSON, everything is a string and the model must infer roles from context.
 
-**Semantic tokens.** Tokens like `pk`, `scd 2`, `merge upsert`, and `pii` are compact, unambiguous signals. They carry more information per token than a paragraph of prose and they are consistent across every spec in your organization. A model trained on thousands of data engineering conversations already knows what these terms mean.
+**Semantic tokens.** Tokens like `pk`, `scd 2`, `merge upsert`, and `pii` are short and unambiguous, and they mean the same thing in every spec in your organisation. A model trained on thousands of data engineering conversations already knows what these terms mean.
 
 **Scoped natural language.** Complex logic lives inside `" "` strings that are syntactically bound to a specific arrow or block. The AI knows exactly which transformation the NL describes. In a spreadsheet, a "Notes" column is disconnected from the field it refers to, and an AI must guess the association.
 
 **Extensibility without grammar changes.** When your team adopts a new convention (say, `(retention 90d)` for data retention policies), you just start using it. No schema changes, no parser updates, no tooling modifications. The AI interprets the new token from context, and you document the convention for consistency.
 
 **Version control.** `.stm` files diff cleanly. When a spec changes, you can see exactly which arrows, metadata, or transforms were modified. An AI agent reviewing a PR can compare the old and new specs and flag implementation code that needs updating. Try doing that with an Excel file.
-
-**Token efficiency.** Measured across the 21 specs in `examples/`, a `.stm` file is a median 9% smaller than the same mapping written as YAML and 36% smaller than JSON (see [`reference/static-compactness.md`](../../reference/static-compactness.md)). That is a modest saving on artifact size, and it helps larger mapping inventories fit within an AI model's context window for cross-mapping analysis, lineage tracing, and consistency checking.
 
 ---
 

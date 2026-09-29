@@ -25,7 +25,7 @@ structured specs with a format that is:
 
 - readable by humans
 - parseable by tools
-- compact enough for AI agents to generate and consume reliably
+- regular enough for people and AI tools to read and write
 - stable enough to act as the source of truth for downstream tooling
 
 Satsuma is intended to sit between systems and describe how data moves from one
@@ -38,10 +38,9 @@ metadata, and references deterministic and parser-backed, while still allowing
 natural language exactly where real projects need it: notes, business rules,
 underspecified transforms, and review context.
 
-That makes Satsuma a good fit for AI agents. Deterministic tooling can extract
-the structural facts with high confidence, while an LLM handles the reasoning
-over the natural-language parts. The parser and CLI are not competing with the
-agent; they are the reliable substrate that lets the agent reason safely.
+The same split suits AI tools. The parser and CLI report the structural facts
+exactly; a person or an AI assistant reads the natural-language parts and
+applies judgement.
 
 ## Why Satsuma Exists
 
@@ -49,26 +48,21 @@ Most mapping specifications today are hard to trust operationally:
 
 - spreadsheets are inconsistent and drift from implementation
 - free-form docs are readable but not machine-checkable
-- YAML and JSON are parseable but too noisy for large mapping inventories
+- YAML and JSON are parseable but hard to read at a glance
 - vendor tools often hide critical logic behind UI configuration
 
 Satsuma aims to solve that by making mapping intent explicit in a language that both
 people and parsers can work with directly.
 
-That matters even more in AI-assisted delivery. Agents can produce better code,
-better reviews, and better impact analysis when they operate against a
-constrained language instead of reverse-engineering free-form implementation
-logic.
-
 The intended operating model is hybrid:
 
 - Satsuma captures the deterministic structure of the integration
 - the `satsuma` CLI extracts facts, topology, metadata, lineage, and NL content
-- the LLM reasons over those extracted facts plus the embedded natural-language intent
+- a person or an LLM reasons over those extracted facts plus the embedded natural-language intent
 
 This is the core idea: use deterministic tools for what must be exact, and use
-LLM reasoning for what cannot be fully formalized without making the language
-unusable.
+human or AI judgement for what cannot be fully formalised without making the
+language unusable.
 
 ## Natural Language as a First-Class Part of the Spec
 
@@ -91,14 +85,14 @@ document into a programming language:
 - transformation notes that require analyst review
 - implementation guidance and caveats for downstream teams
 
-Satsuma keeps both in one versioned artifact. That is important for AI agents:
+Satsuma keeps both in one versioned artifact. That helps every reader, human or AI:
 
 - the parser-backed parts provide reliable structure
 - the natural-language parts preserve the reasoning context humans actually use
 - the CLI can surface both without inventing semantics
-- the agent can then apply judgment instead of scraping prose from Excel cells
+- a reader can apply judgement instead of scraping prose from Excel cells
 
-## Extensible Metadata: Satsuma's Superpower
+## Extensible Metadata
 
 Satsuma's `( )` metadata accepts **any vocabulary token**. There are no reserved
 metadata keywords. When you write `(merge upsert, match_on customer_id)` or
@@ -120,9 +114,9 @@ schema payments (
 ```
 
 None of those tokens required a language change. They work today. Write an
-`LLM-Guidelines.md` that tells AI agents how to interpret your custom tokens
-(what DDL to generate, what tests to create, what policies to enforce), and
-every AI agent in your organisation knows how to act on them. The
+`LLM-Guidelines.md` that explains your custom tokens (what DDL to generate,
+what tests to create, what policies to enforce), and every person and AI tool
+that reads your specs works from the same definitions. The
 [convention guides](docs/) that ship with Satsuma
 ([Kimball](docs/data-modelling/kimball/LLM-Guidelines.md),
 [Data Vault](docs/data-modelling/datavault/LLM-Guidelines.md),
@@ -247,7 +241,7 @@ and 4 role-specific playbooks adapt it to how you actually work:
 | [05 — Mapping Blocks](lessons/05-mappings.md) | Arrows, transforms, value maps, multi-source mappings |
 | [06 — Natural Language Transforms](lessons/06-nl-transforms.md) | When to formalize vs. keep it natural, `@ref` references |
 | [07 — Nested Data, Arrays, and Complex Shapes](lessons/07-nested-mappings.md) | Dotted paths, array notation, nested arrow blocks |
-| [08 — The Satsuma CLI](lessons/08-satsuma-cli.md) | The CLI as the agent's deterministic toolkit |
+| [08 — The Satsuma CLI](lessons/08-satsuma-cli.md) | Exact structural answers about a workspace |
 | [09 — Human-Agent Workflows](lessons/09-agent-workflows.md) | Impact analysis, coverage checks, PII audits, change review |
 | [10 — End-to-End Delivery](lessons/10-real-world-workflows.md) | The full delivery loop from gathering to versioned source of truth |
 

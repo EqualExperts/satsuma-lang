@@ -1,8 +1,8 @@
-# Lesson 08 — The Satsuma CLI as the Agent's Toolkit
+# Lesson 08 — The Satsuma CLI
 
-## The CLI Is Primarily for the Agent
+## What the CLI Is For
 
-The Satsuma CLI (`satsuma`) is designed as a **deterministic extraction layer** that the agent composes into workflows. In day-to-day work, the agent often runs the commands for you. But humans should still know a small core set directly so they can verify outputs, debug problems, and build trust in the tooling.
+The Satsuma CLI (`satsuma`) is a **deterministic extraction layer**: each command answers one structural question about a workspace, and you — or your agent — combine the answers into workflows. In day-to-day work, the agent often runs the commands for you. You should still know a small core set directly so you can verify outputs, debug problems, and build trust in the tooling.
 
 The key principle: **the CLI gives exact slices; the agent supplies the analysis.**
 
@@ -10,13 +10,13 @@ The key principle: **the CLI gives exact slices; the agent supplies the analysis
 
 ## Why This Design
 
-Loading entire Satsuma files into an agent's context window is wasteful and error-prone. A workspace might have dozens of files with thousands of lines. The CLI solves this by letting the agent request exactly the information it needs:
+A workspace might have dozens of files with thousands of lines, and most questions are about a small part of it. The CLI lets you, or the agent, ask for exactly that part:
 
 - "Show me just the `customers` schema" — not the entire file.
 - "List all arrows involving `email`" — not every mapping in the workspace.
 - "Find all fields tagged `pii`" — not a full-text search.
 
-This keeps the agent's context focused and its answers precise.
+The answers are exact, because they come from the parse tree rather than from reading the text.
 
 ---
 
