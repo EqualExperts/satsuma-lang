@@ -2,7 +2,7 @@
 id: vnm-gucl
 status: open
 deps: []
-links: []
+links: [sl-u3x8]
 created: 2026-08-06T17:24:08Z
 type: bug
 priority: 3

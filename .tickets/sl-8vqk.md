@@ -2,7 +2,7 @@
 id: sl-8vqk
 status: closed
 deps: []
-links: [sl-kezo]
+links: [sl-kezo, sl-ui5d, sl-i9ve]
 created: 2026-08-02T21:42:17Z
 type: feature
 priority: 3
