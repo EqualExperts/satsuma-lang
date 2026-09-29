@@ -50,7 +50,7 @@ Here's the key insight from all this research: there are plenty of **transformat
 - Format-agnostic (not just JSON, not just XML, not just SQL)
 - Separate from execution (describes *what*, not *how to run it*)
 - BA-readable (not just developer-readable)
-- AI-friendly (compact enough for LLM context windows)
+- Readable and writable by AI tools as well as people
 - Self-documenting (notes, PII tags, quality rules built in)
 - Versionable (lives in Git, not SharePoint)
 

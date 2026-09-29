@@ -49,10 +49,9 @@ split.
 beautiful, parseable domain-specific language that becomes the single source of
 truth for how data transforms between systems.
 
-But that analogy is only half the story. Satsuma is also designed as an
-**AI-native mapping spec**: a language where deterministic structure and natural
-language live together intentionally, so parser-backed tools and LLM reasoning
-can work side by side.
+But that analogy is only half the story. In Satsuma, exact structure and natural
+language live together on purpose: parser-backed tools handle the structure, and
+people or AI assistants read and reason about the natural-language parts.
 
 ### Design goals
 
@@ -64,7 +63,7 @@ can work side by side.
 
 4. **Natural language should be first-class, but bounded.** Notes, review context, and underspecified business rules should travel with the mapping instead of being pushed into Slack threads or detached documents. That natural language should be explicitly located and easy for tooling to extract.
 
-5. **It should be leaner than equivalent YAML.** Token efficiency matters for AI consumption, but it also matters for human scanning. Less ceremony means faster comprehension. *Measured 2026-08-06: a median 9% smaller than YAML and 36% smaller than JSON across the 21 specs in `examples/` (`reference/static-compactness.md`). The goal as originally written said 40-60%, which the measurement does not support.*
+5. **It should carry less ceremony than equivalent YAML.** Less ceremony means a mapping is faster to scan and easier to review. *Measured 2026-08-06: a median 9% smaller than YAML and 36% smaller than JSON across the 21 specs in `examples/` (`reference/static-compactness.md`). The goal as originally written said 40-60%, which the measurement does not support.*
 
 6. **It should handle the real world.** Not just clean REST-to-REST API mappings, but legacy SQL Server databases with dates stored as VARCHAR, EDI fixed-length messages with qualifier-filtered segments, COBOL copybooks with field names that contain spaces, and XML with deeply nested namespaces.
 

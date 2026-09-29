@@ -14,7 +14,7 @@ Satsuma is a concise notation for describing data schemas, mappings, and transfo
 1. **The parser is an LLM.** Structure exists to delineate intent and scope — not to be exhaustively parseable by a formal grammar. Ambiguity that a competent human can resolve is acceptable.
 2. **Natural language is a first-class citizen.** Complex transform logic belongs in quoted English, not in a pseudo-programming language.
 3. **Three delimiters, three jobs.** `( )` for metadata, `{ }` for structural content, `" "` for natural language. Every use of a delimiter should fit exactly one of these roles.
-4. **Token-efficient.** Eliminate ceremony. If something can be inferred, don't require it.
+4. **Concise.** Eliminate ceremony. If something can be inferred, don't require it.
 5. **Extensible without grammar changes.** New vocabulary tokens (like `scd`, `datavault`, `hub`) are interpreted by the LLM, not reserved by the language.
 
 ---

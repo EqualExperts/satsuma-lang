@@ -12,7 +12,7 @@ Copy and paste everything below the line into any LLM or image generation tool f
 
 ### Satsuma — Brand Identity
 
-**What Satsuma is:** A domain-specific language for source-to-target data mapping. It replaces scattered spreadsheets, wiki pages, and YAML files with a single, readable, parseable format. Think "DBML for data mappings." It is human-readable (business analysts can review it), machine-parseable (tree-sitter grammar with deterministic tooling), and AI-native (LLMs generate valid Satsuma reliably).
+**What Satsuma is:** A domain-specific language for source-to-target data mapping. It replaces scattered spreadsheets, wiki pages, and YAML files with a single, readable, parseable format. Think "DBML for data mappings." It is human-readable (business analysts can review it), machine-parseable (tree-sitter grammar with deterministic tooling), and readable and writable by AI tools as well as people.
 
 **The name:** Satsuma is a citrus fruit — small, sweet, easy to peel. The name evokes something that is approachable, well-structured (segments), and satisfying. The project takes its visual identity from the fruit.
 
@@ -102,12 +102,14 @@ Reference file: `../assets/satsuma-logo.png` (full logo with wordmark), `../asse
 - "Human-readable, machine-parseable" (the core tagline)
 - "Single source of truth" (for mapping logic)
 - "Parser-backed" (not regex heuristics)
-- "AI-native" (not "AI-powered" — the language is designed for AI, not driven by it)
+- "For people and AI tools alike" (not "AI-native" or "AI-powered" — AI tools are one kind of reader, not the headline)
 - "The mapping language" (not "a mapping framework" or "a mapping platform")
 
 **Avoid:**
 - Buzzwords: "leverage", "synergy", "revolutionize", "cutting-edge", "next-gen"
 - Vague claims: "powerful", "robust", "enterprise-grade" without specifics
+- Hype: "superpower", "dramatic", "high-fidelity"
+- Claims about file size, token savings or better AI output — lead with readability instead
 - Developer-only language when addressing mixed audiences
 - Exclamation marks in body copy (reserve for genuinely exciting moments)
 

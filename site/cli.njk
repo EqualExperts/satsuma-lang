@@ -1,9 +1,9 @@
 ---
 layout: default.njk
-title: "Satsuma CLI &mdash; Agent Tooling for Structural Extraction"
-description: "The Satsuma CLI gives AI agents many deterministic, parser-backed commands to slice, query, and validate Satsuma workspaces. Humans use it for formatting, validation, and linting."
-og_title: "Satsuma CLI &mdash; Agent Tooling for Structural Extraction"
-og_description: "Give your AI agent many commands to extract structure, trace lineage, and validate Satsuma workspaces. Humans get formatting, linting, and validation."
+title: "Satsuma CLI &mdash; Validate, Format and Query Your Mappings"
+description: "The Satsuma CLI validates, formats and lints Satsuma files, traces lineage, and answers structural questions about a workspace, for people, CI pipelines and AI assistants."
+og_title: "Satsuma CLI &mdash; Validate, Format and Query Your Mappings"
+og_description: "Validate, format and lint Satsuma mappings, trace lineage, and query a workspace from the command line."
 nav_id: cli
 permalink: cli.html
 ---
@@ -17,24 +17,24 @@ permalink: cli.html
             {{ stats.cliCommands }} commands &middot; {{ stats.packages['satsuma-cli'] }} tests
           </div>
           <h1 class="text-4xl sm:text-5xl font-extrabold text-charcoal leading-tight mb-6">
-            The agent's <span class="text-orange">toolkit</span> for Satsuma
+            Check and query your <span class="text-orange">mappings</span>
           </h1>
           <p class="text-lg text-warm-gray leading-relaxed mb-4">
-            The Satsuma CLI exists mainly so an AI agent doesn't have to load a whole workspace into its context window and guess. It answers precise structural questions &mdash; one field's lineage, every PII tag, the fields still unmapped &mdash; with small, deterministic JSON slices instead of raw files, so your agent spends its tokens reasoning, not re-parsing.
+            The Satsuma CLI checks your mappings and answers precise questions about them &mdash; one field&rsquo;s lineage, every PII tag, the fields still unmapped. Answers come as readable text or JSON, straight from the parse tree.
           </p>
           <p class="text-warm-gray leading-relaxed mb-4">
-            Humans use it too &mdash; <code class="font-mono text-sm text-orange-dark bg-orange/10 px-1.5 py-0.5 rounded">validate</code>, <code class="font-mono text-sm text-orange-dark bg-orange/10 px-1.5 py-0.5 rounded">fmt</code>, and <code class="font-mono text-sm text-orange-dark bg-orange/10 px-1.5 py-0.5 rounded">lint</code> are your day-to-day workflow commands. But most of the {{ stats.cliCommands }} commands exist for the agent, not for you.
+            <code class="font-mono text-sm text-orange-dark bg-orange/10 px-1.5 py-0.5 rounded">validate</code>, <code class="font-mono text-sm text-orange-dark bg-orange/10 px-1.5 py-0.5 rounded">fmt</code> and <code class="font-mono text-sm text-orange-dark bg-orange/10 px-1.5 py-0.5 rounded">lint</code> are the everyday commands. The rest query a workspace, whether you run them yourself, from CI, or through an AI assistant.
           </p>
           <p class="text-warm-gray leading-relaxed mb-8">
-            <strong>The CLI extracts facts. The agent interprets them.</strong> It also powers the VS Code extension's diagnostics, lineage views, and code intelligence.
+            <strong>The CLI reports facts from the parse tree. It never interprets natural language.</strong> It also powers the VS Code extension's diagnostics, lineage views, and code intelligence.
           </p>
           <div class="flex flex-wrap gap-3">
-            <a href="#agent-setup" class="inline-flex items-center gap-2 px-6 py-3 gradient-orange text-white font-semibold rounded-xl shadow-lg shadow-orange/25 hover:shadow-xl transition-all">
-              Set up your agent
+            <a href="#install" class="inline-flex items-center gap-2 px-6 py-3 gradient-orange text-white font-semibold rounded-xl shadow-lg shadow-orange/25 hover:shadow-xl transition-all">
+              Install
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3"/></svg>
             </a>
-            <a href="#install" class="inline-flex items-center gap-2 px-6 py-3 bg-cream text-charcoal font-semibold rounded-xl border border-charcoal/10 hover:border-charcoal/20 transition-all">
-              Install
+            <a href="#human-workflows" class="inline-flex items-center gap-2 px-6 py-3 bg-cream text-charcoal font-semibold rounded-xl border border-charcoal/10 hover:border-charcoal/20 transition-all">
+              Everyday commands
             </a>
             <a href="https://github.com/EqualExperts/satsuma-lang/blob/main/SATSUMA-CLI.md" target="_blank" rel="noopener"
                class="inline-flex items-center gap-2 px-6 py-3 bg-cream text-charcoal font-semibold rounded-xl border border-charcoal/10 hover:border-charcoal/20 transition-all">
@@ -51,10 +51,11 @@ permalink: cli.html
             <span class="text-xs text-gray-400 ml-2 font-mono">satsuma</span>
           </div>
           <pre>
-<span class="output"># Teach your agent about Satsuma in one command</span>
-<span class="prompt">$</span> satsuma agent-reference <span class="flag">&gt;&gt;</span> AGENTS.md
+<span class="output"># Check a mapping</span>
+<span class="prompt">$</span> satsuma validate <span class="flag">examples/sfdc-to-snowflake/pipeline.stm</span>
+<span class="output">valid &mdash; 0 errors, 0 warnings</span>
 
-<span class="output"># Agent can now query your workspace</span>
+<span class="output"># Summarise the workspace</span>
 <span class="prompt">$</span> satsuma summary <span class="flag">examples/sfdc-to-snowflake/pipeline.stm</span>
 
 <span class="highlight">Workspace Summary</span>  <span class="output">examples/sfdc-to-snowflake/pipeline.stm</span>
@@ -75,108 +76,82 @@ permalink: cli.html
     </div>
   </section>
 
-  <!-- Agent Setup — front and center -->
-  <section id="agent-setup" class="py-16 lg:py-24 bg-white">
+  <!-- Human Workflows -->
+  <section id="human-workflows" class="py-16 lg:py-24 bg-white">
     <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-      <div class="max-w-3xl mx-auto reveal">
-        <div class="inline-flex items-center gap-2 px-3 py-1.5 bg-charcoal/10 text-charcoal text-sm font-medium rounded-full mb-4">
-          Start here
+      <div class="mb-12 reveal">
+        <div class="inline-flex items-center gap-2 px-3 py-1.5 bg-green/10 text-green-dark text-sm font-medium rounded-full mb-4">
+          Everyday use
         </div>
-        <h2 class="text-3xl font-bold text-charcoal mb-3">Teach your agent Satsuma in 30 seconds</h2>
-        <p class="text-warm-gray mb-8">
-          <code class="font-mono text-sm text-orange-dark bg-orange/10 px-1.5 py-0.5 rounded">satsuma agent-reference</code> prints a compact prompt that teaches any AI agent the Satsuma grammar, the CLI commands, and the recommended workflow patterns. Append it to your agent's instructions file and you're done.
-        </p>
+        <h2 class="text-3xl font-bold text-charcoal mb-3">Your day-to-day commands</h2>
+        <p class="text-warm-gray max-w-2xl">These three are the commands you will run most. Use them before committing, in CI, or from the editor; the VS Code extension runs them too.</p>
+      </div>
 
-        <div class="bg-cream rounded-2xl p-6 border border-charcoal/5 mb-6">
-          <h3 class="text-lg font-bold text-charcoal mb-2">One-time setup</h3>
-          <p class="text-sm text-warm-gray mb-4">Append the reference to whatever file your agent reads at startup. Works with Claude Code, Copilot, Cursor, Windsurf, or any agent that reads a system prompt from a file.</p>
-          <div class="terminal text-xs">
-            <div class="terminal-header">
-              <div class="terminal-dot red"></div>
-              <div class="terminal-dot yellow"></div>
-              <div class="terminal-dot green"></div>
-            </div>
-            <pre>
-<span class="output"># Claude Code</span>
-<span class="prompt">$</span> satsuma agent-reference <span class="flag">&gt;&gt;</span> CLAUDE.md
-
-<span class="output"># GitHub Copilot</span>
-<span class="prompt">$</span> satsuma agent-reference <span class="flag">&gt;&gt;</span> .github/copilot-instructions.md
-
-<span class="output"># Cursor</span>
-<span class="prompt">$</span> satsuma agent-reference <span class="flag">&gt;&gt;</span> .cursor/rules/satsuma.mdc
-
-<span class="output"># Or paste into any conversation</span>
-<span class="prompt">$</span> satsuma agent-reference <span class="flag">| pbcopy</span></pre>
-          </div>
-        </div>
-
+      <div class="grid lg:grid-cols-3 gap-8 reveal">
+        <!-- validate -->
         <div class="bg-cream rounded-2xl p-6 border border-charcoal/5">
-          <h3 class="text-lg font-bold text-charcoal mb-2">What the agent gets</h3>
-          <p class="text-sm text-warm-gray mb-4">The reference covers:</p>
-          <div class="grid sm:grid-cols-2 gap-3">
-            <div class="flex items-start gap-2">
-              <svg class="w-4 h-4 text-green flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-              <span class="text-sm text-warm-gray">Compact EBNF grammar for all Satsuma syntax</span>
-            </div>
-            <div class="flex items-start gap-2">
-              <svg class="w-4 h-4 text-green flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-              <span class="text-sm text-warm-gray">All {{ stats.cliCommands }} CLI commands with usage patterns</span>
-            </div>
-            <div class="flex items-start gap-2">
-              <svg class="w-4 h-4 text-green flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-              <span class="text-sm text-warm-gray">Transform function library and metadata tokens</span>
-            </div>
-            <div class="flex items-start gap-2">
-              <svg class="w-4 h-4 text-green flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-              <span class="text-sm text-warm-gray">Step-by-step workflow for reading and writing <code class="font-mono text-xs">.stm</code> files</span>
-            </div>
-            <div class="flex items-start gap-2">
-              <svg class="w-4 h-4 text-green flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-              <span class="text-sm text-warm-gray">22 common mistakes with fixes</span>
-            </div>
-            <div class="flex items-start gap-2">
-              <svg class="w-4 h-4 text-green flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-              <span class="text-sm text-warm-gray">Excel-to-Satsuma conversion examples</span>
-            </div>
+          <h3 class="text-xl font-bold text-charcoal mb-2 font-mono">validate</h3>
+          <p class="text-sm text-warm-gray mb-2"><em>"Is my workspace well-formed?"</em></p>
+          <p class="text-sm text-warm-gray mb-4">Checks parse errors, undefined schema references, missing fields, and invalid paths. Run it before every commit.</p>
+          <div class="terminal text-xs">
+            <div class="terminal-header"><div class="terminal-dot red"></div><div class="terminal-dot yellow"></div><div class="terminal-dot green"></div></div>
+            <pre>
+<span class="prompt">$</span> satsuma validate <span class="flag">examples/sfdc-to-snowflake/pipeline.stm</span>
+<span class="output">valid &mdash; 0 errors, 0 warnings</span>
+
+<span class="prompt">$</span> satsuma validate <span class="flag">--json</span>
+<span class="output">{ "valid": true, "errors": 0, "warnings": 0 }</span></pre>
           </div>
         </div>
 
-        <div class="bg-cream rounded-2xl p-6 border border-charcoal/5 mt-6">
-          <h3 class="text-lg font-bold text-charcoal mb-2">Only need part of it?</h3>
-          <p class="text-sm text-warm-gray mb-4">
-            <code class="font-mono text-xs bg-code-bg px-1 rounded">satsuma agent-reference</code> with no flags always prints the whole document — that never changes, so anything already piping it keeps working. If your agent only writes Satsuma or only reads it, hand it just that slice instead:
-          </p>
+        <!-- fmt -->
+        <div class="bg-cream rounded-2xl p-6 border border-charcoal/5">
+          <h3 class="text-xl font-bold text-charcoal mb-2 font-mono">fmt</h3>
+          <p class="text-sm text-warm-gray mb-2"><em>"One canonical style, zero config."</em></p>
+          <p class="text-sm text-warm-gray mb-4">Opinionated formatter backed by the tree-sitter CST. Semantics-preserving. Use <code class="font-mono text-xs bg-code-bg px-1 rounded">--check</code> in CI.</p>
           <div class="terminal text-xs">
-            <div class="terminal-header">
-              <div class="terminal-dot red"></div>
-              <div class="terminal-dot yellow"></div>
-              <div class="terminal-dot green"></div>
-            </div>
+            <div class="terminal-header"><div class="terminal-dot red"></div><div class="terminal-dot yellow"></div><div class="terminal-dot green"></div></div>
             <pre>
-<span class="output"># Generating or converting into Satsuma — grammar, conventions, examples</span>
-<span class="prompt">$</span> satsuma agent-reference <span class="flag">--profile write</span> <span class="flag">&gt;&gt;</span> AGENTS.md
+<span class="prompt">$</span> satsuma fmt <span class="flag">examples/sfdc-to-snowflake/pipeline.stm</span>
+<span class="output">Formatted 1 file(s)</span>
 
-<span class="output"># Tracing lineage, coverage, or impact in an existing workspace</span>
-<span class="prompt">$</span> satsuma agent-reference <span class="flag">--profile read</span> <span class="flag">&gt;&gt;</span> AGENTS.md
+<span class="prompt">$</span> satsuma fmt <span class="flag">--check examples/sfdc-to-snowflake/pipeline.stm</span>
+<span class="output">0 file(s) would be reformatted</span>
 
-<span class="output"># List every section's id and measured token cost</span>
-<span class="prompt">$</span> satsuma agent-reference <span class="flag">--list</span></pre>
+<span class="prompt">$</span> satsuma fmt <span class="flag">--diff mapping.stm</span></pre>
+          </div>
+        </div>
+
+        <!-- lint -->
+        <div class="bg-cream rounded-2xl p-6 border border-charcoal/5">
+          <h3 class="text-xl font-bold text-charcoal mb-2 font-mono">lint</h3>
+          <p class="text-sm text-warm-gray mb-2"><em>"Does this follow best practices?"</em></p>
+          <p class="text-sm text-warm-gray mb-4">Policy and convention checks with <code class="font-mono text-xs bg-code-bg px-1 rounded">--fix</code> for safe autofix. Catches hidden NL dependencies and duplicate definitions.</p>
+          <div class="terminal text-xs">
+            <div class="terminal-header"><div class="terminal-dot red"></div><div class="terminal-dot yellow"></div><div class="terminal-dot green"></div></div>
+            <pre>
+<span class="prompt">$</span> satsuma lint <span class="flag">--fix</span>
+<span class="output">Fixed 2 issue(s)</span>
+
+<span class="prompt">$</span> satsuma lint <span class="flag">--rules</span>
+<span class="output">hidden-source-in-nl  (fixable)</span>
+<span class="output">unresolved-nl-ref</span>
+<span class="output">duplicate-definition</span></pre>
           </div>
         </div>
       </div>
     </div>
   </section>
 
-  <!-- How Agents Use the CLI -->
+  <!-- Querying a workspace -->
   <section id="agent-workflows" class="py-16 lg:py-24">
     <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
       <div class="text-center mb-12 reveal">
         <div class="inline-flex items-center gap-2 px-3 py-1.5 bg-orange/10 text-orange-dark text-sm font-medium rounded-full mb-4">
-          Agent Workflows
+          Querying
         </div>
-        <h2 class="text-3xl font-bold text-charcoal mb-3">How agents use the CLI</h2>
-        <p class="text-warm-gray max-w-3xl mx-auto">The CLI gives agents token-efficient structural queries instead of dumping entire files into context. Agents compose these primitives into higher-level workflows &mdash; the CLI extracts the facts, the agent reasons over them.</p>
+        <h2 class="text-3xl font-bold text-charcoal mb-3">Querying a workspace</h2>
+        <p class="text-warm-gray max-w-3xl mx-auto">Each command answers one structural question. Combine them for bigger jobs &mdash; impact analysis, PII audits, coverage checks &mdash; whether you run them yourself or an AI assistant runs them for you.</p>
       </div>
 
       <!-- Validate lineage -->
@@ -185,10 +160,10 @@ permalink: cli.html
           <div>
             <h3 class="text-2xl font-bold text-charcoal mb-3">Validate lineage and trace data flow</h3>
             <p class="text-warm-gray mb-4">
-              Your agent can trace any data element from source to destination across the entire workspace. It starts with <code class="font-mono text-sm text-orange-dark bg-orange/10 px-1.5 py-0.5 rounded">lineage</code> for schema-level paths, then drills into <code class="font-mono text-sm text-orange-dark bg-orange/10 px-1.5 py-0.5 rounded">arrows</code> for field-level detail.
+              You can trace any data element from source to destination across the whole workspace. Start with <code class="font-mono text-sm text-orange-dark bg-orange/10 px-1.5 py-0.5 rounded">lineage</code> for schema-level paths, then drill into <code class="font-mono text-sm text-orange-dark bg-orange/10 px-1.5 py-0.5 rounded">arrows</code> for field-level detail.
             </p>
             <p class="text-warm-gray mb-4">
-              When an arrow is classified as <code class="font-mono text-sm text-orange-dark bg-orange/10 px-1.5 py-0.5 rounded">nl</code>, the agent reads the natural-language intent and interprets it. When it's <code class="font-mono text-sm text-green-dark bg-green/10 px-1.5 py-0.5 rounded">structural</code>, the transform pipeline is fully specified &mdash; no interpretation needed.
+              When an arrow is classified as <code class="font-mono text-sm text-orange-dark bg-orange/10 px-1.5 py-0.5 rounded">nl</code>, its natural-language intent needs a reader to interpret it. When it's <code class="font-mono text-sm text-green-dark bg-green/10 px-1.5 py-0.5 rounded">structural</code>, the transform pipeline is fully specified &mdash; no interpretation needed.
             </p>
             <div class="space-y-2 text-sm text-warm-gray">
               <div class="flex items-start gap-2">
@@ -201,7 +176,7 @@ permalink: cli.html
               </div>
               <div class="flex items-start gap-2">
                 <span class="font-mono text-orange-dark font-bold mt-0.5">3.</span>
-                <span><code class="font-mono bg-code-bg px-1 rounded">nl</code> extracts NL intent at <code class="font-mono bg-code-bg px-1 rounded">[nl]</code> hops for the agent to interpret</span>
+                <span><code class="font-mono bg-code-bg px-1 rounded">nl</code> extracts NL intent at <code class="font-mono bg-code-bg px-1 rounded">[nl]</code> hops for a reader to interpret</span>
               </div>
               <div class="flex items-start gap-2">
                 <span class="font-mono text-orange-dark font-bold mt-0.5">4.</span>
@@ -248,10 +223,10 @@ permalink: cli.html
           <div class="lg:order-2">
             <h3 class="text-2xl font-bold text-charcoal mb-3">Extract NL blocks for analysis and critique</h3>
             <p class="text-warm-gray mb-4">
-              Satsuma uses natural-language strings for intent that can't be expressed as deterministic pipelines. The <code class="font-mono text-sm text-orange-dark bg-orange/10 px-1.5 py-0.5 rounded">nl</code> command extracts these verbatim &mdash; notes, transform descriptions, and comments &mdash; so your agent can analyze, critique, or summarize them.
+              Satsuma uses natural-language strings for intent that can't be expressed as deterministic pipelines. The <code class="font-mono text-sm text-orange-dark bg-orange/10 px-1.5 py-0.5 rounded">nl</code> command extracts these verbatim &mdash; notes, transform descriptions, and comments &mdash; so you, or an assistant, can review, critique or summarise them.
             </p>
             <p class="text-warm-gray mb-4">
-              Agents use this to review business logic, check if NL descriptions match the structural transforms around them, identify ambiguities, or generate documentation from the intent strings.
+              Use this to review business logic, check if NL descriptions match the structural transforms around them, identify ambiguities, or generate documentation from the intent strings.
             </p>
             <div class="space-y-2 text-sm text-warm-gray">
               <div class="flex items-start gap-2">
@@ -310,13 +285,13 @@ permalink: cli.html
           <div>
             <h3 class="text-2xl font-bold text-charcoal mb-3">Metadata and custom tags for code generation</h3>
             <p class="text-warm-gray mb-4">
-              Satsuma's metadata system is open-ended &mdash; any token can be a tag. Your agent uses <code class="font-mono text-sm text-orange-dark bg-orange/10 px-1.5 py-0.5 rounded">meta</code> and <code class="font-mono text-sm text-orange-dark bg-orange/10 px-1.5 py-0.5 rounded">find --tag</code> to extract these, then combines them with <strong>your organisation's guidelines</strong> to drive code generation.
+              Satsuma's metadata system is open-ended &mdash; any word can be a tag. An AI assistant uses <code class="font-mono text-sm text-orange-dark bg-orange/10 px-1.5 py-0.5 rounded">meta</code> and <code class="font-mono text-sm text-orange-dark bg-orange/10 px-1.5 py-0.5 rounded">find --tag</code> to extract these, then combines them with <strong>your organisation's guidelines</strong> to drive code generation.
             </p>
             <p class="text-warm-gray mb-4">
-              For example, if your team follows the Data Vault standard, your agent reads <code class="font-mono text-xs bg-code-bg px-1 rounded">pk</code>, <code class="font-mono text-xs bg-code-bg px-1 rounded">bk</code>, <code class="font-mono text-xs bg-code-bg px-1 rounded">hash_diff</code> tags from schema metadata and generates hub, satellite, and link DDL accordingly. If your team uses <code class="font-mono text-xs bg-code-bg px-1 rounded">pii</code> and <code class="font-mono text-xs bg-code-bg px-1 rounded">encrypt</code> tags, the agent knows to emit encryption logic.
+              For example, if your team follows the Data Vault standard, an assistant reads <code class="font-mono text-xs bg-code-bg px-1 rounded">pk</code>, <code class="font-mono text-xs bg-code-bg px-1 rounded">bk</code>, <code class="font-mono text-xs bg-code-bg px-1 rounded">hash_diff</code> tags from schema metadata and generates hub, satellite, and link DDL accordingly. If your team uses <code class="font-mono text-xs bg-code-bg px-1 rounded">pii</code> and <code class="font-mono text-xs bg-code-bg px-1 rounded">encrypt</code> tags, it knows to emit encryption logic.
             </p>
             <p class="text-warm-gray">
-              The CLI doesn't know what <code class="font-mono text-xs bg-code-bg px-1 rounded">hash_diff</code> means &mdash; it just extracts the tag. Your agent, armed with your org's standards doc, interprets it.
+              The CLI doesn't know what <code class="font-mono text-xs bg-code-bg px-1 rounded">hash_diff</code> means &mdash; it just extracts the tag. An assistant that has read your organisation&rsquo;s standards interprets it.
             </p>
           </div>
           <div class="terminal shadow-xl text-xs">
@@ -360,9 +335,9 @@ permalink: cli.html
       <div class="mb-16 reveal">
         <div class="grid lg:grid-cols-2 gap-8 items-start">
           <div class="lg:order-2">
-            <h3 class="text-2xl font-bold text-charcoal mb-3">One-shot workspace reasoning</h3>
+            <h3 class="text-2xl font-bold text-charcoal mb-3">The whole workspace in one call</h3>
             <p class="text-warm-gray mb-4">
-              For complex analysis, <code class="font-mono text-sm text-orange-dark bg-orange/10 px-1.5 py-0.5 rounded">graph --json</code> exports the complete semantic graph in a single call &mdash; all nodes, edges, field-level data flow, and unresolved NL arrows. The agent loads it once and reasons offline, without round-trips.
+              For complex analysis, <code class="font-mono text-sm text-orange-dark bg-orange/10 px-1.5 py-0.5 rounded">graph --json</code> exports the complete semantic graph in a single call &mdash; all nodes, edges, field-level data flow, and unresolved NL arrows. Load it once and analyse it however you need, with no further calls.
             </p>
             <div class="space-y-2 text-sm text-warm-gray">
               <div class="flex items-start gap-2">
@@ -415,9 +390,9 @@ permalink: cli.html
         </div>
       </div>
 
-      <!-- Agent workflow examples grid -->
+      <!-- Example workflows grid -->
       <div class="reveal">
-        <h3 class="text-2xl font-bold text-charcoal mb-6 text-center">Example agent workflows</h3>
+        <h3 class="text-2xl font-bold text-charcoal mb-6 text-center">Example workflows</h3>
         <div class="grid md:grid-cols-2 gap-8">
           <!-- Impact Analysis -->
           <div class="bg-cream rounded-2xl p-6 border border-charcoal/5">
@@ -494,67 +469,92 @@ permalink: cli.html
     </div>
   </section>
 
-  <!-- Human Workflows -->
-  <section id="human-workflows" class="py-16 lg:py-24 bg-white">
+  <!-- Using the CLI with an AI assistant -->
+  <section id="agent-setup" class="py-16 lg:py-24 bg-white">
     <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-      <div class="mb-12 reveal">
-        <div class="inline-flex items-center gap-2 px-3 py-1.5 bg-green/10 text-green-dark text-sm font-medium rounded-full mb-4">
-          Human Workflows
+      <div class="max-w-3xl mx-auto reveal">
+        <div class="inline-flex items-center gap-2 px-3 py-1.5 bg-charcoal/10 text-charcoal text-sm font-medium rounded-full mb-4">
+          AI assistants
         </div>
-        <h2 class="text-3xl font-bold text-charcoal mb-3">Your day-to-day commands</h2>
-        <p class="text-warm-gray max-w-2xl">These three commands are the human side of the CLI. Run them before committing, in CI, or as editor commands. They're also used by the VS Code extension under the hood.</p>
-      </div>
+        <h2 class="text-3xl font-bold text-charcoal mb-3">Using the CLI with an AI assistant</h2>
+        <p class="text-warm-gray mb-8">
+          <code class="font-mono text-sm text-orange-dark bg-orange/10 px-1.5 py-0.5 rounded">satsuma agent-reference</code> prints a compact reference for AI assistants: the Satsuma grammar, the CLI commands and the recommended ways of working. Add it to your assistant&rsquo;s instructions file.
+        </p>
 
-      <div class="grid lg:grid-cols-3 gap-8 reveal">
-        <!-- validate -->
-        <div class="bg-cream rounded-2xl p-6 border border-charcoal/5">
-          <h3 class="text-xl font-bold text-charcoal mb-2 font-mono">validate</h3>
-          <p class="text-sm text-warm-gray mb-2"><em>"Is my workspace well-formed?"</em></p>
-          <p class="text-sm text-warm-gray mb-4">Checks parse errors, undefined schema references, missing fields, and invalid paths. Run it before every commit.</p>
+        <div class="bg-cream rounded-2xl p-6 border border-charcoal/5 mb-6">
+          <h3 class="text-lg font-bold text-charcoal mb-2">One-time setup</h3>
+          <p class="text-sm text-warm-gray mb-4">Append the reference to whichever file your assistant reads at startup. This works with Claude Code, Copilot, Cursor, Windsurf, or any assistant that reads its instructions from a file.</p>
           <div class="terminal text-xs">
-            <div class="terminal-header"><div class="terminal-dot red"></div><div class="terminal-dot yellow"></div><div class="terminal-dot green"></div></div>
+            <div class="terminal-header">
+              <div class="terminal-dot red"></div>
+              <div class="terminal-dot yellow"></div>
+              <div class="terminal-dot green"></div>
+            </div>
             <pre>
-<span class="prompt">$</span> satsuma validate <span class="flag">examples/sfdc-to-snowflake/pipeline.stm</span>
-<span class="output">valid &mdash; 0 errors, 0 warnings</span>
+<span class="output"># Claude Code</span>
+<span class="prompt">$</span> satsuma agent-reference <span class="flag">&gt;&gt;</span> CLAUDE.md
 
-<span class="prompt">$</span> satsuma validate <span class="flag">--json</span>
-<span class="output">{ "valid": true, "errors": 0, "warnings": 0 }</span></pre>
+<span class="output"># GitHub Copilot</span>
+<span class="prompt">$</span> satsuma agent-reference <span class="flag">&gt;&gt;</span> .github/copilot-instructions.md
+
+<span class="output"># Cursor</span>
+<span class="prompt">$</span> satsuma agent-reference <span class="flag">&gt;&gt;</span> .cursor/rules/satsuma.mdc
+
+<span class="output"># Or paste into any conversation</span>
+<span class="prompt">$</span> satsuma agent-reference <span class="flag">| pbcopy</span></pre>
           </div>
         </div>
 
-        <!-- fmt -->
         <div class="bg-cream rounded-2xl p-6 border border-charcoal/5">
-          <h3 class="text-xl font-bold text-charcoal mb-2 font-mono">fmt</h3>
-          <p class="text-sm text-warm-gray mb-2"><em>"One canonical style, zero config."</em></p>
-          <p class="text-sm text-warm-gray mb-4">Opinionated formatter backed by the tree-sitter CST. Semantics-preserving. Use <code class="font-mono text-xs bg-code-bg px-1 rounded">--check</code> in CI.</p>
-          <div class="terminal text-xs">
-            <div class="terminal-header"><div class="terminal-dot red"></div><div class="terminal-dot yellow"></div><div class="terminal-dot green"></div></div>
-            <pre>
-<span class="prompt">$</span> satsuma fmt <span class="flag">examples/sfdc-to-snowflake/pipeline.stm</span>
-<span class="output">Formatted 1 file(s)</span>
-
-<span class="prompt">$</span> satsuma fmt <span class="flag">--check examples/sfdc-to-snowflake/pipeline.stm</span>
-<span class="output">0 file(s) would be reformatted</span>
-
-<span class="prompt">$</span> satsuma fmt <span class="flag">--diff mapping.stm</span></pre>
+          <h3 class="text-lg font-bold text-charcoal mb-4">What the reference covers</h3>
+          <div class="grid sm:grid-cols-2 gap-3">
+            <div class="flex items-start gap-2">
+              <svg class="w-4 h-4 text-green flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+              <span class="text-sm text-warm-gray">Compact EBNF grammar for all Satsuma syntax</span>
+            </div>
+            <div class="flex items-start gap-2">
+              <svg class="w-4 h-4 text-green flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+              <span class="text-sm text-warm-gray">All {{ stats.cliCommands }} CLI commands with usage patterns</span>
+            </div>
+            <div class="flex items-start gap-2">
+              <svg class="w-4 h-4 text-green flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+              <span class="text-sm text-warm-gray">Transform function library and metadata tokens</span>
+            </div>
+            <div class="flex items-start gap-2">
+              <svg class="w-4 h-4 text-green flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+              <span class="text-sm text-warm-gray">Step-by-step workflow for reading and writing <code class="font-mono text-xs">.stm</code> files</span>
+            </div>
+            <div class="flex items-start gap-2">
+              <svg class="w-4 h-4 text-green flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+              <span class="text-sm text-warm-gray">22 common mistakes with fixes</span>
+            </div>
+            <div class="flex items-start gap-2">
+              <svg class="w-4 h-4 text-green flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+              <span class="text-sm text-warm-gray">Excel-to-Satsuma conversion examples</span>
+            </div>
           </div>
         </div>
 
-        <!-- lint -->
-        <div class="bg-cream rounded-2xl p-6 border border-charcoal/5">
-          <h3 class="text-xl font-bold text-charcoal mb-2 font-mono">lint</h3>
-          <p class="text-sm text-warm-gray mb-2"><em>"Does this follow best practices?"</em></p>
-          <p class="text-sm text-warm-gray mb-4">Policy and convention checks with <code class="font-mono text-xs bg-code-bg px-1 rounded">--fix</code> for safe autofix. Catches hidden NL dependencies and duplicate definitions.</p>
+        <div class="bg-cream rounded-2xl p-6 border border-charcoal/5 mt-6">
+          <h3 class="text-lg font-bold text-charcoal mb-2">Only need part of it?</h3>
+          <p class="text-sm text-warm-gray mb-4">
+            <code class="font-mono text-xs bg-code-bg px-1 rounded">satsuma agent-reference</code> with no flags always prints the whole document — that never changes, so anything already piping it keeps working. If your assistant only writes Satsuma or only reads it, give it just that part:
+          </p>
           <div class="terminal text-xs">
-            <div class="terminal-header"><div class="terminal-dot red"></div><div class="terminal-dot yellow"></div><div class="terminal-dot green"></div></div>
+            <div class="terminal-header">
+              <div class="terminal-dot red"></div>
+              <div class="terminal-dot yellow"></div>
+              <div class="terminal-dot green"></div>
+            </div>
             <pre>
-<span class="prompt">$</span> satsuma lint <span class="flag">--fix</span>
-<span class="output">Fixed 2 issue(s)</span>
+<span class="output"># Generating or converting into Satsuma — grammar, conventions, examples</span>
+<span class="prompt">$</span> satsuma agent-reference <span class="flag">--profile write</span> <span class="flag">&gt;&gt;</span> AGENTS.md
 
-<span class="prompt">$</span> satsuma lint <span class="flag">--rules</span>
-<span class="output">hidden-source-in-nl  (fixable)</span>
-<span class="output">unresolved-nl-ref</span>
-<span class="output">duplicate-definition</span></pre>
+<span class="output"># Tracing lineage, coverage, or impact in an existing workspace</span>
+<span class="prompt">$</span> satsuma agent-reference <span class="flag">--profile read</span> <span class="flag">&gt;&gt;</span> AGENTS.md
+
+<span class="output"># List every section's id and size</span>
+<span class="prompt">$</span> satsuma agent-reference <span class="flag">--list</span></pre>
           </div>
         </div>
       </div>
@@ -562,7 +562,7 @@ permalink: cli.html
   </section>
 
   <!-- Installation -->
-  <section id="install" class="py-16 lg:py-24 bg-white">
+  <section id="install" class="py-16 lg:py-24">
     <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 reveal">
       <div class="max-w-3xl mx-auto">
         <h2 class="text-3xl font-bold text-charcoal mb-3">Installation</h2>
@@ -613,10 +613,10 @@ permalink: cli.html
         <div>
           <h2 class="text-3xl font-bold text-charcoal mb-3">That's the shape of it &mdash; not the whole list</h2>
           <p class="text-warm-gray mb-4">
-            This page shows you how an agent strings commands together, not a catalogue of all {{ stats.cliCommands }}. They fall into a few families &mdash; block extractors like <code class="font-mono text-xs bg-code-bg px-1 rounded">summary</code> and <code class="font-mono text-xs bg-code-bg px-1 rounded">schema</code>, fine-grained primitives like <code class="font-mono text-xs bg-code-bg px-1 rounded">arrows</code> and <code class="font-mono text-xs bg-code-bg px-1 rounded">meta</code>, the one-shot <code class="font-mono text-xs bg-code-bg px-1 rounded">graph</code> export, and the human-facing analysis trio above &mdash; but the fastest way to get the exhaustive, always-current list is to ask the CLI itself.
+            This page shows how the commands fit together, not a catalogue of all {{ stats.cliCommands }}. They fall into a few families &mdash; block extractors like <code class="font-mono text-xs bg-code-bg px-1 rounded">summary</code> and <code class="font-mono text-xs bg-code-bg px-1 rounded">schema</code>, fine-grained primitives like <code class="font-mono text-xs bg-code-bg px-1 rounded">arrows</code> and <code class="font-mono text-xs bg-code-bg px-1 rounded">meta</code>, the one-shot <code class="font-mono text-xs bg-code-bg px-1 rounded">graph</code> export, and the human-facing analysis trio above &mdash; but the fastest way to get the exhaustive, always-current list is to ask the CLI itself.
           </p>
           <p class="text-warm-gray">
-            <code class="font-mono text-sm text-orange-dark bg-orange/10 px-1.5 py-0.5 rounded">satsuma agent-reference</code> gives your agent this same list with usage patterns baked in, so it rarely needs <code class="font-mono text-xs bg-code-bg px-1 rounded">--help</code> at all.
+            <code class="font-mono text-sm text-orange-dark bg-orange/10 px-1.5 py-0.5 rounded">satsuma agent-reference</code> gives an AI assistant this same list with usage patterns included, so it rarely needs <code class="font-mono text-xs bg-code-bg px-1 rounded">--help</code> at all.
           </p>
         </div>
         <div class="terminal shadow-xl text-xs">
@@ -669,7 +669,7 @@ permalink: cli.html
             </div>
             <div>
               <h4 class="font-semibold text-charcoal mb-1">Does not compose analysis workflows</h4>
-              <p class="text-sm text-warm-gray">There are no <code class="font-mono text-xs">impact</code> or <code class="font-mono text-xs">audit</code> commands. These are agent workflows built from primitives &mdash; including <code class="font-mono text-xs">coverage</code>, which reports one schema's mapped/unmapped fields but doesn't itself trace impact or run an audit.</p>
+              <p class="text-sm text-warm-gray">There are no <code class="font-mono text-xs">impact</code> or <code class="font-mono text-xs">audit</code> commands. These are workflows built from smaller commands &mdash; including <code class="font-mono text-xs">coverage</code>, which reports one schema's mapped/unmapped fields but doesn't itself trace impact or run an audit.</p>
             </div>
           </div>
           <div class="flex items-start gap-4 p-4 bg-cream rounded-xl">
@@ -687,7 +687,7 @@ permalink: cli.html
             </div>
             <div>
               <h4 class="font-semibold text-charcoal mb-1">Does not accept NL queries</h4>
-              <p class="text-sm text-warm-gray">Commands take explicit structural arguments. The agent decides which commands to call based on the user's question.</p>
+              <p class="text-sm text-warm-gray">Commands take explicit structural arguments. You, or your assistant, choose which commands answer a question.</p>
             </div>
           </div>
         </div>
@@ -698,9 +698,9 @@ permalink: cli.html
   <!-- CTA -->
   <section class="py-20 lg:py-28">
     <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center reveal">
-      <h2 class="text-3xl sm:text-4xl font-bold text-charcoal mb-4">Ready to give your agent superpowers?</h2>
+      <h2 class="text-3xl sm:text-4xl font-bold text-charcoal mb-4">Install the CLI</h2>
       <p class="text-lg text-warm-gray mb-8 max-w-2xl mx-auto">
-        Install the CLI, run <code class="font-mono text-orange-dark bg-orange/10 px-1.5 py-0.5 rounded">satsuma agent-reference >> AGENTS.md</code>, and your agent can query your data mappings in seconds.
+        One npm package that runs on every platform. Install it, then run <code class="font-mono text-orange-dark bg-orange/10 px-1.5 py-0.5 rounded">satsuma validate</code> on your first mapping.
       </p>
       <div class="flex flex-wrap justify-center gap-4">
         <a href="#install" class="inline-flex items-center gap-2 px-8 py-3.5 gradient-orange text-white font-semibold rounded-xl shadow-lg shadow-orange/25 hover:shadow-xl transition-all">

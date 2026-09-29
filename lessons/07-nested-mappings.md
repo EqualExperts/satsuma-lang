@@ -292,4 +292,4 @@ The structure tells you the shape. The NL tells you the business logic. Together
 
 ---
 
-**Next:** [Lesson 08 — The Satsuma CLI as the Agent's Toolkit](08-satsuma-cli.md) — how the CLI provides exact structural facts that the agent composes into workflows.
+**Next:** [Lesson 08 — The Satsuma CLI](08-satsuma-cli.md) — how the CLI provides exact structural facts that the agent composes into workflows.

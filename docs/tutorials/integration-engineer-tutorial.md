@@ -364,7 +364,7 @@ When both exist, you can also ask an AI agent to validate consistency: *"Check t
 
 ---
 
-## 8. Why Satsuma Produces Better Results Than Vendor-Specific Tools
+## 8. Why Keep a Satsuma Spec Alongside Vendor-Specific Tools
 
 You might be thinking: *"My iPaaS already has a mapping UI. Why would I write a separate spec?"*
 
@@ -372,7 +372,7 @@ Four reasons:
 
 **Portability.** When you switch from Workato to MuleSoft (or add a second platform), your mapping logic comes with you. Vendor UIs lock your specifications into their export format — if they export at all. Satsuma specs are plain text that any tool can read.
 
-**AI readability.** Satsuma's structured syntax — schemas with typed fields and metadata, explicit arrows, pipe chains, natural-language transforms — gives an AI agent dramatically more context than a screenshot of a vendor UI or a free-text description. The result is better-quality generated code with fewer hallucinations.
+**Readable by people and AI tools.** Satsuma's structured syntax — schemas with typed fields and metadata, explicit arrows, pipe chains, natural-language transforms — says more than a screenshot of a vendor UI or a free-text description, and an AI assistant can read it as easily as a colleague can.
 
 **Natural language carries business context.** A MuleSoft DataWeave transform tells you *what* the code does, but not *why*. Satsuma's natural-language transforms and notes embed the business rationale right next to the technical mapping. When you ask an AI agent to modify the integration six months later, it has the full context.
 

@@ -142,7 +142,7 @@ Extends the mapping model to real nested payloads and repeated structures. The l
 
 ---
 
-### [Lesson 08 — The Satsuma CLI as the Agent’s Toolkit](08-satsuma-cli.md)
+### [Lesson 08 — The Satsuma CLI](08-satsuma-cli.md)
 
 Reframes the CLI correctly based on the current docs: not as a natural-language query engine, but as a deterministic extraction layer the agent composes into workflows. The learner also sees the small set of commands a human should know directly for trust and debugging: `summary`, `schema`, `validate`, `lint`, and `mapping`. The key idea is that the CLI gives exact slices; the agent supplies the analysis.
 
