@@ -57,7 +57,7 @@
     "@satsuma/viz-backend": "*",
     "@types/node": "^26.6.3",
     "c8": "^12.0.0",
-    "fast-check": "^4.9.0",
+    "fast-check": "^4.10.2",
     "js-tiktoken": "^1.0.21",
     "tree-sitter-satsuma": "*",
     "tsx": "^4.23.12",
