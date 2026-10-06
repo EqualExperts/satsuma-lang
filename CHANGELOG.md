@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## v0.14.0 — 2026-10-06
+
 ### Reach an enclosing level from inside `each` and `flatten` with `^.` and `$.` (`sl-8vqk`, ADR-053)
 
 Every path inside an `each`, `flatten` or nested-arrow block is relative to
