@@ -5,7 +5,7 @@
   "description": "Tree-sitter grammar for Satsuma v2",
   "license": "MIT",
   "scripts": {
-    "install": "echo 'Skipping native build — WASM only'",
+    "install": "echo 'Skipping native build \u2014 WASM only'",
     "generate": "tree-sitter generate && node scripts/generate-cst-symbols.mjs",
     "generate:cst-symbols": "node scripts/generate-cst-symbols.mjs",
     "check:cst-symbols": "node scripts/generate-cst-symbols.mjs --check",
@@ -17,6 +17,7 @@
     "smoke": "node scripts/smoke-check.js"
   },
   "devDependencies": {
-    "tree-sitter-cli": "^0.27.0"
+    "tree-sitter-cli": "^0.27.0",
+    "web-tree-sitter": "^0.27.0"
   }
 }

@@ -5,17 +5,15 @@ from __future__ import annotations
 import argparse
 import json
 import re
-import subprocess
 import sys
 import typing as t
 from collections import Counter
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from tree_sitter_bin import resolve_tree_sitter_bin
+from print_tree import print_tree
 
 ROOT = Path(__file__).resolve().parents[3]
-TREE_SITTER_BIN = resolve_tree_sitter_bin(ROOT, Path(__file__).resolve().parents[1])
 DEFAULT_GLOBS = (
     "examples/*.stm",
     "features/02-multi-schema/examples/**/*.stm",
@@ -337,44 +335,19 @@ def resolve_input_path(path: Path) -> Path:
     return cwd_candidate
 
 
-def parse_with_cli(path: Path) -> Node:
-    cmd = [
-        TREE_SITTER_BIN,
-        "parse",
-        "--wasm",
-        "-p",
-        str(ROOT / "tooling" / "tree-sitter-satsuma"),
-        str(path),
-    ]
-
-    import os
-
-    env = os.environ.copy()
-    env["XDG_CACHE_HOME"] = str(ROOT / ".cache")
-    result = subprocess.run(
-        cmd,
-        check=False,
-        capture_output=True,
-        text=True,
-        env=env,
-    )
-    # tree-sitter returns non-zero when ERROR/MISSING nodes are present, but
-    # still emits a valid (recovered) tree on stdout.  Only raise when there
-    # is no usable tree output at all.
-    # Filter out wrapper script info lines
-    stdout = "\n".join(
-        line for line in result.stdout.splitlines() if not line.startswith("Using ")
-    )
-    if not stdout.strip():
-        raise RuntimeError(
-            result.stderr.strip() or "tree-sitter parse produced no output"
-        )
-    return parse_tree_dump(stdout)
+def parse_file(path: Path) -> Node:
+    result = print_tree(path)
+    # Like the tree-sitter CLI, print_tree returns non-zero when ERROR/MISSING
+    # nodes are present but still emits a valid (recovered) tree on stdout.
+    # Only raise when there is no usable tree output at all.
+    if not result.stdout.strip():
+        raise RuntimeError(result.stderr.strip() or "print-tree produced no output")
+    return parse_tree_dump(result.stdout)
 
 
 def build_summary(path: Path) -> dict[str, t.Any]:
     source = SourceText(path.read_text())
-    root = parse_with_cli(path)
+    root = parse_file(path)
     summary = summarize_tree(source, root)
     summary["file"] = str(path.relative_to(ROOT))
     return summary
@@ -382,7 +355,7 @@ def build_summary(path: Path) -> dict[str, t.Any]:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
-        description="Emit JSON summaries from Satsuma CSTs using the repo-local tree-sitter wrapper."
+        description="Emit JSON summaries from Satsuma CSTs using the built Satsuma grammar."
     )
     parser.add_argument(
         "files", nargs="*", type=Path, help="Specific Satsuma files to summarize."

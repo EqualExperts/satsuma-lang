@@ -393,7 +393,8 @@ npm run reinstall
 ```bash
 cd tooling/tree-sitter-satsuma
 npm run generate          # regenerate parser from grammar.js
-npm test                  # corpus tests + fixture tests + CST tests + smoke tests
+npm test                  # regenerate, CST contract generator tests, corpus tests
+python3 -m pytest scripts/  # fixture, CST consumer and smoke-summary tests
 ```
 
 Individual test suites:
@@ -407,6 +408,11 @@ python3 scripts/test_smoke_summary.py       # smoke test all examples
 
 Always use the `--wasm` flag with the `tree-sitter` CLI — there is no native
 build in this repository.
+
+The Python suites parse with the built `tree-sitter-satsuma.wasm` (through
+`scripts/print-tree.mjs` and web-tree-sitter), not the `tree-sitter` CLI, so
+they need no C toolchain — but they test whatever grammar was last built. Run
+`npm run build` after changing `grammar.js`, before running them.
 
 When changing `grammar.js`, regenerate and commit the generated parser sources:
 

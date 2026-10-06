@@ -3,19 +3,16 @@
 from __future__ import annotations
 
 import json
-import subprocess
 import sys
 from dataclasses import dataclass
 from pathlib import Path
 
-from tree_sitter_bin import resolve_tree_sitter_bin
+from print_tree import print_tree
 
 PACKAGE_ROOT = Path(__file__).resolve().parents[1]
 REPO_ROOT = PACKAGE_ROOT.parents[1]
 FIXTURE_ROOT = PACKAGE_ROOT / "test" / "fixtures"
 EXAMPLES_ROOT = REPO_ROOT / "examples"
-
-TREE_SITTER_BIN = resolve_tree_sitter_bin(REPO_ROOT, PACKAGE_ROOT)
 
 
 @dataclass(frozen=True)
@@ -94,36 +91,9 @@ def parse_fixture(fixture: Fixture) -> tuple[bool, str]:
     if not fixture.source.exists():
         return False, f"source file does not exist: {fixture.source}"
 
-    cmd = [
-        TREE_SITTER_BIN,
-        "parse",
-        "--wasm",
-        "-p",
-        str(PACKAGE_ROOT),
-        str(fixture.source),
-    ]
-    import os
-
-    env = os.environ.copy()
-    env["XDG_CACHE_HOME"] = str(REPO_ROOT / ".cache")
-    result = subprocess.run(
-        cmd,
-        cwd=PACKAGE_ROOT,
-        capture_output=True,
-        text=True,
-        check=False,
-        env=env,
-    )
-
-    # Filter out wrapper script info lines (Using ROOT_DIR, Using XDG_CACHE_HOME)
-    tree_lines = [
-        line for line in result.stdout.splitlines() if not line.startswith("Using ")
-    ]
-    tree = "\n".join(tree_lines).strip()
-    diag_lines = [
-        line for line in result.stderr.splitlines() if not line.startswith("Using ")
-    ]
-    diagnostics = "\n".join(diag_lines).strip()
+    result = print_tree(fixture.source)
+    tree = result.stdout.strip()
+    diagnostics = result.stderr.strip()
     combined = "\n".join(part for part in (tree, diagnostics) if part)
 
     if result.returncode != 0 and not (fixture.allow_error or fixture.allow_missing):

@@ -343,7 +343,11 @@ test.describe("Navigation intent", () => {
     // SourceLocation property; the harness must normalize it to stable JSON.
     await page.evaluate(() => window.__satsumaHarness.clearEvents());
 
-    await page.locator("[data-testid='overview-schema-card-sfdc-opportunity']").click();
+    // Click the header name itself: the card's centre is not the header once
+    // the card shows its note (sl-q7pm), and only the header navigates.
+    await page
+      .locator("[data-testid='overview-schema-card-sfdc-opportunity'] .header-name")
+      .click();
 
     await expect
       .poll(async () => recordedEvents(page, "navigate"))
