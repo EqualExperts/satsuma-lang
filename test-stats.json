@@ -4,7 +4,7 @@
   "packages": {
     "satsuma-core": 866,
     "satsuma-cli": 1203,
-    "satsuma-lsp": 373,
+    "satsuma-lsp": 376,
     "satsuma-viz-model": 7,
     "satsuma-viz-backend": 209,
     "satsuma-viz": 220,

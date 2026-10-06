@@ -156,6 +156,53 @@ describe("computeActionContext", () => {
       assert.equal(ctx.schemaName, "tgt");
       assert.equal(ctx.fieldPath, "tgt.out.items.sku");
     });
+
+    // A container-relative path whose first segment happens to share a
+    // mapping schema's name: `src.x` inside `each orders` is the field
+    // orders.src.x, not the schema `src` followed by its top-level `x`.
+    const SHADOWED_PREFIX = [
+      "schema src {",
+      "  x UUID",
+      "  orders list_of record {",
+      "    src record {",
+      "      x UUID",
+      "    }",
+      "  }",
+      "}",
+      "schema tgt {",
+      "  z UUID",
+      "  out list_of record {",
+      "    y UUID",
+      "  }",
+      "}",
+      "mapping `m` {",
+      "  source { src }",
+      "  target { tgt }",
+      "  each orders -> out {",
+      "    src.x -> y",
+      "  }",
+      "  src.x -> z",
+      "}",
+    ].join("\n");
+
+    it("traces the same field whichever segment of a container-relative path the cursor is on", () => {
+      // The first segment used to be read as the schema prefix, so the cursor
+      // on `src` traced the top-level src.x while the cursor on `x` traced
+      // src.orders.src.x: one arrow, two lineage targets.
+      for (const col of [4, 8]) {
+        const ctx = contextAt(SHADOWED_PREFIX, 18, col);
+        assert.equal(ctx.schemaName, "src", `col ${col}`);
+        assert.equal(ctx.fieldPath, "src.orders.src.x", `col ${col}`);
+      }
+    });
+
+    it("still reads the first segment as the schema prefix at mapping-body level", () => {
+      // Outside any container `src.x` is schema-qualified, so the prefix
+      // case must keep naming the top-level field (gpt-jwek).
+      const ctx = contextAt(SHADOWED_PREFIX, 20, 2);
+      assert.equal(ctx.schemaName, "src");
+      assert.equal(ctx.fieldPath, "src.x");
+    });
   });
 
   it("returns enclosing field path for schema fields", () => {

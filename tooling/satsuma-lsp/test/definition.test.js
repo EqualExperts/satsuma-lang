@@ -450,6 +450,40 @@ mapping m {
     assert.equal(nestedDefinition(28, 9).range.start.line, 7);
   });
 
+  it("treats a container-relative first segment as a field even when it shares a schema's name", () => {
+    // `src.x` inside `each orders` names the record orders.src (line 3); only
+    // at mapping-body level is `src` the schema prefix (line 0).
+    const source = `schema src {
+  x UUID
+  orders list_of record {
+    src record {
+      x UUID
+    }
+  }
+}
+schema tgt {
+  z UUID
+  out list_of record {
+    y UUID
+  }
+}
+mapping m {
+  source { src }
+  target { tgt }
+  each orders -> out {
+    src.x -> y
+  }
+  src.x -> z
+}`;
+    const at = (line, col) => {
+      const result = definition({ "file:///a.stm": source }, "file:///a.stm", line, col);
+      assert.ok(result, "expected a definition");
+      return (Array.isArray(result) ? result[0] : result).range.start.line;
+    };
+    assert.equal(at(18, 4), 3);
+    assert.equal(at(20, 2), 0);
+  });
+
   it("jumps to a field a fragment spreads into a record, in the fragment's file", () => {
     // The field is declared in the fragment, so that is where the jump lands.
     const result = definition(
