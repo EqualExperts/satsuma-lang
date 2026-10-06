@@ -13,6 +13,7 @@ import type { FieldDecl, SyntaxNode } from "./types.js";
 import { expandEntityFields } from "./spread-expand.js";
 import type { SpreadEntity, EntityRefResolver, SpreadEntityLookup } from "./spread-expand.js";
 import { resolveAuthoredPathAgainstContainer } from "./reference-stages.js";
+import { arrowPathText } from "./arrow-path.js";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -985,7 +986,7 @@ function containerTargetBase(
 ): string | null {
   if (!rawTgt) return outerTgt;
   if (node.type === "flatten_block" && !isRelativeTargetPath(rawTgt)) return outerTgt;
-  return qualifyTarget(outerTgt, extractPathText(rawTgt));
+  return qualifyTarget(outerTgt, arrowPathText(rawTgt));
 }
 
 function walkArrowsForNL(
@@ -1054,7 +1055,7 @@ function walkArrowsForNL(
     }
     if (c.type === "map_arrow" || c.type === "computed_arrow" || c.type === "nested_arrow") {
       const tgtNode = c.namedChildren.find((x) => x.type === "tgt_path");
-      const tgt = qualifyTarget(targetField, extractPathText(tgtNode));
+      const tgt = qualifyTarget(targetField, arrowPathText(tgtNode));
 
       const pipeChain = c.namedChildren.find((x) => x.type === "pipe_chain");
       if (pipeChain) {
@@ -1081,14 +1082,6 @@ function walkArrowsForNL(
       walkArrowsForNL(c, mappingName, namespace, tgt, results);
     }
   }
-}
-
-function extractPathText(pathNode: SyntaxNode | undefined): string | null {
-  if (!pathNode) return null;
-  const inner = pathNode.namedChildren[0];
-  if (!inner) return pathNode.text;
-  if (inner.type === "backtick_path") return inner.text.slice(1, -1);
-  return inner.text;
 }
 
 // ── High-level resolution ─────────────────────────────────────────────────────

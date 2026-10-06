@@ -880,6 +880,14 @@ describe("extractNLRefData — container target qualification (sl-hrql)", () => 
     assert.deepEqual(targetFields(src), ["contact_line"]);
   });
 
+  it("unquotes a backtick target segment before qualifying it (bsw-f9fq)", () => {
+    // `.\`odd y\`` names the declared field `odd y`; keeping the backticks gave
+    // "rows.`odd y`", which no target field matches.
+    const src =
+      'mapping m {\n  each orders -> rows {\n    -> .`odd y` { "copy @src.orders.a" }\n  }\n}';
+    assert.deepEqual(targetFields(src), ["rows.odd y"]);
+  });
+
   it("leaves a mapping-body-level arrow target unqualified", () => {
     // The no-container control: top-level targets were always correct and must
     // stay byte-identical, since lint's fix targeting matches on this value.

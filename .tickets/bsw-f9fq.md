@@ -1,6 +1,6 @@
 ---
 id: bsw-f9fq
-status: open
+status: closed
 deps: []
 links: []
 created: 2026-10-06T09:45:31Z
@@ -22,3 +22,10 @@ Repros (each validates with `field-not-in-schema`, and coverage marks the field 
 
 - Every path form strips backticks per segment (ideally built from CST segments, not raw text), in both extract.ts and nl-ref.ts.
 - Tests for the three repros; coverage agrees.
+
+## Notes
+
+**2026-10-06T16:54:39Z**
+
+Cause: `pathText` (extract.ts) and its copy `extractPathText` (nl-ref.ts) rebuilt arrow paths from raw node text, unquoting only a leading backtick name and only its outermost pair, while the namespaced branch dropped backtick segments entirely; any later quoted segment kept its backticks and matched no declared field.
+Fix: New core module `arrow-path.ts` decomposes a src_path/tgt_path from its CST segments (`arrowPathParts` → anchor, namespace, unquoted segments; `arrowPathText` renders it for the container resolver); both copies are deleted in favour of it, and error-recovered paths still fall back to raw text. (commit immediately after c684abd0)

@@ -318,3 +318,63 @@ describe("extractArrowRecords — authored paths and container on nested arrows 
     assert.equal(extractArrowRecords(root)[0].nesting, undefined);
   });
 });
+
+describe("extractArrowRecords — backtick segments anywhere in a path (bsw-f9fq)", () => {
+  // A quoted segment names the same field as its declaration (`` `odd name` ``
+  // declares `odd name`), so the resolved path must carry it unquoted wherever
+  // it sits. Before bsw-f9fq only a path whose *first* segment was quoted lost
+  // its backticks — and then only the outermost pair — so every case below
+  // reached validation and coverage as a field no declaration matched.
+
+  it("unquotes a backtick segment after a plain first segment", () => {
+    const root = rootOf(`${MAPPING_HEADER}  orders.\`odd name\` -> x\n}`);
+    assert.deepEqual(pairs(extractArrowRecords(root)), ["orders.odd name -> x"]);
+  });
+
+  it("unquotes every segment of a path made only of backtick segments", () => {
+    // The old whole-path slice(1, -1) turned this into "my orders`.`odd name".
+    const root = rootOf(`${MAPPING_HEADER}  \`my orders\`.\`odd name\` -> x\n}`);
+    assert.deepEqual(pairs(extractArrowRecords(root)), ["my orders.odd name -> x"]);
+  });
+
+  it("unquotes a relative backtick segment and prefixes the each container", () => {
+    const root = rootOf(`${MAPPING_HEADER}
+  each orders -> rows {
+    .\`odd name\` -> .\`odd y\`
+  }
+}`);
+    assert.deepEqual(pairs(extractArrowRecords(root)), [
+      "orders -> rows",
+      "orders.odd name -> rows.odd y",
+    ]);
+  });
+
+  it("unquotes a root-escaped backtick segment and ignores the container", () => {
+    const root = rootOf(`${MAPPING_HEADER}
+  each orders -> rows {
+    $.\`long name\` -> .c
+  }
+}`);
+    const leaf = extractArrowRecords(root).find((r) => r.target === "rows.c");
+    assert.deepEqual(leaf?.sources, ["long name"]);
+  });
+
+  it("unquotes a parent-escaped backtick segment after popping one level", () => {
+    const root = rootOf(`${MAPPING_HEADER}
+  each orders -> rows {
+    each lines -> .items {
+      ^.\`odd name\` -> .y
+    }
+  }
+}`);
+    const leaf = extractArrowRecords(root).find((r) => r.target === "rows.items.y");
+    assert.deepEqual(leaf?.sources, ["orders.odd name"]);
+  });
+
+  it("keeps a backtick field segment on a namespaced path instead of dropping it", () => {
+    // The namespaced branch used to keep identifier children only, so the
+    // quoted field vanished and the arrow pointed at the schema itself.
+    const root = rootOf(`${MAPPING_HEADER}  crm::orders.\`odd name\` -> x\n}`);
+    assert.deepEqual(pairs(extractArrowRecords(root)), ["crm::orders.odd name -> x"]);
+  });
+});

@@ -150,6 +150,8 @@ export {
   fieldNameText,
   walkDescendants,
 } from "./cst-utils.js";
+export { arrowPathParts, arrowPathText, pathSegmentText, renderArrowPath } from "./arrow-path.js";
+export type { ArrowPathAnchor, ArrowPathParts } from "./arrow-path.js";
 export {
   isAnnotationComment,
   trailingCommentOwner,
