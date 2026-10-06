@@ -520,10 +520,19 @@ describe("Bug 4: suppress field-not-in-schema for schemas with spreads", () => {
   });
 
   it("suppresses field-not-in-schema for target with unresolved spreads", () => {
+    // The spread must name a fragment the index lacks. `hasSpreads` alone with
+    // nothing named is not "unresolved": extraction produces exactly that for
+    // a schema whose only spreads are nested, and reading it as unresolved hid
+    // every field warning for such schemas (bsw-xivc).
     const index = makeIndex({
       schemas: [
         { name: "src", fields: [{ name: "created_at", type: "TIMESTAMP" }] },
-        { name: "tgt", fields: [{ name: "id", type: "INT" }], hasSpreads: true },
+        {
+          name: "tgt",
+          fields: [{ name: "id", type: "INT" }],
+          hasSpreads: true,
+          spreads: ["missing_fragment"],
+        },
       ],
       mappings: [{ name: "m1", sources: ["src"], targets: ["tgt"] }],
       fieldArrows: [

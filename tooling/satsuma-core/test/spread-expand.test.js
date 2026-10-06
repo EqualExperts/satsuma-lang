@@ -9,6 +9,7 @@ import {
   expandDeclaredFields,
   expandEntityFields,
   expandNestedSpreads,
+  expandSpreads,
   makeEntityRefResolver,
 } from "../dist/spread-expand.js";
 
@@ -327,5 +328,97 @@ describe("expandDeclaredFields()", () => {
     // Resolvers hand back null for a reference they cannot resolve; coverage is
     // not a validation pass and must carry on reporting the schemas it did find.
     assert.deepEqual(expandDeclaredFields(null, null, resolveRef, lookup), []);
+  });
+});
+
+// ── expandSpreads ─────────────────────────────────────────────────────────────
+//
+// The validation-facing pass: it adds every spread-contributed dotted path to a
+// set and reports whether any spread failed to resolve. That flag switches off
+// field checks for the whole schema, so a false "unresolved" silently hides
+// every field-not-in-schema warning (bsw-xivc) and every lint finding that
+// reads it (bsw-hbcb). A nested spread — one inside a record body — must count
+// exactly as a top-level one does.
+
+describe("expandSpreads()", () => {
+  /** A record field whose body is a spread of `spreads` (and nothing else). */
+  const spreadRecord = (name, spreads, children = []) => ({
+    ...field(name, "record", children),
+    hasSpreads: true,
+    spreads,
+  });
+  /** Extraction sets the schema's `hasSpreads` for a nested spread too, with no top-level `spreads`. */
+  const nestedOnlySchema = (fields) => ({ fields, hasSpreads: true, spreads: [] });
+
+  /** Run expandSpreads over one schema keyed `s`; returns { unresolved, paths, diagnostics }. */
+  function expand(schema, fragments) {
+    const fragMap = new Map(fragments.map((f) => [f.name, f]));
+    const paths = new Set();
+    const diagnostics = [];
+    const unresolved = expandSpreads(
+      ["s"],
+      null,
+      makeEntityRefResolver(fragMap),
+      (key) => fragMap.get(key),
+      paths,
+      diagnostics,
+      (key) => (key === "s" ? schema : null),
+    );
+    return { unresolved, paths, diagnostics };
+  }
+
+  it("treats a schema whose only spread is nested and resolves as fully resolved (bsw-xivc)", () => {
+    // `schema t { r record { ...f } }`: before the fix the empty top-level
+    // spread list plus `hasSpreads` read as "unresolved", disabling validation.
+    const { unresolved, paths } = expand(nestedOnlySchema([spreadRecord("r", ["f"])]), [
+      fragment("f", [field("a", "INT")]),
+    ]);
+    assert.equal(unresolved, false);
+    assert.ok(paths.has("r.a"), "the fragment's field lands under the record's prefix");
+  });
+
+  it("reports a nested spread naming an undefined fragment as unresolved", () => {
+    // The record's field list really is unknown here, so suppressing field
+    // checks is the right call — the counterpart of the case above.
+    const { unresolved } = expand(nestedOnlySchema([spreadRecord("r", ["nope"])]), []);
+    assert.equal(unresolved, true);
+  });
+
+  it("follows a nested spread through a fragment that spreads another fragment", () => {
+    // Transitive spreads must reach the nested prefix and resolve, or a
+    // two-level fragment chain inside a record would fall back to "unresolved".
+    const { unresolved, paths } = expand(nestedOnlySchema([spreadRecord("r", ["outer"])]), [
+      fragment("outer", [field("a")], ["inner"]),
+      fragment("inner", [field("b")]),
+    ]);
+    assert.equal(unresolved, false);
+    assert.deepEqual([...paths].sort(), ["r.a", "r.b"]);
+  });
+
+  it("expands a spread nested inside a record that a top-level spread contributes", () => {
+    // `schema s { ...wrapper }` with `fragment wrapper { addr record { ...addr_f } }`:
+    // the inner spread sits in a fragment's field tree, not the schema's.
+    const { unresolved, paths } = expand({ fields: [], hasSpreads: true, spreads: ["wrapper"] }, [
+      {
+        name: "wrapper",
+        fields: [spreadRecord("addr", ["addr_f"])],
+        hasSpreads: true,
+        spreads: [],
+      },
+      fragment("addr_f", [field("line1")]),
+    ]);
+    assert.equal(unresolved, false);
+    assert.deepEqual([...paths].sort(), ["addr", "addr.line1"]);
+  });
+
+  it("reports a fragment that spreads itself from inside a record as circular, not as an infinite walk", () => {
+    // `fragment f { r record { ...f } }` describes an infinitely deep record.
+    const { diagnostics } = expand({ fields: [], hasSpreads: true, spreads: ["f"] }, [
+      { name: "f", fields: [spreadRecord("r", ["f"])], hasSpreads: true, spreads: [] },
+    ]);
+    assert.deepEqual(
+      diagnostics.map((d) => d.rule),
+      ["circular-spread"],
+    );
   });
 });

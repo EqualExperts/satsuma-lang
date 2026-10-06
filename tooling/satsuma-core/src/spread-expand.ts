@@ -46,6 +46,16 @@ export type ExpandedField = FieldDecl & {
   fromFragment?: string;
 };
 
+/** One `...Frag` written inside a record body, as `collectNestedSpreads` finds it. */
+export interface NestedSpread {
+  /** Dotted path of the record whose body holds the spread, e.g. `address` or `order.lines`. */
+  recordPath: string;
+  /** The fragment reference as authored, unresolved. */
+  spread: string;
+  /** 0-based row of the record's declaration, when the field carries one; for diagnostics. */
+  row?: number;
+}
+
 export interface SpreadDiagnostic {
   file: string;
   line: number;
@@ -83,9 +93,9 @@ export function collectFieldPaths(fields: FieldDecl[], prefix: string, paths: Se
  *    third fragment). Both are resolved here via the recursive
  *    `expandEntitySpreads` walker, with cycle protection through `visited`.
  *  - Schemas can also contain *nested* record-level spreads (a record-typed
- *    field whose body uses `...Frag`). Those are walked separately by
- *    `expandNestedFieldPaths` so the fully-qualified dotted paths
- *    (`address.street`, etc.) end up in `fieldPaths`.
+ *    field whose body uses `...Frag`). Those resolve exactly like top-level
+ *    ones, under the record's dotted prefix (`address.street`), and count
+ *    towards the returned flag the same way (bsw-xivc).
  *
  * `lookupSchema` is optional because some callers (e.g. fragment-only
  * expansions) operate over a fragment-only index; when omitted we simply
@@ -105,61 +115,32 @@ export function expandSpreads(
 
   for (const key of schemaKeys) {
     const schema = lookupSchema ? lookupSchema(key) : null;
-    if (!schema?.hasSpreads) continue;
-    if (
-      !expandEntitySpreads(
-        schema,
-        currentNs,
-        resolveRef,
-        lookupFragment,
-        fieldPaths,
-        visited,
-        diagnostics,
-        [],
-      )
-    ) {
-      hasUnresolved = true;
-    }
-    // Also expand nested record-level spreads into fieldPaths
-    expandNestedFieldPaths(schema.fields, "", currentNs, resolveRef, lookupFragment, fieldPaths);
+    if (!schema) continue;
+    const walk: SpreadWalk = { currentNs, resolveRef, lookupFragment, fieldPaths, diagnostics };
+    if (!expandEntitySpreads(schema, "", walk, visited, [])) hasUnresolved = true;
   }
   return hasUnresolved;
 }
 
 /**
- * Walk the field tree and expand nested record-level spreads into the
- * fieldPaths set with proper prefixing.
+ * Every spread written inside a record body anywhere in `fields`, with the
+ * record's dotted path — the nested counterpart of an entity's `spreads` list.
+ * Extraction stores a nested spread on its record field rather than on the
+ * owning schema, so any check over "the spreads this schema uses" must walk
+ * the tree to see them (bsw-xivc). Fields contributed by a spread are not
+ * included; those belong to the fragment and are checked there.
  */
-function expandNestedFieldPaths(
-  fields: FieldDecl[],
-  prefix: string,
-  currentNs: string | null,
-  resolveRef: EntityRefResolver,
-  lookupFragment: SpreadEntityLookup,
-  fieldPaths: Set<string>,
-): void {
+export function collectNestedSpreads(fields: FieldDecl[], prefix = ""): NestedSpread[] {
+  const found: NestedSpread[] = [];
   for (const field of fields) {
-    if (field.children && field.hasSpreads && field.spreads) {
-      const fieldPrefix = prefix + field.name + ".";
-      for (const spreadName of field.spreads) {
-        const resolvedKey = resolveRef(spreadName, currentNs);
-        if (!resolvedKey) continue;
-        const fragment = lookupFragment(resolvedKey);
-        if (!fragment) continue;
-        collectFieldPaths(fragment.fields, fieldPrefix, fieldPaths);
-      }
+    if (!field.children) continue;
+    const recordPath = prefix + field.name;
+    for (const spread of field.spreads ?? []) {
+      found.push({ recordPath, spread, row: field.startRow });
     }
-    if (field.children) {
-      expandNestedFieldPaths(
-        field.children,
-        prefix + field.name + ".",
-        currentNs,
-        resolveRef,
-        lookupFragment,
-        fieldPaths,
-      );
-    }
+    found.push(...collectNestedSpreads(field.children, recordPath + "."));
   }
+  return found;
 }
 
 /**
@@ -368,25 +349,43 @@ export function makeEntityRefResolver(entityMap: Map<string, unknown>): EntityRe
 // ── Internal helper ───────────────────────────────────────────────────────────
 
 /**
- * Recursively expand spreads for a schema or fragment, adding fragment fields
- * to the fieldPaths set. Detects cycles and emits diagnostics for them.
+ * What stays fixed across one `expandSpreads` walk: how to resolve and fetch
+ * fragments, and where paths and diagnostics go. Bundled so the recursive
+ * walkers below take only what varies — the entity, its prefix, the scope.
+ */
+interface SpreadWalk {
+  currentNs: string | null;
+  resolveRef: EntityRefResolver;
+  lookupFragment: SpreadEntityLookup;
+  /** Receives every dotted path a spread contributes, prefixed by its record. */
+  fieldPaths: Set<string>;
+  /** Receives circular-spread errors. */
+  diagnostics: SpreadDiagnostic[];
+}
+
+/**
+ * Expand an entity's spreads — top-level and nested — into `walk.fieldPaths`,
+ * each under `prefix`. Returns false if any spread, at any depth, names a
+ * fragment that cannot be found: the entity's field list is then incomplete.
+ *
+ * `expanded` is the diamond guard for one field scope (a fragment spread twice
+ * into the same record contributes once); a nested record opens a fresh scope,
+ * because the same fragment under a different prefix contributes different
+ * paths. `chain` is the path of fragments being expanded, and stops a fragment
+ * that reaches itself — at the top level or from inside a record — with a
+ * circular-spread error rather than an endless walk.
  */
 function expandEntitySpreads(
   entity: SpreadEntity,
-  currentNs: string | null,
-  resolveRef: EntityRefResolver,
-  lookupFragment: SpreadEntityLookup,
-  fieldPaths: Set<string>,
+  prefix: string,
+  walk: SpreadWalk,
   expanded: Set<string>,
-  diagnostics: SpreadDiagnostic[],
   chain: string[],
 ): boolean {
-  const spreads = entity.spreads ?? [];
-  if (spreads.length === 0 && entity.hasSpreads) return false;
+  let allResolved = expandRecordSpreads(entity, prefix, walk, chain);
   const ancestors = new Set(chain);
-  let allResolved = true;
-  for (const spreadName of spreads) {
-    const resolvedKey = resolveRef(spreadName, currentNs);
+  for (const spreadName of entity.spreads ?? []) {
+    const resolvedKey = walk.resolveRef(spreadName, walk.currentNs);
     if (!resolvedKey) {
       allResolved = false;
       continue;
@@ -394,7 +393,7 @@ function expandEntitySpreads(
     if (ancestors.has(resolvedKey)) {
       const cycleStart = chain.indexOf(resolvedKey);
       const cyclePath = [...chain.slice(cycleStart), resolvedKey];
-      diagnostics.push({
+      walk.diagnostics.push({
         file: entity.file ?? "unknown",
         line: entity.row != null ? entity.row + 1 : 1,
         column: 1,
@@ -406,27 +405,49 @@ function expandEntitySpreads(
     }
     if (expanded.has(resolvedKey)) continue;
     expanded.add(resolvedKey);
-    const fragment = lookupFragment(resolvedKey);
+    const fragment = walk.lookupFragment(resolvedKey);
     if (!fragment) {
       allResolved = false;
       continue;
     }
-    collectFieldPaths(fragment.fields, "", fieldPaths);
-    if (fragment.hasSpreads) {
-      if (
-        !expandEntitySpreads(
-          fragment,
-          currentNs,
-          resolveRef,
-          lookupFragment,
-          fieldPaths,
-          expanded,
-          diagnostics,
-          [...chain, resolvedKey],
-        )
-      ) {
-        allResolved = false;
-      }
+    collectFieldPaths(fragment.fields, prefix, walk.fieldPaths);
+    // Walked whether or not `hasSpreads` is set: adapters differ on whether a
+    // nested spread sets it (extraction does; the LSP and viz adapters set it
+    // from top-level spreads only), and an entity with no spreads costs nothing.
+    if (!expandEntitySpreads(fragment, prefix, walk, expanded, [...chain, resolvedKey])) {
+      allResolved = false;
+    }
+  }
+  return allResolved;
+}
+
+/**
+ * Walk a field tree and expand the spreads written inside its record bodies,
+ * each under that record's dotted path. A record's body is treated as an
+ * entity of its own — its children plus its spread list — so nested spreads
+ * resolve, recurse and fail exactly as top-level ones do. A record has no
+ * declaration site of its own in `SpreadEntity` terms, so diagnostics raised
+ * inside it point at the entity that owns it. Returns false if any nested
+ * spread is unresolved.
+ */
+function expandRecordSpreads(
+  owner: SpreadEntity,
+  prefix: string,
+  walk: SpreadWalk,
+  chain: string[],
+): boolean {
+  let allResolved = true;
+  for (const field of owner.fields) {
+    if (!field.children) continue;
+    const record: SpreadEntity = {
+      fields: field.children,
+      hasSpreads: (field.spreads ?? []).length > 0,
+      spreads: field.spreads ?? [],
+      file: owner.file,
+      row: owner.row,
+    };
+    if (!expandEntitySpreads(record, prefix + field.name + ".", walk, new Set(), chain)) {
+      allResolved = false;
     }
   }
   return allResolved;

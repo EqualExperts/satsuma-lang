@@ -15,6 +15,16 @@ import { collectSemanticDiagnostics, validateSemanticWorkspace } from "@satsuma/
 // ---------- Test helper ----------
 
 /**
+ * Mirror extraction's `hasSpreads`: set when the entity spreads a fragment at
+ * the top level *or* any record field in its tree does (extract.ts). Nested
+ * spreads live on the field (`field.spreads`), not in the entity's `spreads`.
+ */
+function declaresSpread(entity) {
+  const nested = (fields) => fields.some((f) => f.spreads?.length || nested(f.children ?? []));
+  return (entity.spreads ?? []).length > 0 || nested(entity.fields ?? []);
+}
+
+/**
  * Build a minimal SemanticIndex from shorthand inputs.
  * Unspecified fields default to empty collections so callers only specify what's relevant.
  */
@@ -37,7 +47,7 @@ function makeIndex({
       row: s.row ?? 0,
       fields: s.fields ?? [],
       spreads: s.spreads ?? [],
-      hasSpreads: (s.spreads ?? []).length > 0,
+      hasSpreads: declaresSpread(s),
       blockMetadata: s.blockMetadata ?? [],
     });
   }
@@ -50,7 +60,7 @@ function makeIndex({
       row: f.row ?? 0,
       fields: f.fields ?? [],
       spreads: f.spreads ?? [],
-      hasSpreads: (f.spreads ?? []).length > 0,
+      hasSpreads: declaresSpread(f),
     });
   }
   const mappingMap = new Map();
@@ -204,6 +214,26 @@ describe("undefined fragment spread diagnostics", () => {
       (d) => d.rule === "undefined-ref" && d.message.includes("audit_fields"),
     );
     assert.ok(spreadDiag, "should warn about missing fragment spread");
+  });
+
+  it("warns when a record field inside a schema spreads a fragment that does not exist (bsw-xivc)", () => {
+    // `schema t { a record { ...nope } }` validated clean while the same spread
+    // at the top level warned. The nested form loses data just the same.
+    const index = makeIndex({
+      schemas: [
+        {
+          name: "t",
+          fields: [
+            { name: "a", type: "record", children: [], spreads: ["nope"], hasSpreads: true },
+          ],
+        },
+      ],
+    });
+    const spreadDiags = collectSemanticDiagnostics(index).filter((d) => d.rule === "undefined-ref");
+    assert.deepEqual(
+      spreadDiags.map((d) => d.message),
+      ["Schema 't' spreads undefined fragment 'nope' in record 'a'"],
+    );
   });
 
   it("does not warn when the fragment exists in the index", () => {
@@ -601,6 +631,67 @@ describe("arrow field-not-in-schema diagnostics", () => {
       (d) => d.rule === "field-not-in-schema" && d.message.includes("spread_sourced_field"),
     );
     assert.equal(fieldDiags.length, 0, "must not warn when source has unresolved spreads");
+  });
+
+  // bsw-xivc: a schema whose only spreads sit inside a record body was read as
+  // "has unresolved spreads", which switches off every field check for it.
+
+  /** Schemas for the nested-spread cases: `nested.r` takes its fields from `f`. */
+  const nestedSpreadSchemas = () => [
+    { name: "flat", fields: [{ name: "x", type: "INT" }] },
+    {
+      name: "nested",
+      fields: [
+        { name: "y", type: "INT" },
+        { name: "r", type: "record", children: [], spreads: ["f"], hasSpreads: true },
+      ],
+    },
+  ];
+  const nestedSpreadFragments = [{ name: "f", fields: [{ name: "a", type: "INT" }] }];
+  const arrow = (sources, target) => ({
+    mapping: "m",
+    namespace: null,
+    sources,
+    target,
+    steps: [],
+    line: 5,
+    file: "test.stm",
+  });
+
+  it("still warns about an undeclared target when the target's only spread is a resolved nested one (bsw-xivc)", () => {
+    const index = makeIndex({
+      schemas: nestedSpreadSchemas(),
+      fragments: nestedSpreadFragments,
+      mappings: [{ name: "m", sources: ["flat"], targets: ["nested"] }],
+      fieldArrows: [arrow(["x"], "bogus")],
+    });
+    assert.deepEqual(fieldMessages(index), [
+      "Arrow target 'bogus' not declared in schema 'nested'",
+    ]);
+  });
+
+  it("still warns about an undeclared source when the source's only spread is a resolved nested one (bsw-xivc)", () => {
+    const index = makeIndex({
+      schemas: nestedSpreadSchemas(),
+      fragments: nestedSpreadFragments,
+      mappings: [{ name: "m", sources: ["nested"], targets: ["flat"] }],
+      fieldArrows: [arrow(["bogus_src"], "x")],
+    });
+    assert.deepEqual(fieldMessages(index), [
+      "Arrow source 'bogus_src' not declared in schema 'nested'",
+    ]);
+  });
+
+  it("accepts a field a resolved nested spread contributes", () => {
+    // The guard on the fix: once validation runs for the schema, the fields the
+    // nested spread inlines (`r.a`) must count as declared.
+    const index = makeIndex({
+      schemas: nestedSpreadSchemas(),
+      fragments: nestedSpreadFragments,
+      mappings: [{ name: "m", sources: ["flat"], targets: ["nested"] }],
+      fieldArrows: [arrow(["x"], "r.a")],
+    });
+    assert.deepEqual(fieldMessages(index), []);
   });
 
   // sl-kkao: multi-source mappings let arrows qualify a source path with the

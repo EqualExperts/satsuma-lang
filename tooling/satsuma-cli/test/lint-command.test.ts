@@ -281,3 +281,30 @@ describe("structural rules registration", () => {
     assert.deepEqual([...rules], ["lineage-cycle"]);
   });
 });
+
+describe("spreads reaching lint across files", () => {
+  it("flags an unenumerated record target whose fields come from an imported fragment (bsw-hbcb)", async () => {
+    // The fragment lives in another file, so this proves import resolution and
+    // nested-spread expansion together feed the rule. Before bsw-xivc's core
+    // fix, a schema whose only spread sat inside a record read as having an
+    // unresolved spread and the rule skipped it, reporting nothing.
+    const dir = workspace(`
+import { addr_f } from "fragments.stm"
+
+schema src { full_name STRING }
+schema tgt { addr record { ...addr_f } }
+
+mapping load {
+  source { src }
+  target { tgt }
+  full_name -> addr
+}
+`);
+    writeFileSync(join(dir, "fragments.stm"), "fragment addr_f { line1 STRING }\n", "utf8");
+    const { stdout } = await lint(dir, "--json", "--select", "unenumerated-record-target");
+    const findings = JSON.parse(stdout).findings;
+
+    assert.equal(findings.length, 1);
+    assert.match(findings[0].message, /'full_name -> addr' targets a record/);
+  });
+});

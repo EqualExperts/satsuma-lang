@@ -1,6 +1,6 @@
 ---
 id: bsw-xivc
-status: open
+status: closed
 deps: []
 links: []
 created: 2026-10-06T09:57:03Z
@@ -31,3 +31,10 @@ Related facet: an undefined nested spread is never reported. `schema t { a recor
 - Nested spreads count as resolved when their fragments resolve; the repro reports both warnings, source side too.
 - An undefined nested spread is reported like a top-level one.
 - Core tests, red before the fix; check the example corpus for newly surfaced warnings and fix or explain them.
+
+## Notes
+
+**2026-10-06T10:37:02Z**
+
+Cause: `expandEntitySpreads` returned "unresolved" for any entity with `hasSpreads` set but an empty top-level `spreads` list, which is exactly what extraction produces when the only spreads sit inside record bodies; the separate nested-path walker never reported failures, and `checkFragmentSpreads` only read the top-level list.
+Fix: one walker in `spread-expand.ts` now treats each record body as an entity of its own, so nested spreads resolve, recurse, detect cycles and report failure exactly like top-level ones; `checkFragmentSpreads` reports undefined nested spreads via the new `collectNestedSpreads`, and the LSP adapter now passes top-level spreads and field rows to core. No example in `examples/` gained a warning (commit immediately after 914c97c2).
