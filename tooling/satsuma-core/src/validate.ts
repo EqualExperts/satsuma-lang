@@ -32,7 +32,7 @@ import {
   isSchemaInMappingSources,
   stripNLRefScopePrefix,
   computeNLRefPosition,
-  splitRefSchemaKey,
+  refMetadataSchemaKey,
 } from "./nl-ref.js";
 import type { DefinitionLookup } from "./nl-ref.js";
 import { expandSpreads, collectFieldPaths, collectNestedSpreads } from "./spread-expand.js";
@@ -832,23 +832,6 @@ function checkRefMetadata(index: SemanticIndex, diagnostics: SemanticDiagnostic[
       diagnostics,
     );
   }
-}
-
-/** A backtick-quoted span, captured without its delimiters. */
-const BACKTICK_SPAN_RE = /`([^`]+)`/g;
-
-/**
- * The schema a `(ref ...)` metadata value names, unquoted: `crm.id` → `crm`,
- * `` raw::`crm-contacts`.id `` → `raw::crm-contacts`, `` `odd.name`.id `` →
- * `odd.name`.
- *
- * The value reaches validation as text, so it is split with the same
- * backtick-aware reader NL @refs use (splitRefSchemaKey): a "." inside
- * backticks is part of a name, never the schema/field boundary (bsw-iuzs).
- */
-function refMetadataSchemaKey(value: string): string {
-  const raw = value.replace(/^@/, "");
-  return splitRefSchemaKey(raw)?.schemaKey ?? raw.replace(BACKTICK_SPAN_RE, "$1");
 }
 
 function checkFieldRefMetadata(

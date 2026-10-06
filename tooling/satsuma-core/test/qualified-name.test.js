@@ -68,4 +68,21 @@ describe("backtick name after :: (bsw-iuzs)", () => {
     );
     assert.deepEqual(extractMetrics(root)[0].sources, ["raw::order-lines"]);
   });
+
+  it("extracts every item of a braced metric source list, ns::`name` unquoted", () => {
+    // metricSourceRefs reads each value_text item, the reader the CLI, the
+    // viz and the LSP now share.
+    const root = parseClean(
+      "schema revenue (metric, source {raw::`order-lines`, other}) {\n  value DECIMAL\n}\n",
+    );
+    assert.deepEqual(extractMetrics(root)[0].sources, ["raw::order-lines", "other"]);
+  });
+
+  it("extracts a metric source written as a bare backtick name, unquoted", () => {
+    // A quoted name is a source too; extraction dropped it before the
+    // consumers shared one reader. (The grammar admits a backtick name only
+    // as a lone value, not inside a braced list.)
+    const root = parseClean("schema revenue (metric, source `odd name`) {\n  value DECIMAL\n}\n");
+    assert.deepEqual(extractMetrics(root)[0].sources, ["odd name"]);
+  });
 });

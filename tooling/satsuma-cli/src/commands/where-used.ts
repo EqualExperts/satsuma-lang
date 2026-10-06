@@ -28,6 +28,7 @@ import {
   resolveScopedEntityRef,
   spreadLabelText,
   importNameText,
+  refMetadataSchemaKey,
 } from "@satsuma/core";
 import type { SyntaxNode, ExtractedWorkspace, ParsedFile } from "../types.js";
 
@@ -185,7 +186,8 @@ function gatherRefs(
         if (!field.metadata) continue;
         for (const m of field.metadata) {
           if (m.kind === "kv" && m.key === "ref") {
-            const refTarget = m.value.replace(/^@/, "").split(".")[0];
+            // Core's backtick-aware reader, shared with validate (bsw-iuzs).
+            const refTarget = refMetadataSchemaKey(m.value);
             if (refTarget === name || refTarget === name.split("::").pop()) {
               refs.push({
                 kind: "ref_metadata",

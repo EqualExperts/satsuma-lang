@@ -310,6 +310,25 @@ describe("extractMetricMetadata (direct)", () => {
   });
 });
 
+describe("extractMetricMetadata source names (bsw-iuzs)", () => {
+  it("unquotes ns::`name` items in a braced source list", () => {
+    // The VizModel's metric card must name each source the way the schema is
+    // keyed, or the overview cannot draw an edge from it: backticks stripped,
+    // one entry per list item.
+    const src = "schema m (metric, source {raw::`crm-contacts`, other}) { v INT }";
+    const meta = findNode(root(src), "metadata_block");
+    const source = [];
+    extractMetricMetadata(
+      meta,
+      source,
+      [],
+      () => {},
+      () => {},
+    );
+    assert.deepStrictEqual(source, ["raw::crm-contacts", "other"]);
+  });
+});
+
 describe("extractMetricFields (direct)", () => {
   // Each field's measure value is taken from extractMeasure; this asserts
   // the full MetricFieldEntry[] for one of every measure variant including

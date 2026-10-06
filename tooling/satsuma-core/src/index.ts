@@ -151,11 +151,13 @@ export {
   pathSegmentText,
   importNameText,
   spreadLabelText,
+  metricSourceRefs,
   sourceRefText,
   sourceRefStructuralText,
   fieldNameText,
   walkDescendants,
 } from "./cst-utils.js";
+export type { MetricSourceRef } from "./cst-utils.js";
 export {
   arrowPathParts,
   arrowPathSegmentNodes,
@@ -253,6 +255,7 @@ export {
   computeNLRefPosition,
   classifyRef,
   splitRefSchemaKey,
+  refMetadataSchemaKey,
   resolveRef,
   extractNLRefData,
   resolveAllNLRefs,
