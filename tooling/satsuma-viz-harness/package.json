@@ -46,7 +46,7 @@
     "one under Turborepo (feature 42, R4)."
   ],
   "devDependencies": {
-    "@playwright/test": "^1.62.1",
+    "@playwright/test": "^1.63.0",
     "@satsuma/viz": "*",
     "@types/node": "^26.6.4",
     "esbuild": "^0.28.2",
