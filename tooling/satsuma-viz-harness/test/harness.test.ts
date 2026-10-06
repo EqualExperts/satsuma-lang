@@ -674,6 +674,34 @@ test.describe("Mapping detail — sfdc opportunity ingestion", () => {
     await expect(amountUsdRow.locator("span.transform-nl")).toBeVisible();
     expect(await amountUsdRow.locator("span.at-ref").count()).toBeGreaterThanOrEqual(1);
   });
+
+  test("a schema's note shows once, in the Notes section, not also as a subtitle", async ({
+    page,
+  }) => {
+    // Reported from a screenshot: `schema X (note "…")` printed its note
+    // twice on the detail card — as the italic label under the header and
+    // again in the Notes section. The backend deliberately fills both
+    // `label` and `notes` from that tag, so the card must drop the copy.
+    await page.goto("/");
+    await page.waitForFunction(() => {
+      const harness = window.__satsumaHarness;
+      if (!harness?.setViewMode) return false; // app.js not evaluated yet
+      harness.setViewMode("single");
+      return true;
+    });
+    await loadFixture(page, sfdcUri);
+    const detail = await openMappingByName(page, "opportunity-ingestion");
+    const card = detail.locator(
+      "sz-schema-card[test-id-prefix='mapping-detail-opportunity-ingestion-source-schema-card-sfdc-opportunity']",
+    );
+
+    await expect(card.getByText("SFDC Opportunity Object", { exact: true })).toHaveCount(1);
+    await expect(
+      card.locator(
+        "[data-testid='mapping-detail-opportunity-ingestion-source-schema-card-sfdc-opportunity-label']",
+      ),
+    ).toHaveCount(0);
+  });
 });
 
 test.describe("Mapping detail — namespaced vault mapping", () => {
@@ -2425,6 +2453,50 @@ test.describe("Compact card expansion in overview", () => {
       );
     expect(boxes.length).toBeGreaterThan(2);
     assertBoxesAreSane(boxes);
+    assertBoxesDoNotOverlap(boxes);
+  });
+
+  test("a field's long badge list wraps inside the expanded card instead of spilling out", async ({
+    page,
+  }) => {
+    // Reported from a screenshot: a field carrying several metadata badges
+    // (pii, format, mask, …) ran its badge strip straight past the card's
+    // right edge. The row was pinned to one line and the strip could not
+    // wrap, so the overflow was invisible to every non-rendering test.
+    // governance.stm's crm_customers.email carries five badges — the same
+    // shape — and only a laid-out browser can say where they paint.
+    await loadFixture(page, governanceUri);
+    const card = page.locator("sz-schema-card[data-testid^='overview-schema-card-crm-customers']");
+    await card.locator(".header-toggle").click();
+    const emailRow = card.locator("[data-testid$='-field-email']");
+    await expect(emailRow).toBeVisible({ timeout: 5_000 });
+
+    const cardRight = await card.evaluate((el) => el.getBoundingClientRect().right);
+    const badgeRights = await emailRow
+      .locator(".badge")
+      .evaluateAll((els) => els.map((el) => el.getBoundingClientRect().right));
+    expect(badgeRights.length).toBeGreaterThanOrEqual(5);
+    for (const right of badgeRights) {
+      expect(right).toBeLessThanOrEqual(cardRight);
+    }
+
+    // Wrapping makes the row taller than one line, and the overview layout
+    // must reserve that height: the expanded card may not paint over any
+    // neighbour (le-a1vp's invariant, now with multi-line rows).
+    const boxes = await page
+      .locator("sz-schema-card[data-testid^='overview-schema-card-']")
+      .evaluateAll((els) =>
+        (els as HTMLElement[]).map((el) => {
+          const r = el.getBoundingClientRect();
+          return {
+            testId: el.getAttribute("data-testid") ?? "",
+            x: r.x,
+            y: r.y,
+            width: r.width,
+            height: r.height,
+          };
+        }),
+      );
     assertBoxesDoNotOverlap(boxes);
   });
 

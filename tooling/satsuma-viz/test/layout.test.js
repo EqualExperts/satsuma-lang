@@ -921,6 +921,52 @@ describe("computeOverviewLayout", () => {
     }
   });
 
+  it("reserves extra height and width for a field whose metadata badges wrap", async () => {
+    // A field with many metadata pills wraps its badges onto several lines in
+    // the card (they used to run off its right edge). The overview layout
+    // sizes the expanded node before any DOM exists, so it must count those
+    // pills: the card widens first, and once at its cap the node grows by the
+    // extra lines. Without this the expanded card paints over its neighbour.
+    const metaField = (name, metadata) => ({
+      ...field(name),
+      constraints: ["pii"],
+      metadata: metadata.map(([key, value]) => ({ key, value })),
+    });
+    const modelWith = (fields) => ({
+      uri: "file:///test.stm",
+      fileNotes: [],
+      namespaces: [
+        {
+          name: null,
+          schemas: [schema("s1", fields), schema("tgt")],
+          mappings: [mapping("m1", ["s1"], "tgt", [arrow("email", "id")])],
+          metrics: [],
+          fragments: [],
+        },
+      ],
+    });
+    const expandedNode = async (fields) =>
+      (
+        await computeOverviewLayout(modelWith(fields), { expandedSchemaIds: new Set(["s1"]) })
+      ).nodes.find((n) => n.id === "s1");
+
+    const plain = await expandedNode([field("email")]);
+    const badged = await expandedNode([
+      metaField("email", [
+        ["format", "email"],
+        ["mask", "email_to_domain"],
+        ["classification", "RESTRICTED"],
+        ["retention", "3y"],
+      ]),
+    ]);
+
+    assert.ok(badged.width > plain.width, "badges must widen the card before it wraps");
+    assert.ok(
+      badged.height > plain.height,
+      "badges that overflow the capped width must add wrapped lines to the node",
+    );
+  });
+
   it("keeps overview namespaced nodes in the flat output", async () => {
     const model = {
       uri: "file:///test.stm",

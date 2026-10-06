@@ -69,6 +69,7 @@ export { metricAsSchemaCard, metricFieldEntries } from "./metric-adapter.js";
 // transform text, join descriptions and filters.
 export { renderMarkdown, highlightAtRefs } from "./markdown.js";
 export { renderNotesSection, noteSectionStyles } from "./notes.js";
+export { fieldBadgeLabels, fieldMetaPills, enumValues } from "./field-badges.js";
 export {
   EMPTY_CANVAS_CLASSES,
   isEmptyCanvasElement,

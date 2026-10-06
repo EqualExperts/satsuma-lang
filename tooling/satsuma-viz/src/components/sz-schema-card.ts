@@ -8,9 +8,12 @@ import { noteSectionStyles, renderNotesSection } from "../notes.js";
 import type { FieldCoverageEntry, FieldCoverageState } from "@satsuma/core/coverage";
 import { uncoveredFieldCoverage } from "@satsuma/core/coverage";
 import { toCoverageFields } from "../field-coverage.js";
+import { enumValues, fieldMetaPills, PII_BADGE_TEXT, PII_TAG } from "../field-badges.js";
 import { summarizeFieldCoverage, countContainerStates } from "@satsuma/core/coverage-rollup";
 import type { CoverageTotals, ContainerStateCounts } from "@satsuma/core/coverage-rollup";
 import {
+  FIELD_BADGE_GAP,
+  FIELD_ROW_PADDING_Y,
   HEADER_HEIGHT,
   META_PILL_ROW_GAP,
   META_PILL_ROW_HEIGHT,
@@ -261,13 +264,16 @@ export class SzSchemaCard extends LitElement {
         padding: 4px 0;
       }
 
+      /* One line tall by default; taller only when the badge strip wraps (see
+       .badges). The overview layout estimates the extra lines from the same
+       badge list (field-badges.ts), so the card's node still fits. */
       .field-row {
         position: relative;
         display: flex;
         align-items: center;
         gap: 6px;
-        padding: 3px 12px;
-        height: var(--sz-field-height);
+        padding: ${FIELD_ROW_PADDING_Y}px 12px;
+        min-height: var(--sz-field-height);
         cursor: pointer;
       }
 
@@ -330,10 +336,16 @@ export class SzSchemaCard extends LitElement {
         flex-shrink: 0;
       }
 
+      /* A field can carry many badges (pii, format, mask, …). Rather than run
+       off the card's right edge, the strip shrinks to the space the name and
+       type leave and wraps onto further lines. In the mapping detail view the
+       card is content-width, so rows size to max-content and never wrap. */
       .badges {
         display: flex;
-        gap: 3px;
-        flex-shrink: 0;
+        flex-wrap: wrap;
+        gap: ${FIELD_BADGE_GAP}px;
+        flex: 0 1 auto;
+        min-width: 0;
       }
 
       .badge {
@@ -345,6 +357,13 @@ export class SzSchemaCard extends LitElement {
         background: var(--sz-badge-bg);
         color: var(--sz-badge-text);
         line-height: 1.4;
+        /* A badge wraps as a unit, never mid-label. One longer than the whole
+         strip end-truncates; its full text stays in the row's tooltip. */
+        white-space: nowrap;
+        max-width: 100%;
+        box-sizing: border-box;
+        overflow: hidden;
+        text-overflow: ellipsis;
       }
 
       /* Field-level metadata pill (sl-6x1o): same chip shape as constraint
@@ -834,6 +853,12 @@ export class SzSchemaCard extends LitElement {
     const coverage = this._coverage();
     const hasNotes = s.notes.length > 0;
     const metaPills = s.metadata.filter((m) => m.key !== "note");
+    // The backend fills a schema's label from its `note` tag, and the same
+    // note also arrives in `notes` and renders in the Notes section below.
+    // Showing both printed the note twice, so a label that merely repeats a
+    // note is dropped — the Notes section is the one Markdown rendering. A
+    // label with its own text (a metric's display name) still shows.
+    const showLabel = s.label !== null && !s.notes.some((n) => n.text === s.label);
     const isReport = this._isReport(s);
 
     return html`
@@ -872,7 +897,7 @@ export class SzSchemaCard extends LitElement {
             >&#9660;</span
           >
         </div>
-        ${s.label ? html`<div class="label">${s.label}</div>` : ""}
+        ${showLabel ? html`<div class="label" data-testid=${`${this.testIdPrefix}-label`}>${s.label}</div>` : ""}
         ${
           metaPills.length > 0
             ? html`<div class="metadata-pills">
@@ -939,7 +964,7 @@ export class SzSchemaCard extends LitElement {
       : (entry?.state ?? "uncovered");
     const hasWarning = f.comments.some((c) => c.kind === "warning");
     const hasQuestion = f.comments.some((c) => c.kind === "question");
-    const hasPii = f.constraints.includes("pii");
+    const hasPii = f.constraints.includes(PII_TAG);
     const isHighlighted = this.highlightFields.has(fieldPath);
     const hlClass = isHighlighted
       ? `hl ${this.highlightColor === "target" ? "hl-target" : "hl-source"}`
@@ -947,7 +972,7 @@ export class SzSchemaCard extends LitElement {
     // Use the dotted path so nested customer.email is distinguishable from a
     // sibling top-level email field (sl-eikr).
     const fieldTestId = `${this.testIdPrefix}-field-${sanitizeTestIdSegment(fieldPath)}`;
-    const metaPills = this._fieldMetaPills(f);
+    const metaPills = fieldMetaPills(f);
     // At most one enum entry per field (the grammar allows a single enum
     // constraint), so a single lookup covers both the collapsed badge and,
     // once expanded, the overlay's value list.
@@ -982,9 +1007,9 @@ export class SzSchemaCard extends LitElement {
         <span class="field-type">${f.type}</span>
         <span class="badges">
           ${f.constraints
-            .filter((c) => c !== "pii")
+            .filter((c) => c !== PII_TAG)
             .map((c) => html`<span class="badge">${c}</span>`)}
-          ${hasPii ? html`<span class="badge pii" title="PII">&#128737; pii</span>` : ""}
+          ${hasPii ? html`<span class="badge pii" title="PII">${PII_BADGE_TEXT}</span>` : ""}
           ${metaPills.map((m) =>
             m.key === "enum"
               ? this._renderEnumBadge(fieldPath, fieldTestId, m)
@@ -1054,42 +1079,12 @@ export class SzSchemaCard extends LitElement {
   }
 
   /**
-   * Metadata entries to render as pills on a field row: everything the author
-   * wrote except entries already rendered elsewhere on the row (sl-6x1o).
-   * Key-value entries always render — `sensitivity internal` and
-   * `access_group property_facilities` must be visible, and a kv whose key is
-   * also a constraint tag (e.g. `encrypt aes`) carries a value the badge
-   * alone would hide. Excluded:
-   *   - bare tags already shown as constraint badges
-   *   - `note` entries, which render as the shaded field-note row below the
-   *     field (sl-1gqw) — same dedupe the schema-level pills apply
-   */
-  private _fieldMetaPills(f: FieldEntry) {
-    // Tolerate models serialized before FieldEntry carried metadata (older
-    // LSP servers, cached webview payloads) — render no pills, don't crash.
-    return (f.metadata ?? []).filter(
-      (m) => m.key !== "note" && !(m.value === "" && f.constraints.includes(m.key)),
-    );
-  }
-
-  /**
-   * An enum entry's individual values. Prefers `m.values` (present from
-   * sl-2ne7 onward); falls back to re-splitting the joined `value` for
-   * payloads from an older viz-backend or a cached webview that predate it,
-   * the same tolerance `_fieldMetaPills` already extends to a missing
-   * `metadata` array.
-   */
-  private _enumValues(m: MetadataEntry): string[] {
-    return m.values ?? (m.value ? m.value.split(" | ") : []);
-  }
-
-  /**
    * An enum badge collapses to a count rather than the joined value list
    * (sl-2ne7): with several values, the joined form was the widest thing on
    * the row. Clicking it opens {@link _renderEnumOverlay} for the same field.
    */
   private _renderEnumBadge(fieldPath: string, fieldTestId: string, m: MetadataEntry) {
-    const values = this._enumValues(m);
+    const values = enumValues(m);
     return html`<span
       class="badge field-meta enum-badge"
       data-testid=${`${fieldTestId}-enum-badge`}
@@ -1111,7 +1106,7 @@ export class SzSchemaCard extends LitElement {
       data-testid=${`${fieldTestId}-enum-overlay`}
       @click=${(e: Event) => e.stopPropagation()}
     >
-      ${this._enumValues(m).map((v) => html`<span class="enum-value-chip">${v}</span>`)}
+      ${enumValues(m).map((v) => html`<span class="enum-value-chip">${v}</span>`)}
     </div>`;
   }
 

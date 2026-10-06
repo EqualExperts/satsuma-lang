@@ -181,7 +181,7 @@ describe("viz automation helpers", () => {
       children: [],
       location: { uri: "file:///t.stm", line: 1, character: 0 },
     };
-    const pills = card._fieldMetaPills(field);
+    const pills = mod.fieldMetaPills(field);
     assert.deepEqual(
       pills.map((p) => p.key),
       ["sensitivity"],
