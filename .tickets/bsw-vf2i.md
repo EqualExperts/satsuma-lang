@@ -1,6 +1,6 @@
 ---
 id: bsw-vf2i
-status: open
+status: closed
 deps: []
 links: []
 created: 2026-10-06T09:45:31Z
@@ -30,3 +30,10 @@ mapping mm { source { out } target { revenue } cid -> total }
 - `focusFieldIsDeclared` and `resolveSchemaFields` treat metric definitions as declaring fields.
 - A viz-backend test builds a field chain for a metric field and asserts `resolved: true` with the upstream hop; verified red before the fix.
 - Playwright: clicking a metric field's lineage button opens the chain view with lineage, not the unknown-field state (extend the sv-embb chain-view describe block; add a metric fixture if none is wired).
+
+## Notes
+
+**2026-10-06T09:56:34Z**
+
+Cause: The sv-embb existence check (`focusFieldIsDeclared`, `resolveSchemaFields`) accepted only index entries of kind "schema", but the workspace index files metric schemas under kind "metric", so every metric field was reported as undeclared.
+Fix: Added `declaresSchemaFields` (schema or metric) in workspace-definition-lookup.ts and used it at both sites; viz-backend tests and a Playwright spec on the metrics-platform fixture cover it (commit immediately after 68e36a19)

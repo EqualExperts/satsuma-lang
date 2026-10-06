@@ -159,6 +159,38 @@ mapping load { source { src } target { tgt } raw_city -> address.city }
       { field: "::src.raw_city", via_mapping: "::load", classification: "none", depth: 1 },
     ]);
   });
+
+  it("resolves a field declared by a metric schema (bsw-vf2i)", () => {
+    // The workspace index files `schema x (metric, ...)` under kind "metric",
+    // not "schema". A metric still declares fields, so its lineage must be
+    // shown rather than the "Field not found" state.
+    const result = chainFrom(
+      `
+schema out { cid INT }
+schema revenue (metric, source out) {
+  total DECIMAL (measure additive)
+}
+mapping mm { source { out } target { revenue } cid -> total }
+`,
+      "revenue.total",
+    );
+
+    assert.equal(result.resolved, undefined);
+    assert.deepEqual(result.upstream, [
+      { field: "::out.cid", via_mapping: "::mm", classification: "none", depth: 1 },
+    ]);
+  });
+
+  it("still marks an undeclared field of a metric schema unresolved (bsw-vf2i)", () => {
+    // Accepting metric definitions must not make every path under a metric
+    // name look declared.
+    const result = chainFrom(
+      "schema revenue (metric) { total DECIMAL (measure additive) }",
+      "revenue.missing",
+    );
+
+    assert.equal(result.resolved, false);
+  });
 });
 
 describe("field-chain CLI parity golden", () => {

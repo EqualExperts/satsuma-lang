@@ -35,6 +35,18 @@ export function fieldInfoToDecl(field: FieldInfo): FieldDecl {
   });
 }
 
+/**
+ * Whether `definition` declares a field tree a field path can resolve against.
+ *
+ * Rule: a metric is a schema. The workspace index files
+ * `schema x (metric, ...)` under kind "metric" so the overview can draw it
+ * differently, but its body declares fields exactly as a plain schema's does,
+ * and `satsuma field-lineage` traces them (bsw-vf2i).
+ */
+export function declaresSchemaFields(definition: DefinitionEntry): boolean {
+  return definition.kind === "schema" || definition.kind === "metric";
+}
+
 /** Optional mapping-side lookup used while resolving refs inside a mapping. */
 export type MappingSidesLookup = (mappingKey: string) => MappingSourcesTargets | null;
 
@@ -92,7 +104,8 @@ function definitionToSpreadEntity(definition: DefinitionEntry): SpreadEntity {
 
 /**
  * The fully spread-expanded field tree `workspace` declares for `schemaKey`,
- * or null when `schemaKey` names no schema.
+ * or null when `schemaKey` names no schema (metric schemas included, see
+ * {@link declaresSchemaFields}).
  *
  * Only fragments spread fields into a schema, so the entity map built here
  * covers fragment definitions alone — the same asymmetry `expandDeclaredFields`
@@ -107,7 +120,7 @@ export function resolveSchemaFields(
   workspace: WorkspaceIndex,
   schemaKey: string,
 ): FieldDecl[] | null {
-  const schema = workspace.definitions.get(schemaKey)?.find((d) => d.kind === "schema");
+  const schema = workspace.definitions.get(schemaKey)?.find(declaresSchemaFields);
   if (!schema) return null;
 
   const fragments = new Map<string, SpreadEntity>();

@@ -1636,6 +1636,50 @@ test.describe("Field chain view — cycle detection (sv-embb)", () => {
   });
 });
 
+// bsw-vf2i: the sv-embb unknown-field check accepted only definitions of kind
+// "schema", but the workspace index files `schema x (metric, ...)` under kind
+// "metric", so every metric field opened the chain view on "Field not found".
+// The viz-backend test proves the model's `resolved` flag; this proves the
+// click a reader makes on a metric card's lineage button lands on a rendered
+// chain with lineage rather than the unknown-field banner.
+test.describe("Field chain view — metric fields (bsw-vf2i)", () => {
+  test("clicking a metric field's lineage button opens the chain view with its upstream hop", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    await loadFixture(page, metricsUri);
+
+    // dispatchEvent rather than a pointer click — overview cards can sit under
+    // the minimap overlay, which intercepts real pointer events.
+    await page
+      .locator("[data-testid='overview-mapping-card-conversion-rate-pipeline']")
+      .dispatchEvent("click");
+    const targetCardPrefix =
+      "mapping-detail-conversion-rate-pipeline-target-schema-card-conversion-rate";
+    await expect(page.locator(`[data-testid^='${targetCardPrefix}']`).first()).toBeVisible({
+      timeout: 10_000,
+    });
+
+    await page
+      .locator(`[data-testid^='${targetCardPrefix}'][data-testid$='-field-region-lineage']`)
+      .first()
+      .click({ force: true });
+
+    await expect(page.locator("[data-testid='viz-root']")).toHaveAttribute(
+      "data-view-mode",
+      "chain",
+      { timeout: 10_000 },
+    );
+    await expect(page.locator("[data-testid='chain-unknown-field']")).toHaveCount(0);
+    const focus = page.locator("[data-testid='chain-focus']");
+    await expect(focus).toContainText("conversion_rate");
+    await expect(focus).toContainText("region");
+    // `region -> region` in _conversion_rate_pipeline puts the source field one
+    // hop upstream of the metric field.
+    await expect(page.locator("[data-testid='chain-column-upstream-1']")).toBeVisible();
+  });
+});
+
 test.describe("Hover highlighting between arrows and field rows", () => {
   test("hovering an arrow row highlights the matching source and target field rows", async ({
     page,
