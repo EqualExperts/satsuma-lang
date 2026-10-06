@@ -27,7 +27,11 @@ import {
 } from "../field-coverage.js";
 import { qualifyChildArrowPath } from "@satsuma/core/extract";
 import { metricFieldEntries } from "../metric-adapter.js";
+import { fieldBadgeLabels } from "../field-badges.js";
 import {
+  FIELD_BADGE_GAP,
+  FIELD_BADGE_LINE_HEIGHT,
+  FIELD_ROW_PADDING_Y,
   HEADER_HEIGHT,
   META_PILL_ROW_GAP,
   META_PILL_ROW_HEIGHT,
@@ -135,6 +139,25 @@ const FULL_TYPE_CHAR_WIDTH = 6.6;
 const FULL_NOTE_CHAR_WIDTH = 6.5;
 const FULL_HEADER_BASE_WIDTH = 86;
 const FULL_FIELD_BASE_WIDTH = 92;
+/** Average glyph width of a field badge's 10px label text. */
+const FIELD_BADGE_CHAR_WIDTH = 6.1;
+/** A field badge's horizontal padding (`.badge { padding: 1px 5px }`). */
+const FIELD_BADGE_PADDING_X = 10;
+/** Room a field row reserves after its badges for each comment marker (16px + gap). */
+const FIELD_COMMENT_MARKER_WIDTH = 22;
+/**
+ * Rendered height of a one-line field row in a compact card: the row's
+ * min-height applies to its content box, so its vertical padding adds on top.
+ */
+const RENDERED_FIELD_ROW_HEIGHT = FIELD_HEIGHT + 2 * FIELD_ROW_PADDING_Y;
+/** Line height of a field note's 11px text (`.field-note { line-height: 1.4 }`). */
+const FIELD_NOTE_LINE_HEIGHT = 11 * 1.4;
+/** A field note row's vertical padding (`.field-note { padding: 2px … 4px }`). */
+const FIELD_NOTE_PADDING_Y = 6;
+/** Horizontal space a field note row gives up: 38px left inset, 12px right, card border. */
+const FIELD_NOTE_INSET_X = 52;
+/** Cap on a field note's text width (`.field-note { max-width: 400px }`). */
+const FIELD_NOTE_MAX_TEXT_WIDTH = 400;
 const FULL_NOTES_TOGGLE_HEIGHT = 28;
 const FULL_NOTES_SECTION_CHROME = 14;
 const FULL_NOTE_LINE_HEIGHT = 18;
@@ -172,16 +195,90 @@ function compactHeight(
 /**
  * Compact card height once the user has expanded its field list in the
  * overview (sz-schema-card's compact-expanded state): the preamble plus every
- * field row, nested fields included. Field-level note lines are not estimated;
- * the card keeps `overflow: visible` while expanded so a small undershoot
- * paints past the node bounds instead of clipping.
+ * field row and field note row, nested fields included. These are estimates
+ * from text length; the card keeps `overflow: visible` while expanded so a
+ * small undershoot paints past the node bounds instead of clipping.
  */
 function compactExpandedHeight(schema: SchemaCard, hasNamespace = false): number {
+  const cardWidth = compactExpandedWidth(schema);
   return (
     preambleHeight(schema, hasNamespace) +
     FIELDS_PADDING_TOP +
-    countFields(schema.fields) * FIELD_HEIGHT +
+    sumFieldRowHeights(schema.fields, cardWidth) +
     FIELDS_PADDING_BOTTOM
+  );
+}
+
+/**
+ * Total rendered height of a card's field rows, nested fields included, when
+ * the card is `cardWidth` wide. A row is one line tall unless its badges wrap;
+ * each extra badge line adds a line height plus the gap between lines.
+ */
+function sumFieldRowHeights(fields: FieldEntry[], cardWidth: number, depth = 0): number {
+  return fields.reduce((sum, field) => {
+    const badgeLines = estimateBadgeLines(field, depth, cardWidth);
+    const wrappedHeight =
+      badgeLines * FIELD_BADGE_LINE_HEIGHT +
+      (badgeLines - 1) * FIELD_BADGE_GAP +
+      2 * FIELD_ROW_PADDING_Y;
+    const rowHeight = Math.max(RENDERED_FIELD_ROW_HEIGHT, wrappedHeight);
+    const notesHeight = field.notes.reduce(
+      (total, note) => total + estimateFieldNoteHeight(note.text, cardWidth),
+      0,
+    );
+    return sum + rowHeight + notesHeight + sumFieldRowHeights(field.children, cardWidth, depth + 1);
+  }, 0);
+}
+
+/**
+ * Height of the shaded note row beneath a field. Note text keeps its source
+ * line breaks when rendered, so each source line wraps independently.
+ */
+function estimateFieldNoteHeight(text: string, cardWidth: number): number {
+  const textWidth = Math.min(FIELD_NOTE_MAX_TEXT_WIDTH, cardWidth - FIELD_NOTE_INSET_X);
+  const charsPerLine = Math.max(1, Math.floor(textWidth / FULL_NOTE_CHAR_WIDTH));
+  return estimateLines(text, charsPerLine) * FIELD_NOTE_LINE_HEIGHT + FIELD_NOTE_PADDING_Y;
+}
+
+/**
+ * How many lines a field's badges wrap onto in a card `cardWidth` wide. The
+ * strip gets whatever the name, type and fixed row chrome leave; badges are
+ * packed greedily left to right, as flex-wrap lays them out. A badge wider
+ * than the whole strip takes a line of its own (the card truncates it).
+ */
+function estimateBadgeLines(field: FieldEntry, depth: number, cardWidth: number): number {
+  const stripWidth = Math.max(0, cardWidth - fieldRowFixedWidth(field, depth));
+  let lines = 1;
+  let lineWidth = 0;
+  for (const badgeWidth of fieldBadgeWidths(field)) {
+    if (lineWidth === 0) {
+      lineWidth = badgeWidth;
+    } else if (lineWidth + FIELD_BADGE_GAP + badgeWidth <= stripWidth) {
+      lineWidth += FIELD_BADGE_GAP + badgeWidth;
+    } else {
+      lines++;
+      lineWidth = badgeWidth;
+    }
+  }
+  return lines;
+}
+
+/** Estimated rendered width of each badge on a field row, in render order. */
+function fieldBadgeWidths(field: FieldEntry): number[] {
+  return fieldBadgeLabels(field).map(
+    (label) => estimateTextWidth(label, FIELD_BADGE_CHAR_WIDTH) + FIELD_BADGE_PADDING_X,
+  );
+}
+
+/** Width of everything on a field row except its badge strip. */
+function fieldRowFixedWidth(field: FieldEntry, depth: number): number {
+  const commentKinds = new Set(field.comments.map((c) => c.kind)).size;
+  return (
+    FULL_FIELD_BASE_WIDTH +
+    depth * 20 +
+    estimateTextWidth(field.name, FULL_FIELD_CHAR_WIDTH) +
+    estimateTextWidth(field.type, FULL_TYPE_CHAR_WIDTH) +
+    commentKinds * FIELD_COMMENT_MARKER_WIDTH
   );
 }
 
@@ -423,18 +520,18 @@ function estimateSchemaHeight(schema: SchemaCard, hasNamespace = false): number 
   );
 }
 
+/**
+ * Width the widest field row needs to show all its badges on one line. Every
+ * badge counts — metadata pills such as `format email` included — so a card
+ * widens (up to its cap) before its rows have to wrap.
+ */
 function measureFieldWidth(fields: FieldEntry[], depth = 0): number {
   return fields.reduce((max, field) => {
-    const constraintText = field.constraints.filter((c) => c !== "pii").join(" ");
-    const commentWidth = field.comments.length > 0 ? 32 : 0;
-    const width =
-      FULL_FIELD_BASE_WIDTH +
-      depth * 20 +
-      estimateTextWidth(field.name, FULL_FIELD_CHAR_WIDTH) +
-      estimateTextWidth(field.type, FULL_TYPE_CHAR_WIDTH) +
-      (constraintText ? estimateTextWidth(constraintText, FULL_META_CHAR_WIDTH) + 24 : 0) +
-      (field.constraints.includes("pii") ? 44 : 0) +
-      commentWidth;
+    const badgeWidths = fieldBadgeWidths(field);
+    const badgesWidth =
+      badgeWidths.reduce((sum, w) => sum + w, 0) +
+      Math.max(0, badgeWidths.length - 1) * FIELD_BADGE_GAP;
+    const width = fieldRowFixedWidth(field, depth) + badgesWidth;
     const childWidth = field.children.length > 0 ? measureFieldWidth(field.children, depth + 1) : 0;
     return Math.max(max, width, childWidth);
   }, 0);

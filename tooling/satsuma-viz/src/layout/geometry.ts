@@ -39,3 +39,20 @@ export const META_PILL_ROW_GAP = 4;
  * + 1px bottom border (see .metadata-pills in sz-schema-card.ts).
  */
 export const METADATA_PILLS_CHROME = 11;
+
+/**
+ * Vertical padding above and below a schema-card field row's content
+ * (`.field-row { padding: 3px 12px }`). The row's min-height applies to its
+ * content box, so a one-line row renders this much taller twice over.
+ */
+export const FIELD_ROW_PADDING_Y = 3;
+
+/**
+ * Height of one line of field badges: 10px text at line-height 1.4 plus 1px
+ * top and bottom padding (`.badge`). A row whose badges wrap grows by this
+ * plus {@link FIELD_BADGE_GAP} per extra line.
+ */
+export const FIELD_BADGE_LINE_HEIGHT = 16;
+
+/** Gap between field badges, horizontally and between wrapped lines (`.badges`). */
+export const FIELD_BADGE_GAP = 3;
