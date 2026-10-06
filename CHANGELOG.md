@@ -118,6 +118,21 @@ Markdown too.
   `SELECT * FROM t` lost its asterisks to emphasis, and so did a lone `*` in
   `a * b`. Both now render as written.
 
+### A fragment spread inside a record no longer switches off validation (`bsw-xivc`, `bsw-hbcb`)
+
+A schema whose only spreads sat inside a record, such as
+`addr record { ...address }`, was treated as having an unresolved spread, so
+`satsuma validate` checked none of its fields: an arrow to a misspelt field
+in that schema passed silently, on the source and target sides alike. Nested
+spreads now resolve exactly as top-level ones do, and an undefined nested
+spread is reported like a top-level one. The `unenumerated-record-target`
+lint rule, which skipped such schemas for the same reason, now fires on
+them. The language server also reports undefined spreads, top-level and
+nested, as you type rather than only on save.
+
+Expect new warnings in workspaces that use this pattern: they were always
+there, just not reported.
+
 ### Language server: go-to-definition in three more places, and schema renames reach `@ref`s (`gpt-jwek`, `gpt-fjo7`)
 
 Go-to-definition now works on a metric's `source` value, on the schema part
