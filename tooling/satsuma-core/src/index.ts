@@ -200,6 +200,7 @@ export {
   extractMetrics,
   isMetricSchema,
   extractMappings,
+  countMappingArrows,
   extractFragments,
   extractTransforms,
   extractNotes,

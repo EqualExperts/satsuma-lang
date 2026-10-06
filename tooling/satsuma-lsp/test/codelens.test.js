@@ -127,6 +127,29 @@ schema orders {
     assert.ok(result[0].command.title.includes("2 arrow(s)"));
   });
 
+  it("counts arrows nested inside each and flatten blocks, as `satsuma summary` does (bsw-ks5q)", () => {
+    // The lens counted only the mapping body's direct children, so an each or
+    // flatten block counted as one arrow however many it held. The expected
+    // numbers are what `satsuma summary --json` reports for these examples.
+    const fs = require("node:fs");
+    const path = require("node:path");
+    const expectedArrowCounts = {
+      "ancestor-escape/pipeline.stm": 4,
+      "nested-iteration/pipeline.stm": 8,
+    };
+    for (const [example, expected] of Object.entries(expectedArrowCounts)) {
+      const source = fs.readFileSync(path.resolve(__dirname, "../../../examples", example), "utf8");
+      const mappingLenses = lenses({ "file:///a.stm": source }, "file:///a.stm").filter((lens) =>
+        lens.command.title.includes("arrow(s)"),
+      );
+      assert.equal(mappingLenses.length, 1, `${example} declares one mapping`);
+      assert.ok(
+        mappingLenses[0].command.title.endsWith(`| ${expected} arrow(s)`),
+        `${example}: expected ${expected} arrows, got "${mappingLenses[0].command.title}"`,
+      );
+    }
+  });
+
   it("shows source info for metrics", () => {
     // Metrics are now schema blocks with (metric, source ...) metadata.
     const result = lenses(
