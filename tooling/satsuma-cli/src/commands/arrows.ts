@@ -105,24 +105,23 @@ Examples:
           const schemaKey = resolvedSchema.key;
           const isQueriedField = queriedFieldMatcher(matches, schemaKey, allFields);
 
-          // Find matching arrows using schema-qualified key
+          // Gather candidates from every index key the field can be filed under:
+          // the schema-qualified key, the bare path and the leaf name (nested
+          // arrows are indexed under all three, which is how a leaf-name query
+          // reaches `orders.lines.id`). No key is trusted on its own. The bare
+          // and leaf keys are shared by every schema and every path ending in the
+          // same segment, and even the qualified key can disagree with the
+          // matcher: in a schema `orders` with a top-level record `orders`, the
+          // index files `orders.id -> b` under `orders.id` although it maps the
+          // record child (bsw-kvj9). So every candidate must come from a mapping
+          // that has the queried schema on the side where its path matches.
           const qualifiedField = `${schemaKey}.${fieldName}`;
-          let arrows = findFieldArrows(qualifiedField, index);
-
-          // Also search by bare path and leaf name: nested arrows are indexed under
-          // both, so this is how a leaf-name query reaches `orders.lines.id`.
-          // Those keys are shared by every schema, and by every path ending in the
-          // same segment, so a candidate is kept only when its mapping involves the
-          // queried schema and its own path is one the query resolved to.
           // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- Safe: split always produces at least one element
           const leafName = fieldName.split(".").pop()!;
-          const seen = new Set(
-            arrows.map(
-              (a) => `${a.mapping}:${a.namespace}:${a.sources.join(",")}:${a.target}:${a.line}`,
-            ),
-          );
-          for (const altKey of [fieldName, leafName]) {
-            for (const a of findFieldArrows(altKey, index)) {
+          let arrows: ArrowRecord[] = [];
+          const seen = new Set<string>();
+          for (const key of [qualifiedField, fieldName, leafName]) {
+            for (const a of findFieldArrows(key, index)) {
               const dedupKey = `${a.mapping}:${a.namespace}:${a.sources.join(",")}:${a.target}:${a.line}`;
               if (seen.has(dedupKey)) continue;
               const qMapping = a.namespace ? `${a.namespace}::${a.mapping}` : (a.mapping ?? "");

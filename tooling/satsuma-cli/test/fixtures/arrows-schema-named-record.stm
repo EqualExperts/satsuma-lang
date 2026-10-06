@@ -1,0 +1,23 @@
+// bsw-kvj9 review: schema `orders` declares a top-level record that is also
+// called `orders`. Inside this schema `orders.id` names the record's child, not
+// the top-level `id` with the schema's name in front, so each arrow below
+// belongs to exactly one field.
+schema orders {
+  id INT
+  orders record {
+    id INT
+  }
+}
+
+schema t {
+  a INT
+  b INT
+}
+
+mapping m {
+  source { orders }
+  target { t }
+
+  id -> a
+  orders.id -> b
+}

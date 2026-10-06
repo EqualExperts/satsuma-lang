@@ -25,3 +25,8 @@ With `src` declaring top-level `id` plus `orders.id` and `orders.lines.id`, each
 
 Cause: `arrows` demanded an exact path only when the query contained a dot; an undotted query accepted any candidate whose path existed anywhere in the schema, so a top-level `id` picked up `orders.id` and `orders.lines.id` through the leaf-name index, and the `--as-source`/`--as-target` filters and text grouping matched by leaf name and suffix too.
 Fix: arrows.ts now resolves the query once with `findDeclaredFields` (exact path wins, else every field of that leaf name) and accepts an arrow only when its schema-local path is one of those resolved paths; the suffix post-filter is gone, the generated-property suite asserts every declared path exactly, and SATSUMA-CLI.md states the rule (commit immediately after 872555bf).
+
+**2026-10-06T19:30:05Z** (review follow-up)
+
+Cause: the schema-qualified index key's arrows were accepted without the queried-field test. In a schema `orders` with a top-level record `orders`, the index files `orders.id -> b` under `orders.id`, while the matcher reads that path as the record child, so `arrows orders.id` listed two arrows under a "1 arrow" header and disagreed with `--as-source`.
+Fix: arrows.ts now gathers candidates from the qualified, bare and leaf keys in one loop and applies the same side-and-path test to all three; integration tests cover the schema-named record (commit immediately after 8b9a2d1e).
