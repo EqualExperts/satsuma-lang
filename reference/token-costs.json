@@ -12,8 +12,8 @@
   "tokenizers": {
     "o200k_base": {
       "perSection": {
-        "grammar": 948,
-        "conventions": 1450,
+        "grammar": 992,
+        "conventions": 1530,
         "mistakes": 448,
         "examples": 441,
         "cli-index": 1136,
@@ -22,26 +22,26 @@
         "workflow-read": 264
       },
       "perProfile": {
-        "write": 3743,
-        "read": 4520
+        "write": 3867,
+        "read": 4600
       },
-      "wholeDocument": 6813,
+      "wholeDocument": 6937,
       "envelopes": {
         "cli": {
           "resident": 0,
           "loaded": "on demand — see per-section/profile figures above"
         },
         "portable-blob": {
-          "resident": 6813,
-          "loaded": 6813
+          "resident": 6937,
+          "loaded": 6937
         },
         "skill": {
           "resident": 164,
-          "loaded": 7062
+          "loaded": 7186
         },
         "mcp-comparison": {
-          "resident": 2253,
-          "loaded": 2253,
+          "resident": 2252,
+          "loaded": 2252,
           "commandCount": 23
         }
       }

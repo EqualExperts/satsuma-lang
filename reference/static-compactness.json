@@ -1,7 +1,24 @@
 {
-  "referenceOverhead": 6813,
+  "referenceOverhead": 6937,
   "tokenizers": {
     "o200k_base": [
+      {
+        "name": "ancestor-escape",
+        "fileCount": 1,
+        "lineCount": 88,
+        "arms": {
+          "S": 610,
+          "Sauthored": 769,
+          "Y": 689,
+          "J": 865
+        },
+        "ratios": {
+          "vsYaml": 11.5,
+          "vsJson": 29.5,
+          "authoredVsYaml": -11.6,
+          "savingVsYaml": 79
+        }
+      },
       {
         "name": "cobol-to-avro",
         "fileCount": 1,
@@ -347,16 +364,16 @@
         "fileCount": 1,
         "lineCount": 29,
         "arms": {
-          "S": 98,
-          "Sauthored": 150,
+          "S": 106,
+          "Sauthored": 158,
           "Y": 142,
           "J": 252
         },
         "ratios": {
-          "vsYaml": 31,
-          "vsJson": 61.1,
-          "authoredVsYaml": -5.6,
-          "savingVsYaml": 44
+          "vsYaml": 25.4,
+          "vsJson": 57.9,
+          "authoredVsYaml": -11.3,
+          "savingVsYaml": 36
         }
       },
       {
@@ -379,6 +396,23 @@
     ]
   },
   "characters": [
+    {
+      "name": "ancestor-escape",
+      "fileCount": 1,
+      "lineCount": 88,
+      "arms": {
+        "S": 2533,
+        "Sauthored": 3202,
+        "Y": 2939,
+        "J": 3625
+      },
+      "ratios": {
+        "vsYaml": 13.8,
+        "vsJson": 30.1,
+        "authoredVsYaml": -8.9,
+        "savingVsYaml": 406
+      }
+    },
     {
       "name": "cobol-to-avro",
       "fileCount": 1,
@@ -724,16 +758,16 @@
       "fileCount": 1,
       "lineCount": 29,
       "arms": {
-        "S": 326,
-        "Sauthored": 543,
+        "S": 334,
+        "Sauthored": 551,
         "Y": 512,
         "J": 951
       },
       "ratios": {
-        "vsYaml": 36.3,
-        "vsJson": 65.7,
-        "authoredVsYaml": -6.1,
-        "savingVsYaml": 186
+        "vsYaml": 34.8,
+        "vsJson": 64.9,
+        "authoredVsYaml": -7.6,
+        "savingVsYaml": 178
       }
     },
     {

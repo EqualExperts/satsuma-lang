@@ -66,7 +66,9 @@ pipe_step        = spread | IDENT ["(" params ")"] | ARITH NUMBER | "map" "{" ma
 map_entries      = { map_key ":" value } ;
 map_key          = value | "<" NUMBER | "default" | "_" | "null" ;
 
-field_path       = ["."] [label "::"] segment {"." segment} ;
+field_path       = ["."] [label "::"] segment {"." segment}
+                 | ("^." {"^."} | "$.") segment {"." segment} ;
+(* Inside each/flatten: each ^. goes up one enclosing level; $. starts from the schema root (ADR-053) *)
 (* :: is ONLY namespace::schema. Fields use dot: namespace::schema.field.nested *)
 segment          = IDENT | BACKTICK_IDENT ;
 

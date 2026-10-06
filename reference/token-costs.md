@@ -12,8 +12,8 @@ See [archive/features/45-agent-reference-progressive-disclosure/PRD.md](../archi
 
 | Section | Tokens |
 |---|---|
-| `grammar` | 948 |
-| `conventions` | 1450 |
+| `grammar` | 992 |
+| `conventions` | 1530 |
 | `mistakes` | 448 |
 | `examples` | 441 |
 | `cli-index` | 1136 |
@@ -25,18 +25,18 @@ See [archive/features/45-agent-reference-progressive-disclosure/PRD.md](../archi
 
 | Profile | Tokens |
 |---|---|
-| `write` | 3743 |
-| `read` | 4520 |
+| `write` | 3867 |
+| `read` | 4600 |
 
-### Whole document: 6813 tokens
+### Whole document: 6937 tokens
 
 ### Envelope resident vs loaded cost
 
 | Envelope | Resident | Loaded |
 |---|---|---|
 | `cli` | 0 | on demand — see per-section/profile figures above |
-| `portable-blob` | 6813 | 6813 |
-| `skill` | 164 | 7062 |
-| `mcp-comparison` | 2253 | 2253 |
+| `portable-blob` | 6937 | 6937 |
+| `skill` | 164 | 7186 |
+| `mcp-comparison` | 2252 | 2252 |
 
 The MCP comparison point covers 23 command schemas, resident on every request whether or not the tool is called — see the PRD's Non-goals section.
