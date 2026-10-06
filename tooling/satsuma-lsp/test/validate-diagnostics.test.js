@@ -182,3 +182,48 @@ describe("runValidate", () => {
     }
   });
 });
+
+describe("ancestor-escape hint in editor diagnostics (sl-i9ve)", () => {
+  // GitHub #525: the editor showed only "Arrow source
+  // 'Order.LineItems.Order.OrderId' not declared", which reads like a tooling
+  // bug. Core now explains it; this proves the explanation survives the CLI
+  // --json round trip into the LSP diagnostic the user actually sees.
+  it("carries the ^. / $. suggestion into the diagnostic message", async () => {
+    const fs = require("node:fs");
+    const os = require("node:os");
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "satsuma-lsp-i9ve-"));
+    const file = path.join(dir, "flatten.stm");
+    fs.writeFileSync(
+      file,
+      [
+        "schema shop {",
+        "  Order record {",
+        "    OrderId STRING",
+        "    LineItems list_of record { SKU STRING }",
+        "  }",
+        "}",
+        "schema rows { order_id STRING }",
+        "mapping m {",
+        "  source { shop }",
+        "  target { rows }",
+        "  flatten Order.LineItems -> rows {",
+        "    Order.OrderId -> order_id",
+        "  }",
+        "}",
+        "",
+      ].join("\n"),
+    );
+    try {
+      const result = await runValidate(pathToFileURL(file).toString(), CLI_PATH);
+      const messages = [...result.values()]
+        .flat()
+        .filter((d) => d.code === "field-not-in-schema")
+        .map((d) => d.message);
+      assert.equal(messages.length, 1);
+      assert.match(messages[0], /paths inside 'flatten Order\.LineItems' are relative to it/);
+      assert.match(messages[0], /write '\^\.OrderId' or '\$\.Order\.OrderId'/);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});

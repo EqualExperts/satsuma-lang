@@ -277,3 +277,44 @@ describe("extractArrowRecords — ADR-053 ancestor escape paths", () => {
     assert.ok(escaped, "the parent escape resolves against each side's own container");
   });
 });
+
+describe("extractArrowRecords — authored paths and container on nested arrows (sl-i9ve)", () => {
+  it("records the container and the paths as written, alongside the resolved ones", () => {
+    // Validation needs what the author typed to explain a failed path; the
+    // resolved `sources` alone cannot say which part the container added.
+    const root = rootOf(`${MAPPING_HEADER}
+  flatten Order.LineItems -> t {
+    Order.OrderId -> .order_id
+  }
+}`);
+    const child = extractArrowRecords(root).find((r) => r.kind === "map");
+    assert.deepEqual(child.sources, ["Order.LineItems.Order.OrderId"]);
+    assert.deepEqual(child.nesting, {
+      containerKind: "flatten",
+      sourceContainer: "Order.LineItems",
+      targetContainer: "t",
+      authoredSources: ["Order.OrderId"],
+      authoredTarget: ".order_id",
+    });
+  });
+
+  it("records the innermost container for an arrow two blocks deep", () => {
+    // The hint must name the block the arrow is actually written in.
+    const root = rootOf(`${MAPPING_HEADER}
+  each a -> x {
+    each b -> .y {
+      .c -> .z
+    }
+  }
+}`);
+    const leaf = extractArrowRecords(root).find((r) => r.kind === "map");
+    assert.equal(leaf.nesting.containerKind, "each");
+    assert.equal(leaf.nesting.sourceContainer, "a.b");
+  });
+
+  it("leaves mapping-body arrows without nesting", () => {
+    // No container means nothing was prefixed and nothing needs explaining.
+    const root = rootOf(`${MAPPING_HEADER}  a -> b\n}`);
+    assert.equal(extractArrowRecords(root)[0].nesting, undefined);
+  });
+});

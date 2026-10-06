@@ -305,20 +305,23 @@ each LineItems -> .items {
 
 A common ETL pattern is taking a single source record with an array and producing one output row per array element. Satsuma makes this explicit with a `flatten` block inside the mapping:
 
+<!-- satsuma-check: schemas from examples/xml-to-parquet/pipeline.stm -->
 ```satsuma
 mapping `order lines` {
   source { `commerce_order` }
   target { `order_lines_parquet` }
 
-  flatten Order.LineItems -> order_lines {
-    Order.OrderId -> order_id
+  flatten Order.LineItems -> order_lines_parquet {
+    ^.OrderId -> order_id
     .SKU -> sku { trim | uppercase }
     .Quantity -> quantity
   }
 }
 ```
 
-The `flatten` block tells the reader: *"For each element in `LineItems`, emit one target row. Parent-level fields like `OrderId` are repeated."*
+The `flatten` block tells the reader: *"For each element in `LineItems`, emit one row of `order_lines_parquet`."*
+
+Every path inside the block is relative to the line item, so `.SKU` means `Order.LineItems.SKU`. Writing `Order.OrderId` inside the block would also be read relative to the line item, as `Order.LineItems.Order.OrderId`, which doesn't exist. To reach a field on the order itself, step up a level with `^.`: `^.OrderId` means `Order.OrderId`, repeated on every row. `$.` instead starts from the top of the schema.
 
 This is one of those patterns that's notoriously difficult to express in a spreadsheet. You'd typically need a separate tab or a paragraph of explanation. In Satsuma, it's a dedicated block and the nested arrow paths make the grain of the target table completely unambiguous.
 

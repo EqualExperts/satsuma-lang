@@ -105,6 +105,10 @@ Never use :: to join schema to field. Namespaces are optional.
   namespace::schema.field.nested_child   // nested record field
   schema.field                           // field (no namespace)
   .field                                 // relative field inside each/flatten
+  ^.field                                // parent escape inside each/flatten (ADR-053)
+  $.field                                // absolute from schema root inside each/flatten (ADR-053)
+  // Inside each/flatten every path is relative to the current element, dot or no
+  // dot: `parent.field` there means `<container>.parent.field`. Use ^. or $. to reach an ancestor.
 
 Cross-namespace references:
   source { raw::customers }

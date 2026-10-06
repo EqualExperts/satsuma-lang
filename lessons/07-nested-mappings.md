@@ -106,27 +106,38 @@ The agent handles the mechanical work of producing correct path expressions. You
 
 Sometimes you want to flatten a nested source into a flat target (one row per array element). Use a `flatten` block inside the mapping:
 
+<!-- satsuma-check: schemas from examples/xml-to-parquet/pipeline.stm -->
 ```satsuma
 mapping `order lines` {
   source { `commerce_order` }
   target { `order_lines_parquet` }
 
-  flatten Order.LineItems -> order_lines {
-    Order.OrderId -> order_id
+  flatten Order.LineItems -> order_lines_parquet {
     .LineNumber -> line_number
     .SKU -> sku { trim | uppercase }
     .Quantity -> quantity
     .UnitPrice -> unit_price
 
-    // Parent-level fields repeated on every row
-    Order.CurrencyCode -> currency_code { trim | uppercase }
-    Order.Channel -> order_channel { trim | lowercase }
-    Order.Customer.CustomerId -> customer_id
+    // Order-level fields, repeated on every row: ^. steps up from the line item to the order
+    ^.OrderId -> order_id
+    ^.CurrencyCode -> currency_code { trim | uppercase }
+    ^.Channel -> order_channel { trim | lowercase }
+    ^.Customer.CustomerId -> customer_id
   }
 }
 ```
 
-The `flatten` block tells downstream tools that this mapping produces one output row per element in `Order.LineItems`. Parent-level fields (like `OrderId`, `CurrencyCode`) are denormalized onto every row.
+The `flatten` block tells downstream tools that this mapping produces one output row per element in `Order.LineItems`.
+
+Every path inside the block is relative to the current line item, with or without the leading dot: `.SKU` and `SKU` both mean `Order.LineItems.SKU`. So `Order.OrderId` written inside the block would mean `Order.LineItems.Order.OrderId`, a field that doesn't exist, and the validator says so. To denormalise an order-level field onto every row, reach it with an ancestor prefix:
+
+| Prefix | Meaning inside `flatten Order.LineItems` | Example |
+|---|---|---|
+| `.` | the current line item | `.SKU` → `Order.LineItems.SKU` |
+| `^.` | one level up — the order | `^.OrderId` → `Order.OrderId` |
+| `$.` | the root of the source schema | `$.Order.OrderId` → `Order.OrderId` |
+
+Each extra `^.` climbs one more level (`^.^.`).
 
 ---
 

@@ -266,6 +266,81 @@ export function resolveAuthoredPathAgainstContainer(
 }
 
 /**
+ * How to reach, with an escape prefix, a field an authored path names at an
+ * enclosing level rather than under its container.
+ */
+export interface AncestorEscape {
+  /** The schema-root path the authored text names at an enclosing level. */
+  resolved: string;
+  /** The shortest `^.` spelling, or null when only `$.` reaches it. */
+  parentEscape: string | null;
+  /** The `$.` spelling, absolute from the schema root. */
+  rootEscape: string;
+}
+
+/**
+ * Explain a container-relative path that resolved to nothing (sl-i9ve, #525).
+ *
+ * Inside `flatten Order.LineItems`, the author of `Order.OrderId` almost
+ * always meant the order's field, but §4.4 resolves it under the container as
+ * `Order.LineItems.Order.OrderId`. This tries the authored text one enclosing
+ * level at a time, nearest first, and returns the escape-prefixed spellings
+ * that would reach the first level where `exists` accepts it.
+ *
+ * @param path      Path as authored. One that already carries an escape prefix
+ *                  gets no suggestion: its author has already chosen a level.
+ * @param container Absolute path the authored path was resolved against.
+ * @param exists    Whether a schema-root path names a declared field.
+ * @returns null when there is no container, the container is itself
+ *          undeclared (that is the real fault, reported on the container's own
+ *          arrow — moving the child would mislead), or no enclosing level
+ *          declares the path.
+ */
+export function findAncestorEscape(
+  path: string,
+  container: string | null,
+  exists: (rootPath: string) => boolean,
+): AncestorEscape | null {
+  if (!path || !container || path.startsWith(ROOT_ESCAPE) || path.startsWith(PARENT_ESCAPE)) {
+    return null;
+  }
+  if (!exists(container)) return null;
+  const relative = stripRelativityMarker(path);
+  const containerSegments = container.split(".");
+  for (let levels = 1; levels <= containerSegments.length; levels++) {
+    const ancestor = containerSegments.slice(0, containerSegments.length - levels);
+    const resolved = [...ancestor, relative].join(".");
+    if (exists(resolved)) {
+      return {
+        resolved,
+        parentEscape: shortestParentEscape(resolved, containerSegments),
+        rootEscape: `${ROOT_ESCAPE}${resolved}`,
+      };
+    }
+  }
+  return null;
+}
+
+/**
+ * The `^.` spelling of `resolved` from inside `containerSegments`: pop up to the
+ * deepest container level that is a prefix of `resolved`, then name the rest.
+ * Null when they share no prefix, since `$.` then says the same thing plainly.
+ */
+function shortestParentEscape(resolved: string, containerSegments: string[]): string | null {
+  const target = resolved.split(".");
+  let shared = 0;
+  while (
+    shared < containerSegments.length &&
+    shared < target.length - 1 &&
+    containerSegments[shared] === target[shared]
+  ) {
+    shared += 1;
+  }
+  if (shared === 0) return null;
+  return PARENT_ESCAPE.repeat(containerSegments.length - shared) + target.slice(shared).join(".");
+}
+
+/**
  * Advance an authored field expression through container qualification.
  *
  * Child paths are relative to the enclosing `each`, `flatten`, or nested-arrow

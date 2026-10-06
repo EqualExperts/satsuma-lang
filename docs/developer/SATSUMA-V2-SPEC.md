@@ -537,7 +537,10 @@ mapping `order lines` {
 }
 ```
 
-The `flatten` block iterates the source list and produces one target row per element. Fields outside the `flatten` block (like `Order.OrderId`) are repeated on every output row. Fields inside the block use `.` prefix to reference the current list element.
+The `flatten` block iterates the source list and produces one target row per element. Paths inside the block follow §4.4: every path is relative to the current list element, with or without the leading `.`, so `Order.OrderId` written inside this block resolves to `Order.LineItems.Order.OrderId` — not a declared field. An ancestor field is repeated on every output row in one of two ways:
+
+- write the arrow outside the `flatten` block, as `Order.OrderId -> order_id` is above; or
+- reach it from inside the block with an escape prefix (ADR-053): `^.OrderId` (one level up) or `$.Order.OrderId` (from the schema root).
 
 ### 4.7 Multi-Source Joins
 

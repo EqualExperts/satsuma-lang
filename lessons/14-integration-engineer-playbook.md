@@ -140,21 +140,22 @@ Integration engineering often involves mapping between formats with different ne
 
 ### Nested source to flat target (flattening)
 
+<!-- satsuma-check: schemas from examples/xml-to-parquet/pipeline.stm -->
 ```satsuma
 mapping `order lines` {
   source { `commerce_order` }
   target { `order_lines_parquet` }
 
-  flatten Order.LineItems -> order_lines {
-    Order.OrderId -> order_id
+  flatten Order.LineItems -> order_lines_parquet {
+    ^.OrderId -> order_id
     .LineNumber -> line_number
     .SKU -> sku { trim | uppercase }
-    Order.CurrencyCode -> currency_code { trim | uppercase }
+    ^.CurrencyCode -> currency_code { trim | uppercase }
   }
 }
 ```
 
-Parent-level fields (`OrderId`, `CurrencyCode`) are denormalized onto every output row.
+Paths inside the block are relative to the line item, so order-level fields (`OrderId`, `CurrencyCode`) are reached one level up with `^.` and denormalised onto every output row. Writing `Order.OrderId` inside the block would resolve to `Order.LineItems.Order.OrderId` and fail validation.
 
 ### Flat source to nested target
 

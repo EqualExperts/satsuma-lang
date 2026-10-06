@@ -933,6 +933,41 @@ export interface ExtractedArrow {
   /** 0-indexed column from CST startPosition. */
   startColumn: number;
   metadata?: MetaEntry[];
+  /**
+   * Present only on an arrow written inside an `each`, `flatten` or nested
+   * arrow body: the container it was resolved against and the paths as the
+   * author wrote them. `sources`/`target` above are already absolute, so this is
+   * the only record of what was typed — validation needs it to explain why a
+   * path that names an enclosing-level field failed (sl-i9ve).
+   */
+  nesting?: ArrowNesting;
+}
+
+/**
+ * The enclosing container of a nested arrow, and that arrow's paths as authored.
+ *
+ * `sourceContainer`/`targetContainer` are the absolute paths the authored paths
+ * were resolved against (spec §4.4); `authoredSources` is index-aligned with
+ * `ExtractedArrow.sources`.
+ */
+export interface ArrowNesting {
+  /** Declaration kind of the innermost enclosing container. */
+  containerKind: "nested" | "each" | "flatten";
+  /** Absolute source path of the container, or null when it has none. */
+  sourceContainer: string | null;
+  /** Absolute target path of the container, or null when it has none. */
+  targetContainer: string | null;
+  /** Each source path exactly as written, before container resolution. */
+  authoredSources: string[];
+  /** The target path exactly as written, or null for a target-less arrow. */
+  authoredTarget: string | null;
+}
+
+/** The container an arrow body is resolved against; null at mapping-body level. */
+interface EnclosingContainer {
+  kind: ArrowNesting["containerKind"];
+  source: string | null;
+  target: string | null;
 }
 
 /**
@@ -977,7 +1012,7 @@ export function extractMappingArrowRecords(
   if (!body) return [];
 
   const records: ExtractedArrow[] = [];
-  collectArrowRecords(body.namedChildren, labelText(mappingNode), namespace, null, null, records);
+  collectArrowRecords(body.namedChildren, labelText(mappingNode), namespace, null, records);
   return records;
 }
 
@@ -1030,39 +1065,43 @@ export function qualifyChildArrowPath(path: string, containerPath: string | null
  * Recursively collect arrow records from a list of sibling CST nodes,
  * appending to `records` in document order.
  *
- * `parentSrc`/`parentTgt` are the absolute paths of the enclosing container
- * (null at mapping-body level). A container's own record already has the
- * parent prefixes applied, so its source/target become the prefixes for the
- * next level down — accumulating across arbitrary depth (sl-zl55).
+ * `enclosing` is the container these nodes sit in (null at mapping-body
+ * level). A container's own record already has the parent prefixes applied, so
+ * its source/target become the prefixes for the next level down — accumulating
+ * across arbitrary depth (sl-zl55).
  */
 function collectArrowRecords(
   nodes: SyntaxNode[],
   mappingName: string | null,
   namespace: string | null,
-  parentSrc: string | null,
-  parentTgt: string | null,
+  enclosing: EnclosingContainer | null,
   records: ExtractedArrow[],
 ): void {
   for (const node of nodes) {
     switch (node.type) {
       case "map_arrow":
       case "computed_arrow":
-        records.push(extractSingleArrow(node, mappingName, namespace, parentSrc, parentTgt));
+        records.push(extractSingleArrow(node, mappingName, namespace, enclosing));
         break;
 
       case "nested_arrow":
       case "each_block":
       case "flatten_block": {
-        const container = extractSingleArrow(node, mappingName, namespace, parentSrc, parentTgt);
+        const container = extractSingleArrow(node, mappingName, namespace, enclosing);
         records.push(container);
         // nested_arrow / each / flatten declare exactly one src_path, so the
         // container's single (already absolute) source is the child prefix.
+        // This case only admits the three nesting node types, so the kind is
+        // always "nested", "each" or "flatten".
         collectArrowRecords(
           node.namedChildren,
           mappingName,
           namespace,
-          container.sources[0] ?? null,
-          container.target,
+          {
+            kind: container.kind as EnclosingContainer["kind"],
+            source: container.sources[0] ?? null,
+            target: container.target,
+          },
           records,
         );
         break;
@@ -1076,30 +1115,33 @@ function collectArrowRecords(
 }
 
 /**
- * Extract a single arrow record, optionally prefixing source/target with parent paths.
+ * Extract a single arrow record, resolving its paths against `enclosing` when
+ * it sits inside a container.
  */
 function extractSingleArrow(
   arrow: SyntaxNode,
   mappingName: string | null,
   namespace: string | null,
-  parentSrc: string | null,
-  parentTgt: string | null,
+  enclosing: EnclosingContainer | null,
 ): ExtractedArrow {
   const srcNodes = children(arrow, "src_path");
   const tgtNode = child(arrow, "tgt_path");
   const pipeChain = child(arrow, "pipe_chain");
   const pipeSteps = pipeChain ? children(pipeChain, "pipe_step") : [];
 
-  let sources: string[] = srcNodes
+  const authoredSources: string[] = srcNodes
     .map((n) => cleanPathText(pathText(n)))
     .filter((s): s is string => s !== null);
-  let target = cleanPathText(pathText(tgtNode));
+  const authoredTarget = cleanPathText(pathText(tgtNode));
   const classification = classifyTransform(pipeSteps);
   const derived = classifyArrow(arrow);
   const steps = decomposePipeSteps(pipeSteps);
 
-  sources = sources.map((s) => qualifyChildArrowPath(s, parentSrc));
-  target = target === null ? null : qualifyChildArrowPath(target, parentTgt);
+  const sources = authoredSources.map((s) => qualifyChildArrowPath(s, enclosing?.source ?? null));
+  const target =
+    authoredTarget === null
+      ? null
+      : qualifyChildArrowPath(authoredTarget, enclosing?.target ?? null);
 
   // Canonical (layout-independent) so two arrows that differ only in how
   // the formatter laid out the chain or a map literal compare equal — diff
@@ -1126,6 +1168,15 @@ function extractSingleArrow(
 
   if (metadata && metadata.length > 0) {
     record.metadata = metadata;
+  }
+  if (enclosing) {
+    record.nesting = {
+      containerKind: enclosing.kind,
+      sourceContainer: enclosing.source,
+      targetContainer: enclosing.target,
+      authoredSources,
+      authoredTarget,
+    };
   }
 
   return record;

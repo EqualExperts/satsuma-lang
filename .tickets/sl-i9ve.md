@@ -1,6 +1,6 @@
 ---
 id: sl-i9ve
-status: open
+status: closed
 deps: []
 links: [sl-ui5d, sl-8vqk]
 created: 2026-09-29T07:27:22Z
@@ -36,3 +36,10 @@ Column: `ExtractedArrow.column` already exists but validate.ts hard-codes `colum
 - LSP semantic-diagnostics test confirms the hint reaches the editor diagnostic.
 - No change to coverage or lineage for any example in examples/.
 - No Playwright needed: diagnostic text only.
+
+## Notes
+
+**2026-10-06T06:30:58Z**
+
+Cause: `ExtractedArrow` kept only the container-resolved paths, so validate could report `Order.LineItems.Order.OrderId` but not that the container had been prefixed onto what the author wrote.
+Fix: Nested arrows now carry `nesting` (container kind, container paths, authored paths). On field-not-in-schema, core's `findAncestorEscape` tries the authored path at each enclosing level and the message names the block and the `^.`/`$.` spelling (ADR-053 escapes now exist, so the hint suggests them rather than moving the arrow). No hint for typos, escaped paths, or children of an undeclared container. Core, extraction and LSP (real-CLI) tests added; example findings unchanged. (commit immediately after 20aec326)
