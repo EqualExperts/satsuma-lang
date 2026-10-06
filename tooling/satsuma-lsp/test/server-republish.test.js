@@ -23,6 +23,10 @@ function makeWorkspace(files) {
   return { root, uri: (name) => pathToFileURL(path.join(root, name)).toString() };
 }
 
+// LSP FileChangeType values for workspace/didChangeWatchedFiles (LSP 3.17 spec).
+const FILE_CHANGED = 2;
+const FILE_DELETED = 3;
+
 const hasCode = (code) => (diags) => diags.some((d) => d.code === code);
 const lacksCode = (code) => (diags) => !diags.some((d) => d.code === code);
 
@@ -80,5 +84,37 @@ describe("republishing other open documents after an edit (bsw-r1wl)", () => {
     client.notify("textDocument/didClose", { textDocument: { uri: workspace.uri("b.stm") } });
 
     await client.waitForDiagnostics(a, seenA, hasCode("duplicate-definition"));
+  });
+
+  it("clears an importer's duplicate-definition when a closed file is renamed on disk", async () => {
+    // b is closed now, so the client reports edits to it only as a watched-file
+    // change. No open document changes, so only the watched-files handler can
+    // republish a; before the fix a kept its stale duplicate.
+    const a = workspace.uri("a.stm");
+    const seenA = client.publishCount(a);
+    fs.writeFileSync(path.join(workspace.root, "b.stm"), "schema y {\n  id INT\n}\n");
+    client.notify("workspace/didChangeWatchedFiles", {
+      changes: [{ uri: workspace.uri("b.stm"), type: FILE_CHANGED }],
+    });
+
+    await client.waitForDiagnostics(a, seenA, lacksCode("duplicate-definition"));
+  });
+
+  it("clears an importer's duplicate-definition when a closed file is deleted on disk", async () => {
+    // Put b's `schema x` back so the duplicate is real again, then delete b.
+    // The deletion removes b from the index, so a's duplicate must clear.
+    const a = workspace.uri("a.stm");
+    const b = workspace.uri("b.stm");
+    const bPath = path.join(workspace.root, "b.stm");
+    let seenA = client.publishCount(a);
+    fs.writeFileSync(bPath, "schema x {\n  id INT\n}\n");
+    client.notify("workspace/didChangeWatchedFiles", { changes: [{ uri: b, type: FILE_CHANGED }] });
+    await client.waitForDiagnostics(a, seenA, hasCode("duplicate-definition"));
+
+    seenA = client.publishCount(a);
+    fs.rmSync(bPath);
+    client.notify("workspace/didChangeWatchedFiles", { changes: [{ uri: b, type: FILE_DELETED }] });
+
+    await client.waitForDiagnostics(a, seenA, lacksCode("duplicate-definition"));
   });
 });
