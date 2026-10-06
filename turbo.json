@@ -21,6 +21,11 @@
   // rather than same-package. Adding a cross-package dependency to a
   // package.json is therefore the only edit needed to change the build order.
 
+  // From 2.11, turbo appends a managed block to AGENTS.md whenever it detects
+  // an AI agent. Its top-level heading fails markdownlint (MD025), which would
+  // break the pre-commit hook for every agent session, so we opt out.
+  "agentGuidance": false,
+
   // Files outside any single package that nonetheless feed its build or tests.
   // A change to one of these invalidates every task's cache, because turbo
   // hashes only a package's own directory by default and would otherwise serve
