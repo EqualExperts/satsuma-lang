@@ -18,14 +18,17 @@ import { createServer } from "node:http";
 import { readFile } from "node:fs/promises";
 import { join, extname, normalize, dirname, sep } from "node:path";
 import { fileURLToPath } from "node:url";
+import harnessPorts from "./harness-ports.cjs";
+
+const { DEFAULT_PLAYGROUND_PORT, PLAYGROUND_PORT_ENV, portFromEnv } = harnessPorts;
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
 /** The bundle emitted by build-playground.mjs (npm run build:playground). */
 const ROOT = join(HERE, "..", "dist", "playground");
 
-/** Distinct from the dev server's 3333 so both Playwright projects coexist. */
-const PORT = 3334;
+/** $SATSUMA_PLAYGROUND_PORT, else 3334 — distinct from the fixture server's port (see harness-ports.cjs). */
+const PORT = portFromEnv(PLAYGROUND_PORT_ENV, DEFAULT_PLAYGROUND_PORT);
 
 /** Mirrors the GitHub Pages deployment prefix — the non-root path under test. */
 const BASE_PATH = "/satsuma-lang/playground/";
@@ -67,7 +70,7 @@ createServer(async (req, res) => {
     res.end("Not found");
   }
   // Bind to loopback only: the playground is a single-machine dev tool.
-  // Port 3334 serves the assembled static bundle; it has no reason to be off-box.
+  // The playground port serves the assembled static bundle; it has no reason to be off-box.
 }).listen(PORT, "127.0.0.1", () => {
   console.log(`[playground-static] serving ${ROOT} at http://localhost:${PORT}${BASE_PATH}`);
 });

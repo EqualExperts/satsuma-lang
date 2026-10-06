@@ -16,6 +16,12 @@
 
 import { existsSync } from "node:fs";
 import { defineConfig, devices } from "@playwright/test";
+import {
+  findFreePortsSync,
+  HARNESS_PORT_ENV,
+  PLAYGROUND_PORT_ENV,
+  portFromEnv,
+} from "./scripts/harness-ports.cjs";
 
 /*
  * Chromium executable resolution.
@@ -48,6 +54,27 @@ const CHROMIUM_LAUNCH = {
   args: CHROMIUM_ARGS,
 };
 
+/*
+ * Server ports. Each run gets two free ports of its own, so runs in different
+ * worktrees — or two agents committing at once — no longer fight over fixed
+ * ones. A port set in the environment wins, which lets a caller pin them.
+ *
+ * The chosen ports are written back to process.env, and that is load-bearing:
+ * Playwright re-evaluates this file in every worker process, and workers
+ * inherit this process's environment. Writing the ports back makes every
+ * worker read the same values instead of each picking fresh ones, and passes
+ * them to the two server commands below, which read the same variables.
+ */
+if (!process.env[HARNESS_PORT_ENV] || !process.env[PLAYGROUND_PORT_ENV]) {
+  const [harness, playground] = findFreePortsSync(2);
+  process.env[HARNESS_PORT_ENV] ||= String(harness);
+  process.env[PLAYGROUND_PORT_ENV] ||= String(playground);
+}
+const HARNESS_PORT = portFromEnv(HARNESS_PORT_ENV, 0);
+const PLAYGROUND_PORT = portFromEnv(PLAYGROUND_PORT_ENV, 0);
+const HARNESS_URL = `http://127.0.0.1:${HARNESS_PORT}`;
+const PLAYGROUND_URL = `http://127.0.0.1:${PLAYGROUND_PORT}/satsuma-lang/playground/`;
+
 export default defineConfig({
   testDir: "./test",
   /* Maximum time one test can run */
@@ -57,7 +84,7 @@ export default defineConfig({
   /* Reporter: show each test name with status */
   reporter: "list",
   use: {
-    baseURL: "http://127.0.0.1:3333",
+    baseURL: HARNESS_URL,
     /* Capture trace on failure for debugging */
     trace: "on-first-retry",
   },
@@ -71,7 +98,7 @@ export default defineConfig({
       // Semantic suite only — *.test.ts. Screenshot review specs live in
       // *.spec.ts and run under the dedicated screenshots project so a
       // contributor can choose to run only one or the other. The static
-      // playground suite runs against the OTHER server (port 3334), so it is
+      // playground suite runs against the OTHER server (the playground port), so it is
       // excluded here and owned by the playground-static project below.
       testMatch: /.*\.test\.ts$/,
       testIgnore: /playground-static/,
@@ -95,7 +122,7 @@ export default defineConfig({
       use: {
         ...devices["Desktop Chrome"],
         launchOptions: CHROMIUM_LAUNCH,
-        baseURL: "http://127.0.0.1:3334/satsuma-lang/playground/",
+        baseURL: PLAYGROUND_URL,
       },
       testMatch: /playground-static\.test\.ts$/,
     },
@@ -109,13 +136,13 @@ export default defineConfig({
   webServer: [
     {
       command: "node dist/server.js",
-      url: "http://127.0.0.1:3333",
+      url: HARNESS_URL,
       reuseExistingServer: false,
       timeout: 15_000,
     },
     {
       command: "node scripts/build-playground.mjs && node scripts/serve-playground.mjs",
-      url: "http://127.0.0.1:3334/satsuma-lang/playground/index.html",
+      url: `${PLAYGROUND_URL}index.html`,
       reuseExistingServer: false,
       timeout: 15_000,
     },

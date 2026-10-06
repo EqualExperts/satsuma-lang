@@ -2,7 +2,7 @@
  * playground-static.test.ts — the published bundle under a non-root base path.
  *
  * Runs ONLY in the playground-static Playwright project, whose baseURL is
- * http://localhost:3334/satsuma-lang/playground/ — a dumb static file server
+ * <playground port>/satsuma-lang/playground/ — a dumb static file server
  * (scripts/serve-playground.mjs) reproducing the GitHub Pages topology. The
  * regular suite exercises the dev server; these tests prove the BUNDLE:
  *   1. It loads and renders a seeded example with every request resolving

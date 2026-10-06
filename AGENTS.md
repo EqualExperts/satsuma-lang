@@ -72,9 +72,9 @@ Before closing a ticket, assess whether logic you've added or modified in a cons
 
 ## Code Readability
 
-**The satsuma-lang tooling is intended to be a teaching example** — the kind of codebase a developer can read to learn how to build a tree-sitter-backed language toolchain well. Every file should meet that bar. When in doubt, ask: *would a capable developer unfamiliar with this system understand what this code does, why it exists, and how it fits the whole — just by reading it?*
+**The satsuma-lang tooling is intended to be a teaching example** — the kind of codebase a developer can read to learn how to build a tree-sitter-backed language toolchain well. Every file should meet that bar. When in doubt, ask: _would a capable developer unfamiliar with this system understand what this code does, why it exists, and how it fits the whole — just by reading it?_
 
-Write code in the spirit of Literate Programming and Clean Code: code should read as a clear explanation of *what* it does and *why*, not just a sequence of instructions for the machine. Functions should be small and focused. Names should communicate intent. Business rules should be visible, not buried.
+Write code in the spirit of Literate Programming and Clean Code: code should read as a clear explanation of _what_ it does and _why_, not just a sequence of instructions for the machine. Functions should be small and focused. Names should communicate intent. Business rules should be visible, not buried.
 
 - **Module-level comments** — every non-trivial module must open with a comment explaining its purpose, what it owns, and what it does not own. A reader skimming the file should understand its role in the system within the first five lines.
 - **Function doc-comments** — exported functions must have a doc-comment that states the contract (inputs, outputs, invariants). Private helpers need a comment only when their intent is non-obvious. A doc-comment that merely restates the function name adds noise — say something a reader couldn't infer from the signature alone.
@@ -99,7 +99,7 @@ Write code in the spirit of Literate Programming and Clean Code: code should rea
 
 Tests should be high-value and low-inertia. A test suite is an asset only when the cost of maintaining it is lower than the cost of not having it.
 
-- **Every test must have a purpose comment.** Each `it()`/`test()` block must open with a comment (or use the description string itself) explaining *why* this case exists and *what property* it validates — not just a restatement of what the code does. A future reader must understand at a glance whether a failing test represents a regression or an outdated expectation.
+- **Every test must have a purpose comment.** Each `it()`/`test()` block must open with a comment (or use the description string itself) explaining _why_ this case exists and _what property_ it validates — not just a restatement of what the code does. A future reader must understand at a glance whether a failing test represents a regression or an outdated expectation.
 - **No redundant tests.** When consolidating logic into a shared module, consolidate the tests too. Do not keep tests in consumer packages that merely re-test the same behaviour already covered in the core module's test suite. Test each invariant once, at the right level of abstraction.
 - **Test inputs should be minimal.** Use the smallest Satsuma snippet that exercises the case. Avoid copying full example files into test fixtures unless the whole-file structure is what is under test.
 - **No smoke tests.** Do not write tests that only verify a function returns without throwing, or that a known-valid input produces a non-null result. Every assertion should validate a specific, meaningful property of the output.
@@ -139,7 +139,7 @@ the response to the user — not silently in your own reasoning:
 
 1. **Is there a property here a unit test cannot observe?** If the change only
    alters what a function returns, a unit test suffices — say so and move on.
-   If the change alters what gets *painted* or what a *user gesture* triggers
+   If the change alters what gets _painted_ or what a _user gesture_ triggers
    (a CSS class after a hover, a section expanding after a click, an element's
    computed style), no amount of getter-level testing proves it; only a
    rendered browser can.
@@ -186,14 +186,17 @@ sl-d7fz fell through.
 Notes:
 
 - `pre`-script: the harness's `pretest` runs `turbo run build
-  --filter=@satsuma/viz-harness`, so a bare `npm test` rebuilds the harness and
-always tests current bundles. It is now the only surviving `pretest` in the
-repo; do not infer that other packages still have build hooks (see
-[Building and testing](#building-and-testing)).
+--filter=@satsuma/viz-harness`, so a bare `npm test` rebuilds the harness and
+  always tests current bundles. It is now the only surviving `pretest` in the
+  repo; do not infer that other packages still have build hooks (see
+  [Building and testing](#building-and-testing)).
 - A developer machine without `/usr/bin/chromium` needs the bundled browser
   once: `npx playwright install chromium` (the config falls back to it).
-- If a stale server is occupying :3333/:3334, Playwright's `webServer` will
-  report `EADDRINUSE`; kill it (`pkill -f "node dist/server.js"`) and rerun.
+- Each run picks two free ports for its fixture and playground servers, so
+  runs in different worktrees, or two agents committing at once, run side by
+  side. To pin them, set `SATSUMA_HARNESS_PORT` and `SATSUMA_PLAYGROUND_PORT`.
+  `npm run dev` still serves on 3333 unless `SATSUMA_HARNESS_PORT` says
+  otherwise.
 - If you add a Playwright spec for a visual element only a browser can prove
   (per the checklist above), it must actually pass here before the task is done —
   do not defer it to a follow-up ticket.
@@ -243,17 +246,17 @@ cross-package build order is **derived from the dependency graph in the
 manifests** — it is not written down as a sequence anywhere, so changing it means
 editing a package's `dependencies`/`devDependencies`, nothing else (ADR-049).
 
-| What you want | Command |
-|---|---|
-| Install and build everything | `npm run install:all` |
-| Rebuild everything | `npm run build:all` |
-| Run every package's tests and typechecks | `npm run test:all` |
-| Work on one package | `turbo run test --filter=<package>` |
-| Coverage for every package that reports it | `npm run test:coverage` |
-| The repo-level scripts' own tests | `npm run test:scripts` |
-| Everything the pre-commit hook runs | `./scripts/run-repo-checks.sh` |
-| Run the viz harness Playwright suite (headless Chromium) | `npx turbo run test --filter=@satsuma/viz-harness`, or `npm --prefix tooling/satsuma-viz-harness test` after `build:all` — see [Viz harness Playwright tests](#viz-harness-playwright-tests) |
-| Preview the current viz UI locally | `npx turbo run build --filter=@satsuma/viz-harness && npm --prefix tooling/satsuma-viz-harness run dev`, then open <http://localhost:3333> — see [tooling/satsuma-viz-harness/README.md](tooling/satsuma-viz-harness/README.md#running-the-dev-server-locally-live-preview-not-playwright). Claude Code users can just run `/viz-dev`. |
+| What you want                                            | Command                                                                                                                                                                                                                                                                                                                                |
+| -------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Install and build everything                             | `npm run install:all`                                                                                                                                                                                                                                                                                                                  |
+| Rebuild everything                                       | `npm run build:all`                                                                                                                                                                                                                                                                                                                    |
+| Run every package's tests and typechecks                 | `npm run test:all`                                                                                                                                                                                                                                                                                                                     |
+| Work on one package                                      | `turbo run test --filter=<package>`                                                                                                                                                                                                                                                                                                    |
+| Coverage for every package that reports it               | `npm run test:coverage`                                                                                                                                                                                                                                                                                                                |
+| The repo-level scripts' own tests                        | `npm run test:scripts`                                                                                                                                                                                                                                                                                                                 |
+| Everything the pre-commit hook runs                      | `./scripts/run-repo-checks.sh`                                                                                                                                                                                                                                                                                                         |
+| Run the viz harness Playwright suite (headless Chromium) | `npx turbo run test --filter=@satsuma/viz-harness`, or `npm --prefix tooling/satsuma-viz-harness test` after `build:all` — see [Viz harness Playwright tests](#viz-harness-playwright-tests)                                                                                                                                           |
+| Preview the current viz UI locally                       | `npx turbo run build --filter=@satsuma/viz-harness && npm --prefix tooling/satsuma-viz-harness run dev`, then open <http://localhost:3333> — see [tooling/satsuma-viz-harness/README.md](tooling/satsuma-viz-harness/README.md#running-the-dev-server-locally-live-preview-not-playwright). Claude Code users can just run `/viz-dev`. |
 
 `--filter` takes a package's **declared name**, not its directory:
 `@satsuma/core`, `@satsuma/lsp`, `satsuma-cli`, `tree-sitter-satsuma`. It pulls in
@@ -276,7 +279,7 @@ Two more consequences worth knowing:
   identical inputs mean identical outputs. To force real work anyway (proving a
   cold build, or debugging the cache itself), use `turbo run build --force`.
   Deleting the cache is not the tool for this: from a linked worktree under
-  `.worktrees/`, turbo shares the *primary* worktree's cache and `clean:all`'s
+  `.worktrees/`, turbo shares the _primary_ worktree's cache and `clean:all`'s
   `.turbo` entry is a no-op.
 - **One suite is deliberately outside `test:all`.** `tree-sitter-satsuma`'s `test`
   shells out to `tree-sitter test --wasm`, which needs its own environment and
@@ -379,7 +382,7 @@ When the grammar is stable enough for structural search and lint, create `sgconf
 # sgconfig.yml
 customLanguages:
   satsuma:
-    libraryPath: tooling/tree-sitter-satsuma/build/satsuma.dylib  # or .so on Linux
+    libraryPath: tooling/tree-sitter-satsuma/build/satsuma.dylib # or .so on Linux
     extensions: [stm]
     expandoChar: _
 ```
@@ -395,7 +398,6 @@ implemented as `ast-grep scan` rules.
 ## Issue Tracking
 
 This project uses a CLI ticket system for task management. Run `tk help` when you need to use it.
-
 
 Expected workflow:
 
@@ -442,7 +444,7 @@ Expected workflow:
 - If a requested change would contradict the spec, stop and raise the conflict clearly.
 - For work in `tooling/tree-sitter-satsuma/`, treat corpus tests in `tooling/tree-sitter-satsuma/test/corpus/` and generated parser artifacts as part of the implementation surface.
 - When changing the tree-sitter grammar, update the grammar source, regenerate parser outputs as needed, and verify the corpus fixtures.
-- **Before opening a PR**, review the commits on the branch and ask: *does this change represent an architectural decision that should be recorded?* Use `/adr-draft` to assess and draft. If an ADR is warranted, check with the user, draft it in `adrs/`, and mark any superseded ADRs (ADR bodies are immutable — the only permitted edits are the Status line and repointing a file path that moved). Include the ADR files in the PR commit. See `skills/adr-draft/SKILL.md` for the full assessment criteria and format.
+- **Before opening a PR**, review the commits on the branch and ask: _does this change represent an architectural decision that should be recorded?_ Use `/adr-draft` to assess and draft. If an ADR is warranted, check with the user, draft it in `adrs/`, and mark any superseded ADRs (ADR bodies are immutable — the only permitted edits are the Status line and repointing a file path that moved). Include the ADR files in the PR commit. See `skills/adr-draft/SKILL.md` for the full assessment criteria and format.
 
 ### Installing the pre-commit hook
 
@@ -476,9 +478,10 @@ instantly with no check output is the signature of an uninstalled hook.
    criteria, and acceptance tests before writing any code.
 2. Write failing tests first (TDD) where practical.
 3. Implement the smallest change that makes the tests pass. Always do the RIGHT thing, not the FAST thing, so never hack tests or add lint ignore rules because that's easier than fixing the underlying issue.
-6. Update `docs/product-owner/PROJECT-OVERVIEW.md` if the architecture changes.
+4. Update `docs/product-owner/PROJECT-OVERVIEW.md` if the architecture changes.
 
 ## Ralph Loops
+
 When you are implementing a whole feature in a Ralph Loop, and have finished all related tk (ticket) tasks such that there are no remaining ready tasks, emit <PROMISE>DONE</PROMISE> to signal completion of the feature.
 
-* Commit your changes after each tk task completes (AND after you have proven that tests are passing and you have added any new coverage and documentation updates).
+- Commit your changes after each tk task completes (AND after you have proven that tests are passing and you have added any new coverage and documentation updates).
