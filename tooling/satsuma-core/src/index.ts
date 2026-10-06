@@ -147,18 +147,15 @@ export {
   stringText,
   entryText,
   qualifiedNameText,
+  pathSegmentText,
+  importNameText,
+  spreadLabelText,
   sourceRefText,
   sourceRefStructuralText,
   fieldNameText,
   walkDescendants,
 } from "./cst-utils.js";
-export {
-  arrowPathParts,
-  arrowPathText,
-  pathSegmentText,
-  renderArrowPath,
-  resolveArrowPath,
-} from "./arrow-path.js";
+export { arrowPathParts, arrowPathText, renderArrowPath, resolveArrowPath } from "./arrow-path.js";
 export type { ArrowPathAnchor, ArrowPathParts, ResolvedArrowPath } from "./arrow-path.js";
 export {
   isAnnotationComment,

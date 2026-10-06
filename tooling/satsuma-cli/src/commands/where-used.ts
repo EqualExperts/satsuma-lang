@@ -23,7 +23,12 @@ import { loadWorkspace } from "../load-workspace.js";
 import { runCommand, CommandError, EXIT_NOT_FOUND } from "../command-runner.js";
 import { resolveIndexKey, canonicalKey } from "../index-builder.js";
 import { resolveAllNLRefs } from "../nl-ref-extract.js";
-import { stripNLRefScopePrefix, resolveScopedEntityRef } from "@satsuma/core";
+import {
+  stripNLRefScopePrefix,
+  resolveScopedEntityRef,
+  spreadLabelText,
+  importNameText,
+} from "@satsuma/core";
 import type { SyntaxNode, ExtractedWorkspace, ParsedFile } from "../types.js";
 
 interface Ref {
@@ -301,23 +306,9 @@ function walkForSpreads(
       const lbl = c.namedChildren.find(
         (x) => x.type === "spread_label" || x.type === "block_label",
       );
-      let sname = "";
-      if (lbl) {
-        const q = lbl.namedChildren.find((x) => x.type === "backtick_name");
-        if (q) {
-          sname = q.text.slice(1, -1);
-        } else {
-          sname = lbl.namedChildren
-            .filter(
-              (x) =>
-                x.type === "identifier" ||
-                x.type === "continuation_word" ||
-                x.type === "qualified_name",
-            )
-            .map((x) => x.text)
-            .join(" ");
-        }
-      }
+      // Core's spreadLabelText unquotes every name form, including a
+      // backtick name after `::` (bsw-iuzs).
+      const sname = lbl ? spreadLabelText(lbl) : "";
       if (sname && resolveScopedEntityRef(sname, namespace, fragments) === fragmentKey) {
         results.push({ block: blockName, row: c.startPosition.row });
       }
@@ -392,7 +383,7 @@ function walkForTransformCalls(
       // Check for fragment_spread inside pipe_step (transform spread: ...name)
       if (inner?.type === "fragment_spread") {
         const lbl = inner.namedChildren.find((x) => x.type === "spread_label");
-        if (bindsToTarget(getSpreadName(lbl))) {
+        if (lbl !== undefined && bindsToTarget(spreadLabelText(lbl))) {
           results.push({ mapping: mappingName, row: c.startPosition.row });
         }
       }
@@ -403,16 +394,6 @@ function walkForTransformCalls(
   }
 }
 
-function getSpreadName(lbl: SyntaxNode | undefined): string {
-  if (!lbl) return "";
-  const q = lbl.namedChildren.find((x) => x.type === "backtick_name");
-  if (q) return q.text.slice(1, -1);
-  return lbl.namedChildren
-    .filter((x) => x.type === "identifier" || x.type === "qualified_name")
-    .map((x) => x.text)
-    .join(" ");
-}
-
 /**
  * Find import declarations that reference `name` in their import list.
  */
@@ -420,17 +401,12 @@ function findImportRefs(rootNode: SyntaxNode, name: string): Array<{ path: strin
   const results: Array<{ path: string; row: number }> = [];
   for (const c of rootNode.namedChildren) {
     if (c.type !== "import_decl") continue;
-    // Check each import_name child
-    const importedNames: string[] = [];
-    for (const child of c.namedChildren) {
-      if (child.type === "import_name") {
-        // import_name wraps a quoted_name, identifier, or qualified_name
-        let text = child.text;
-        if (text.startsWith("'") && text.endsWith("'")) text = text.slice(1, -1);
-        if (text.startsWith("`") && text.endsWith("`")) text = text.slice(1, -1);
-        importedNames.push(text);
-      }
-    }
+    // Each import_name is read through core, so a quoted name in any form
+    // (`` `a b` ``, `` ns::`a b` ``) compares unquoted (bsw-iuzs).
+    const importedNames = c.namedChildren
+      .filter((x) => x.type === "import_name")
+      .map(importNameText)
+      .filter((n): n is string => n !== null);
     if (importedNames.some((n) => n === name)) {
       const pathNode = c.namedChildren.find((x) => x.type === "import_path");
       const pathStr =

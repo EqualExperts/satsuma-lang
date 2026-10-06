@@ -545,7 +545,7 @@ permalink: examples.html
   }
 
   <span class="keyword">mapping</span> <span class="string">`load hub_store`</span> {
-    <span class="keyword">source</span> { <span class="field">`pos::stores`</span> }
+    <span class="keyword">source</span> { <span class="field">pos::stores</span> }
     <span class="keyword">target</span> { <span class="field">`hub_store`</span> }
 
     STORE_ID <span class="operator">-></span> store_hk   { <span class="function">md5</span>(STORE_ID) }
@@ -635,7 +635,7 @@ permalink: examples.html
                 <pre class="text-sm"><code class="stm"><span class="keyword">namespace</span> <span class="field">staging</span> (<span class="constraint">note <span class="string">"Cleaned and conformed staging area"</span></span>) {
   <span class="comment">// Map HR employees to staging — source is in merged namespace block</span>
   <span class="keyword">mapping</span> <span class="string">`stage employees`</span> {
-    <span class="keyword">source</span> { <span class="field">`source::hr_employees`</span> }
+    <span class="keyword">source</span> { <span class="field">source::hr_employees</span> }
     <span class="keyword">target</span> { <span class="field">`stg_employees`</span> }
 
     employee_id <span class="operator">-></span> employee_hk  { <span class="field">hash_key</span> }

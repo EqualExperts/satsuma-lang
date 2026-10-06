@@ -22,7 +22,9 @@ file             = { import_stmt | note_block | namespace | schema | fragment | 
 
 import_stmt      = "import" "{" name_list "}" "from" STRING ;
 name_list        = name_ref {"," name_ref} ;
-name_ref         = label | label "::" label ;
+name_ref         = label | IDENT "::" label ;
+(* Quote only the name after ::, as in raw::`crm contacts`. A namespace name is never quoted.
+   Backticks around the whole qualified name still parse but are deprecated *)
 
 note_block       = "note" "{" (STRING | TRIPLESTRING) "}" ;
 
@@ -40,7 +42,7 @@ enum_items       = value {"," value} ;
 schema_body      = { field_decl | spread | note_block | COMMENT } ;
 field_decl       = (IDENT | BACKTICK_IDENT) [type_expr] ["(" metadata ")"] ["{" schema_body "}"] ;
 type_expr        = TYPE ["(" params ")"] | "record" | "list_of" TYPE ["(" params ")"] | "list_of" "record" ;
-spread           = "..." label ;
+spread           = "..." (label | IDENT "::" label) ;
 
 (* A metric is a schema block decorated with (metric, ...) metadata — not a separate block type. *)
 (* metric_entry tags: metric_name STRING | source (name_ref | "{" name_list "}") | grain IDENT  *)
@@ -66,7 +68,7 @@ pipe_step        = spread | IDENT ["(" params ")"] | ARITH NUMBER | "map" "{" ma
 map_entries      = { map_key ":" value } ;
 map_key          = value | "<" NUMBER | "default" | "_" | "null" ;
 
-field_path       = ["."] [label "::"] segment {"." segment}
+field_path       = ["."] [IDENT "::"] segment {"." segment}
                  | ("^." {"^."} | "$.") segment {"." segment} ;
 (* Inside each/flatten: each ^. goes up one enclosing level; $. starts from the schema root (ADR-053) *)
 (* No whitespace or comment after ".", "^." or "$." or between segments: `^. x` and `a. b` are parse errors *)

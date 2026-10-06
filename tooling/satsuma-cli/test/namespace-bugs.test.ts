@@ -232,3 +232,41 @@ describe("namespace output canonicalization regressions", () => {
     );
   });
 });
+
+// A namespaced name that needs quoting is written ns::`name` (bsw-iuzs). The
+// fixture uses that form in an import, a spread, a (ref) value and a mapping
+// source, all naming declarations in defs.stm.
+const BACKTICK_NAME_FIXTURE = resolve(__dirname, "fixtures/namespace-backtick-name/use.stm");
+
+describe("ns::`name` references (bsw-iuzs)", () => {
+  it("validate resolves every ns::`name` reference with no parse error or undefined-ref", async () => {
+    // The ticket's repro: before the grammar accepted a backtick name after
+    // ::, this reported a parse error and undefined-ref for `raw` and the name.
+    const { stdout, code } = await run("validate", BACKTICK_NAME_FIXTURE);
+    assert.equal(code, 0);
+    assert.match(stdout, /no issues found/i);
+  });
+
+  it("where-used finds the import and the spread that name a fragment as ns::`name`", async () => {
+    // where-used scans imports and spreads itself; both must compare the
+    // unquoted name, or the quoted form is invisible to it.
+    const { stdout, code } = await run(
+      "where-used",
+      "raw::audit fields",
+      BACKTICK_NAME_FIXTURE,
+      "--json",
+    );
+    assert.equal(code, 0);
+    const kinds = JSON.parse(stdout)
+      .refs.map((r: { kind: string }) => r.kind)
+      .sort();
+    assert.deepEqual(kinds, ["fragment_spread", "import"]);
+  });
+
+  it("arrows attributes the mapping's arrow to the ns::`name` source schema", async () => {
+    // The source ref must key to raw::crm-contacts for its fields to have arrows.
+    const { stdout, code } = await run("arrows", "raw::crm-contacts.id", BACKTICK_NAME_FIXTURE);
+    assert.equal(code, 0);
+    assert.match(stdout, /1 arrow/);
+  });
+});

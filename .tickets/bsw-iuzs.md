@@ -1,6 +1,6 @@
 ---
 id: bsw-iuzs
-status: open
+status: closed
 deps: []
 links: []
 created: 2026-10-06T09:45:31Z
@@ -24,3 +24,10 @@ mapping m { source { raw::`crm-contacts` } target { t } id -> id }
 ## Acceptance Criteria
 
 - `qualified_name` accepts a backtick name on either side of `::`; corpus test added; the repro validates clean and resolves in the CLI and the LSP.
+
+## Notes
+
+**2026-10-06T17:52:06Z**
+
+Cause: `qualified_name` (and `qualified_dotted_name` and the structural `at_ref` branch) accepted only a bare identifier after `::`, so `` raw::`crm-contacts` `` was a syntax error in imports, `source`/`target`, spreads and metadata. Behind the grammar, `qualifiedNameText` read identifier children only and `(ref ...)` validation split its text on the first `.`, so even a parsed quoted name would not have resolved.
+Fix: the grammar takes `_path_seg` after `::`; namespace names stay bare identifiers, as the user decided, which narrows the "either side" criterion. Core gained `importNameText`/`spreadLabelText` (with `pathSegmentText` moved to cst-utils) and the CLI where-used, viz-backend index and LSP symbols now use them instead of their own copies; `(ref ...)` uses the backtick-aware `splitRefSchemaKey`. Spec §2.2, the agent references and useful-prompts document `` ns::`name` `` and mark whole-name backticks as deprecated; the namespace examples and site page are migrated. The deprecation diagnostic is follow-up bsw-qdep. (commit immediately after e142abd8)

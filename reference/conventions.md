@@ -23,7 +23,8 @@ Prefer lowercase snake_case for schemas, namespaces, and fields.
 This avoids backtick quoting: `order_headers` not `order-headers`.
 Backticks are only needed when a name contains characters outside [a-z0-9_-]:
   schema `order-headers` { ... }       // kebab-case — needs backticks
-  source { `raw::crm-contacts` }       // backtick the unsafe segment only
+  source { raw::`crm-contacts` }       // quote only the name after ::
+  source { `raw::crm-contacts` }       // deprecated: quotes the whole qualified name
 
 ## Path syntax — :: vs .
 :: separates namespace from schema. . separates schema from field.

@@ -331,11 +331,9 @@ function getBlockName(node: SyntaxNode): string | null {
   if (!label) return null;
   const inner = label.namedChildren[0];
   if (!inner) return label.text;
+  // A block_label is an identifier or a backtick_name (grammar.js); a block
+  // is never declared under a qualified `ns::name`.
   if (inner.type === "backtick_name") return inner.text.slice(1, -1);
-  if (inner.type === "qualified_name") {
-    const ids = inner.namedChildren.filter((c) => c.type === "identifier");
-    return ids.map((id) => id.text).join("::");
-  }
   return inner.text;
 }
 

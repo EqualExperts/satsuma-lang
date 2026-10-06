@@ -918,6 +918,41 @@ describe("ref metadata target diagnostics", () => {
   });
 });
 
+describe("ref metadata with backtick-quoted names (bsw-iuzs)", () => {
+  /** One schema whose field carries `(ref <value>)`, plus `target` declared. */
+  function refIndex(value, target) {
+    return makeIndex({
+      schemas: [
+        {
+          name: "hub",
+          fields: [{ name: "id", type: "INT", metadata: [{ kind: "kv", key: "ref", value }] }],
+        },
+        { fields: [{ name: "id", type: "INT" }], ...target },
+      ],
+    });
+  }
+
+  it("resolves (ref ns::`name`.field) to the declared namespaced schema", () => {
+    // The grammar now parses a backtick name after ::; the ref must find
+    // raw::crm-contacts rather than a schema literally named with backticks.
+    const index = refIndex("raw::`crm-contacts`.`customer-id`", {
+      name: "crm-contacts",
+      namespace: "raw",
+      qualifiedName: "raw::crm-contacts",
+    });
+    const refDiags = collectSemanticDiagnostics(index).filter((d) => d.rule === "undefined-ref");
+    assert.deepEqual(refDiags, []);
+  });
+
+  it("does not split a schema name on a dot inside backticks", () => {
+    // `odd.name`.id names schema "odd.name"; splitting on the first "." would
+    // look up a schema called "`odd" and warn.
+    const index = refIndex("`odd.name`.id", { name: "odd.name" });
+    const refDiags = collectSemanticDiagnostics(index).filter((d) => d.rule === "undefined-ref");
+    assert.deepEqual(refDiags, []);
+  });
+});
+
 // ---------- Shared validation entry point ----------
 
 describe("validateSemanticWorkspace", () => {

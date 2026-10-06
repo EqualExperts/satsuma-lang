@@ -1,0 +1,13 @@
+// Refers to raw's quoted names in the ns::`name` form from every structural position.
+import { raw::`crm-contacts`, raw::`audit fields` } from "defs.stm"
+
+schema t {
+  ...raw::`audit fields`
+  id INT (ref raw::`crm-contacts`.id)
+}
+
+mapping m {
+  source { raw::`crm-contacts` }
+  target { t }
+  id -> id
+}

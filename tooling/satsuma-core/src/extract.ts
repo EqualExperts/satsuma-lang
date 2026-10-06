@@ -19,8 +19,9 @@ import {
   stringText,
   entryText,
   qualifiedNameText,
+  importNameText,
+  spreadLabelText,
   sourceRefStructuralText,
-  isPresent,
 } from "./cst-utils.js";
 import type {
   Classification,
@@ -169,21 +170,6 @@ export function extractFieldTree(bodyNode: SyntaxNode): FieldTree {
   }
 
   return { fields, hasSpreads, spreads };
-}
-
-/**
- * Extract the text from a spread_label node.
- * Handles qualified_name, backtick_name, and multi-word (identifier + continuation_word) forms.
- */
-function spreadLabelText(labelNode: SyntaxNode): string {
-  const qn = child(labelNode, "qualified_name");
-  if (qn) return qualifiedNameText(qn) ?? qn.text;
-  const q = child(labelNode, "backtick_name");
-  if (q) return q.text.slice(1, -1);
-  const words = labelNode.namedChildren
-    .filter((c) => c.type === "identifier" || c.type === "continuation_word")
-    .map((c) => c.text);
-  return words.join(" ");
 }
 
 // Comment node types from the grammar extras list. These appear as named
@@ -792,16 +778,7 @@ export interface ExtractedImport {
 export function extractImports(rootNode: SyntaxNode): ExtractedImport[] {
   return children(rootNode, "import_decl").map((node) => {
     const names = children(node, "import_name")
-      .map((nm) => {
-        // isPresent guards against zero-width MISSING recovery nodes —
-        // `import { } from "x"` must yield no names, not [""] (sl-0nvt).
-        const qn = child(nm, "qualified_name");
-        if (isPresent(qn)) return qualifiedNameText(qn);
-        const q = child(nm, "backtick_name");
-        if (isPresent(q)) return q.text.slice(1, -1);
-        const id = child(nm, "identifier");
-        return isPresent(id) ? id.text : null;
-      })
+      .map(importNameText)
       .filter((n): n is string => n != null);
 
     const pathNode = child(node, "import_path");

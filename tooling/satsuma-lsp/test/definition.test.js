@@ -169,6 +169,32 @@ mapping \`test\` {
     assert.equal(loc.range.start.line, 1);
   });
 
+  it("jumps from a ns::`name` source ref to the quoted schema (bsw-iuzs)", () => {
+    // Before the grammar accepted a backtick name after ::, this source ref
+    // was a syntax error and go-to-definition found nothing. Cursor sits
+    // inside the quoted segment, the part a reader clicks.
+    const result = definition(
+      {
+        "file:///a.stm": `namespace raw {
+  schema \`crm-contacts\` {
+    id INT
+  }
+}
+mapping m {
+  source { raw::\`crm-contacts\` }
+  target { t }
+  id -> id
+}`,
+      },
+      "file:///a.stm",
+      6,
+      20, // cursor on "crm-contacts" inside raw::`crm-contacts`
+    );
+    assert.ok(result);
+    const loc = Array.isArray(result) ? result[0] : result;
+    assert.equal(loc.range.start.line, 1);
+  });
+
   it("jumps from block label to its own definition", () => {
     const result = definition(
       {

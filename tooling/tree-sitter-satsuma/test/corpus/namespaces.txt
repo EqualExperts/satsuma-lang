@@ -97,7 +97,7 @@ namespace vault {
             (identifier)))))))
 
 ================================================================================
-namespace with mapping
+namespace with mapping (deprecated whole-name quoting `ns::name` still parses)
 ================================================================================
 
 namespace vault {
@@ -605,7 +605,7 @@ namespace source {
           (type_expr))))))
 
 ================================================================================
-cross-namespace staging mapping (ns-merging pattern)
+cross-namespace staging mapping (ns-merging pattern, deprecated whole-name quoting)
 ================================================================================
 
 namespace staging {
@@ -655,3 +655,96 @@ namespace staging {
               (pipe_text
                 (identifier)))))))))
 
+================================================================================
+backtick schema name after :: in import, source and @ref (bsw-iuzs)
+================================================================================
+
+import { raw::`crm-contacts` } from "raw.stm"
+
+mapping {
+  source { raw::`crm-contacts` }
+  target { tgt }
+  -> name { @raw::`crm-contacts`.`full name` | trim }
+}
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (import_decl
+    (import_name
+      (qualified_name
+        (identifier)
+        (backtick_name)))
+    (import_path
+      (nl_string)))
+  (mapping_block
+    (mapping_body
+      (source_block
+        (source_ref
+          (qualified_name
+            (identifier)
+            (backtick_name))))
+      (target_block
+        (source_ref
+          (identifier)))
+      (computed_arrow
+        (tgt_path
+          (field_path
+            (identifier)))
+        (pipe_chain
+          (pipe_step
+            (pipe_text
+              (at_ref
+                (identifier)
+                (backtick_name)
+                (backtick_name))))
+          (pipe_step
+            (pipe_text
+              (identifier))))))))
+
+================================================================================
+backtick name after :: in a spread and a ref metadata value (bsw-iuzs)
+================================================================================
+
+schema tgt {
+  ...raw::`audit fields`
+  id INT (ref raw::`crm-contacts`.`customer-id`)
+}
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (schema_block
+    (block_label
+      (identifier))
+    (schema_body
+      (fragment_spread
+        (spread_label
+          (qualified_name
+            (identifier)
+            (backtick_name))))
+      (field_decl
+        (field_name
+          (identifier))
+        (type_expr)
+        (metadata_block
+          (tag_with_value
+            (identifier)
+            (value_text
+              (qualified_dotted_name
+                (qualified_name
+                  (identifier)
+                  (backtick_name))
+                (backtick_name)))))))))
+
+================================================================================
+A backtick namespace name before :: is rejected (bsw-iuzs)
+:error
+================================================================================
+
+mapping {
+  source { `raw`::contacts }
+  target { tgt }
+}
+
+--------------------------------------------------------------------------------

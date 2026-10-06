@@ -204,7 +204,7 @@
         },
         {
           "type": "SYMBOL",
-          "name": "identifier"
+          "name": "_path_seg"
         }
       ]
     },
@@ -2156,7 +2156,7 @@
               },
               {
                 "type": "SYMBOL",
-                "name": "identifier"
+                "name": "_path_seg"
               }
             ]
           }
@@ -2245,7 +2245,7 @@
                 },
                 {
                   "type": "SYMBOL",
-                  "name": "identifier"
+                  "name": "_path_seg"
                 },
                 {
                   "type": "REPEAT",

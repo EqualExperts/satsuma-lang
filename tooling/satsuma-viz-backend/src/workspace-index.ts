@@ -26,7 +26,8 @@ import type { SyntaxNode, Tree } from "./parser-utils";
 import { nodeRange, child, children, labelText, walkDescendants } from "./parser-utils";
 import {
   sourceRefStructuralText as coreSourceRefStructuralText,
-  qualifiedNameText as coreQualifiedNameText,
+  importNameText,
+  spreadLabelText,
   entryText,
   extractFieldTree,
   isMetricSchema,
@@ -1300,9 +1301,10 @@ function fieldDeclToInfo(decl: FieldDecl, cstNode: SyntaxNode | null): FieldInfo
 // ---------- Text extraction helpers ----------
 //
 // These delegate to @satsuma/core cst-utils for the standard CST text
-// extraction logic. Only LSP-specific adapters (importNameText, spreadLabelText,
-// extractArrowFullPath) remain here because they handle grammar forms or
-// multi-word patterns not needed by the general-purpose core helpers.
+// extraction logic. Import and spread names come straight from core's
+// importNameText/spreadLabelText, so a backtick name after `::` unquotes the same way
+// everywhere (bsw-iuzs). Only extractArrowFullPath remains here as an
+// index-specific adapter.
 
 /**
  * Extract the structural schema/fragment name from a source_ref node.
@@ -1310,38 +1312,6 @@ function fieldDeclToInfo(decl: FieldDecl, cstNode: SyntaxNode | null): FieldInfo
  */
 function sourceRefStructuralText(ref: SyntaxNode): string | null {
   return coreSourceRefStructuralText(ref);
-}
-
-/**
- * Extract import name text from an import_name node.
- * Handles qualified_name (ns::name), backtick_name, and identifier children.
- * LSP-specific: import_name nodes are only relevant for workspace indexing.
- */
-function importNameText(node: SyntaxNode): string | null {
-  const qn = child(node, "qualified_name");
-  if (qn) return coreQualifiedNameText(qn);
-  const quoted = child(node, "backtick_name");
-  if (quoted) return quoted.text.slice(1, -1);
-  const id = child(node, "identifier");
-  if (id) return id.text;
-  return null;
-}
-
-/**
- * Extract text from a spread_label node, handling multi-word spreads.
- * Multi-word spreads use identifier + continuation_word children (sl-3ccy).
- * LSP-specific: the core spread extractor in extract.ts has its own version.
- */
-function spreadLabelText(node: SyntaxNode): string | null {
-  const qn = child(node, "qualified_name");
-  if (qn) return coreQualifiedNameText(qn);
-  const quoted = child(node, "backtick_name");
-  if (quoted) return quoted.text.slice(1, -1);
-  const ids = node.namedChildren.filter(
-    (c: SyntaxNode) => c.type === "identifier" || c.type === "continuation_word",
-  );
-  if (ids.length > 0) return ids.map((i: SyntaxNode) => i.text).join(" ");
-  return node.text;
 }
 
 // ---------- Internal helpers ----------
