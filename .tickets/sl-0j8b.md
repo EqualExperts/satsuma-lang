@@ -1,6 +1,6 @@
 ---
 id: sl-0j8b
-status: in_progress
+status: closed
 deps: []
 links: []
 created: 2026-09-29T07:27:22Z
@@ -47,6 +47,8 @@ A second gap: the LSP only publishes comment diagnostics for **open** documents 
 **2026-10-06T00:00:00Z**
 
 Cause: b14d1464 moved `//?` diagnostics from Information to Hint with the Unnecessary tag, which VS Code leaves out of the Problems panel. Show Warnings already received questions from the CLI (its default output mixes both kinds) but published them all as Warning, because the JSON items carried no per-item kind.
-Fix: LSP publishes `//?` at Information, untagged. `satsuma warnings --json` labels each item with `kind`; Show Warnings maps it to Warning/Information and withholds a file's results while it is open, since the LSP reports open files (overlap decision, documented in warnings.ts). Message wording moved to core `commentDiagnosticMessage` so both routes agree. (commit immediately after 20aec326)
+Fix: LSP publishes `//?` at Information, untagged. `satsuma warnings --json` labels each item with `kind`; Show Warnings maps it to Warning/Information and withholds a file's results while it is open, since the LSP reports open files (overlap decision, documented in warnings.ts). Message wording moved to core `commentDiagnosticMessage` so both routes agree. (commit 34ace8b0, merged as PR #597)
 
-Still open: the manual VS Code check in the acceptance criteria. Close once it is done.
+**2026-10-06T14:00:00Z**
+
+Manual check done by Thorben Louw on a VSIX built from main: `//?` questions are listed in the Problems panel, and the gh-542 behaviour is fixed. Closing. (commit immediately after 986b7d08)
