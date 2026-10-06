@@ -79,6 +79,8 @@ This mirrors how Satsuma the language works: unlike some IDEs that treat all fil
 - **Warning comments** (`//!`) — appear as warnings in the Problems panel.
 - **Question comments** (`//?`) — appear as information in the Problems panel.
 
+Warning and question comments are reported for files open in an editor. Run **Satsuma: Show Warnings** to list them for every file the entry file imports, open or not.
+
 ### Navigation
 
 - **Go-to-Definition** (Ctrl+Click / F12) — jump from schema name in `source`/`target` to its definition, fragment spread to fragment block, import name to imported definition, import path to file. Scoped to import-reachable symbols.
@@ -121,7 +123,7 @@ Nine commands available via `Ctrl+Shift+P`:
 |---|---|
 | **Satsuma: Validate Workspace** | Run `satsuma validate` and populate the Problems panel |
 | **Satsuma: Show Lineage From...** | Pick a schema and trace its downstream lineage |
-| **Satsuma: Show Warnings** | Show all `//!` warnings in the Problems panel |
+| **Satsuma: Show Warnings** | Show all `//!` warnings and `//?` questions in the Problems panel, including files that are not open |
 | **Satsuma: Show Workspace Summary** | Display workspace statistics |
 | **Satsuma: Overview Visualization** | Open the interactive workspace overview (also the eye icon in the editor title bar and the editor/Explorer context menus) |
 | **Satsuma: Show Field Lineage** | Trace a field's chain in the visualization panel's chain view |

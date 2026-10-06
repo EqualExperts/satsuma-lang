@@ -1,16 +1,7 @@
-import { Diagnostic, DiagnosticSeverity, DiagnosticTag } from "vscode-languageserver";
+import { Diagnostic, DiagnosticSeverity } from "vscode-languageserver";
 import type { SyntaxNode, Tree } from "./parser-utils";
 import { nodeRange } from "./parser-utils";
-import { collectParseErrors } from "@satsuma/core";
-
-/**
- * Fallback text for a bare `//!` marker that carries no message of its own.
- * Diagnostics must never ship an empty message: vscode's Diagnostic
- * constructor throws `illegalArgument("message must be set")` on a falsy
- * message, and one bad entry aborts the client's whole diagnostic batch,
- * freezing diagnostics for the file (sl-sme1, gh-273).
- */
-const EMPTY_WARNING_COMMENT_MESSAGE = "Warning comment (no text)";
+import { collectParseErrors, commentDiagnosticMessage } from "@satsuma/core";
 
 /**
  * Produce LSP diagnostics from a tree-sitter parse tree.
@@ -18,6 +9,11 @@ const EMPTY_WARNING_COMMENT_MESSAGE = "Warning comment (no text)";
  * - ERROR / MISSING nodes → Error severity (via collectParseErrors from @satsuma/core)
  * - warning_comment (//!) → Warning severity
  * - question_comment (//?…) → Information severity
+ *
+ * Rule: questions are Information, never Hint. VS Code's Problems panel lists
+ * Error, Warning and Information only, and an open question is meant to be
+ * seen there (Feature 16 PRD). A Hint with the Unnecessary tag hid questions
+ * and greyed them out until gh-542 / sl-0j8b restored this.
  */
 export function computeDiagnostics(tree: Tree): Diagnostic[] {
   const diagnostics: Diagnostic[] = [];
@@ -75,20 +71,18 @@ function walkComments(node: SyntaxNode, out: Diagnostic[]): void {
     const child = node.child(i);
 
     if (child.type === "warning_comment") {
-      const text = child.text.replace(/^\/\/!\s*/, "");
       out.push({
         range: nodeRange(child),
         severity: DiagnosticSeverity.Warning,
         source: "satsuma",
-        message: text || EMPTY_WARNING_COMMENT_MESSAGE,
+        message: commentDiagnosticMessage("warning", child.text.replace(/^\/\/!/, "")),
       });
     } else if (child.type === "question_comment") {
       out.push({
         range: nodeRange(child),
-        severity: DiagnosticSeverity.Hint,
+        severity: DiagnosticSeverity.Information,
         source: "satsuma",
-        message: `TODO: ${child.text.replace(/^\/\/\?\s*/, "")}`,
-        tags: [DiagnosticTag.Unnecessary],
+        message: commentDiagnosticMessage("question", child.text.replace(/^\/\/\?/, "")),
       });
     }
 

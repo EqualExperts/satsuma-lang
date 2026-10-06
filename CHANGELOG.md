@@ -2,6 +2,22 @@
 
 ## Unreleased
 
+### `//?` questions are listed in VS Code's Problems panel again (`sl-0j8b`, gh-542)
+
+The language server had been publishing `//?` comments as hints with the
+"unnecessary" tag. VS Code leaves hints out of the Problems panel and greys
+the comment out, so open questions were harder to see, not easier. They are
+now Information diagnostics, worded `Question: <text>`.
+
+**Satsuma: Show Warnings** now lists questions at Information too, rather
+than as warnings, so questions in files nobody has open also reach the
+panel. For a file that is open, the command leaves reporting to the language
+server, so each comment appears once.
+
+`satsuma warnings --json` gives every item a `kind` of `"warning"` or
+`"question"`. The default output has always mixed the two under a
+`"warning"` envelope, and this is the only way to tell them apart.
+
 ### Rolling builds now identify the exact commit (`sl-13p5`)
 
 CLI, standalone LSP, and VSIX artifacts built from `main` or a local untagged

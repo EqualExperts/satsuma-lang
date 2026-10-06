@@ -12,6 +12,8 @@ export type {
   SatsumaGrammarSymbol,
   SatsumaCstType,
 } from "./generated/cst-types.js";
+export { commentDiagnosticMessage } from "./comment-diagnostics.js";
+export type { CommentDiagnosticKind } from "./comment-diagnostics.js";
 export { SATSUMA_FILE_EXTENSIONS, SATSUMA_FILE_GLOB, isSatsumaFilePath } from "./source-files.js";
 export {
   canonicalizeEntityRef,

@@ -1,14 +1,14 @@
 /**
  * warnings.ts — `satsuma warnings` command
  *
- * Lists all warning comments (//! ...) from the workspace.
- * With --questions, lists question comments (//?  ...) instead.
+ * Lists all warning (//! ...) and question (//? ...) comments from the
+ * workspace. With --questions, lists question comments only.
  *
  * Output format (default):
  *   file.stm:12  //! some records have NULL
  *
  * Flags:
- *   --questions   show //?  comments instead of //! comments
+ *   --questions   show only //? comments
  *   --json        structured JSON output
  */
 
@@ -21,7 +21,7 @@ export function register(program: Command): void {
   program
     .command("warnings [path]")
     .description("List warning or question comments in a Satsuma file and its imports")
-    .option("--questions", "show question comments (//?  ...) instead")
+    .option("--questions", "show only question comments (//? ...)")
     .option("--json", "output JSON")
     .addHelpText(
       "after",
@@ -30,12 +30,16 @@ JSON shape (--json):
   {
     "kind":  "warning" | "question",
     "count": int,
-    "items": [{"text": str, "line": int, "file": str, "block": str, "blockType": str}, ...]
+    "items": [{"kind": "warning" | "question", "text": str, "line": int,
+               "file": str, "block": str, "blockType": str}, ...]
   }
 
+  The envelope "kind" names the filter; each item's "kind" names the comment.
+  Without --questions the envelope says "warning" but the items include both.
+
 Examples:
-  satsuma warnings pipeline.stm              # //! warnings in file and imports
-  satsuma warnings pipeline.stm --questions  # //? questions instead
+  satsuma warnings pipeline.stm              # //! and //? in file and imports
+  satsuma warnings pipeline.stm --questions  # //? questions only
   satsuma warnings pipeline.stm --json       # structured output`,
     )
     .action(
@@ -62,6 +66,7 @@ Examples:
 
           if (opts.json) {
             const jsonItems = items.map((item) => ({
+              kind: item._kind,
               text: item.text,
               line: item.row + 1,
               file: item.file,
