@@ -1,6 +1,6 @@
 {
   "cliCommands": 23,
-  "parserCorpusTests": 320,
+  "parserCorpusTests": 330,
   "packages": {
     "satsuma-core": 859,
     "satsuma-cli": 1189,
