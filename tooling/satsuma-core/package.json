@@ -92,7 +92,7 @@
   },
   "dependencies": {
     "web-tree-sitter": "^0.27.0",
-    "yaml": "^2.9.0"
+    "yaml": "^2.9.1"
   },
   "//devDependencies": [
     "tree-sitter-satsuma is not imported anywhere in this package. It is declared",
