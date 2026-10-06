@@ -61,7 +61,7 @@ Block-level extraction — retrieve whole blocks or workspace-level summaries.
 }
 ```
 
-**Read `srcs`, not `src`, for an arrow's inputs.** `a, b -> c` has two sources and `src` holds only the first. `srcs` was added after v0.14.0; `src` keeps its earlier meaning so existing readers do not break.
+**Read `srcs`, not `src`, for an arrow's inputs.** `a, b -> c` has two sources and `src` holds only the first. `srcs` was added in v0.14.0; `src` keeps its earlier meaning so existing readers do not break.
 
 ### Structural Primitives
 

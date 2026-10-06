@@ -134,7 +134,7 @@ showing `(anonymous)` (`bsw-c7z2`); the mapping code lens counts arrows inside
 and **Overview Visualization** from the Explorer's right-click menu shows the
 file you clicked rather than the one last open (`bsw-a2zk`).
 
-### CLI fixes for `arrows` and the `unenumerated-record-target` lint rule (`gpt-qhfo`, `gpt-i1uv`, `sl-3fou`)
+### CLI fixes for `arrows`, `mapping` and the `unenumerated-record-target` lint rule (`gpt-qhfo`, `gpt-i1uv`, `sl-3fou`, `bsw-fbd8`, `bsw-an3y`)
 
 `satsuma arrows <schema>.<nested.path>` could return a shallower field's
 arrow instead of the queried field's own. A fully qualified path now matches
@@ -144,6 +144,14 @@ The `unenumerated-record-target` rule went silent for any schema with a
 fragment spread, even one that resolved. It now skips only unresolved
 spreads. Its advice for a multi-source arrow also changed: the old remedies
 do not parse there, so it now recommends one arrow per target leaf.
+
+`satsuma mapping` dropped every source after the first in a multi-source
+arrow, printing `a -> c` for `a, b -> c` in text, `--arrows-only` and
+`--json` alike. It now shows them all. In `--json`, each arrow gains `srcs`,
+listing every source in order; `src` still holds the first, so existing
+readers keep working. The text output also lost `each` and `flatten` blocks
+nested inside another one; they now print at any depth
+(`bsw-fbd8`, `bsw-an3y`).
 
 ### Rolling builds now identify the exact commit (`sl-13p5`)
 
