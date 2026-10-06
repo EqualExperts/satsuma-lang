@@ -77,7 +77,7 @@ Fine-grained extraction — slice below block level to get specific arrows, NL c
 | `fields <schema>`                        | Field list with types and metadata                                   | `satsuma fields sat_customer_demographics`                                      |
 | `match-fields --source <s> --target <t>` | Normalized name comparison between two schemas                       | `satsuma match-fields --source loyalty_sfdc --target sat_customer_demographics` |
 
-The field in `arrows <schema.field>` is matched exactly when it names a declared path: `arrows src.id` returns only the top-level `id`'s arrows, and `arrows src.orders.id` only that nested field's. A name that is not a declared path is shorthand for every field of that name at any depth, so `arrows pacs008.BIC` returns each nested `BIC`.
+The field in `arrows <schema.field>` is matched exactly when it names a declared path: `arrows src.id` returns only the top-level `id`'s arrows, and `arrows src.orders.id` only that nested field's. A name that is not a declared path is shorthand for every field of that name at any depth, so `arrows pacs008.BIC` returns each nested `BIC`. An arrow path may spell its schema either way: inside `namespace n`, a flatten to the target schema writes its children as `fact.sku`, and `arrows n::fact.sku` finds them.
 
 ### Workspace Graph
 

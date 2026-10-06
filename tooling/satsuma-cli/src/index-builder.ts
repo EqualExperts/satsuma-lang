@@ -20,6 +20,10 @@ import {
   extractNamespaces,
   extractImports,
   extractNotes,
+  schemaLocalFieldPath,
+  createAuthoredEntityRef,
+  createCanonicalEntityRef,
+  createContainerQualifiedFieldRef,
 } from "@satsuma/core";
 export { resolveScopedEntityRef } from "@satsuma/core";
 import type { ResolvedFileImport } from "@satsuma/core";
@@ -125,6 +129,39 @@ export function qualifiedKey(namespace: string | null | undefined, name: string 
 export function canonicalKey(key: string): string {
   if (key.includes("::")) return key;
   return canonicalRef(null, key);
+}
+
+/** The `.` a relative arrow path (`.sku`) starts with; it names no schema. */
+const LEADING_RELATIVE_DOT = /^\./;
+
+/**
+ * An authored arrow path reduced to a path inside one schema, or null when the
+ * path names that schema itself or another schema on the same mapping side.
+ *
+ * `schemaKey` and `sideSchemaKeys` are index keys (`fact`, `n::fact`). The
+ * prefix rules are core's `schemaLocalFieldPath`, the ones coverage and lint
+ * use, so a path is attributed the same way everywhere. Their point here is
+ * that a schema has several spellings: inside `namespace n`, a flatten to the
+ * target schema records its children as `fact.sku`, and `fact.` must come off
+ * a path owned by `n::fact` just as `n::fact.` would (bsw-tzc6).
+ *
+ * `declaresTopLevel`, when given, says whether the schema declares a top-level
+ * field of a name; such a field wins over a prefix that only looks like the
+ * schema's name.
+ */
+export function arrowPathInSchema(
+  authoredPath: string,
+  schemaKey: string,
+  sideSchemaKeys: readonly string[],
+  declaresTopLevel?: (name: string) => boolean,
+): string | null {
+  return schemaLocalFieldPath(
+    createContainerQualifiedFieldRef(authoredPath.replace(LEADING_RELATIVE_DOT, "")),
+    createAuthoredEntityRef(schemaKey),
+    createCanonicalEntityRef(canonicalKey(schemaKey)),
+    sideSchemaKeys.filter((key) => key !== schemaKey).map(createAuthoredEntityRef),
+    declaresTopLevel,
+  );
 }
 
 /**
@@ -527,6 +564,28 @@ function buildFieldArrows(
     index.get(key)!.push(record);
   }
 
+  /**
+   * Index `record` under `<schema>.<path>`, in index and canonical spelling, for
+   * each schema on this side that owns the path. A path written with any
+   * spelling of a schema's name (`n::fact.sku`, or `fact.sku` inside the
+   * namespace) belongs to that schema alone, so its prefix is replaced rather
+   * than doubled; an unprefixed path is offered to every schema on the side.
+   */
+  function addSchemaQualifiedKeys(
+    path: string,
+    sideSchemas: readonly string[],
+    record: ArrowRecord,
+  ): void {
+    for (const schema of sideSchemas) {
+      const local = arrowPathInSchema(path, schema, sideSchemas);
+      if (local === null) continue;
+      const internalKey = `${schema}.${local}`;
+      addToIndex(internalKey, record);
+      // Also index under canonical form for Phase 5 @ref edge lookups
+      addToIndex(canonicalKey(internalKey), record);
+    }
+  }
+
   for (const record of arrowRecords) {
     const mappingKey = qualifiedKey(record.namespace, record.mapping);
     const mapping = mappings.get(mappingKey);
@@ -534,16 +593,8 @@ function buildFieldArrows(
     const targetSchemas = mapping?.targets ?? [];
 
     for (const source of record.sources) {
-      const bareSource = source.replace(/^\./, "");
-      for (const schema of sourceSchemas) {
-        // Don't double-prefix if source already starts with schema name
-        if (!bareSource.startsWith(schema + ".") && bareSource !== schema) {
-          const internalKey = `${schema}.${bareSource}`;
-          addToIndex(internalKey, record);
-          // Also index under canonical form for Phase 5 @ref edge lookups
-          addToIndex(canonicalKey(internalKey), record);
-        }
-      }
+      const bareSource = source.replace(LEADING_RELATIVE_DOT, "");
+      addSchemaQualifiedKeys(source, sourceSchemas, record);
       addToIndex(source, record);
       if (bareSource !== source) addToIndex(bareSource, record);
       // Index leaf field name for nested paths (e.g., PHONES[].PHONE_TYPE → PHONE_TYPE)
@@ -553,16 +604,8 @@ function buildFieldArrows(
       }
     }
     if (record.target) {
-      const bareTarget = record.target.replace(/^\./, "");
-      for (const schema of targetSchemas) {
-        // Don't double-prefix if target already starts with schema name
-        if (!bareTarget.startsWith(schema + ".") && bareTarget !== schema) {
-          const internalKey = `${schema}.${bareTarget}`;
-          addToIndex(internalKey, record);
-          // Also index under canonical form for Phase 5 @ref edge lookups
-          addToIndex(canonicalKey(internalKey), record);
-        }
-      }
+      const bareTarget = record.target.replace(LEADING_RELATIVE_DOT, "");
+      addSchemaQualifiedKeys(record.target, targetSchemas, record);
       addToIndex(record.target, record);
       if (bareTarget !== record.target) addToIndex(bareTarget, record);
       // Index leaf field name for nested paths

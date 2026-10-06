@@ -14,13 +14,14 @@
 import type { Command } from "commander";
 import { loadWorkspace } from "../load-workspace.js";
 import { runCommand, CommandError, EXIT_NOT_FOUND, EXIT_PARSE_ERROR } from "../command-runner.js";
-import { resolveIndexKey, canonicalKey } from "../index-builder.js";
+import { resolveIndexKey, canonicalKey, arrowPathInSchema } from "../index-builder.js";
+import { arrowEndpoint } from "../field-endpoints.js";
 import { resolveAllNLRefs } from "../nl-ref-extract.js";
 import { expandDeclaredFields } from "../spread-expand.js";
 import { findDeclaredFields } from "../field-lookup.js";
 import type { DeclaredFieldMatch } from "../field-lookup.js";
 import { collectFieldNames } from "@satsuma/core";
-import type { ExtractedWorkspace, ArrowRecord } from "../types.js";
+import type { ExtractedWorkspace, ArrowRecord, FieldDecl } from "../types.js";
 
 export function register(program: Command): void {
   program
@@ -102,7 +103,7 @@ Examples:
             throw new CommandError(lines.join("\n"), EXIT_NOT_FOUND);
           }
           const schemaKey = resolvedSchema.key;
-          const isQueriedField = queriedFieldMatcher(matches, schemaKey);
+          const isQueriedField = queriedFieldMatcher(matches, schemaKey, allFields);
 
           // Find matching arrows using schema-qualified key
           const qualifiedField = `${schemaKey}.${fieldName}`;
@@ -174,17 +175,15 @@ Examples:
               if (a.classification === "nl-derived") return false;
               const aMappingKey = a.namespace ? `${a.namespace}::${a.mapping}` : (a.mapping ?? "");
               if (aMappingKey !== nlMappingKey || a.target !== nlRef.targetField) return false;
-              // Arrow sources may be bare field names (e.g. "c") while resolvedTo is
-              // canonical (e.g. "::s1.c"). Qualify each source against the mapping's
-              // source schemas to compare properly.
+              // Arrow sources are authored paths (e.g. "c", "s1.c") while resolvedTo
+              // is canonical (e.g. "::s1.c"). Try each source schema as the owner of
+              // an unprefixed path, so a multi-source mapping matches whichever
+              // schema the ref names; with no source schema the path stands alone.
               const srcSchemas = nlMapping?.sources ?? [];
-              return a.sources.some((s) => {
-                if (s === resolvedTo || canonicalKey(s) === resolvedTo) return true;
-                for (const schema of srcSchemas) {
-                  if (canonicalKey(`${schema}.${s}`) === resolvedTo) return true;
-                }
-                return false;
-              });
+              const owners = srcSchemas.length > 0 ? srcSchemas : [undefined];
+              return a.sources.some((s) =>
+                owners.some((owner) => endpointText(s, srcSchemas, owner) === resolvedTo),
+              );
             });
             if (alreadyDeclared) continue;
 
@@ -254,49 +253,25 @@ Examples:
               const sourceSchemas = mapping?.sources ?? [];
               const targetSchemas = mapping?.targets ?? [];
 
-              // Determine which schema the target field belongs to
-              let targetSchema: string;
-              if (targetSchemas.includes(resolvedSchema.key)) {
-                targetSchema = resolvedSchema.key;
-              } else {
-                targetSchema = targetSchemas[0] ?? resolvedSchema.key;
-              }
-
-              const qualifyPath = (path: string | null, schema: string): string | null => {
-                if (!path) return null;
-                if (path.startsWith(schema + ".") || path === schema) return path;
-                // If path is already schema-qualified (contains a dot and the prefix
-                // is a known schema), don't double-qualify
-                const dotIdx = path.indexOf(".");
-                if (dotIdx > 0) {
-                  const prefix = path.slice(0, dotIdx);
-                  if (index.schemas.has(prefix)) return path;
-                }
-                return `${schema}.${path}`;
-              };
-
-              // For multi-source arrows, find the actual schema that owns each source field
-              // rather than attributing all fields to the queried schema.
-              const resolveSourceField = (path: string): string => {
-                // Already in canonical form (::schema.field or ns::schema.field)
-                if (path.includes("::")) return path;
-                // Already fully qualified with a known schema prefix
-                const dotIdx = path.indexOf(".");
-                if (dotIdx > 0) {
-                  const prefix = path.slice(0, dotIdx);
-                  if (index.schemas.has(prefix)) return path;
-                }
-                // Search each source schema for a field matching path
-                for (const schemaKey of sourceSchemas) {
-                  const s = index.schemas.get(schemaKey);
-                  if (!s) continue;
-                  const allNames = expandDeclaredFields(s, s.namespace ?? null, index).map(
-                    (f) => f.name,
-                  );
-                  if (allNames.includes(path)) return `${schemaKey}.${path}`;
-                }
-                // Fallback: use first source schema
-                return `${sourceSchemas[0] ?? resolvedSchema.key}.${path}`;
+              // An unprefixed target belongs to the queried schema when it is a
+              // target here. An unprefixed source belongs to the source schema
+              // that declares its first segment: a multi-source arrow's fields
+              // are not all the queried schema's.
+              const targetOwner = resolvedSchema.key;
+              // A mapping the index cannot find declares no schemas; attribute its
+              // paths to the queried schema rather than leave them unqualified.
+              const sideOrQueried = (schemas: readonly string[]): readonly string[] =>
+                schemas.length > 0 ? schemas : [resolvedSchema.key];
+              const sourceOwner = (path: string): string | undefined => {
+                const head = path.replace(/^\./, "").split(".")[0];
+                return sourceSchemas.find((key) => {
+                  const s = index.schemas.get(key);
+                  return s
+                    ? expandDeclaredFields(s, s.namespace ?? null, index).some(
+                        (f) => f.name === head,
+                      )
+                    : false;
+                });
               };
 
               const result: Record<string, unknown> = {
@@ -304,9 +279,11 @@ Examples:
                 source:
                   a.sources.length === 0
                     ? null
-                    : a.sources.map((s) => canonicalKey(resolveSourceField(s))).join(", "),
+                    : a.sources
+                        .map((s) => endpointText(s, sideOrQueried(sourceSchemas), sourceOwner(s)))
+                        .join(", "),
                 target: a.target
-                  ? canonicalKey(qualifyPath(a.target, targetSchema) ?? a.target)
+                  ? endpointText(a.target, sideOrQueried(targetSchemas), targetOwner)
                   : null,
                 classification: a.classification,
                 transform_raw: a.transform_raw,
@@ -342,24 +319,49 @@ Examples:
  * that is not a declared path falls back to every field of that name at any
  * depth (sl-xj4p's leaf-name shorthand), and then each of those paths matches.
  *
- * An arrow path is compared after removing a leading `.` and the queried
- * schema's prefix, in either its index spelling (`src.`, `ns::src.`) or its
- * canonical one (`::src.`, which nl-derived arrows carry as their source). Paths are
- * compared whole, never by suffix: a suffix match is how a shallower or deeper
- * field with the same leaf name used to slip in (gpt-qhfo, bsw-kvj9).
+ * An arrow path is first reduced to a path inside the queried schema by
+ * `arrowPathInSchema`, which removes a leading `.` and any spelling of the
+ * schema's name: the index key (`src.`, `ns::src.`), the canonical form
+ * (`::src.`, which nl-derived sources carry) and, inside a namespace, the bare
+ * name (`src.`, which a flatten to the target schema writes, bsw-tzc6). A
+ * top-level field that shares the schema's name is not mistaken for that
+ * prefix. Paths are then compared whole, never by suffix: a suffix match is how
+ * a shallower or deeper field with the same leaf name used to slip in
+ * (gpt-qhfo, bsw-kvj9).
  */
 function queriedFieldMatcher(
   matches: DeclaredFieldMatch[],
   schemaKey: string,
+  schemaFields: readonly FieldDecl[],
 ): (arrowPath: string | null) => boolean {
   const queried = new Set(matches.map((m) => m.path.join(".")));
-  const schemaPrefixes = [`${schemaKey}.`, `${canonicalKey(schemaKey)}.`];
+  const declaresTopLevel = (name: string) => schemaFields.some((f) => f.name === name);
   return (arrowPath) => {
     if (!arrowPath) return false;
-    const bare = arrowPath.replace(/^\./, "");
-    const prefix = schemaPrefixes.find((p) => bare.startsWith(p));
-    return queried.has(prefix ? bare.slice(prefix.length) : bare);
+    const local = arrowPathInSchema(arrowPath, schemaKey, [], declaresTopLevel);
+    return local !== null && queried.has(local);
   };
+}
+
+/**
+ * Canonical endpoint text for an authored arrow path on one side of a mapping.
+ *
+ * Core's `resolveFieldEndpoint` (through `arrowEndpoint`) decides ownership: a
+ * path that names a side schema, in any spelling, belongs to it; an unprefixed
+ * path belongs to the first schema. `owner`, when it is on this side, is put
+ * first so it claims the unprefixed paths. The queried-field filters have
+ * already chosen the arrow; this only spells its endpoints for `--json`.
+ */
+function endpointText(
+  path: string,
+  sideSchemas: readonly string[],
+  owner: string | undefined,
+): string {
+  const ordered =
+    owner !== undefined && sideSchemas.includes(owner)
+      ? [owner, ...sideSchemas.filter((schema) => schema !== owner)]
+      : sideSchemas;
+  return arrowEndpoint(path, ordered);
 }
 
 /**

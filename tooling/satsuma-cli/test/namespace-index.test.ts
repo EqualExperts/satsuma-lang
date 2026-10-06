@@ -821,3 +821,17 @@ describe("fieldArrows index: nested child arrow keys (sl-9gvb)", () => {
     );
   });
 });
+
+describe("fieldArrows index: schema-prefixed paths in a namespace (bsw-tzc6)", () => {
+  it("keys a bare-schema-prefixed flatten child under the namespaced field, not a doubled prefix", async () => {
+    // `flatten items -> fact` inside `namespace n` yields the target `fact.sku`.
+    // `fact` is the bare half of the index key `n::fact`, so the arrow belongs to
+    // `n::fact.sku`; prefixing it again gave `n::fact.fact.sku`, a key no field has.
+    const { parseFile } = await import("#src/parser.js");
+    const { extractFileData } = await import("#src/index-builder.js");
+    const fixture = resolve(__dirname, "fixtures/namespace-flatten-target.stm");
+    const index = buildIndex([extractFileData(parseFile(fixture))]);
+    assert.ok(index.fieldArrows.has("n::fact.sku"), "should index n::fact.sku");
+    assert.ok(!index.fieldArrows.has("n::fact.fact.sku"), "must not index n::fact.fact.sku");
+  });
+});
