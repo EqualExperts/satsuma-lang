@@ -94,6 +94,7 @@ map_key          = value | "<" NUMBER | "default" | "_" | "null" ;
 field_path       = ["."] [label "::"] segment {"." segment}
                  | ("^." {"^."} | "$.") segment {"." segment} ;
 (* Inside each/flatten: each ^. goes up one enclosing level; $. starts from the schema root (ADR-053) *)
+(* No whitespace or comment after ".", "^." or "$." or between segments: `^. x` and `a. b` are parse errors *)
 (* :: is ONLY namespace::schema. Fields use dot: namespace::schema.field.nested *)
 segment          = IDENT | BACKTICK_IDENT ;
 

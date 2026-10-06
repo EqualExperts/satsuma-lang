@@ -2,7 +2,7 @@
   "cliCommands": 23,
   "parserCorpusTests": 320,
   "packages": {
-    "satsuma-core": 790,
+    "satsuma-core": 792,
     "satsuma-cli": 1166,
     "satsuma-lsp": 331,
     "satsuma-viz-model": 7,

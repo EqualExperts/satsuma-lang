@@ -487,6 +487,8 @@ The `each` keyword introduces an iteration over a source list, producing element
 
 Both keep the dot semantics untouched: a bare `field` or `.field` still receives the container prefix exactly as before; only a path carrying an escape prefix resolves differently. Popping past the root resolves root-relative, and whether the result names a declared field is still validated by `field-not-in-schema`, exactly as a mis-typed absolute path would be.
 
+**A path is written without internal whitespace.** No space, line break or comment may follow `.`, `^.` or `$.`, or sit between path segments: `^. order_no`, `^. ^.id`, `$. order_no`, `. sku` and `orders. order_no` are all parse errors. A path is one lexical unit, so a spaced form cannot quietly mean something different from its unspaced spelling. Whitespace after `::` in a namespaced path is not covered by this rule.
+
 **Correlating two lists declared side by side.** A list is only nested if it is _declared_ nested. Two lists at the schema root are iterated by two sibling `each` blocks, which may write into the same target list; state the correspondence in a `note`, using an `@ref` so it is traceable:
 
 ```

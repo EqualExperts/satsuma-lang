@@ -993,8 +993,14 @@ function formatEachFlattenBlock(
 
 // ── Path Formatting ───────────────────────────────────────────────────────────
 
+/**
+ * Rebuild a path from its leaf tokens (identifiers, backtick names, dots,
+ * `^.`/`$.` markers and `::`) with nothing between them. Joining leaves is
+ * only meaning-preserving because the grammar admits no whitespace or comment
+ * inside a path after `.`, `^.` or `$.` (bsw-0twy, spec §4.4): before that
+ * rule, `^. ^.sid` parsed and this join silently rewrote it to `^.^.sid`.
+ */
 function formatPath(node: SyntaxNode): string {
-  // Reconstruct path from children: identifiers, dots, backtick_names, ::
   const parts: string[] = [];
   for (const child of node.children) {
     // The path node wraps a field_path, relative_field_path, namespaced_path, or backtick_path

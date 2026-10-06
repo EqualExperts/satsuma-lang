@@ -358,3 +358,200 @@ mapping {
         (tgt_path
           (field_path
             (identifier)))))))
+
+================================================================================
+Space after ^. is an error, not a spaced path (bsw-0twy)
+================================================================================
+
+mapping {
+  each xs -> t {
+    ^. a -> b
+  }
+}
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (mapping_block
+    (mapping_body
+      (each_block
+        (src_path
+          (field_path
+            (identifier)))
+        (tgt_path
+          (field_path
+            (identifier)))
+        (ERROR
+          (continuation_word))
+        (computed_arrow
+          (tgt_path
+            (field_path
+              (identifier))))))))
+
+================================================================================
+Space between two ^. markers is an error (bsw-0twy)
+================================================================================
+
+mapping {
+  each xs -> t {
+    ^. ^.a -> b
+  }
+}
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (mapping_block
+    (mapping_body
+      (each_block
+        (src_path
+          (field_path
+            (identifier)))
+        (tgt_path
+          (field_path
+            (identifier)))
+        (ERROR)
+        (map_arrow
+          (src_path
+            (parent_path
+              (identifier)))
+          (tgt_path
+            (field_path
+              (identifier))))))))
+
+================================================================================
+Space after $. is an error, not a spaced path (bsw-0twy)
+================================================================================
+
+mapping {
+  each xs -> t {
+    $. a -> b
+  }
+}
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (mapping_block
+    (mapping_body
+      (each_block
+        (src_path
+          (field_path
+            (identifier)))
+        (tgt_path
+          (field_path
+            (identifier)))
+        (ERROR
+          (continuation_word))
+        (computed_arrow
+          (tgt_path
+            (field_path
+              (identifier))))))))
+
+================================================================================
+Space after a leading relative dot is an error (bsw-0twy)
+================================================================================
+
+mapping {
+  each xs -> t {
+    . a -> b
+  }
+}
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (mapping_block
+    (mapping_body
+      (each_block
+        (src_path
+          (field_path
+            (identifier)))
+        (tgt_path
+          (field_path
+            (identifier)))
+        (ERROR
+          (continuation_word))
+        (computed_arrow
+          (tgt_path
+            (field_path
+              (identifier))))))))
+
+================================================================================
+Space after a continuation dot is an error (bsw-0twy)
+================================================================================
+
+mapping {
+  a. b -> c
+}
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (mapping_block
+    (mapping_body
+      (map_arrow
+        (src_path
+          (field_path
+            (identifier)))
+        (ERROR
+          (continuation_word))
+        (tgt_path
+          (field_path
+            (identifier)))))))
+
+================================================================================
+Space after a dot following a backtick name is an error (bsw-0twy)
+================================================================================
+
+mapping {
+  `a`. b -> c
+}
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (mapping_block
+    (mapping_body
+      (map_arrow
+        (src_path
+          (backtick_path
+            (backtick_name)))
+        (ERROR
+          (continuation_word))
+        (tgt_path
+          (field_path
+            (identifier)))))))
+
+================================================================================
+Comment after ^. cannot sit inside a path (bsw-0twy)
+================================================================================
+
+mapping {
+  each xs -> t {
+    ^. // why
+    a -> b
+  }
+}
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (mapping_block
+    (mapping_body
+      (each_block
+        (src_path
+          (field_path
+            (identifier)))
+        (tgt_path
+          (field_path
+            (identifier)))
+        (ERROR)
+        (comment)
+        (map_arrow
+          (src_path
+            (field_path
+              (identifier)))
+          (tgt_path
+            (field_path
+              (identifier))))))))
