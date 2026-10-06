@@ -1,6 +1,6 @@
 ---
 id: mbt-q3lv
-status: open
+status: closed
 deps: []
 links: []
 created: 2026-08-04T16:46:52Z
@@ -16,3 +16,10 @@ tooling/satsuma-viz-harness/scripts/watch-and-test.test.mjs intermittently fails
 
 The test either waits on a deterministic signal instead of a fixed 5s budget, or its timeout accounts for the watcher's 1s poll interval; 20 consecutive runs pass
 
+
+## Notes
+
+
+**2026-10-06T09:01:33Z**
+
+Closed as obsolete. The watcher and its test (tooling/satsuma-viz-harness/scripts/watch-and-test.mjs and watch-and-test.test.mjs) were deleted on 2026-08-10 when the harness moved to headless Chromium (commit ec46db7d), so there is nothing left to deflake.

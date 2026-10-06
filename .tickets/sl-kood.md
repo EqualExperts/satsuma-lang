@@ -1,6 +1,6 @@
 ---
 id: sl-kood
-status: done
+status: closed
 deps: []
 links: []
 created: 2026-03-26T07:18:45Z

@@ -1,6 +1,6 @@
 ---
 id: sl-j4eg
-status: done
+status: closed
 deps: []
 links: []
 created: 2026-03-30T05:29:44Z

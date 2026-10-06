@@ -1,6 +1,6 @@
 ---
 id: sc-1tcm
-status: done
+status: closed
 deps: []
 links: []
 created: 2026-03-26T07:01:13Z

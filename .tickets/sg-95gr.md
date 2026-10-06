@@ -1,6 +1,6 @@
 ---
 id: sg-95gr
-status: done
+status: closed
 deps: []
 links: []
 created: 2026-03-20T12:48:16Z

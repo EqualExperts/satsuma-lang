@@ -1,6 +1,6 @@
 ---
 id: sl-2e4z
-status: done
+status: closed
 deps: []
 links: []
 created: 2026-03-23T09:55:40Z

@@ -1,6 +1,6 @@
 ---
 id: sl-oz1t
-status: done
+status: closed
 deps: [sl-t7mg]
 links: []
 created: 2026-03-23T09:55:41Z

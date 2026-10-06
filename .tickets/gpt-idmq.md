@@ -1,7 +1,7 @@
 ---
 id: gpt-idmq
 status: open
-deps: []
+deps: [gpt-l0nz]
 links: []
 created: 2026-08-06T15:22:14Z
 type: task
@@ -24,3 +24,10 @@ A related cost note, not correctness: nlRefWorkspaceArbitrary (workspace-arbitra
 
 A transform-block arbitrary and a namespaced-metric arbitrary exist, are documented per-axis the way the file's others are, and are wired into workspaceScenarioArbitrary. R6's where-used property asserts transform_call refs positively rather than only asserting the empty set. Decide the single-sample cost question explicitly and record the choice.
 
+
+## Notes
+
+
+**2026-10-06T09:01:33Z**
+
+Now depends on gpt-l0nz (2026-10-06 ticket audit). Its transform-block half needs the same thing gpt-l0nz adds: a transform declaration in workspace-model.js, rendered by workspace-render.js and reachable from an arbitrary. Build that once there, then this ticket adds the namespaced-metric arbitrary and the positive transform_call assertion.
