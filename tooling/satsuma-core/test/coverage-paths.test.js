@@ -16,6 +16,7 @@ import {
   createContainerQualifiedFieldRef,
   isCoveredPath,
   schemaLocalFieldPath,
+  schemaLocalSegments,
 } from "@satsuma/core";
 
 /** Exercise schema localization through every validated stage boundary. */
@@ -231,5 +232,37 @@ describe("schemaLocalFieldPath()", () => {
     assert.equal(localize("orders.amount", "orders", [], declaresTopLevel), "orders.amount");
     // Without the declaration the same input is a schema-qualified reference.
     assert.equal(localize("orders.amount", "orders"), "amount");
+  });
+});
+
+describe("schemaLocalSegments()", () => {
+  // The segment form of the rule above, for callers that hold a resolved path
+  // as segments (the LSP and the workspace index). Only what the segment form
+  // changes is pinned here; the four rules themselves are pinned above.
+
+  /** Run the segment form with the same stage-boundary refs as `localize`. */
+  function localizeSegments(segments, authoredSchemaRef, otherSchemaRefs = []) {
+    return schemaLocalSegments(
+      segments,
+      createAuthoredEntityRef(authoredSchemaRef),
+      createCanonicalEntityRef(`::${authoredSchemaRef}`),
+      otherSchemaRefs.map(createAuthoredEntityRef),
+    );
+  }
+
+  it("strips a leading schema segment and keeps a quoted segment containing a dot whole", () => {
+    // Joined text would make `a.b` two levels; the segment form keeps it one
+    // field, which is what a declared-field lookup needs.
+    assert.deepEqual(localizeSegments(["crm", "a.b"], "crm"), ["a.b"]);
+  });
+
+  it("does not treat a first segment that merely starts with the schema name as a prefix", () => {
+    // The text rule matches on `crm.`; a segment `crm.x` (one quoted field)
+    // is a field of the schema, not the schema followed by `x`.
+    assert.deepEqual(localizeSegments(["crm.x"], "crm"), ["crm.x"]);
+  });
+
+  it("returns null for a path whose first segment names another schema on the side", () => {
+    assert.equal(localizeSegments(["ledger", "email"], "crm", ["ledger"]), null);
   });
 });

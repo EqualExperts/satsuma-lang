@@ -2,6 +2,8 @@ import { Hover, MarkupKind } from "vscode-languageserver";
 import type { SyntaxNode, Tree } from "./parser-utils";
 import { nodeRange, child, children, labelText, stringText, nodeAtPosition } from "./parser-utils";
 import { isMetricSchema } from "@satsuma/core";
+import { findNodeContext, resolveArrowContextField } from "./definition";
+import type { WorkspaceIndex } from "./workspace-index";
 
 // Maximum number of fields shown in a schema/fragment hover preview.
 // Beyond this cap the hover becomes too tall to be useful in the editor;
@@ -11,15 +13,22 @@ const MAX_HOVER_FIELDS = 8;
 /**
  * Compute hover information for the node at the given position.
  *
- * Per-file only — no workspace index.  Shows structural information
- * derived from the CST: block summaries, field types, metadata, etc.
+ * Mostly per-file: block summaries, field types, metadata and the like come
+ * from this file's CST alone. The one exception is an arrow path, whose field
+ * may be declared in another file — with `index` supplied, hovering a path
+ * shows the field it resolves to (bsw-89wr); without it, only the path text.
  */
-export function computeHover(tree: Tree, line: number, character: number): Hover | null {
+export function computeHover(
+  tree: Tree,
+  line: number,
+  character: number,
+  index?: WorkspaceIndex,
+): Hover | null {
   const node = nodeAtPosition(tree, line, character);
   if (!node) return null;
 
   // Walk up the tree to find a meaningful hover target
-  const result = hoverForNode(node, tree);
+  const result = hoverForNode(node, tree, index);
   if (!result) return null;
 
   return {
@@ -33,10 +42,13 @@ interface HoverResult {
   node: SyntaxNode;
 }
 
-function hoverForNode(node: SyntaxNode, tree: Tree): HoverResult | null {
+function hoverForNode(node: SyntaxNode, tree: Tree, index?: WorkspaceIndex): HoverResult | null {
   // Try the node itself and ancestors until we find something useful
   let current: SyntaxNode | null = node;
   while (current) {
+    if (current.type === "src_path" || current.type === "tgt_path") {
+      return hoverArrowPath(current, node, index);
+    }
     const result = tryHover(current, tree);
     if (result) return result;
     current = current.parent;
@@ -72,10 +84,6 @@ function tryHover(node: SyntaxNode, tree: Tree): HoverResult | null {
       // defined in practice; null here would just mean "no hover", which
       // the caller already handles by walking further up the tree.
       return node.parent ? hoverSpread(node.parent, tree) : null;
-
-    case "src_path":
-    case "tgt_path":
-      return hoverArrowPath(node);
 
     case "pipe_text":
       return hoverPipeText(node);
@@ -317,12 +325,26 @@ function hoverSpread(node: SyntaxNode, tree: Tree): HoverResult | null {
   return { markdown: `**spread** \`...${name}\``, node: label };
 }
 
-function hoverArrowPath(node: SyntaxNode): HoverResult | null {
+/**
+ * Hover for an arrow path: the path as written and, when the index can
+ * resolve it, the declared field it means — its schema-qualified path,
+ * resolved against the enclosing each/flatten containers, and its type.
+ * `cursorNode` picks the segment, so hovering `a` in `.a.b` describes `a`.
+ */
+function hoverArrowPath(
+  node: SyntaxNode,
+  cursorNode: SyntaxNode,
+  index: WorkspaceIndex | undefined,
+): HoverResult {
   const side = node.type === "src_path" ? "source" : "target";
-  return {
-    markdown: `**${side} path** \`${node.text}\``,
-    node,
-  };
+  const heading = `**${side} path** \`${node.text}\``;
+  const ctx = index ? findNodeContext(cursorNode) : null;
+  const declared = ctx && index ? resolveArrowContextField(ctx, index) : null;
+  if (!declared) return { markdown: heading, node };
+
+  const fieldPath = `${declared.schema}.${declared.localPath.join(".")}`;
+  const type = declared.field.type ? ` \`${declared.field.type}\`` : "";
+  return { markdown: `${heading}\n\nField \`${fieldPath}\`${type}`, node };
 }
 
 function hoverPipeText(node: SyntaxNode): HoverResult | null {

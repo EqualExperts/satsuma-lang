@@ -91,6 +91,7 @@ export {
   buildCoveredFieldPaths,
   isCoveredPath,
   schemaLocalFieldPath,
+  schemaLocalSegments,
   schemaRefPrefixes,
 } from "./coverage-paths.js";
 export type { CoveredFieldPaths } from "./coverage-paths.js";
@@ -155,8 +156,21 @@ export {
   fieldNameText,
   walkDescendants,
 } from "./cst-utils.js";
-export { arrowPathParts, arrowPathText, renderArrowPath, resolveArrowPath } from "./arrow-path.js";
-export type { ArrowPathAnchor, ArrowPathParts, ResolvedArrowPath } from "./arrow-path.js";
+export {
+  arrowPathParts,
+  arrowPathSegmentNodes,
+  arrowPathText,
+  renderArrowPath,
+  resolveArrowPath,
+  resolveArrowPathInPlace,
+  resolvedSegmentsThrough,
+} from "./arrow-path.js";
+export type {
+  ArrowPathAnchor,
+  ArrowPathInPlace,
+  ArrowPathParts,
+  ResolvedArrowPath,
+} from "./arrow-path.js";
 export {
   isAnnotationComment,
   trailingCommentOwner,

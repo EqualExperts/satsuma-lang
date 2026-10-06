@@ -15,7 +15,8 @@
  * This module owns turning that CST into structured parts, rendering the parts
  * back to the authored path string, and handing them to the container rule in
  * reference-stages.ts so a path is resolved from its segments rather than from
- * re-split text. The rule itself (what `^.`, `$.` and `.` mean) lives in
+ * re-split text — top-down during extraction, or in place from a single path
+ * node for an editor (`resolveArrowPathInPlace`). The rule itself (what `^.`, `$.` and `.` mean) lives in
  * reference-stages.ts, and nothing here looks a field up.
  *
  * Why the CST and not `node.text`: a path's raw text keeps the backticks of
@@ -32,6 +33,7 @@ import {
   resolvePathSegmentsAgainstContainer,
   type ContainerSegments,
 } from "./reference-stages.js";
+import type { SatsumaCstType } from "./generated/cst-types.js";
 import type { SyntaxNode } from "./types.js";
 
 // ── Types ───────────────────────────────────────────────────────────────────
@@ -249,4 +251,110 @@ function firstLine(text: string | null): string | null {
   if (!text) return null;
   const nlIdx = text.indexOf("\n");
   return nlIdx === -1 ? text : text.slice(0, nlIdx).trim();
+}
+
+// ── Resolution in place, from any path node ────────────────────────────────
+
+/**
+ * Node types whose body paths are written relative to the container's own
+ * header paths (spec §4.4) — the same three `collectArrowRecords` in
+ * extract.ts recurses through.
+ */
+const CONTAINER_NODE_TYPES: ReadonlySet<SatsumaCstType> = new Set([
+  "nested_arrow",
+  "each_block",
+  "flatten_block",
+]);
+
+/**
+ * An arrow path resolved where it sits in the CST, together with the nodes of
+ * its own authored segments, so an editor can tell which part of the resolved
+ * path the cursor is on.
+ */
+export interface ArrowPathInPlace {
+  /** The authored text, as {@link resolveArrowPath} returns it. */
+  authored: string;
+  /** The path made absolute against every enclosing container. */
+  resolved: ResolvedArrowPath;
+  /**
+   * The `identifier` / `backtick_name` nodes of the authored segments, in
+   * order, excluding a namespace qualifier. They align with the *last*
+   * `segmentNodes.length` entries of `resolved.segments`, since container
+   * resolution only ever prepends. Empty for an error-recovered path, whose
+   * segments are not trusted (rule sl-8o1n).
+   */
+  segmentNodes: SyntaxNode[];
+}
+
+/**
+ * The authored segment nodes of a `src_path` / `tgt_path`, excluding a
+ * namespace qualifier; empty when the path is absent or error-recovered.
+ */
+export function arrowPathSegmentNodes(pathNode: SyntaxNode | null | undefined): SyntaxNode[] {
+  const inner = pathNode?.namedChildren[0];
+  if (!inner || !anchorOf(inner)) return [];
+  const segNodes = segmentNodes(inner);
+  if (!segNodes) return [];
+  return inner.type === "namespaced_path" ? segNodes.slice(1) : segNodes;
+}
+
+/**
+ * Resolve a `src_path` / `tgt_path` node against the containers that enclose
+ * it, by walking up the CST rather than down from the mapping.
+ *
+ * Extraction resolves top-down as it walks a mapping body; an editor starts
+ * from the one path under the cursor and has no such walk. Both must give the
+ * same answer — an LSP that resolves `.id` inside `each orders` to the
+ * top-level `id` sends go-to-definition to the wrong field (bsw-89wr) — so
+ * this applies the same two rules extraction does: the container's header path
+ * on the same side is the frame, and a container's own frame is its enclosing
+ * container's. core's arrow-path tests pin that the two agree on every arrow
+ * in the example corpus.
+ *
+ * @returns null when the node is absent or holds no path text.
+ */
+export function resolveArrowPathInPlace(
+  pathNode: SyntaxNode | null | undefined,
+): ArrowPathInPlace | null {
+  if (!pathNode) return null;
+  const result = resolveArrowPath(pathNode, enclosingContainerPath(pathNode));
+  if (!result) return null;
+  return { ...result, segmentNodes: arrowPathSegmentNodes(pathNode) };
+}
+
+/**
+ * The resolved segments up to and including the authored segment `node`, or
+ * all of them when `node` is not one of the path's segments (the cursor is on
+ * a `^.` marker, say). Lets go-to-definition on `b` in `.a.b` land on `a.b`,
+ * and on `a` land on `a`.
+ */
+export function resolvedSegmentsThrough(path: ArrowPathInPlace, node: SyntaxNode): string[] {
+  const all = [...path.resolved.segments];
+  // Compared by span, not identity: web-tree-sitter mints a fresh wrapper on
+  // every child access, so two wrappers of one node are never `===`.
+  const at = path.segmentNodes.findIndex(
+    (seg) => seg.startIndex === node.startIndex && seg.endIndex === node.endIndex,
+  );
+  if (at < 0) return all;
+  const firstAuthored = all.length - path.segmentNodes.length;
+  return all.slice(0, Math.max(0, firstAuthored) + at + 1);
+}
+
+/**
+ * The resolved same-side header path of the container enclosing the arrow
+ * that owns `pathNode`, or null at mapping-body level.
+ *
+ * A path's parent is its arrow (or the container whose header it is); that
+ * node's parent is the enclosing container when there is one. Sources take the
+ * first header path that resolves, as extraction's `resolvedSources[0]` does.
+ */
+function enclosingContainerPath(pathNode: SyntaxNode): ResolvedArrowPath | null {
+  const container = pathNode.parent?.parent;
+  if (!container || !CONTAINER_NODE_TYPES.has(container.type)) return null;
+  for (const header of container.namedChildren) {
+    if (header.type !== pathNode.type) continue;
+    const resolved = resolveArrowPathInPlace(header)?.resolved;
+    if (resolved) return resolved;
+  }
+  return null;
 }

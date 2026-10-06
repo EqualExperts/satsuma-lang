@@ -34,6 +34,12 @@ import {
   createAtRefRegex,
   splitRefSchemaKey,
   renderFieldDeclType,
+  arrowPathParts,
+  resolveArrowPathInPlace,
+  pathSegmentText,
+  schemaLocalSegments,
+  createAuthoredEntityRef,
+  createCanonicalEntityRef,
 } from "@satsuma/core";
 import type { FieldDecl, SatsumaCstType, SatsumaGrammarSymbol } from "@satsuma/core";
 
@@ -813,24 +819,35 @@ function indexArrowFieldRefs(
 
   walkDescendants(body, (n) => {
     if (n.type !== "src_path" && n.type !== "tgt_path") return;
-    const isSrc = n.type === "src_path";
-    const schemas = isSrc ? sourceSchemas : targetSchemas;
+    const schemas = n.type === "src_path" ? sourceSchemas : targetSchemas;
 
-    const fieldName = extractArrowFieldName(n); // first segment / bare name
-    const fullPath = extractArrowFullPath(n); // full dotted path, namespace-stripped
-
-    if (!fieldName) return;
+    // Read from the CST and resolved against the enclosing each/flatten/nested
+    // containers, exactly as extraction resolves the arrow. Munging the text
+    // keyed `.id` inside `each orders` as `src.id` (the top-level field),
+    // `^.x` under `^` and kept the backticks of later segments, so
+    // find-references from either end never met (bsw-89wr). An error-recovered
+    // path has no trusted segments and is not indexed (rule sl-8o1n).
+    const path = resolveArrowPathInPlace(n);
+    const [firstSegment] = path?.segmentNodes ?? [];
+    if (!path || !firstSegment) return;
+    const fieldName = pathSegmentText(firstSegment);
+    // A namespaced path (`crm::address.street`) names a schema and field, and
+    // is keyed without its `ns::`, as the range below excludes it (sl-xf3f).
+    const fullPath = arrowPathParts(n)?.namespace
+      ? path.segmentNodes.map(pathSegmentText).join(".")
+      : path.resolved.text;
 
     // Rename replaces a reference's stored range verbatim, so each range must
     // cover exactly the text keyed under the entry's name. Storing the whole
     // path node here clobbered everything around the name: renaming a schema
     // "address" rewrote the arrow "address.street -> s" to "<new> -> s",
     // silently deleting ".street" (sl-xf3f). It also made find-references
-    // highlight whole dotted paths for a bare-name query.
-    const firstSegmentRange = arrowFirstSegmentRange(n) ?? nodeRange(n);
-    const fullPathRange = arrowFullPathRange(n) ?? nodeRange(n);
+    // highlight whole dotted paths for a bare-name query. Neither range covers
+    // a `.`, `^.`, `$.` or `ns::` marker, which are not part of any name.
+    const firstSegmentRange = nodeRange(firstSegment);
+    const fullPathRange = authoredSegmentsRange(path.segmentNodes);
 
-    // Bare field name — range covers the first path segment only
+    // Bare field name — the first authored segment
     addReference(index, fieldName, {
       uri,
       range: firstSegmentRange,
@@ -839,71 +856,76 @@ function indexArrowFieldRefs(
       namespace,
     });
 
-    // schema.fullPath — canonical qualified keys, matching CLI index-builder
-    if (fullPath) {
-      for (const schema of schemas) {
-        const qualKey = `${schema}.${fullPath}`;
-        addReference(index, qualKey, {
-          uri,
-          range: fullPathRange,
-          name: qualKey,
-          context: "arrow",
-          namespace,
-        });
-      }
-      // Also index the full path without a schema prefix when it differs from
-      // the bare name (nested paths like CdtTrfTxInf.DbtrAgt.BIC)
-      if (fullPath !== fieldName) {
-        addReference(index, fullPath, {
-          uri,
-          range: fullPathRange,
-          name: fullPath,
-          context: "arrow",
-          namespace,
-        });
-      }
+    // schema.path — the container-resolved path under each schema it can
+    // belong to; arrowFieldReferenceKeys is the one rule queries use too.
+    for (const qualKey of arrowFieldReferenceKeys(schemas, path.resolved.segments)) {
+      addReference(index, qualKey, {
+        uri,
+        range: fullPathRange,
+        name: qualKey,
+        context: "arrow",
+        namespace,
+      });
+    }
+    // Also index the resolved path without a schema prefix when it differs
+    // from the bare name (nested paths like CdtTrfTxInf.DbtrAgt.BIC)
+    if (fullPath !== fieldName) {
+      addReference(index, fullPath, {
+        uri,
+        range: fullPathRange,
+        name: fullPath,
+        context: "arrow",
+        namespace,
+      });
     }
   });
 }
 
 /**
- * The CST node for the first field segment of a src_path/tgt_path — the
- * `identifier` or `backtick_name` whose text extractArrowFieldName returns.
- * Skips the namespace qualifier of a namespaced_path and the leading dot of a
- * relative_field_path. Returns null on unexpected shapes (error recovery).
+ * The reference keys an arrow path's resolved field is indexed under: one
+ * `schema.path` per schema on the arrow's side the path can belong to.
+ *
+ * The path is made schema-local by core's rule (`schemaLocalSegments`), so a
+ * multi-source arrow written `crm.email` is keyed `crm.email` under `crm` only,
+ * not also `crm.crm.email` and `ledger.crm.email`. Exported because a
+ * find-references query from an arrow must build its keys the same way or the
+ * two never meet.
+ *
+ * @param sideSchemas      The schemas named on the arrow's side of the mapping,
+ *                         as authored in its source/target block.
+ * @param resolvedSegments The container-resolved path (arrow-path.ts
+ *                         `resolveArrowPathInPlace`), possibly led by a schema.
  */
-function arrowFirstSegmentNode(pathNode: SyntaxNode): SyntaxNode | null {
-  const inner = pathNode.namedChildren[0];
-  if (!inner) return null;
-  // namespaced_path = identifier "::" seg ("." seg)* — its first named child
-  // is the namespace, so the field's first segment is the second. Every other
-  // path form (field_path, backtick_path, relative_field_path) starts
-  // directly with its first segment.
-  const seg = inner.type === "namespaced_path" ? inner.namedChildren[1] : inner.namedChildren[0];
-  return seg ?? null;
+export function arrowFieldReferenceKeys(
+  sideSchemas: readonly string[],
+  resolvedSegments: readonly string[],
+): string[] {
+  const keys: string[] = [];
+  for (const schema of sideSchemas) {
+    const others = sideSchemas.filter((s) => s !== schema).map(createAuthoredEntityRef);
+    const local = schemaLocalSegments(
+      resolvedSegments,
+      createAuthoredEntityRef(schema),
+      createCanonicalEntityRef(schema.includes("::") ? schema : `::${schema}`),
+      others,
+    );
+    if (local) keys.push(`${schema}.${local.join(".")}`);
+  }
+  return keys;
 }
 
-/** Range of exactly the first path segment of a src_path/tgt_path node. */
-function arrowFirstSegmentRange(pathNode: SyntaxNode): Range | null {
-  const seg = arrowFirstSegmentNode(pathNode);
-  return seg ? nodeRange(seg) : null;
-}
-
-/**
- * Range of the dotted field path as keyed by extractArrowFullPath: from the
- * first field segment to the end of the path. The leading dot of relative
- * paths and the `ns::` prefix of namespaced paths are not part of the keyed
- * name, so they must stay outside the range a rename rewrites (sl-xf3f).
- */
-function arrowFullPathRange(pathNode: SyntaxNode): Range | null {
-  const inner = pathNode.namedChildren[0];
-  const seg = arrowFirstSegmentNode(pathNode);
-  if (!inner || !seg) return null;
+/** The span from the first to the last authored segment of a path. */
+function authoredSegmentsRange(segmentNodes: readonly SyntaxNode[]): Range {
+  // Callers pass a non-empty list; the fallbacks exist only for
+  // noUncheckedIndexedAccess.
+  const first = segmentNodes[0];
+  const last = segmentNodes[segmentNodes.length - 1] ?? first;
+  if (!first || !last) return Range.create(0, 0, 0, 0);
   return Range.create(
-    seg.startPosition.row,
-    seg.startPosition.column,
-    inner.endPosition.row,
-    inner.endPosition.column,
+    first.startPosition.row,
+    first.startPosition.column,
+    last.endPosition.row,
+    last.endPosition.column,
   );
 }
 
@@ -919,61 +941,6 @@ function getMappingBodySchemas(body: SyntaxNode, blockType: SatsumaGrammarSymbol
     }
   }
   return names;
-}
-
-/**
- * Extract the full field path from a src_path or tgt_path node —
- * strips any leading dot (relative paths) and namespace prefix (ns::field).
- * Returns the dotted field path, e.g. "Amount", "CdtTrfTxInf.DbtrAgt.BIC",
- * or "field name" for a backtick-quoted first segment.
- */
-function extractArrowFullPath(pathNode: SyntaxNode): string | null {
-  const text = pathNode.text;
-  if (!text) return null;
-
-  // Backtick path: `field name` or `field name`.nested — strip backticks from first seg
-  if (text.startsWith("`")) {
-    const endTick = text.indexOf("`", 1);
-    if (endTick <= 0) return null;
-    const firstSeg = text.slice(1, endTick);
-    const rest = text.slice(endTick + 1); // e.g. ".nested" or ""
-    return rest.startsWith(".") ? firstSeg + rest : firstSeg;
-  }
-
-  // Strip leading dot from relative paths (.field → field)
-  const stripped = text.startsWith(".") ? text.slice(1) : text;
-
-  // Strip namespace prefix (ns::field → field)
-  const nsIdx = stripped.indexOf("::");
-  return (nsIdx >= 0 ? stripped.slice(nsIdx + 2) : stripped) || null;
-}
-
-/** Extract the first-segment field name from a src_path or tgt_path node. */
-function extractArrowFieldName(pathNode: SyntaxNode): string | null {
-  const text = pathNode.text;
-  if (!text) return null;
-
-  // Handle backtick paths: `field name` or `field name`.sub
-  if (text.startsWith("`")) {
-    const endTick = text.indexOf("`", 1);
-    if (endTick > 0) return text.slice(1, endTick);
-    return null;
-  }
-
-  // Handle relative paths: .field or .parent.field — strip leading dot
-  const stripped = text.startsWith(".") ? text.slice(1) : text;
-
-  // Take the first segment (before any dots)
-  // split() on any string always yields at least one element; the
-  // fallback exists only for noUncheckedIndexedAccess.
-  const firstSegment = stripped.split(".")[0] ?? "";
-
-  // Handle namespaced: ns::field → take field part
-  if (firstSegment.includes("::")) {
-    return firstSegment.split("::").pop() ?? null;
-  }
-
-  return firstSegment || null;
 }
 
 const NL_AT_REF_RE = createAtRefRegex();
@@ -1303,8 +1270,7 @@ function fieldDeclToInfo(decl: FieldDecl, cstNode: SyntaxNode | null): FieldInfo
 // These delegate to @satsuma/core cst-utils for the standard CST text
 // extraction logic. Import and spread names come straight from core's
 // importNameText/spreadLabelText, so a backtick name after `::` unquotes the same way
-// everywhere (bsw-iuzs). Only extractArrowFullPath remains here as an
-// index-specific adapter.
+// everywhere (bsw-iuzs), and arrow paths are read by core's arrow-path module.
 
 /**
  * Extract the structural schema/fragment name from a source_ref node.
