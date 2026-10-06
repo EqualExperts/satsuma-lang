@@ -8,7 +8,14 @@
  *   cd tooling/tree-sitter-satsuma && npx node-gyp configure && npx node-gyp build
  */
 
-import { copyFileSync, mkdtempSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
+import {
+  copyFileSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  unlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve, join } from "node:path";
@@ -2233,6 +2240,27 @@ describe("satsuma validate", () => {
     const { stdout, code } = await run("validate", resolve(EXAMPLES, "lib/common.stm"));
     assert.equal(code, 0);
     assert.match(stdout, /no issues/i);
+  });
+
+  it("every canonical example file validates with no errors or warnings (bsw-8flg)", async () => {
+    // The examples are the executable corpus readers copy from, so a warning
+    // in one teaches a broken pattern. bsw-8flg found namespaces.stm mapping
+    // fields its source schema never declared, and ns-platform.stm importing
+    // schemas that had since been renamed; nothing failed because validate
+    // exits 0 on warnings. This pins the whole corpus clean.
+    const exampleFiles = readdirSync(EXAMPLES, { recursive: true, encoding: "utf8" })
+      .filter((relative) => relative.endsWith(".stm"))
+      .sort();
+    assert.ok(exampleFiles.length > 0, "the example corpus must not be empty");
+
+    const findings: string[] = [];
+    for (const relative of exampleFiles) {
+      const { stdout } = await run("validate", "--json", resolve(EXAMPLES, relative));
+      for (const finding of JSON.parse(stdout).findings) {
+        findings.push(`${relative}:${finding.line} [${finding.rule}] ${finding.message}`);
+      }
+    }
+    assert.deepEqual(findings, []);
   });
 
   it("parse errors report correct structure", async () => {
