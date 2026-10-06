@@ -4367,6 +4367,42 @@ describe("satsuma arrows — a declared path beats the leaf-name fallback (bsw-k
     assert.equal(code, 0);
     assert.deepEqual(sourcesOf(stdout), ["::src.orders.lines.ref", "::src.orders.ref"]);
   });
+
+  describe("when a top-level record shares the schema's name", () => {
+    const NAMED = resolve(__dirname, "fixtures", "arrows-schema-named-record.stm");
+
+    /** The canonical targets of an `arrows --json` answer, sorted. */
+    const targetsOf = (stdout: string): string[] =>
+      (JSON.parse(stdout) as Array<{ target: string }>).map((a) => a.target).sort();
+
+    it("lists only the top-level field's arrow, agreeing with its own summary", async () => {
+      // In schema `orders`, `orders.id -> b` maps the record child
+      // `orders.orders.id`. The index files it under the key `orders.id` too, and
+      // that key's arrows used to be listed without the queried-field test, so
+      // the text listed two arrows under a "1 arrow" header.
+      const { stdout, code } = await run("arrows", "orders.id", NAMED);
+      assert.equal(code, 0);
+      assert.match(stdout, /orders\.id — 1 arrow \(1 as source\)/);
+      assert.ok(!stdout.includes("-> b"), "the record child's arrow leaked into the output");
+    });
+
+    it("answers the plain and --as-source queries with the same arrows", async () => {
+      // The direction filter only narrows by side; on a source-only field it
+      // must return exactly what the unfiltered query returns.
+      const plain = await run("arrows", "orders.id", "--json", NAMED);
+      const asSource = await run("arrows", "orders.id", "--as-source", "--json", NAMED);
+      assert.deepEqual(targetsOf(plain.stdout), ["::t.a"]);
+      assert.deepEqual(targetsOf(asSource.stdout), ["::t.a"]);
+    });
+
+    it("attributes the record child's arrow to the record child alone", async () => {
+      // The arrow excluded above is not lost: it answers the query for the
+      // field it actually maps.
+      const { stdout, code } = await run("arrows", "orders.orders.id", "--json", NAMED);
+      assert.equal(code, 0);
+      assert.deepEqual(targetsOf(stdout), ["::t.b"]);
+    });
+  });
 });
 
 describe("satsuma nl/meta field syntax (sg-95gr)", () => {
