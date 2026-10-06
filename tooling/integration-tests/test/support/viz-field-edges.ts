@@ -24,6 +24,7 @@
  */
 
 import { qualifyChildArrowPath } from "@satsuma/core/extract";
+import { PATH_SEPARATOR, type ContainerSegments } from "@satsuma/core/reference-stages";
 import { arrowEndpoint } from "satsuma-cli/testing";
 import type { FieldArrowLike, FieldEdgeSource, FieldMappingSides } from "@satsuma/core";
 import type {
@@ -36,24 +37,43 @@ import type {
   VizModel,
 } from "@satsuma/viz-backend/viz-model";
 
-/** The absolute source/target paths child arrows inside a container resolve against. */
+/**
+ * The absolute source/target segments child arrows inside a container resolve
+ * against — segments, not joined text, so a dotted backtick container stays
+ * one level for `^.` (bsw-2yzd).
+ */
 interface ContainerScope {
-  source: string | null;
-  target: string | null;
+  source: ContainerSegments | null;
+  target: ContainerSegments | null;
 }
 
 /** Mapping-body level: arrows there are already absolute. */
 const MAPPING_BODY_SCOPE: ContainerScope = { source: null, target: null };
 
-/** The scope inside `block`, given the scope the block itself sits in. */
+/**
+ * The scope inside `block`, given the scope the block itself sits in: the
+ * block's carried, already-absolute header segments, else (older payloads) its
+ * header text qualified against the outer scope and split into levels.
+ */
 function scopeWithin(
   outer: ContainerScope,
   block: EachBlock | FlattenBlock | NestedArrowBlock,
 ): ContainerScope {
   return {
-    source: qualifyChildArrowPath(block.sourceField, outer.source) || null,
-    target: qualifyChildArrowPath(block.targetField, outer.target) || null,
+    source: sideScope(block.sourceContainerSegments, block.sourceField, outer.source),
+    target: sideScope(block.targetContainerSegments, block.targetField, outer.target),
   };
+}
+
+/** One side of {@link scopeWithin}. */
+function sideScope(
+  carried: readonly string[] | undefined,
+  header: string,
+  outer: ContainerSegments | null,
+): ContainerSegments | null {
+  if (carried) return carried.length > 0 ? carried : null;
+  const qualified = qualifyChildArrowPath(header, outer);
+  return qualified ? qualified.split(PATH_SEPARATOR) : null;
 }
 
 /** One qualified arrow, ready to become a `FieldArrowLike`. */

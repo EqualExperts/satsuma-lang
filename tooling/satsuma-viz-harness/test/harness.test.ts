@@ -53,6 +53,8 @@ const buyToOmUri = libraryUri("contracts/buy-to-om-order.stm");
 const nestedIterationUri = libraryUri("nested-iteration/pipeline.stm");
 /** Minimal fixture with a top-level dotted each target (tced-ninm). */
 const topLevelDottedEachUri = libraryUri("top-level-dotted-each/pipeline.stm");
+/** Minimal fixture: `^.` inside an each over a dotted backtick field (bsw-2yzd). */
+const dottedBacktickContainerUri = libraryUri("dotted-backtick-container/pipeline.stm");
 /**
  * Governance fixture's own mapping — a two-source join (crm_customers,
  * finance_transactions) with computed arrows whose NL text names source
@@ -1824,6 +1826,36 @@ test.describe("Hover highlighting between arrows and field rows", () => {
     );
     const targetField = detail.locator(
       "[data-testid='mapping-detail-m-target-schema-card-tgt-field-rows-role']",
+    );
+
+    await expect(sourceField).toHaveClass(/\bhl\b/);
+    await expect(targetField).toHaveClass(/\bhl\b/);
+  });
+
+  test("hovering a ^. arrow inside an each over a dotted backtick field highlights the schema-root source (bsw-2yzd)", async ({
+    page,
+  }) => {
+    // `` each `line.items` -> rows `` is one container level whose name holds a
+    // dot. `^.sid` pops that whole level to the schema root's `sid`; read from
+    // the joined text it popped only `items` and named the undeclared
+    // `line.sid`, so hovering the row lit no source field.
+    await page.goto("/");
+    await page.waitForFunction(() => {
+      const harness = window.__satsumaHarness;
+      if (!harness?.setViewMode) return false;
+      harness.setViewMode("single");
+      return true;
+    });
+    await loadFixture(page, dottedBacktickContainerUri);
+    const detail = await openMappingByName(page, "m");
+
+    await detail.locator("[data-testid='mapping-detail-m-arrow-row-each-rows-y']").hover();
+
+    const sourceField = detail.locator(
+      "[data-testid='mapping-detail-m-source-schema-card-src-field-sid']",
+    );
+    const targetField = detail.locator(
+      "[data-testid='mapping-detail-m-target-schema-card-tgt-field-rows-y']",
     );
 
     await expect(sourceField).toHaveClass(/\bhl\b/);

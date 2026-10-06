@@ -25,6 +25,7 @@ import {
   fieldDeclFromRenderedType,
   isMetricSchema,
   renderFieldDeclType,
+  resolveArrowPathInPlace,
 } from "@satsuma/core";
 import type { MetaEntry, FieldDecl, SpreadEntity } from "@satsuma/core";
 import { isAnnotationComment, trailingCommentOwner, trailingComments } from "@satsuma/core";
@@ -1116,6 +1117,32 @@ function extractNestedBlockContents(uri: string, node: SyntaxNode): NestedBlockC
 }
 
 /**
+ * The header fields every container block shares: its source and target
+ * paths as authored text, and the same paths resolved to schema-root segments
+ * by core (`resolveArrowPathInPlace`), which walks the CST's enclosing
+ * containers itself. The segments are what the viz resolves the block's body
+ * against, because the text form loses a dot inside a backtick segment
+ * (bsw-2yzd); see `ContainerSegmentsOfBlock` in the VizModel contract.
+ */
+function containerHeader(
+  node: SyntaxNode,
+): Pick<
+  EachBlock,
+  "sourceField" | "targetField" | "sourceContainerSegments" | "targetContainerSegments"
+> {
+  const srcPath = child(node, "src_path");
+  const tgtPath = child(node, "tgt_path");
+  const sourceSegments = resolveArrowPathInPlace(srcPath)?.resolved.segments;
+  const targetSegments = resolveArrowPathInPlace(tgtPath)?.resolved.segments;
+  return {
+    sourceField: srcPath ? pathText(srcPath) : "",
+    targetField: tgtPath ? pathText(tgtPath) : "",
+    ...(sourceSegments ? { sourceContainerSegments: [...sourceSegments] } : {}),
+    ...(targetSegments ? { targetContainerSegments: [...targetSegments] } : {}),
+  };
+}
+
+/**
  * Extract an `each` sub-block — a per-list-element mapping nested inside a
  * parent mapping.
  *
@@ -1125,12 +1152,8 @@ function extractNestedBlockContents(uri: string, node: SyntaxNode): NestedBlockC
  * are valid inside `each` and are collected alongside direct arrows.
  */
 function extractEachBlock(uri: string, node: SyntaxNode): EachBlock {
-  const srcPath = child(node, "src_path");
-  const tgtPath = child(node, "tgt_path");
-
   return {
-    sourceField: srcPath ? pathText(srcPath) : "",
-    targetField: tgtPath ? pathText(tgtPath) : "",
+    ...containerHeader(node),
     ...extractNestedBlockContents(uri, node),
     location: nodeLocation(uri, node),
   };
@@ -1145,12 +1168,8 @@ function extractEachBlock(uri: string, node: SyntaxNode): EachBlock {
  * that target.
  */
 function extractFlattenBlock(uri: string, node: SyntaxNode): FlattenBlock {
-  const srcPath = child(node, "src_path");
-  const tgtPath = child(node, "tgt_path");
-
   return {
-    sourceField: srcPath ? pathText(srcPath) : "",
-    targetField: tgtPath ? pathText(tgtPath) : "",
+    ...containerHeader(node),
     ...extractNestedBlockContents(uri, node),
     location: nodeLocation(uri, node),
   };
@@ -1167,12 +1186,8 @@ function extractFlattenBlock(uri: string, node: SyntaxNode): FlattenBlock {
  * identically and the grammar decides what can actually appear.
  */
 function extractNestedArrowBlock(uri: string, node: SyntaxNode): NestedArrowBlock {
-  const srcPath = child(node, "src_path");
-  const tgtPath = child(node, "tgt_path");
-
   return {
-    sourceField: srcPath ? pathText(srcPath) : "",
-    targetField: tgtPath ? pathText(tgtPath) : "",
+    ...containerHeader(node),
     ...extractNestedBlockContents(uri, node),
     location: nodeLocation(uri, node),
   };

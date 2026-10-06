@@ -209,15 +209,16 @@ export interface ResolvedArrowPath {
 /**
  * Resolve a `src_path` / `tgt_path` node against its enclosing container.
  *
- * A well-formed, un-namespaced path is resolved segment by segment
- * (`resolvePathSegmentsAgainstContainer`), never re-split from text.
+ * A well-formed path is resolved segment by segment
+ * (`resolvePathSegmentsAgainstContainer`), never re-split from text. A
+ * namespaced path's qualifier rides on its schema segment (`ns::schema`), so
+ * `` ns::s.`a.b` `` is the two levels `["ns::s", "a.b"]` and joins back to the
+ * canonical `ns::s.a.b` identity (bsw-2yzd).
  *
- * Two shapes have no clean segments and keep the text resolver: an
- * error-recovered path, whose raw text must stay visibly malformed (rule
- * sl-8o1n above), and a namespaced path, whose canonical `ns::schema.field`
- * identity is text. Their segments are the resolved text split on `.` — exact
- * unless a segment holds a dot, which is how every path was handled before
- * bsw-2yzd, so these rare shapes lose nothing they had.
+ * Only an error-recovered path has no clean segments. It keeps the text
+ * resolver, so its raw text stays visibly malformed (rule sl-8o1n above), and
+ * its segments are the resolved text split on `.`; such a path never resolves
+ * to a declared field, so it is never a container worth descending into.
  *
  * @param pathNode  The path node, or null/undefined for an arrow without one.
  * @param container The resolved enclosing container, or null at mapping-body
@@ -234,16 +235,27 @@ export function resolveArrowPath(
   if (!authored) return null;
 
   const parts = arrowPathParts(pathNode);
-  if (parts && parts.namespace === null) {
+  if (parts) {
     const segments = resolvePathSegmentsAgainstContainer(
       parts.anchor,
-      parts.segments,
+      qualifiedSegments(parts),
       container?.segments ?? null,
     );
     return { authored, resolved: { text: segments.join(PATH_SEPARATOR), segments } };
   }
   const text = resolveAuthoredPathAgainstContainer(authored, container?.segments ?? null);
   return { authored, resolved: { text, segments: text.split(PATH_SEPARATOR) } };
+}
+
+/**
+ * A path's segments with any namespace folded into the schema segment, so
+ * joining them gives the canonical `ns::schema.field` text `renderArrowPath`
+ * would, while a dotted field segment stays one level.
+ */
+function qualifiedSegments(parts: ArrowPathParts): string[] {
+  if (parts.namespace === null) return parts.segments;
+  const [schema = "", ...field] = parts.segments;
+  return [canonicalRef(parts.namespace, schema), ...field];
 }
 
 /** The text up to its first line break, trimmed when one was cut off. */

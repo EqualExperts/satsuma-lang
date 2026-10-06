@@ -1,0 +1,28 @@
+// Minimal fixture: an each block whose header names a field with a dot in
+// its backtick-quoted name.  `line.items` is one field, so it is one
+// container level, and ^.sid inside it pops the whole name to reach the
+// schema root (bsw-2yzd).
+
+schema src {
+  sid  VARCHAR(10)  (pk)
+  `line.items` list_of record {
+    v  VARCHAR(20)  (required)
+  }
+}
+
+schema tgt {
+  rows list_of record {
+    x  VARCHAR(20)  (required)
+    y  VARCHAR(10)  (required)
+  }
+}
+
+mapping m {
+  source { src }
+  target { tgt }
+
+  each `line.items` -> rows {
+    .v -> .x
+    ^.sid -> .y
+  }
+}

@@ -358,6 +358,42 @@ describe("mappings", () => {
 
 // ---------- Metrics ----------
 
+describe("container segments on each, flatten and nested-arrow blocks (bsw-2yzd)", () => {
+  // A container header names one nesting level per segment, and a backtick
+  // segment may hold a dot. The joined `sourceField` text cannot carry that,
+  // so the block also carries its header resolved to schema-root segments,
+  // which is what the viz resolves `^.` against.
+  const SRC =
+    "schema src { sid STRING\n `line.items` list_of record { v STRING\n parts list_of record { p STRING } } }\n" +
+    "schema tgt { rows list_of record { x STRING\n y STRING\n parts list_of record { q STRING } } }\n" +
+    "mapping m {\n  source { src }\n  target { tgt }\n" +
+    "  each `line.items` -> rows {\n    .v -> .x\n    ^.sid -> .y\n" +
+    "    each .parts -> .parts { .p -> .q }\n  }\n}";
+
+  it("keeps a dotted backtick header as one segment", () => {
+    const each = vizModel(SRC).namespaces[0].mappings[0].eachBlocks[0];
+    assert.deepEqual(each.sourceContainerSegments, ["line.items"]);
+    assert.deepEqual(each.targetContainerSegments, ["rows"]);
+  });
+
+  it("resolves a nested block's header against its enclosing container", () => {
+    const inner = vizModel(SRC).namespaces[0].mappings[0].eachBlocks[0].nestedEach[0];
+    assert.deepEqual(inner.sourceContainerSegments, ["line.items", "parts"]);
+    assert.deepEqual(inner.targetContainerSegments, ["rows", "parts"]);
+  });
+
+  it("folds a namespace into the schema segment of a namespaced header", () => {
+    const model = vizModel(
+      "namespace a { schema src { `line.items` list_of record { v STRING } } }\n" +
+        "schema tgt { rows list_of record { x STRING } }\n" +
+        "mapping m {\n  source { a::src }\n  target { tgt }\n" +
+        "  each a::src.`line.items` -> rows { .v -> .x }\n}",
+    );
+    const mapping = model.namespaces.flatMap((n) => n.mappings).find((m) => m.id === "m");
+    assert.deepEqual(mapping.eachBlocks[0].sourceContainerSegments, ["a::src", "line.items"]);
+  });
+});
+
 describe("metrics", () => {
   it("extracts basic metric", () => {
     // Metrics are now schema blocks with (metric, metric_name "...", ...) metadata.

@@ -273,6 +273,29 @@ export interface ResolvedAtRef {
 }
 
 /**
+ * A container block's header paths resolved to schema-root segments — the
+ * frame every arrow in the block's body is resolved against.
+ *
+ * One entry per nesting level, unquoted, with a namespace folded into the
+ * schema entry (`a::src`). The joined `sourceField` / `targetField` text cannot
+ * stand in for these: `` `line.items` `` is one field whose name holds a dot, and
+ * re-splitting "line.items" counts it as two levels, so `^.sid` inside it
+ * resolved to the undeclared `line.sid` and the viz drew no edge for it
+ * (bsw-2yzd). Already absolute, so a consumer uses them as the block's scope
+ * directly instead of qualifying the header against the enclosing block.
+ *
+ * Optional because a payload cached by an older host will not carry them; a
+ * consumer then falls back to qualifying the header text, which is exact
+ * whenever no segment holds a dot.
+ */
+export interface ContainerSegmentsOfBlock {
+  /** Source header resolved against the enclosing containers; absent if not sent. */
+  sourceContainerSegments?: string[];
+  /** Target header resolved against the enclosing containers; absent if not sent. */
+  targetContainerSegments?: string[];
+}
+
+/**
  * An each_block — iterates over a list field and maps its children.
  *
  * `each` and `flatten` may interleave to any depth: the grammar's
@@ -281,7 +304,7 @@ export interface ResolvedAtRef {
  * `each`. Both nesting collections must therefore be walked by any consumer
  * counting or resolving arrows (sl-vu22).
  */
-export interface EachBlock {
+export interface EachBlock extends ContainerSegmentsOfBlock {
   /** Source list field being iterated. */
   sourceField: string;
   /** Target list field being populated. */
@@ -301,7 +324,7 @@ export interface EachBlock {
  *
  * Nests exactly as `each` does; see {@link EachBlock}.
  */
-export interface FlattenBlock {
+export interface FlattenBlock extends ContainerSegmentsOfBlock {
   /** Source list field being flattened. */
   sourceField: string;
   /**
@@ -339,7 +362,7 @@ export interface FlattenBlock {
  * shape and one walker; if the grammar ever admits iteration inside a
  * nested_arrow, the model and its consumers are already correct.
  */
-export interface NestedArrowBlock {
+export interface NestedArrowBlock extends ContainerSegmentsOfBlock {
   /** Source record path, as authored (relative `.addr` inside a container). */
   sourceField: string;
   /** Target record path, as authored. */
