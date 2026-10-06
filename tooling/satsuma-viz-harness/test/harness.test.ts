@@ -2550,3 +2550,248 @@ test.describe("Theme switching — representative audit tokens", () => {
     expect(edgeStrokeDark).not.toBe(edgeStrokeLight);
   });
 });
+
+// ---------- Canvas panning (gh-513, sl-u3x8) ----------
+//
+// A unit test cannot observe any of this: the canvas offset after a real
+// drag, the computed cursor, a card's click being swallowed, the minimap
+// tracking the drag, or a text selection. pan-gesture.test.js pins the rules;
+// these prove the gestures in a browser.
+
+/** A point in the viewport, in page coordinates. */
+interface Point {
+  x: number;
+  y: number;
+}
+
+/**
+ * Find a point in the viewport whose innermost element, seen through every
+ * shadow root, is canvas background. Scanning for one, rather than hard-coding
+ * a coordinate, keeps the tests honest when a layout shifts: the point is
+ * proved empty before the test relies on it. The class list mirrors
+ * EMPTY_CANVAS_CLASSES in satsuma-viz's pan-gesture.ts.
+ */
+async function findEmptyCanvasPoint(page: Page): Promise<Point> {
+  const point = await page.evaluate(() => {
+    const background = new Set([
+      "viewport",
+      "viewport-inner",
+      "detail-inner",
+      "canvas",
+      "card-layer",
+      "layout",
+      "column",
+      "chain-rail",
+      "chain-column",
+    ]);
+    const host = document.querySelector("[data-testid='viz-root']");
+    const viewport = host?.shadowRoot?.querySelector("[data-testid='viz-viewport']");
+    if (!viewport) return null;
+    const r = viewport.getBoundingClientRect();
+    for (let fy = 0.15; fy < 0.85; fy += 0.05) {
+      for (let fx = 0.1; fx < 0.75; fx += 0.05) {
+        const x = r.left + r.width * fx;
+        const y = r.top + r.height * fy;
+        let el: Element | null = document.elementFromPoint(x, y);
+        while (el?.shadowRoot) {
+          const inner = el.shadowRoot.elementFromPoint(x, y);
+          if (!inner || inner === el) break;
+          el = inner;
+        }
+        if (el && [...el.classList].some((c) => background.has(c))) return { x, y };
+      }
+    }
+    return null;
+  });
+  expect(point, "no empty canvas found in the viewport").not.toBeNull();
+  return point as Point;
+}
+
+/** The canvas pan/zoom transform, which changes exactly when the canvas moves. */
+async function canvasTransform(page: Page): Promise<string | null> {
+  return page.locator(".viewport-inner").getAttribute("style");
+}
+
+/** The minimap's viewport rectangle position, which tracks the pan. */
+async function minimapViewportPosition(page: Page): Promise<string> {
+  return page
+    .locator(".minimap-viewport")
+    .evaluate((el) => `${(el as HTMLElement).style.left},${(el as HTMLElement).style.top}`);
+}
+
+/** A locator's on-screen box, failing the test if the element is not rendered. */
+async function boxOf(locator: ReturnType<Page["locator"]>) {
+  const box = await locator.boundingBox();
+  if (!box) throw new Error("element has no bounding box: it is not rendered");
+  return box;
+}
+
+/** Open a fixture in single-file mode and fit it, so the canvas starts framed. */
+async function loadFittedFixture(page: Page, uri: string): Promise<void> {
+  await page.goto("/");
+  await page.waitForFunction(() => {
+    const harness = window.__satsumaHarness;
+    if (!harness?.setViewMode) return false; // app.js not evaluated yet
+    harness.setViewMode("single");
+    return true;
+  });
+  await loadFixture(page, uri);
+  await page.locator("[data-testid='toolbar-fit']").click();
+}
+
+test.describe("Canvas panning (sl-u3x8)", () => {
+  test("left-dragging empty overview canvas pans it, and the minimap follows during the drag", async ({
+    page,
+  }) => {
+    await loadFittedFixture(page, sfdcUri);
+    const start = await findEmptyCanvasPoint(page);
+    const before = await canvasTransform(page);
+    const minimapBefore = await minimapViewportPosition(page);
+
+    await page.mouse.move(start.x, start.y);
+    await page.mouse.down();
+    await page.mouse.move(start.x + 60, start.y + 40, { steps: 5 });
+    // Mid-drag, before release: the minimap must track live, not on mouseup.
+    expect(await minimapViewportPosition(page)).not.toBe(minimapBefore);
+    await page.mouse.move(start.x + 120, start.y + 80, { steps: 5 });
+    await page.mouse.up();
+
+    expect(await canvasTransform(page)).not.toBe(before);
+    expect(await canvasTransform(page)).toContain("translate(");
+  });
+
+  test("shows grab over empty canvas, and grabbing while a pan is under way", async ({ page }) => {
+    // The cursor is the only cue that the canvas can be dragged at all — the
+    // #513 reporter fell back to the minimap because nothing said so.
+    await loadFittedFixture(page, sfdcUri);
+    const start = await findEmptyCanvasPoint(page);
+
+    await page.mouse.move(start.x, start.y);
+    await page.mouse.move(start.x + 1, start.y + 1);
+    await expect(page.locator("[data-testid='viz-viewport']")).toHaveCSS("cursor", "grab");
+
+    await page.mouse.down();
+    await page.mouse.move(start.x + 30, start.y + 30, { steps: 3 });
+    await expect(page.locator("[data-testid='viz-pan-overlay']")).toHaveCSS("cursor", "grabbing");
+    await page.mouse.up();
+    await expect(page.locator("[data-testid='viz-pan-overlay']")).toHaveCount(0);
+  });
+
+  test("a left-drag that starts on a card does not pan, so cards keep their own gestures", async ({
+    page,
+  }) => {
+    await loadFittedFixture(page, sfdcUri);
+    const card = page.locator("sz-schema-card[data-testid^='overview-schema-card-']").first();
+    const box = await boxOf(card);
+    const before = await canvasTransform(page);
+
+    await page.mouse.move(box.x + box.width / 2, box.y + 10);
+    await page.mouse.down();
+    await page.mouse.move(box.x + box.width / 2 + 80, box.y + 60, { steps: 5 });
+    await page.mouse.up();
+
+    expect(await canvasTransform(page)).toBe(before);
+  });
+
+  test("Space+drag pans from on top of a mapping card without opening the mapping", async ({
+    page,
+  }) => {
+    await loadFittedFixture(page, sfdcUri);
+    const card = page.locator("[data-testid^='overview-mapping-card-']").first();
+    const box = await boxOf(card);
+    const at = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+    const before = await canvasTransform(page);
+
+    await page.mouse.move(at.x, at.y);
+    await page.keyboard.down("Space");
+    await expect(page.locator("[data-testid='viz-pan-overlay']")).toHaveCSS("cursor", "grab");
+    await page.mouse.down();
+    await page.mouse.move(at.x + 90, at.y + 50, { steps: 5 });
+    await page.mouse.up();
+    await page.keyboard.up("Space");
+
+    expect(await canvasTransform(page)).not.toBe(before);
+    // A plain click on this card opens the mapping detail; under Space it must not.
+    await expect(page.locator("[data-testid='viz-root']")).not.toHaveAttribute(
+      "data-view-mode",
+      "detail",
+    );
+    await expect(page.locator("[data-testid='viz-pan-overlay']")).toHaveCount(0);
+  });
+
+  test("an empty-canvas drag across the mapping detail view pans and selects no text", async ({
+    page,
+  }) => {
+    await loadFittedFixture(page, sfdcUri);
+    await openFirstMappingDetail(page);
+    const start = await findEmptyCanvasPoint(page);
+    const before = await canvasTransform(page);
+
+    await page.mouse.move(start.x, start.y);
+    await page.mouse.down();
+    // Sweep across the detail columns, which are full of selectable text.
+    await page.mouse.move(start.x + 200, start.y + 120, { steps: 10 });
+    await page.mouse.up();
+
+    expect(await canvasTransform(page)).not.toBe(before);
+    expect(await page.evaluate(() => window.getSelection()?.toString() ?? "")).toBe("");
+  });
+
+  test("left-dragging empty chain-view canvas pans it", async ({ page }) => {
+    await loadFittedFixture(page, cycleUri);
+    const cardPrefix = await expandOverviewCard(page, "cycle-a");
+    await page.locator("[data-testid='toolbar-fit']").click();
+    await page.locator(`[data-testid='${cardPrefix}-field-id-lineage']`).click({ force: true });
+    await expect(page.locator("[data-testid='viz-root']")).toHaveAttribute(
+      "data-view-mode",
+      "chain",
+      { timeout: 10_000 },
+    );
+    const start = await findEmptyCanvasPoint(page);
+    const before = await canvasTransform(page);
+
+    await page.mouse.move(start.x, start.y);
+    await page.mouse.down();
+    await page.mouse.move(start.x + 70, start.y + 30, { steps: 5 });
+    await page.mouse.up();
+
+    expect(await canvasTransform(page)).not.toBe(before);
+  });
+
+  test("a pan keeps following the pointer outside the viewport until release, then stops", async ({
+    page,
+  }) => {
+    // Before sl-u3x8 leaving the viewport ended the pan; pointer capture keeps
+    // it going, as in any canvas tool.
+    await loadFittedFixture(page, sfdcUri);
+    const start = await findEmptyCanvasPoint(page);
+    const viewportBox = await boxOf(page.locator("[data-testid='viz-viewport']"));
+
+    await page.mouse.move(start.x, start.y);
+    await page.mouse.down();
+    await page.mouse.move(start.x, viewportBox.y + 5, { steps: 5 });
+    const atEdge = await canvasTransform(page);
+    // Above the viewport, over the toolbar.
+    await page.mouse.move(start.x, viewportBox.y - 20, { steps: 3 });
+    const outside = await canvasTransform(page);
+    expect(outside).not.toBe(atEdge);
+    await page.mouse.up();
+
+    await page.mouse.move(start.x + 50, start.y, { steps: 3 });
+    expect(await canvasTransform(page)).toBe(outside);
+  });
+
+  test("middle-button drag still pans from anywhere, as before", async ({ page }) => {
+    await loadFittedFixture(page, sfdcUri);
+    const card = page.locator("sz-schema-card[data-testid^='overview-schema-card-']").first();
+    const box = await boxOf(card);
+    const before = await canvasTransform(page);
+
+    await page.mouse.move(box.x + box.width / 2, box.y + 10);
+    await page.mouse.down({ button: "middle" });
+    await page.mouse.move(box.x + box.width / 2 + 60, box.y + 40, { steps: 5 });
+    await page.mouse.up({ button: "middle" });
+
+    expect(await canvasTransform(page)).not.toBe(before);
+  });
+});

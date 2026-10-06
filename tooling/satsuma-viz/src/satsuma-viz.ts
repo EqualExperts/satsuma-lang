@@ -1,4 +1,4 @@
-import { LitElement, html, svg, css, unsafeCSS } from "lit";
+import { LitElement, html, svg, css, unsafeCSS, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import { unsafeHTML } from "lit/directives/unsafe-html.js";
 import type {
@@ -23,6 +23,7 @@ import { renderMarkdown } from "./markdown.js";
 import { buildCoverageIndex, mappingSchemaCoverage, schemaHasFieldPath } from "./field-coverage.js";
 import type { SchemaCoverage } from "./field-coverage.js";
 import { metricAsSchemaCard } from "./metric-adapter.js";
+import { isEmptyCanvasElement, isTextEntryTarget, startsPan } from "./pan-gesture.js";
 // Imported from the narrow reference-stages submodule, not the package root:
 // the root barrel re-exports parser/extraction code that needs Node's tree-
 // sitter bindings, which esbuild cannot bundle for this browser component
@@ -68,6 +69,13 @@ export { metricAsSchemaCard, metricFieldEntries } from "./metric-adapter.js";
 // transform text, join descriptions and filters.
 export { renderMarkdown, highlightAtRefs } from "./markdown.js";
 export { renderNotesSection, noteSectionStyles } from "./notes.js";
+export {
+  EMPTY_CANVAS_CLASSES,
+  isEmptyCanvasElement,
+  isTextEntryTarget,
+  startsPan,
+} from "./pan-gesture.js";
+export type { PanPress, KeyTarget } from "./pan-gesture.js";
 export type {
   LayoutResult,
   LayoutNode,
@@ -640,6 +648,23 @@ export class SatsumaViz extends LitElement {
       will-change: transform;
     }
 
+    /* Canvas panning cursors (sl-u3x8): grab over empty canvas and while
+       Space is held, grabbing during a pan. */
+    .viewport.over-canvas {
+      cursor: grab;
+    }
+
+    .pan-overlay {
+      position: absolute;
+      inset: 0;
+      z-index: 1000;
+      cursor: grab;
+    }
+
+    .pan-overlay.panning {
+      cursor: grabbing;
+    }
+
     .zoom-indicator {
       position: fixed;
       bottom: 12px;
@@ -1087,7 +1112,23 @@ export class SatsumaViz extends LitElement {
   private static readonly MIN_ZOOM = 0.2;
   private static readonly MAX_ZOOM = 3;
 
-  private _isPanning = false;
+  /*
+   * Canvas panning (gh-513, sl-u3x8). Which presses pan is decided in
+   * pan-gesture.ts; this state tracks the pan under way and drives the
+   * cursors and the pan overlay.
+   */
+  /** A pan is under way: the overlay shows `grabbing` and blocks selection. */
+  @state()
+  private _panning = false;
+  /** Space is held over the viewport: the overlay shows `grab` and eats clicks. */
+  @state()
+  private _spaceHeld = false;
+  /** The pointer is over empty canvas: the viewport shows `grab`. */
+  @state()
+  private _overCanvas = false;
+  /** Space arms panning only while the pointer is over this viewport. */
+  private _pointerInViewport = false;
+  private _panPointerId: number | null = null;
   private _panStartX = 0;
   private _panStartY = 0;
   private _panStartPanX = 0;
@@ -1124,6 +1165,11 @@ export class SatsumaViz extends LitElement {
     } else {
       window.addEventListener("resize", this._handleHostResize);
     }
+    // On window, not the host: the host has no tabindex, and in VS Code key
+    // presses land on the webview document.
+    window.addEventListener("keydown", this._onWindowKeyDown);
+    window.addEventListener("keyup", this._onWindowKeyUp);
+    window.addEventListener("blur", this._releaseSpace);
     this.addEventListener("field-hover", ((e: SzFieldHoverEvent) => {
       this._hoveredSchema = e.schemaId;
       this._hoveredField = e.fieldName;
@@ -1150,6 +1196,9 @@ export class SatsumaViz extends LitElement {
     } else {
       window.removeEventListener("resize", this._handleHostResize);
     }
+    window.removeEventListener("keydown", this._onWindowKeyDown);
+    window.removeEventListener("keyup", this._onWindowKeyUp);
+    window.removeEventListener("blur", this._releaseSpace);
     super.disconnectedCallback();
   }
 
@@ -1475,14 +1524,17 @@ export class SatsumaViz extends LitElement {
         ${this._renderToolbar(namespaces)}
         <div class="view-content">
           <div
-            class="viewport"
+            class="viewport ${this._overCanvas ? "over-canvas" : ""}"
             data-testid="viz-viewport"
             @wheel=${this._onWheel}
-            @mousedown=${this._onMouseDown}
-            @mousemove=${this._onMouseMove}
-            @mouseup=${this._onMouseUp}
-            @mouseleave=${this._onMouseUp}
+            @pointerdown=${this._onPanPointerDown}
+            @pointermove=${this._onPanPointerMove}
+            @pointerup=${this._onPanPointerUp}
+            @pointercancel=${this._onPanPointerUp}
+            @pointerenter=${this._onViewportPointerEnter}
+            @pointerleave=${this._onViewportPointerLeave}
           >
+            ${this._renderPanOverlay()}
             <div
               class="viewport-inner"
               style="transform: translate(${this._panX}px, ${this._panY}px) scale(${this._zoom});"
@@ -1529,14 +1581,17 @@ export class SatsumaViz extends LitElement {
           ${this._renderFileNotes()}
           <div class="notes-pane-wrapper">
             <div
-              class="viewport"
+              class="viewport ${this._overCanvas ? "over-canvas" : ""}"
               data-testid="viz-viewport"
               @wheel=${this._onWheel}
-              @mousedown=${this._onMouseDown}
-              @mousemove=${this._onMouseMove}
-              @mouseup=${this._onMouseUp}
-              @mouseleave=${this._onMouseUp}
+              @pointerdown=${this._onPanPointerDown}
+              @pointermove=${this._onPanPointerMove}
+              @pointerup=${this._onPanPointerUp}
+              @pointercancel=${this._onPanPointerUp}
+              @pointerenter=${this._onViewportPointerEnter}
+              @pointerleave=${this._onViewportPointerLeave}
             >
+              ${this._renderPanOverlay()}
               <div
                 class="viewport-inner"
                 style="transform: translate(${this._panX}px, ${this._panY}px) scale(${this._zoom});"
@@ -1563,14 +1618,17 @@ export class SatsumaViz extends LitElement {
           ${this._renderFileNotes()}
           <div class="notes-pane-wrapper">
             <div
-              class="viewport"
+              class="viewport ${this._overCanvas ? "over-canvas" : ""}"
               data-testid="viz-viewport"
               @wheel=${this._onWheel}
-              @mousedown=${this._onMouseDown}
-              @mousemove=${this._onMouseMove}
-              @mouseup=${this._onMouseUp}
-              @mouseleave=${this._onMouseUp}
+              @pointerdown=${this._onPanPointerDown}
+              @pointermove=${this._onPanPointerMove}
+              @pointerup=${this._onPanPointerUp}
+              @pointercancel=${this._onPanPointerUp}
+              @pointerenter=${this._onViewportPointerEnter}
+              @pointerleave=${this._onViewportPointerLeave}
             >
+              ${this._renderPanOverlay()}
               <div
                 class="viewport-inner"
                 style="transform: translate(${this._panX}px, ${this._panY}px) scale(${this._zoom});"
@@ -1605,14 +1663,17 @@ export class SatsumaViz extends LitElement {
         ${this._renderFileNotes()}
         <div class="notes-pane-wrapper">
           <div
-            class="viewport"
+            class="viewport ${this._overCanvas ? "over-canvas" : ""}"
             data-testid="viz-viewport"
             @wheel=${this._onWheel}
-            @mousedown=${this._onMouseDown}
-            @mousemove=${this._onMouseMove}
-            @mouseup=${this._onMouseUp}
-            @mouseleave=${this._onMouseUp}
+            @pointerdown=${this._onPanPointerDown}
+            @pointermove=${this._onPanPointerMove}
+            @pointerup=${this._onPanPointerUp}
+            @pointercancel=${this._onPanPointerUp}
+            @pointerenter=${this._onViewportPointerEnter}
+            @pointerleave=${this._onViewportPointerLeave}
           >
+            ${this._renderPanOverlay()}
             <div
               class="viewport-inner"
               style="transform: translate(${this._panX}px, ${this._panY}px) scale(${this._zoom});"
@@ -1918,30 +1979,106 @@ export class SatsumaViz extends LitElement {
     }
   }
 
-  private _onMouseDown(e: MouseEvent) {
-    if (e.button === 1 || (e.button === 0 && e.altKey)) {
-      // Middle-click or Alt+click to pan
-      e.preventDefault();
-      this._isPanning = true;
-      this._panStartX = e.clientX;
-      this._panStartY = e.clientY;
-      this._panStartPanX = this._panX;
-      this._panStartPanY = this._panY;
-      (e.currentTarget as HTMLElement).style.cursor = "grabbing";
-    }
+  // ── Canvas panning (gh-513, sl-u3x8) ──────────────────────────────────
+
+  /**
+   * Start a pan if pan-gesture.ts says this press should. Pointer capture
+   * keeps the pan following the pointer after it leaves the viewport, until
+   * release.
+   */
+  private _onPanPointerDown(e: PointerEvent) {
+    const press = {
+      button: e.button,
+      altKey: e.altKey,
+      spaceHeld: this._spaceHeld,
+      onEmptyCanvas: this._isOnEmptyCanvas(e),
+    };
+    if (!startsPan(press)) return;
+    // Stops a drag across detail-view text from selecting it, and stops
+    // middle-click autoscroll.
+    e.preventDefault();
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    this._panPointerId = e.pointerId;
+    this._panning = true;
+    this._panStartX = e.clientX;
+    this._panStartY = e.clientY;
+    this._panStartPanX = this._panX;
+    this._panStartPanY = this._panY;
   }
 
-  private _onMouseMove(e: MouseEvent) {
-    if (!this._isPanning) return;
+  /** Follow the pointer during a pan; otherwise keep the hover cursor current. */
+  private _onPanPointerMove(e: PointerEvent) {
+    if (!this._panning) {
+      this._overCanvas = this._isOnEmptyCanvas(e);
+      return;
+    }
+    if (e.pointerId !== this._panPointerId) return;
     this._panX = this._panStartPanX + (e.clientX - this._panStartX);
     this._panY = this._panStartPanY + (e.clientY - this._panStartY);
   }
 
-  private _onMouseUp(e: MouseEvent | Event) {
-    if (this._isPanning) {
-      this._isPanning = false;
-      (e.currentTarget as HTMLElement).style.cursor = "";
-    }
+  private _onPanPointerUp(e: PointerEvent) {
+    if (!this._panning || e.pointerId !== this._panPointerId) return;
+    const viewport = e.currentTarget as HTMLElement;
+    if (viewport.hasPointerCapture(e.pointerId)) viewport.releasePointerCapture(e.pointerId);
+    this._panning = false;
+    this._panPointerId = null;
+  }
+
+  private _onViewportPointerEnter() {
+    this._pointerInViewport = true;
+  }
+
+  private _onViewportPointerLeave() {
+    this._pointerInViewport = false;
+    this._overCanvas = false;
+  }
+
+  /**
+   * Whether the press landed on canvas background. The first entry of the
+   * composed path is the innermost element, seen through the cards' shadow
+   * roots; `e.target` would only show the outermost card host.
+   */
+  private _isOnEmptyCanvas(e: PointerEvent): boolean {
+    const innermost = e.composedPath()[0];
+    return innermost instanceof Element && isEmptyCanvasElement(innermost.classList);
+  }
+
+  /**
+   * Space over the viewport arms the hand tool. It is ignored while typing in
+   * a field or editor, and when the pointer is elsewhere on the page, so the
+   * page's own Space behaviour survives.
+   */
+  private readonly _onWindowKeyDown = (e: KeyboardEvent) => {
+    if (e.code !== "Space" || !this._pointerInViewport) return;
+    const target = e.composedPath()[0];
+    if (target instanceof HTMLElement && isTextEntryTarget(target)) return;
+    // Stops Space scrolling the page underneath the canvas.
+    e.preventDefault();
+    this._spaceHeld = true;
+  };
+
+  private readonly _onWindowKeyUp = (e: KeyboardEvent) => {
+    if (e.code === "Space") this._releaseSpace();
+  };
+
+  /** Also runs on window blur: a keyup sent to another window never arrives. */
+  private readonly _releaseSpace = () => {
+    this._spaceHeld = false;
+  };
+
+  /**
+   * A transparent cover over the viewport while Space is held or a pan is
+   * under way. It gives one reliable cursor over cards that set their own,
+   * keeps a Space+drag from clicking the card underneath, and has no text to
+   * select.
+   */
+  private _renderPanOverlay() {
+    if (!this._spaceHeld && !this._panning) return nothing;
+    return html`<div
+      class="pan-overlay ${this._panning ? "panning" : ""}"
+      data-testid="viz-pan-overlay"
+    ></div>`;
   }
 
   private _showZoomIndicator() {

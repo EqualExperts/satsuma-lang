@@ -1,6 +1,6 @@
 ---
 id: sl-u3x8
-status: open
+status: closed
 deps: [vnm-gucl]
 links: [vnm-gucl]
 created: 2026-09-29T07:27:22Z
@@ -40,3 +40,12 @@ From GitHub issue #513. vnm-gucl fixes the hint text (middle-mouse drag); it exp
 ## Tests
 
 A unit test cannot observe pan offsets after a real gesture, computed cursors, suppressed clicks or the live minimap, so Playwright is required. Add `describe("Canvas panning")` to `tooling/satsuma-viz-harness/test/harness.test.ts` using `page.mouse` and `page.keyboard.down("Space")`, asserting: `.viewport-inner` transform changes after an empty-canvas drag and not after a card click; the card's click effect does not happen under Space+drag; computed cursor goes `grab` → `grabbing`; `.minimap-viewport` `left`/`top` change between `mouse.move` steps; `window.getSelection().toString() === ''` after a drag across text. Existing overview/detail fixtures suffice; click toolbar Fit first on small graphs (sv-embb). Unit-test the threshold and target classification if extracted as pure helpers. The harness must run green on Linux (CI or container) — headless Chromium segfaults in the macOS agent session.
+
+## Notes
+
+**2026-10-06T15:00:00Z**
+
+Cause: the viz only panned on middle-drag or Alt+drag, with no cursor cue, so left-drag did nothing and #513's reporter fell back to the minimap.
+Fix: new pan-gesture.ts decides which presses pan (allow-list of background classes per view, matched on the innermost composed-path element); SatsumaViz switched to pointer events with pointer capture, a window-level Space hand tool armed only while the pointer is over the viewport and not while typing, and a transparent overlay during Space/panning that carries the grab/grabbing cursor, swallows the card click and blocks text selection. Harness hint updated; 8 Playwright tests in "Canvas panning (sl-u3x8)", 6 checked to fail against the old code. (commit immediately after 631e9605)
+
+Deviation from the approach: no click-versus-drag threshold. Nothing on the canvas background has a click handler, and the overlay already stops Space+drag clicking a card, so a threshold would have been dead code. Add one if a background click behaviour is ever introduced.
