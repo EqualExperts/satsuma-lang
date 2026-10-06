@@ -35,11 +35,12 @@ import * as http from "http";
 import * as fs from "fs";
 import * as path from "path";
 import { pathToFileURL } from "url";
+import { DEFAULT_HARNESS_PORT, HARNESS_PORT_ENV, portFromEnv } from "../scripts/harness-ports.cjs";
 
 // ---------- Configuration ----------
 
-/** Port the harness server listens on. */
-const PORT = 3333;
+/** Port the harness server listens on: $SATSUMA_HARNESS_PORT, else 3333 (see harness-ports.cjs). */
+const PORT = portFromEnv(HARNESS_PORT_ENV, DEFAULT_HARNESS_PORT);
 
 /**
  * Examples directory — two levels up from the harness package root.
@@ -274,7 +275,7 @@ async function main(): Promise<void> {
 
   const server = http.createServer(makeHandler(fixtures, fixturesByUri));
   // Bind to loopback only: the harness is a single-machine test/dev tool.
-  // Ports 3333 and 3334 serve fixture content and compiled UI; they have no reason to be off-box.
+  // The harness and playground ports serve fixture content and compiled UI; they have no reason to be off-box.
   server.listen(PORT, "127.0.0.1", () => {
     console.log(`[harness] ready at http://localhost:${PORT}`);
   });

@@ -21,13 +21,13 @@ either.
 
 ## What lives here
 
-| Path | Purpose |
-| --- | --- |
-| `src/server.ts` | Tiny HTTP server. Lists `examples/**.stm` fixtures via `/api/fixtures` and serves the harness web UI. |
-| `src/client/` | Harness web UI: fixture picker, view-mode toggle, the `<satsuma-viz>` host, and the `window.__satsumaHarness` event recorder. |
-| `test/harness.test.ts` | **Semantic regression suite.** Real-click / real-hover Playwright tests asserting overview rendering, mapping detail content, field coverage, hover highlighting, interaction events, filters, and geometry sanity. |
-| `test/screenshots.spec.ts` | **Screenshot review workflow.** Drives each fixture into a documented UI state and emits a named PNG plus a manifest entry. NOT a golden-baseline suite. |
-| `playwright.config.ts` | Three Playwright projects — `chromium` (semantic suite), `screenshots` (review artifacts), and `playground-static` (static bundle smoke + privacy). |
+| Path                           | Purpose                                                                                                                                                                                                                                                            |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `src/server.ts`                | Tiny HTTP server. Lists `examples/**.stm` fixtures via `/api/fixtures` and serves the harness web UI.                                                                                                                                                              |
+| `src/client/`                  | Harness web UI: fixture picker, view-mode toggle, the `<satsuma-viz>` host, and the `window.__satsumaHarness` event recorder.                                                                                                                                      |
+| `test/harness.test.ts`         | **Semantic regression suite.** Real-click / real-hover Playwright tests asserting overview rendering, mapping detail content, field coverage, hover highlighting, interaction events, filters, and geometry sanity.                                                |
+| `test/screenshots.spec.ts`     | **Screenshot review workflow.** Drives each fixture into a documented UI state and emits a named PNG plus a manifest entry. NOT a golden-baseline suite.                                                                                                           |
+| `playwright.config.ts`         | Three Playwright projects — `chromium` (semantic suite), `screenshots` (review artifacts), and `playground-static` (static bundle smoke + privacy).                                                                                                                |
 | `scripts/build-playground.mjs` | Assembles the server-free **"Try it Live!"** bundle (`npm run build:playground` → `dist/playground/`): page, client + viz bundles, both WASM files, and the examples manifest — every asset page-relative so it deploys under a non-root base path (GitHub Pages). |
 
 ---
@@ -53,7 +53,7 @@ hot-reload — after further source changes, stop it (`Ctrl-C`, or
 `kill "$(lsof -ti:3333)"`), re-run the turbo build, and start it again.
 
 Note `npm run dev` here runs this package's own `build` script first, which
-only rebuilds *this* package's bundle from already-built dependencies — it
+only rebuilds _this_ package's bundle from already-built dependencies — it
 does not build `@satsuma/core`, `@satsuma/viz`, etc. themselves. Run the
 `turbo run build` step above whenever a dependency changed, not just this
 package.
@@ -140,8 +140,11 @@ browser once first:
 npx playwright install chromium
 ```
 
-If a run fails with `EADDRINUSE` on :3333/:3334, a stale server is holding the
-port — kill it and rerun: `pkill -f "node dist/server.js"`.
+Each run starts its fixture and playground servers on two free ports of its
+own, so runs in different worktrees can overlap. To pin them, set
+`SATSUMA_HARNESS_PORT` and `SATSUMA_PLAYGROUND_PORT`; an invalid value stops the
+run with an error naming the variable. The dev server (`npm run dev`) serves on
+3333 by default and also honours `SATSUMA_HARNESS_PORT`.
 
 ---
 
@@ -151,14 +154,14 @@ The suite intentionally covers six canonical fixtures, each chosen to exercise
 a render path the others do not. Adding a new fixture should be justified by
 a render path not already covered here.
 
-| Fixture | Why it is in the suite |
-| --- | --- |
-| `examples/sfdc-to-snowflake/pipeline.stm` | Non-namespaced vanilla schemas, single named mapping, computed arrows, NL `@ref` highlighting, map transforms — the canonical "small example" path. |
-| `examples/namespaces/ns-platform.stm` | Namespaced schemas and mappings, qualified IDs, namespace pills, namespace filter — exercises the namespace card-height path that non-namespaced cards never hit. |
-| `examples/metrics-platform/metrics.stm` | Metric schemas (rendered via `<sz-metric-card>`), cross-file lineage merge, file filter across `metrics.stm` and `metric_sources.stm`. |
-| `examples/reports-and-models/pipeline.stm` | Report and model schemas with their distinct card metadata. |
-| `examples/filter-flatten-governance/filter-flatten-governance.stm` | Multi-source joins with NL join text, mapping notes, nested child fields, list/flatten sections, governance metadata, field-coverage indicators. |
-| `examples/sap-po-to-mfcs/pipeline.stm` | Larger real-world layout — layout-stability and a "looks right at scale" review screenshot. |
+| Fixture                                                            | Why it is in the suite                                                                                                                                            |
+| ------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `examples/sfdc-to-snowflake/pipeline.stm`                          | Non-namespaced vanilla schemas, single named mapping, computed arrows, NL `@ref` highlighting, map transforms — the canonical "small example" path.               |
+| `examples/namespaces/ns-platform.stm`                              | Namespaced schemas and mappings, qualified IDs, namespace pills, namespace filter — exercises the namespace card-height path that non-namespaced cards never hit. |
+| `examples/metrics-platform/metrics.stm`                            | Metric schemas (rendered via `<sz-metric-card>`), cross-file lineage merge, file filter across `metrics.stm` and `metric_sources.stm`.                            |
+| `examples/reports-and-models/pipeline.stm`                         | Report and model schemas with their distinct card metadata.                                                                                                       |
+| `examples/filter-flatten-governance/filter-flatten-governance.stm` | Multi-source joins with NL join text, mapping notes, nested child fields, list/flatten sections, governance metadata, field-coverage indicators.                  |
+| `examples/sap-po-to-mfcs/pipeline.stm`                             | Larger real-world layout — layout-stability and a "looks right at scale" review screenshot.                                                                       |
 
 ---
 
@@ -195,7 +198,7 @@ projects, and have different failure semantics.
 - These shots are **review artifacts, not golden baselines.** They are intended
   for human markup and for feeding to a VLM together with the manifest entry as
   visual context. A failing screenshot test means the harness could not reach
-  the documented state — *not* that pixels diverged from a stored reference.
+  the documented state — _not_ that pixels diverged from a stored reference.
 
 The ten review shots produced today are listed in
 `archive/features/30-viz-test-suite-expansion/PRD.md` §"Screenshot artifacts for human
