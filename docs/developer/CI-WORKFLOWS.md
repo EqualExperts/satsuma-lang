@@ -135,7 +135,9 @@ Runs four distinct checks:
 4. **Corpus tests** — `npm run test:corpus` (`tree-sitter test --wasm`; there is
    no native parser, ADR-002). Count in [`test-stats.json`](../../test-stats.json)
 5. **pytest suite** — fixture tests, CST consumer tests, and smoke tests over
-   the full example corpus
+   the full example corpus. These parse with the `tree-sitter-satsuma.wasm`
+   restored from the `install` job's cache, via `scripts/print-tree.mjs`, so
+   they compile nothing
 
 Test results are uploaded as JUnit XML.
 
