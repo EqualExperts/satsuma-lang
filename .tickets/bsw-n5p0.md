@@ -1,6 +1,6 @@
 ---
 id: bsw-n5p0
-status: open
+status: closed
 deps: []
 links: []
 created: 2026-10-06T09:45:31Z
@@ -25,3 +25,10 @@ tags: [bug-sweep-2026-10, docs, release]
 
 - Every user-visible change in `git log v0.13.0..HEAD --no-merges` has an Unreleased entry in the existing CHANGELOG style.
 - `node scripts/release-metadata.mjs notes <next>` on a scratch copy shows them.
+
+## Notes
+
+**2026-10-06T10:08:33Z**
+
+Cause: Unreleased listed only four of the user-visible changes since v0.13.0, because entries were not added as features landed.
+Fix: PR #611 filled in every change and promoted them to the v0.14.0 section (commit 21a593c4).

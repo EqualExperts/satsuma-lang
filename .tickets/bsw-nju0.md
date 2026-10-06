@@ -1,6 +1,6 @@
 ---
 id: bsw-nju0
-status: open
+status: closed
 deps: []
 links: []
 created: 2026-10-06T09:45:31Z
@@ -17,3 +17,10 @@ tags: [bug-sweep-2026-10, docs]
 
 - The HOW-DO-I answer shows `^.field` and `$.field` with a short example and links to the spec section.
 - `scripts/check-doc-snippets.mjs` passes.
+
+## Notes
+
+**2026-10-06T10:08:33Z**
+
+Cause: HOW-DO-I.md predated ADR-053 and still told readers to move the arrow out of the block.
+Fix: PR #611 rewrote the answer to teach ^. and $. with a validated example, linking spec section 4.4 (commit 4897076a).
