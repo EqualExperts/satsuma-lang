@@ -102,11 +102,41 @@ describe("satsuma fmt idempotency", () => {
 // ── Parse error handling ────────────────────────────────────────────────────
 
 describe("satsuma fmt error handling", () => {
-  it("skips files with parse errors and reports on stderr", async () => {
+  it("fmt --check exits 2 and names the skipped file when the input does not parse (bsw-u11n)", async () => {
+    // --check is a CI gate: an unparseable file must fail it with the
+    // documented parse-error code, not pass with 0 because nothing "changed".
     const fixture = resolve(__dirname, "fixtures/parse-error.stm");
-    const { stderr } = await satsuma("fmt", "--check", fixture);
-    // Should mention parse error but not crash
-    assert.match(stderr, /parse error/i);
+    const { code, stderr } = await satsuma("fmt", "--check", fixture);
+    assert.match(stderr, /skipping .*parse-error\.stm: parse error/i);
+    assert.equal(code, 2);
+  });
+
+  it("exits 2 in every mode when one file is skipped but another is formatted (bsw-u11n)", async () => {
+    // A parse error must not be masked by other files' formatting work: the
+    // good file is still formatted (or listed), but the run reports exit 2 so
+    // the skipped file cannot slip through. Each mode gets fresh copies because
+    // plain fmt rewrites the imported file.
+    const modes: { flags: string[]; expectOut: RegExp }[] = [
+      { flags: [], expectOut: /formatted .*ugly\.stm/ },
+      { flags: ["--check"], expectOut: /ugly\.stm/ },
+      { flags: ["--diff"], expectOut: /^\+\+\+ .*ugly\.stm/m },
+    ];
+    for (const { flags, expectOut } of modes) {
+      const tmp = mkdtempSync(join(tmpdir(), "fmt-mixed-"));
+      const entry = join(tmp, "entry.stm");
+      const ugly = join(tmp, "ugly.stm");
+      writeFileSync(entry, 'import { t } from "ugly.stm"\n\nschema s {\n  x INT (\n}\n');
+      writeFileSync(ugly, "schema   t {\n a   INT\n}\n");
+
+      const { code, stdout, stderr } = await satsuma("fmt", ...flags, entry);
+      const label = `fmt ${flags.join(" ") || "(write)"}`;
+      assert.match(stderr, /skipping .*entry\.stm: parse error/, label);
+      assert.match(stdout, expectOut, label);
+      assert.equal(code, 2, label);
+      if (flags.length === 0) {
+        assert.equal(readFileSync(ugly, "utf8"), "schema t {\n  a  INT\n}\n", label);
+      }
+    }
   });
 });
 
