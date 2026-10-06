@@ -457,19 +457,44 @@ describe("namespaces", () => {
 // ---------- Comments ----------
 
 describe("comments", () => {
-  it("extracts warning comments from fields", () => {
-    const model = vizModel("schema s {\n  email STRING //! PII risk\n}");
+  it("attaches a trailing //! and //? to their own fields, not the schema", () => {
+    // extractComments looked trailing comments up with indexOf on a fresh
+    // .children array, which never matches a web-tree-sitter node, so field
+    // comments vanished and the cards drew no warning/question badges. The
+    // last field's comment is also hoisted out of the body by the grammar
+    // and used to be credited to the schema instead.
+    const model = vizModel(
+      "schema s {\n  id INT (pk) //! legacy key\n  status STRING //? enum?\n}",
+    );
     const schema = model.namespaces[0].schemas[0];
-    // Warning comments appear on the schema or the field
-    const allComments = [...schema.comments, ...schema.fields.flatMap((f) => f.comments)];
-    assert.ok(allComments.some((c) => c.kind === "warning"));
+    const byField = Object.fromEntries(
+      schema.fields.map((f) => [f.name, f.comments.map((c) => `${c.kind}:${c.text}`)]),
+    );
+    assert.deepEqual(byField, { id: ["warning:legacy key"], status: ["question:enum?"] });
+    assert.deepEqual(schema.comments, []);
   });
 
-  it("extracts question comments", () => {
-    const model = vizModel("schema s {\n  status STRING //? Should this be an enum?\n}");
+  it("attaches a trailing comment to its own mapping arrow", () => {
+    const model = vizModel(
+      "schema a { x INT }\nschema b { y INT }\n" +
+        "mapping m {\n  source { a }\n  target { b }\n  x -> y //! lossy\n}",
+    );
+    const mapping = model.namespaces[0].mappings[0];
+    assert.deepEqual(
+      mapping.arrows[0].comments.map((c) => c.text),
+      ["lossy"],
+    );
+    assert.deepEqual(mapping.comments, []);
+  });
+
+  it("keeps a comment on its own line inside a schema with the schema", () => {
+    const model = vizModel("schema s {\n  //! whole schema\n  id INT\n}");
     const schema = model.namespaces[0].schemas[0];
-    const allComments = [...schema.comments, ...schema.fields.flatMap((f) => f.comments)];
-    assert.ok(allComments.some((c) => c.kind === "question"));
+    assert.deepEqual(
+      schema.comments.map((c) => c.text),
+      ["whole schema"],
+    );
+    assert.deepEqual(schema.fields[0].comments, []);
   });
 
   it("attaches a standalone comment between top-level blocks to the preceding block", () => {

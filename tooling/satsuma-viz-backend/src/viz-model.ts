@@ -26,6 +26,7 @@ import {
   renderFieldDeclType,
 } from "@satsuma/core";
 import type { MetaEntry, FieldDecl, SpreadEntity } from "@satsuma/core";
+import { isAnnotationComment, trailingCommentOwner, trailingComments } from "@satsuma/core";
 import { createWorkspaceDefinitionLookup, fieldInfoToDecl } from "./workspace-definition-lookup";
 
 // ---------- VizModel protocol types ----------
@@ -502,15 +503,8 @@ function collectTopLevelComments(
 function collectSiblingComments(uri: string, siblings: SyntaxNode[], group: NamespaceGroup): void {
   for (let i = 0; i < siblings.length; i++) {
     const node = siblings[i];
-    if (!node) continue;
-    if (node.type !== "warning_comment" && node.type !== "question_comment") {
-      continue;
-    }
-    const entry: CommentEntry = {
-      kind: node.type === "warning_comment" ? "warning" : "question",
-      text: extractCommentText(node),
-      location: nodeLocation(uri, node),
-    };
+    if (!node || !isAnnotationComment(node)) continue;
+    const entry = toCommentEntry(uri, node);
 
     // Attach to the nearest preceding schema/mapping/metric/fragment
     const target = findPrecedingBlock(siblings, i, group);
@@ -1453,63 +1447,28 @@ function extractNotes(uri: string, node: SyntaxNode): NoteBlock[] {
   return notes;
 }
 
+/** One //! or //? comment node as a model CommentEntry. */
+function toCommentEntry(uri: string, node: SyntaxNode): CommentEntry {
+  return {
+    kind: node.type === "warning_comment" ? "warning" : "question",
+    text: extractCommentText(node),
+    location: nodeLocation(uri, node),
+  };
+}
+
 /**
- * Extract //! and //? comments. In the CST these appear as warning_comment
- * and question_comment nodes — either as children or siblings of the node.
+ * The //! and //? comments that belong to `node`: those among its own
+ * children that do not trail one of its fields or arrows, plus — when `node`
+ * is itself a field or arrow — the comments trailing it on its line. Core's
+ * comment-attachment module owns the trailing rule, including the case where
+ * the grammar hoists a last field's comment out of its schema body.
  */
 function extractComments(uri: string, node: SyntaxNode): CommentEntry[] {
-  const comments: CommentEntry[] = [];
-
-  // Check children (all children, not just named) for comment nodes
-  for (const ch of node.children) {
-    if (ch.type === "warning_comment") {
-      comments.push({
-        kind: "warning",
-        text: extractCommentText(ch),
-        location: nodeLocation(uri, ch),
-      });
-    } else if (ch.type === "question_comment") {
-      comments.push({
-        kind: "question",
-        text: extractCommentText(ch),
-        location: nodeLocation(uri, ch),
-      });
-    }
-  }
-
-  // Also check siblings: warning/question comments after this node on the same line
-  // or immediately following as separate sibling nodes
-  const parent = node.parent;
-  if (parent) {
-    const siblings = parent.children;
-    const nodeIndex = siblings.indexOf(node);
-    if (nodeIndex >= 0) {
-      for (let i = nodeIndex + 1; i < siblings.length; i++) {
-        const sib = siblings[i];
-        if (!sib) continue;
-        if (sib.type === "warning_comment" && sib.startPosition.row === node.endPosition.row) {
-          comments.push({
-            kind: "warning",
-            text: extractCommentText(sib),
-            location: nodeLocation(uri, sib),
-          });
-        } else if (
-          sib.type === "question_comment" &&
-          sib.startPosition.row === node.endPosition.row
-        ) {
-          comments.push({
-            kind: "question",
-            text: extractCommentText(sib),
-            location: nodeLocation(uri, sib),
-          });
-        } else {
-          break;
-        }
-      }
-    }
-  }
-
-  return comments;
+  const own = node.children.filter(
+    (ch) => isAnnotationComment(ch) && trailingCommentOwner(ch) === null,
+  );
+  const trailing = trailingComments(node);
+  return [...own, ...trailing].map((c) => toCommentEntry(uri, c));
 }
 
 // ---------- Metadata extraction ----------

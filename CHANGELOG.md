@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+### Overview cards show the whole mapping label and schema notes, and field comments get their badges (`sl-q7pm`)
+
+A long mapping name such as `CustomerRecordToMailingList` pushed its "4 →s"
+arrow count past the edge of its overview box. The box is now sized for the
+count as well, and a name too long for the widest box is shortened with an
+ellipsis instead. Overview schema cards now show the schema's `note`, as the
+mapping view already did. And `//!` and `//?` comments on fields and mapping
+arrows now reach the visualisation, so their warning and question badges
+appear in both the overview and the mapping view. They had been silently
+dropped, and a comment on a schema's last field was credited to the schema.
+
 ## v0.14.0 — 2026-10-06
 
 ### Reach an enclosing level from inside `each` and `flatten` with `^.` and `$.` (`sl-8vqk`, ADR-053)

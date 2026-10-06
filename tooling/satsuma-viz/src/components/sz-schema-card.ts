@@ -4,7 +4,7 @@ import { unsafeHTML } from "lit/directives/unsafe-html.js";
 import type { SchemaCard, FieldEntry, MetadataEntry } from "../model.js";
 import { SzNavigateEvent, SzFieldHoverEvent, SzFieldLineageEvent } from "../satsuma-viz.js";
 import { renderMarkdown } from "../markdown.js";
-import { noteSectionStyles, renderNotesSection } from "../notes.js";
+import { noteSectionStyles, renderNotesSection, schemaLabelShown } from "../notes.js";
 import type { FieldCoverageEntry, FieldCoverageState } from "@satsuma/core/coverage";
 import { uncoveredFieldCoverage } from "@satsuma/core/coverage";
 import { toCoverageFields } from "../field-coverage.js";
@@ -853,12 +853,8 @@ export class SzSchemaCard extends LitElement {
     const coverage = this._coverage();
     const hasNotes = s.notes.length > 0;
     const metaPills = s.metadata.filter((m) => m.key !== "note");
-    // The backend fills a schema's label from its `note` tag, and the same
-    // note also arrives in `notes` and renders in the Notes section below.
-    // Showing both printed the note twice, so a label that merely repeats a
-    // note is dropped — the Notes section is the one Markdown rendering. A
-    // label with its own text (a metric's display name) still shows.
-    const showLabel = s.label !== null && !s.notes.some((n) => n.text === s.label);
+    // A label that merely repeats a note is dropped; see schemaLabelShown.
+    const showLabel = schemaLabelShown(s);
     const isReport = this._isReport(s);
 
     return html`
@@ -1302,6 +1298,7 @@ export class SzSchemaCard extends LitElement {
             ? html`<div class="fields">${s.fields.map((f) => this._renderField(f, 0))}</div>`
             : ""
         }
+        ${s.notes.length > 0 ? this._renderNotes(s.notes) : ""}
       </div>
     `;
   }

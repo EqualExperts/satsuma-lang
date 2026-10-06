@@ -752,6 +752,24 @@ describe("computeLayout field ports for dotted, prefixed, and namespaced paths (
     assert.notEqual(top.y, nested.y, "the two ports must sit on different field rows");
   });
 
+  it("reserves no label line on a full card whose label only repeats its note", async () => {
+    // The backend copies a schema's note into its label, and the card hides a
+    // label that repeats a note (it already shows in the Notes section). The
+    // layout used to reserve the hidden line anyway, leaving a gap.
+    const heightOf = async (overrides) => {
+      const result = await computeLayout(model([{ ...schema("s"), ...overrides }]));
+      return result.nodes.get("s").height;
+    };
+    const note = { text: "Customer record", isMultiline: false };
+    const noteOnly = await heightOf({ notes: [note] });
+
+    assert.equal(await heightOf({ label: note.text, notes: [note] }), noteOnly);
+    assert.ok(
+      (await heightOf({ label: "Display name", notes: [note] })) > noteOnly,
+      "a label with its own text is shown, so it takes a line",
+    );
+  });
+
   it("keys ports by field path even when the node id contains '::'", async () => {
     // Pre-fix extractLayout split port ids on ":", so a namespaced node id
     // like "crm::customers" yielded garbage field keys.
@@ -1077,6 +1095,90 @@ describe("computeOverviewLayout", () => {
     assert.ok(
       srcNode.x < mappingNode.x && mappingNode.x < tgtNode.x,
       `Mapping node should be placed between source (${srcNode.x}) and target (${tgtNode.x})`,
+    );
+  });
+
+  it("sizes a mapping pill for its arrow-count suffix, not just its name", async () => {
+    // The pill used to be sized from the name alone, so the renderer pinned
+    // the card to a width the "N →s" suffix then spilled past. More arrows
+    // means a longer suffix, so the node must grow with the count.
+    const overviewWith = (arrowCount) => ({
+      uri: "file:///test.stm",
+      fileNotes: [],
+      namespaces: [
+        {
+          name: null,
+          schemas: [schema("src"), schema("tgt")],
+          mappings: [
+            mapping(
+              "CustomerRecordToMailingList",
+              ["src"],
+              "tgt",
+              Array.from({ length: arrowCount }, () => arrow("id", "id")),
+            ),
+          ],
+          metrics: [],
+          fragments: [],
+        },
+      ],
+    });
+    const widthFor = async (arrowCount) =>
+      (await computeOverviewLayout(overviewWith(arrowCount))).nodes.find((n) =>
+        n.id.startsWith("mapping:"),
+      ).width;
+
+    assert.ok(
+      (await widthFor(1000)) > (await widthFor(4)),
+      "a four-digit arrow count needs a wider pill than a one-digit count",
+    );
+  });
+
+  it("reserves no label line on a compact schema card, which never shows one", async () => {
+    // The compact overview card renders no label. Counting one left an empty
+    // line above every overview card whose schema carries a note, since the
+    // backend copies the note into the label.
+    const withLabel = (label) => ({
+      uri: "file:///test.stm",
+      fileNotes: [],
+      namespaces: [
+        {
+          name: null,
+          schemas: [{ ...schema("s"), label }],
+          mappings: [],
+          metrics: [],
+          fragments: [],
+        },
+      ],
+    });
+    const heightFor = async (label) =>
+      (await computeOverviewLayout(withLabel(label))).nodes.find((n) => n.id === "s").height;
+
+    assert.equal(await heightFor("Display name"), await heightFor(null));
+  });
+
+  it("reserves height on a compact schema card for its notes", async () => {
+    // The overview card now shows a schema's notes (expanded, as the full
+    // card does), so its node must be tall enough to hold them or the note
+    // paints over the card below.
+    const withNotes = (notes) => ({
+      uri: "file:///test.stm",
+      fileNotes: [],
+      namespaces: [
+        {
+          name: null,
+          schemas: [{ ...schema("s"), notes }],
+          mappings: [],
+          metrics: [],
+          fragments: [],
+        },
+      ],
+    });
+    const heightFor = async (notes) =>
+      (await computeOverviewLayout(withNotes(notes))).nodes.find((n) => n.id === "s").height;
+
+    assert.ok(
+      (await heightFor([{ text: "I am a note", isMultiline: false }])) > (await heightFor([])),
+      "a note must add height to the compact card",
     );
   });
 

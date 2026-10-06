@@ -150,6 +150,11 @@ export {
   fieldNameText,
   walkDescendants,
 } from "./cst-utils.js";
+export {
+  isAnnotationComment,
+  trailingCommentOwner,
+  trailingComments,
+} from "./comment-attachment.js";
 export { classifyTransform, classifyArrow } from "./classify.js";
 export type { LintFinding } from "./lint-findings.js";
 export { TYPE_MISMATCH_RULE_ID, detectTypeMismatches } from "./lint-type-mismatch.js";
