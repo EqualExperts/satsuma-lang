@@ -1,8 +1,9 @@
 /**
- * cst-query.ts — Namespace-aware CST lookup helpers.
+ * cst-query.ts — Namespace-aware CST lookup helpers: find a named block, and a
+ * field declaration inside one.
  */
 
-import { labelText } from "@satsuma/core";
+import { fieldNameText, labelText } from "@satsuma/core";
 import type { SatsumaGrammarSymbol } from "@satsuma/core";
 import type { SyntaxNode } from "./types.js";
 
@@ -77,4 +78,31 @@ function findBlockNodeInContainer(
     if (c.type === nodeType && labelText(c) === localName) return c;
   }
   return null;
+}
+
+/**
+ * The `field_decl` at `path` inside a schema or fragment block, following each
+ * segment through the nested record body it names. Exact: a segment that does
+ * not name a field at its own level yields null rather than a same-named field
+ * elsewhere. Spreads are not followed — a spread-supplied field is declared in
+ * its fragment's block, so look it up there.
+ */
+export function findFieldDeclByPath(
+  blockNode: SyntaxNode,
+  path: readonly string[],
+): SyntaxNode | null {
+  let body = blockNode.namedChildren.find((c) => c.type === "schema_body");
+  let decl: SyntaxNode | null = null;
+  for (const segment of path) {
+    if (!body) return null;
+    decl =
+      body.namedChildren.find(
+        (c) =>
+          c.type === "field_decl" &&
+          fieldNameText(c.namedChildren.find((x) => x.type === "field_name")) === segment,
+      ) ?? null;
+    if (!decl) return null;
+    body = decl.namedChildren.find((c) => c.type === "schema_body");
+  }
+  return decl;
 }

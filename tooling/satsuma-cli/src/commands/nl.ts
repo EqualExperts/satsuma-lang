@@ -18,7 +18,8 @@ import type { NLItem } from "../nl-extract.js";
 import { labelText } from "@satsuma/core";
 import type { SatsumaGrammarSymbol } from "@satsuma/core";
 import { findBlockNode } from "../cst-query.js";
-import type { SyntaxNode, ExtractedWorkspace, ParsedFile, FieldDecl } from "../types.js";
+import { findDeclaredFields, findFieldDeclaration } from "../field-lookup.js";
+import type { SyntaxNode, ExtractedWorkspace, ParsedFile } from "../types.js";
 
 interface NLItemWithFile extends NLItem {
   file: string;
@@ -195,13 +196,12 @@ function extractFromField(
     throw new CommandError(`Schema '${schemaName}' not found.`, EXIT_NOT_FOUND);
   }
 
+  // Spread-supplied fields count at any depth, and their notes are read from
+  // the fragment that writes them (bsw-ep0m). A bare name reaches every field
+  // of that name in the schema, so each one's notes are reported.
   const schema = resolvedSchema.entry;
-  // For multi-segment paths, require exact path match; for single-segment, use flat search
-  const fieldExists =
-    pathSegments.length > 1
-      ? schemaHasFieldByPath(schema.fields, pathSegments)
-      : schemaHasField(schema.fields, leafName);
-  if (!fieldExists) {
+  const matches = findDeclaredFields(schema, pathSegments, index);
+  if (matches.length === 0) {
     throw new CommandError(
       `Field '${fieldPath}' not found in schema '${schemaName}'.`,
       EXIT_NOT_FOUND,
@@ -209,18 +209,12 @@ function extractFromField(
   }
 
   const items: NLItemWithFile[] = [];
-  const parsed = parsedFiles.find((p) => p.filePath === schema.file);
-  const schemaNode = parsed
-    ? findBlockNode(parsed.tree.rootNode, "schema_block", resolvedSchema.key)
-    : null;
-  const body = schemaNode?.namedChildren.find((c) => c.type === "schema_body");
-  if (body) {
-    // Navigate to the nested body for intermediate path segments, then find the leaf field
-    const targetBody = navigateToNestedBody(body, pathSegments.slice(0, -1));
-    for (const fieldDecl of findFieldDecls(targetBody, leafName)) {
-      for (const item of extractNLContent(fieldDecl, leafName)) {
-        items.push({ ...item, file: schema.file });
-      }
+  const owner = { key: resolvedSchema.key, blockType: "schema_block" as const, file: schema.file };
+  for (const match of matches) {
+    const declaration = findFieldDeclaration(match, owner, index, parsedFiles);
+    if (!declaration) continue;
+    for (const item of extractNLContent(declaration.node, leafName)) {
+      items.push({ ...item, file: declaration.file });
     }
   }
 
@@ -291,74 +285,6 @@ function collectFieldArrowNL(
       items.push({ ...item, file });
     }
   }
-}
-
-function getFieldDeclName(fieldDecl: SyntaxNode): string | null {
-  const nameNode = fieldDecl.namedChildren.find((c) => c.type === "field_name");
-  const inner = nameNode?.namedChildren[0];
-  if (!inner) return null;
-  if (inner.type === "backtick_name") return inner.text.slice(1, -1);
-  return inner.text;
-}
-
-function schemaHasField(fields: FieldDecl[], fieldName: string): boolean {
-  for (const field of fields) {
-    if (field.name === fieldName) return true;
-    if (field.children && schemaHasField(field.children, fieldName)) return true;
-  }
-  return false;
-}
-
-function schemaHasFieldByPath(fields: FieldDecl[], segments: string[]): boolean {
-  if (segments.length === 0) return false;
-  const [head, ...rest] = segments;
-  for (const field of fields) {
-    if (field.name === head) {
-      if (rest.length === 0) return true;
-      if (field.children) return schemaHasFieldByPath(field.children, rest);
-    }
-  }
-  return false;
-}
-
-function navigateToNestedBody(body: SyntaxNode, intermediateSegments: string[]): SyntaxNode {
-  let current = body;
-  for (const seg of intermediateSegments) {
-    let found = false;
-    for (const c of current.namedChildren) {
-      if (c.type === "field_decl") {
-        if (getFieldDeclName(c) === seg) {
-          const nested = c.namedChildren.find((x) => x.type === "schema_body");
-          if (nested) {
-            current = nested;
-            found = true;
-            break;
-          }
-        }
-      }
-    }
-    if (!found) break;
-  }
-  return current;
-}
-
-function findFieldDecls(
-  bodyNode: SyntaxNode,
-  fieldName: string,
-  acc: SyntaxNode[] = [],
-): SyntaxNode[] {
-  for (const child of bodyNode.namedChildren) {
-    if (child.type === "field_decl") {
-      if (getFieldDeclName(child) === fieldName) {
-        acc.push(child);
-        continue;
-      }
-      // Recurse into nested record/list_of fields
-      const nestedBody = child.namedChildren.find((c) => c.type === "schema_body");
-      if (nestedBody) findFieldDecls(nestedBody, fieldName, acc);
-    }
-  }
-  return acc;
 }
 
 function printDefault(items: NLItemWithFile[]): void {

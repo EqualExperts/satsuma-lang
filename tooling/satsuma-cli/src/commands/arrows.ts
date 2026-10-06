@@ -16,7 +16,8 @@ import { loadWorkspace } from "../load-workspace.js";
 import { runCommand, CommandError, EXIT_NOT_FOUND, EXIT_PARSE_ERROR } from "../command-runner.js";
 import { resolveIndexKey, canonicalKey } from "../index-builder.js";
 import { resolveAllNLRefs } from "../nl-ref-extract.js";
-import { expandEntityFields } from "../spread-expand.js";
+import { expandDeclaredFields } from "../spread-expand.js";
+import { findDeclaredFields } from "../field-lookup.js";
 import { collectFieldNames, findFieldByPath } from "@satsuma/core";
 import type { ExtractedWorkspace, ArrowRecord } from "../types.js";
 
@@ -84,13 +85,12 @@ Examples:
             throw new CommandError(lines.join("\n"), EXIT_NOT_FOUND);
           }
 
-          // Validate field exists in schema (including fragment spread fields and nested children)
+          // Validate field exists in schema, seeing through fragment spreads at
+          // any depth (bsw-ep0m). `allFields` is the same expanded tree, so the
+          // arrow matching below agrees with this check.
           const schema = resolvedSchema.entry;
-          const spreadFields = expandEntityFields(schema, schema.namespace ?? null, index);
-          const allFields = [...schema.fields, ...spreadFields];
-          const fieldExists =
-            findFieldByPath(allFields, fieldName) !== null ||
-            collectFieldNames(allFields).includes(fieldName);
+          const allFields = expandDeclaredFields(schema, schema.namespace ?? null, index);
+          const fieldExists = findDeclaredFields(schema, fieldName.split("."), index).length > 0;
           if (!fieldExists) {
             // Suggest close matches from top-level and nested fields
             const allNames = collectFieldNames(allFields);
@@ -338,8 +338,9 @@ Examples:
                 for (const schemaKey of sourceSchemas) {
                   const s = index.schemas.get(schemaKey);
                   if (!s) continue;
-                  const sSpread = expandEntityFields(s, s.namespace ?? null, index);
-                  const allNames = [...s.fields, ...sSpread].map((f) => f.name);
+                  const allNames = expandDeclaredFields(s, s.namespace ?? null, index).map(
+                    (f) => f.name,
+                  );
                   if (allNames.includes(path)) return `${schemaKey}.${path}`;
                 }
                 // Fallback: use first source schema

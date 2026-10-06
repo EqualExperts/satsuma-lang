@@ -15,7 +15,7 @@ import { assertNever, classifyFieldDecl } from "@satsuma/core";
 import { loadWorkspace } from "../load-workspace.js";
 import { runCommand, CommandError, EXIT_NOT_FOUND } from "../command-runner.js";
 import { resolveIndexKey } from "../index-builder.js";
-import { expandEntityFields, expandNestedSpreads } from "../spread-expand.js";
+import { expandDeclaredFields } from "../spread-expand.js";
 import { coverageForMapping, coveredFieldPaths } from "../coverage-workspace.js";
 import { resolveAllNLRefs } from "../nl-ref-extract.js";
 import type {
@@ -91,20 +91,16 @@ Examples:
           const resolvedSchemaName = resolved.key;
 
           const entity = resolved.entry;
-          let fields: FieldWithTags[] = deepCopyFields(entity.fields);
-
-          // Expand fragment spreads — inline fields from spread fragments (schemas and fragments only)
-          if (entityKind !== "metric") {
-            // Expand nested record-level spreads in place first
-            expandNestedSpreads(fields, entity.namespace ?? null, index);
-            // Then expand schema-level spreads
-            const spreadFields = expandEntityFields(
-              entity as SchemaRecord | FragmentRecord,
-              entity.namespace ?? null,
-              index,
-            );
-            fields = [...fields, ...spreadFields];
-          }
+          // Inline fragment spreads at every depth (schemas and fragments only);
+          // core returns a fresh tree, so the enrichment below cannot touch the index.
+          let fields: FieldWithTags[] =
+            entityKind === "metric"
+              ? deepCopyFields(entity.fields)
+              : expandDeclaredFields(
+                  entity as SchemaRecord | FragmentRecord,
+                  entity.namespace ?? null,
+                  index,
+                );
 
           // Enrich with metadata if requested
           if (opts.withMeta) {

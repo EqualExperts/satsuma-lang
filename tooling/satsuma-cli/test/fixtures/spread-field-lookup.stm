@@ -1,0 +1,60 @@
+// Fixture for bsw-ep0m: fields that reach a schema only through fragment
+// spreads, at every depth a field-scoped command must see through.
+//
+// src.created_by        top-level spread (audit)
+// src.orders.created_by spread inside a record, transitively (line -> audit)
+// src.orders.qty        spread inside a record (line)
+// src.ship.addr.city    a fragment's own record that spreads another (shipping -> geo)
+
+fragment audit {
+  created_by  STRING  (note "who created it")
+}
+
+fragment line {
+  ...audit
+  qty  INT  (note "units ordered")
+}
+
+fragment geo {
+  city  STRING  (note "delivery city")
+}
+
+fragment shipping {
+  addr record {
+    ...geo
+  }
+}
+
+schema src {
+  ...audit
+  orders list_of record {
+    ...line
+    oid  STRING
+  }
+  ship record {
+    ...shipping
+  }
+}
+
+schema tgt {
+  who   STRING
+  city  STRING
+  rows list_of record {
+    a  STRING
+    c  INT
+    d  STRING
+  }
+}
+
+mapping m {
+  source { src }
+  target { tgt }
+
+  created_by -> who
+  ship.addr.city -> city
+  each orders -> rows {
+    .created_by -> .a
+    .qty -> .c
+    .oid -> .d
+  }
+}

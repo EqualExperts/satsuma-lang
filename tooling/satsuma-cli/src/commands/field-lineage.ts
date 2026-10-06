@@ -18,14 +18,8 @@ import { runCommand, CommandError, EXIT_NOT_FOUND, EXIT_PARSE_ERROR } from "../c
 import { parsePositiveInt } from "../option-parsers.js";
 import { resolveIndexKey, canonicalKey } from "../index-builder.js";
 import { createFieldEdgeSource } from "../field-edge-source.js";
-import { expandEntityFields } from "../spread-expand.js";
-import {
-  buildFieldEdges,
-  collectFieldNames,
-  createCanonicalFieldEndpoint,
-  findFieldByPath,
-  traceFieldLineage,
-} from "@satsuma/core";
+import { findDeclaredFields } from "../field-lookup.js";
+import { buildFieldEdges, createCanonicalFieldEndpoint, traceFieldLineage } from "@satsuma/core";
 import type { FieldLineageDirection, FieldLineageResult } from "@satsuma/core";
 
 export function register(program: Command): void {
@@ -95,13 +89,9 @@ Examples:
             throw new CommandError(`Schema '${schemaName}' not found.`, EXIT_NOT_FOUND);
           }
 
-          // Validate field exists (including spread fields)
+          // Validate field exists, seeing through fragment spreads at any depth (bsw-ep0m)
           const schema = resolvedSchema.entry;
-          const spreadFields = expandEntityFields(schema, schema.namespace ?? null, index);
-          const allFields = [...schema.fields, ...spreadFields];
-          const fieldExists =
-            findFieldByPath(allFields, fieldName) !== null ||
-            collectFieldNames(allFields).includes(fieldName);
+          const fieldExists = findDeclaredFields(schema, fieldName.split("."), index).length > 0;
           if (!fieldExists) {
             throw new CommandError(
               `Field '${fieldName}' not found in schema '${schemaName}'.`,

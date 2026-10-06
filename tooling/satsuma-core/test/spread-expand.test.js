@@ -324,6 +324,72 @@ describe("expandDeclaredFields()", () => {
     assert.deepEqual(address.spreads, ["address_fields"], "and still records its spread");
   });
 
+  describe("a record a fragment supplies, whose body spreads another fragment", () => {
+    // bsw-ep0m. A spread contributes copies of the fragment's fields, and a
+    // copied record still carries its own `...geo`. Expanding only the
+    // entity's own records left `addr` childless, so `ship.addr.city` was
+    // declared yet no command could find it.
+    const geo = fragment("geo", [field("city")]);
+    const shipping = fragment("shipping", [
+      { ...field("addr", "record", []), hasSpreads: true, spreads: ["geo"] },
+    ]);
+    const graph = new Map([
+      ["geo", geo],
+      ["shipping", shipping],
+    ]);
+    const resolveGraph = makeEntityRefResolver(graph);
+    const lookupGraph = (key) => graph.get(key) ?? null;
+
+    it("inlines it when the fragment is spread inside a record", () => {
+      const schema = {
+        fields: [{ ...field("ship", "record", []), hasSpreads: true, spreads: ["shipping"] }],
+        hasSpreads: false,
+        spreads: [],
+      };
+      assert.deepEqual(leaves(expandDeclaredFields(schema, null, resolveGraph, lookupGraph)), [
+        "ship.addr.city",
+      ]);
+    });
+
+    it("inlines it when the fragment is spread at schema level", () => {
+      const schema = { fields: [field("id")], hasSpreads: true, spreads: ["shipping"] };
+      const fields = expandDeclaredFields(schema, null, resolveGraph, lookupGraph);
+      assert.deepEqual(leaves(fields), ["id", "addr.city"]);
+      // Each field names the fragment that writes it, so a caller can find its
+      // declaration: `addr` is in shipping's body, `city` in geo's.
+      assert.equal(fields[1].fromFragment, "shipping");
+      assert.equal(fields[1].children[0].fromFragment, "geo");
+    });
+
+    it("leaves the fragment index untouched", () => {
+      // The copies are expanded, not the fragment's own record: a later
+      // command reading `shipping` must still see the spread its author wrote.
+      const schema = { fields: [], hasSpreads: true, spreads: ["shipping"] };
+      expandDeclaredFields(schema, null, resolveGraph, lookupGraph);
+      assert.deepEqual(shipping.fields[0].children, []);
+      assert.deepEqual(shipping.fields[0].spreads, ["geo"]);
+    });
+  });
+
+  it("stops when a fragment's record spreads that same fragment", () => {
+    // `fragment node { child record { ...node } }` describes an infinite tree.
+    // Expansion must terminate rather than recurse until the stack overflows;
+    // the repeated spread is dropped at the first level it would re-enter.
+    const node = fragment("node", [
+      field("id"),
+      { ...field("child", "record", []), hasSpreads: true, spreads: ["node"] },
+    ]);
+    const graph = new Map([["node", node]]);
+    const schema = { fields: [], hasSpreads: true, spreads: ["node"] };
+    const fields = expandDeclaredFields(
+      schema,
+      null,
+      makeEntityRefResolver(graph),
+      (key) => graph.get(key) ?? null,
+    );
+    assert.deepEqual(leaves(fields), ["id", "child"]);
+  });
+
   it("returns nothing for an absent entity rather than throwing", () => {
     // Resolvers hand back null for a reference they cannot resolve; coverage is
     // not a validation pass and must carry on reporting the schemas it did find.
