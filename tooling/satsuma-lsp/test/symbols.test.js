@@ -173,6 +173,25 @@ mapping \`migrate\` {
     assert.deepEqual(symbols, []);
   });
 
+  it("names a namespace by its identifier and selects that identifier (bsw-c7z2)", () => {
+    // Namespaces carry their name in a `name` field, not a block_label, so
+    // the generic label lookup found nothing and the outline showed every
+    // namespace as "(anonymous)".
+    const tree = parse("namespace ns {\n  schema s1 { id UUID }\n  schema s2 { id UUID }\n}");
+    const symbols = computeDocumentSymbols(tree);
+    assert.equal(symbols.length, 1);
+    assert.equal(symbols[0].name, "ns");
+    assert.equal(symbols[0].kind, SymbolKind.Namespace);
+    assert.deepEqual(
+      symbols[0].children.map((c) => c.name),
+      ["s1", "s2"],
+    );
+    // "ns" starts at col 10 on line 0
+    assert.equal(symbols[0].selectionRange.start.line, 0);
+    assert.equal(symbols[0].selectionRange.start.character, 10);
+    assert.equal(symbols[0].selectionRange.end.character, 12);
+  });
+
   it("selectionRange points to the block label", () => {
     const tree = parse("schema customers {\n  id UUID\n}");
     const symbols = computeDocumentSymbols(tree);

@@ -49,8 +49,8 @@ function blockSymbol(node: SyntaxNode, kind: SymbolKind): DocumentSymbol | null 
   const name = symbolName(node);
   if (!name) return null;
 
-  const lblNode = child(node, "block_label");
-  const selectionRange = lblNode ? nodeRange(lblNode) : nodeRange(node);
+  const nameNode = blockNameNode(node);
+  const selectionRange = nameNode ? nodeRange(nameNode) : nodeRange(node);
   const detail = symbolDetail(node);
 
   const sym: DocumentSymbol = {
@@ -198,8 +198,21 @@ function mappingChildSymbols(body: SyntaxNode): DocumentSymbol[] {
 
 // ---------- Name extraction helpers ----------
 
+/**
+ * The node holding a block's name. Most blocks name themselves with a
+ * `block_label`; a namespace uses the grammar's `name` field on a plain
+ * identifier instead, so the label lookup alone reports every namespace as
+ * anonymous (bsw-c7z2).
+ */
+function blockNameNode(node: SyntaxNode): SyntaxNode | null {
+  if (node.type === "namespace_block") return node.childForFieldName("name");
+  return child(node, "block_label");
+}
+
 function symbolName(node: SyntaxNode): string | null {
   switch (node.type) {
+    case "namespace_block":
+      return blockNameNode(node)?.text ?? "(anonymous)";
     case "note_block":
       return "note";
     case "import_decl": {
