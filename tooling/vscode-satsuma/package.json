@@ -200,7 +200,7 @@
     "@satsuma/lsp": "*",
     "@satsuma/viz": "*",
     "elkjs": "^0.12.0",
-    "vscode-languageclient": "^10.1.0"
+    "vscode-languageclient": "^10.1.2"
   },
   "//devDependencies": [
     "Neither @satsuma/viz-backend nor tree-sitter-satsuma is imported by the",
