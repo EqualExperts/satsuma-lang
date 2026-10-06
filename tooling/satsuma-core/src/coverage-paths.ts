@@ -230,3 +230,36 @@ export function schemaLocalFieldPath(
 
   return createSchemaLocalPath(fieldRef);
 }
+
+/**
+ * The segment form of {@link schemaLocalFieldPath}: the same four rules, applied
+ * to a resolved path's segments rather than to its joined text.
+ *
+ * Editors need this form. They hold a path as segments (arrow-path.ts
+ * `resolveArrowPathInPlace`) and must look each one up in a declared field
+ * tree, where a quoted segment containing a dot (`` `a.b` ``) is one field, not
+ * two — joining and re-splitting would lose that. Only the first segment can
+ * name a schema, so the rules compare it whole against the schema's spellings.
+ *
+ * @returns The segments local to `authoredSchemaRef`, or null when the path
+ *          names that schema itself (rule 1) or another schema on the same
+ *          side (rule 3).
+ */
+export function schemaLocalSegments(
+  segments: readonly string[],
+  authoredSchemaRef: AuthoredEntityRef,
+  canonicalSchemaRef: CanonicalEntityRef,
+  otherSchemaRefs: readonly AuthoredEntityRef[],
+  declaresTopLevel?: (name: string) => boolean,
+): string[] | null {
+  const [first, ...rest] = segments;
+  if (first === undefined) return null;
+
+  const shadowedByOwnField = declaresTopLevel?.(first) ?? false;
+  const ownPrefixes = [authoredSchemaRef, canonicalSchemaRef].flatMap(schemaRefPrefixes);
+  if (!shadowedByOwnField && ownPrefixes.includes(first)) {
+    return rest.length > 0 ? rest : null;
+  }
+  if (otherSchemaRefs.flatMap(schemaRefPrefixes).includes(first)) return null;
+  return [...segments];
+}

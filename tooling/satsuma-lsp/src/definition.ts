@@ -1,5 +1,13 @@
 import { Location } from "vscode-languageserver";
-import { createAtRefRegex, fieldNameText, qualifiedNameText, sourceRefText } from "@satsuma/core";
+import {
+  createAtRefRegex,
+  fieldNameText,
+  qualifiedNameText,
+  resolveArrowPathInPlace,
+  resolvedSegmentsThrough,
+  sourceRefText,
+} from "@satsuma/core";
+import { resolveArrowField, type ArrowFieldTarget } from "./arrow-field";
 import type { SyntaxNode, Tree } from "./parser-utils";
 import { child, children, labelText, nodeAtPosition } from "./parser-utils";
 import { WorkspaceIndex, resolveDefinition, FieldInfo } from "./workspace-index";
@@ -55,6 +63,14 @@ export interface NodeContext {
   mappingTargets?: string[];
   /** Raw path text for arrow and NL field contexts. */
   rawPath?: string;
+  /**
+   * For arrow_source / arrow_target: the field the cursor names, as the path
+   * resolved against its enclosing each/flatten/nested containers and cut at
+   * the segment under the cursor (core `resolvedSegmentsThrough`). It may lead
+   * with a schema name when the mapping side has several. `name` is its last
+   * segment.
+   */
+  fieldPath?: string[];
   /** The node we identified context from (for range info). */
   node: SyntaxNode;
 }
@@ -64,14 +80,19 @@ export function findNodeContext(startNode: SyntaxNode): NodeContext | null {
   let current: SyntaxNode | null = startNode;
 
   while (current) {
-    const ctx = tryContext(current);
+    const ctx = tryContext(current, startNode);
     if (ctx) return ctx;
     current = current.parent;
   }
   return null;
 }
 
-function tryContext(node: SyntaxNode): NodeContext | null {
+/**
+ * The context `node` establishes, if any. `cursorNode` is the node the walk
+ * started from; an arrow path uses it to tell which segment is under the
+ * cursor.
+ */
+function tryContext(node: SyntaxNode, cursorNode: SyntaxNode): NodeContext | null {
   const ns = findEnclosingNamespace(node);
 
   switch (node.type) {
@@ -132,37 +153,11 @@ function tryContext(node: SyntaxNode): NodeContext | null {
       return { kind: "field_name", name, namespace: ns, parentName, node };
     }
 
-    case "src_path": {
-      const pathText = extractPathFieldName(node);
-      const rawPath = extractPathText(node);
-      if (!pathText || !rawPath) return null;
-      const mapping = findEnclosingMapping(node);
-      return {
-        kind: "arrow_source",
-        name: pathText,
-        namespace: ns,
-        node,
-        rawPath,
-        mappingSources: mapping ? getMappingSchemaRefs(mapping, "source_block") : [],
-        mappingTargets: mapping ? getMappingSchemaRefs(mapping, "target_block") : [],
-      };
-    }
+    case "src_path":
+      return arrowPathContext(node, cursorNode, "arrow_source", ns);
 
-    case "tgt_path": {
-      const pathText = extractPathFieldName(node);
-      const rawPath = extractPathText(node);
-      if (!pathText || !rawPath) return null;
-      const mapping = findEnclosingMapping(node);
-      return {
-        kind: "arrow_target",
-        name: pathText,
-        namespace: ns,
-        node,
-        rawPath,
-        mappingSources: mapping ? getMappingSchemaRefs(mapping, "source_block") : [],
-        mappingTargets: mapping ? getMappingSchemaRefs(mapping, "target_block") : [],
-      };
-    }
+    case "tgt_path":
+      return arrowPathContext(node, cursorNode, "arrow_target", ns);
 
     case "at_ref": {
       // @ref CST node in bare pipe text or metadata value text
@@ -222,6 +217,62 @@ function tryContext(node: SyntaxNode): NodeContext | null {
     default:
       return null;
   }
+}
+
+/**
+ * The context of a `src_path` / `tgt_path`: the field it names, resolved
+ * against its enclosing containers by core, never by re-reading the text.
+ *
+ * The path is resolved where it sits, so `.id` inside `each orders -> rows`
+ * names `orders.id` on the source side and `rows.id` on the target side, a
+ * backtick segment arrives unquoted, and `^.` / `$.` reach the ancestor they
+ * escape to (ADR-053). Reading the text instead turned `.id` into an empty
+ * first segment and every relative path into "no definition" (bsw-89wr).
+ */
+function arrowPathContext(
+  pathNode: SyntaxNode,
+  cursorNode: SyntaxNode,
+  kind: "arrow_source" | "arrow_target",
+  ns: string | null,
+): NodeContext | null {
+  const inPlace = resolveArrowPathInPlace(pathNode);
+  const rawPath = extractPathText(pathNode);
+  if (!inPlace || !rawPath) return null;
+  const fieldPath = resolvedSegmentsThrough(inPlace, cursorNode);
+  const name = fieldPath[fieldPath.length - 1];
+  if (!name) return null;
+  const mapping = findEnclosingMapping(pathNode);
+  return {
+    kind,
+    name,
+    namespace: ns,
+    node: pathNode,
+    rawPath,
+    fieldPath,
+    mappingSources: mapping ? getMappingSchemaRefs(mapping, "source_block") : [],
+    mappingTargets: mapping ? getMappingSchemaRefs(mapping, "target_block") : [],
+  };
+}
+
+/**
+ * The declared field an arrow_source / arrow_target context names, looked up
+ * by its full resolved path among the schemas on its side of the mapping.
+ * Null for any other context kind, or when no schema declares the path.
+ * Shared by go-to-definition, find-references and hover so all three agree.
+ */
+export function resolveArrowContextField(
+  ctx: NodeContext,
+  index: WorkspaceIndex,
+): ArrowFieldTarget | null {
+  if (!ctx.fieldPath) return null;
+  const schemas =
+    ctx.kind === "arrow_source"
+      ? ctx.mappingSources
+      : ctx.kind === "arrow_target"
+        ? ctx.mappingTargets
+        : undefined;
+  if (!schemas) return null;
+  return resolveArrowField(index, schemas, ctx.fieldPath, ctx.namespace);
 }
 
 /**
@@ -362,16 +413,10 @@ function resolveContext(
       return null;
     }
 
-    case "arrow_source": {
-      // Look up field in source schemas of the enclosing mapping
-      const schemas = ctx.mappingSources ?? [];
-      return resolveFieldInSchemas(index, schemas, ctx.name, ctx.namespace);
-    }
-
+    case "arrow_source":
     case "arrow_target": {
-      // Look up field in target schemas of the enclosing mapping
-      const schemas = ctx.mappingTargets ?? [];
-      return resolveFieldInSchemas(index, schemas, ctx.name, ctx.namespace);
+      const target = resolveArrowContextField(ctx, index);
+      return target ? Location.create(target.uri, target.field.range) : null;
     }
 
     case "nl_ref": {
@@ -517,38 +562,6 @@ function findEnclosingMapping(node: SyntaxNode): SyntaxNode | null {
     current = current.parent;
   }
   return null;
-}
-
-/** Extract the first segment of a path (the field name before any dots). */
-function extractPathFieldName(pathNode: SyntaxNode): string | null {
-  // src_path / tgt_path wraps a _path_expr which can be:
-  //   field_path (identifier.identifier...), relative_field_path (.identifier...),
-  //   backtick_path, namespaced_path, parent_path (^.identifier...),
-  //   root_path ($.identifier...)
-  const text = pathNode.text;
-  if (!text) return null;
-
-  // Handle backtick paths: `field name`
-  if (text.startsWith("`") && text.endsWith("`")) {
-    return text.slice(1, -1).split(".")[0] ?? null;
-  }
-
-  // Strip the ADR-053 ancestor-escape prefixes so go-to-definition finds the
-  // field the escape points at rather than the `^`/`$` marker. Resolution here
-  // is by field name (the LSP resolves a leaf by name, not by full container
-  // path), so dropping the escape prefix matches how a relative `.field`'s
-  // leading dot is already ignored.
-  const withoutEscape = text.replace(/^(?:\^\.|\$\.)+/, "");
-
-  // Handle dotted paths: take the first segment. split() on a non-empty
-  // string always yields at least one element (`text` is non-empty per the
-  // guard above), so the fallback exists only for noUncheckedIndexedAccess.
-  const firstSegment = withoutEscape.split(".")[0] ?? "";
-  // Handle namespaced: ns::field → take field part
-  if (firstSegment.includes("::")) {
-    return firstSegment.split("::").pop() ?? null;
-  }
-  return firstSegment;
 }
 
 function extractPathText(pathNode: SyntaxNode): string | null {

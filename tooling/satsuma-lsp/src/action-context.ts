@@ -2,7 +2,7 @@ import type { SyntaxNode, Tree } from "./parser-utils";
 import { child, children, labelText, nodeAtPosition } from "./parser-utils";
 import { findNodeContext, type NodeContext } from "./definition";
 import type { WorkspaceIndex } from "./workspace-index";
-import { sourceRefText } from "@satsuma/core";
+import { resolveArrowPathInPlace, sourceRefText } from "@satsuma/core";
 
 export interface ActionContext {
   schemaName: string | null;
@@ -111,10 +111,10 @@ function inferSchemaName(ctx: NodeContext): string | null {
       return ctx.parentName ?? null;
 
     case "arrow_source":
-      return inferSchemaFromPath(ctx.mappingSources ?? [], ctx.rawPath ?? null);
+      return inferSchemaFromPath(ctx.mappingSources ?? [], resolvedArrowPath(ctx));
 
     case "arrow_target":
-      return inferSchemaFromPath(ctx.mappingTargets ?? [], ctx.rawPath ?? null);
+      return inferSchemaFromPath(ctx.mappingTargets ?? [], resolvedArrowPath(ctx));
 
     // The schema prefix of a qualified arrow path (`customers` in
     // `customers.email`). Which side it belongs to is not carried on the
@@ -137,10 +137,10 @@ function inferFieldPath(ctx: NodeContext): string | null {
       return ctx.parentName ? `${ctx.parentName}.${ctx.name}` : null;
 
     case "arrow_source":
-      return inferArrowFieldPath(ctx.mappingSources ?? [], ctx.rawPath ?? null);
+      return inferArrowFieldPath(ctx.mappingSources ?? [], resolvedArrowPath(ctx));
 
     case "arrow_target":
-      return inferArrowFieldPath(ctx.mappingTargets ?? [], ctx.rawPath ?? null);
+      return inferArrowFieldPath(ctx.mappingTargets ?? [], resolvedArrowPath(ctx));
 
     case "arrow_schema":
       return inferArrowFieldPath(arrowSchemaCandidates(ctx), ctx.rawPath ?? null);
@@ -151,6 +151,16 @@ function inferFieldPath(ctx: NodeContext): string | null {
     default:
       return null;
   }
+}
+
+/**
+ * The whole path an arrow_source / arrow_target context sits on, resolved
+ * against its enclosing each/flatten/nested containers by core — so `.x`
+ * inside `each orders` is `orders.x`, not a bare `x`. Falls back to the raw
+ * text only when core cannot resolve the node.
+ */
+function resolvedArrowPath(ctx: NodeContext): string | null {
+  return resolveArrowPathInPlace(ctx.node)?.resolved.text ?? ctx.rawPath ?? null;
 }
 
 /**

@@ -2,6 +2,7 @@ const { describe, it, before } = require("node:test");
 const assert = require("node:assert/strict");
 const { initTestParser, parse } = require("./helper");
 const { computeHover } = require("../dist/hover");
+const { createWorkspaceIndex, indexFile } = require("../dist/workspace-index");
 
 before(async () => {
   await initTestParser();
@@ -145,6 +146,29 @@ describe("computeHover", () => {
     );
     assert.ok(md);
     assert.ok(md.includes("**target path**"));
+  });
+
+  it("names the container-resolved field and its type when hovering a relative path", () => {
+    // bsw-89wr: `.id` inside `each orders` is `src.orders.id`, a VARCHAR, not
+    // the top-level `id` INT. Hover needs the index for the declaration.
+    const source = `schema src {
+  id INT
+  orders list_of record {
+    id VARCHAR
+  }
+}
+mapping m {
+  source { src }
+  target { tgt }
+  each orders -> rows {
+    .id -> .id
+  }
+}`;
+    const tree = parse(source);
+    const index = createWorkspaceIndex();
+    indexFile(index, "file:///a.stm", tree);
+    const md = computeHover(tree, 10, 5, index)?.contents?.value ?? "";
+    assert.ok(md.includes("Field `src.orders.id` `VARCHAR`"), md);
   });
 
   it("shows namespace info", () => {

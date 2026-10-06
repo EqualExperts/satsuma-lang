@@ -171,6 +171,46 @@ mapping \`a\` {
     assert.ok(arrowRef, "expected a reference on the arrow line (line 7)");
   });
 
+  // ── Container-relative arrow paths (bsw-89wr) ──────────────────────────
+  const EACH = `schema src {
+  id VARCHAR
+  orders list_of record {
+    id VARCHAR
+  }
+}
+schema tgt {
+  k VARCHAR
+  rows list_of record {
+    id VARCHAR
+  }
+}
+mapping m {
+  source { src }
+  target { tgt }
+  id -> k
+  each orders -> rows {
+    .id -> .id
+  }
+}`;
+
+  it("finds a relative arrow path's sites and declaration, but not a same-named top-level field's", () => {
+    // From `.id` inside `each orders`, the field is orders.id: its declaration
+    // (line 3) and this arrow (line 17), never the top-level `id -> k` (line 15).
+    const result = refs({ "file:///a.stm": EACH }, "file:///a.stm", 17, 5, true);
+    const lines = result.map((r) => r.range.start.line).sort((a, b) => a - b);
+    assert.deepEqual(lines, [3, 17]);
+  });
+
+  it("finds a relative arrow path from the nested schema field it resolves to", () => {
+    // From `id` inside `orders record`, the `.id` written inside the each
+    // block is a use of that field.
+    const result = refs({ "file:///a.stm": EACH }, "file:///a.stm", 3, 5, false);
+    assert.ok(
+      result.some((r) => r.range.start.line === 17),
+      "expected the .id arrow inside the each block",
+    );
+  });
+
   it("finds @ref references in NL strings for a schema", () => {
     const src = `schema customers {
   id UUID

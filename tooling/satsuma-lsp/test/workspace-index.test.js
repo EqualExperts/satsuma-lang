@@ -586,6 +586,58 @@ describe("arrow field path indexing", () => {
   });
 });
 
+describe("arrow field paths keyed by their container-resolved field (bsw-89wr)", () => {
+  // find-references from a schema field and from an arrow meet only when the
+  // index keys each arrow path by the field it resolves to. Keying the text
+  // filed `.id` inside `each orders` under the top-level `src.id`, and `^.x` /
+  // `$.x` under `^` / `$`.
+  const SOURCE = `schema src {
+  id VARCHAR
+  code VARCHAR
+  orders list_of record {
+    id VARCHAR
+  }
+}
+schema tgt {
+  rows list_of record {
+    id VARCHAR
+    code VARCHAR
+    top VARCHAR
+  }
+}
+mapping m {
+  source { src }
+  target { tgt }
+  each orders -> rows {
+    .id -> .id
+    ^.code -> .code
+    $.id -> .top
+  }
+}`;
+
+  /** Lines of the arrow references filed under `key`. */
+  function arrowLines(idx, key) {
+    return (idx.references.get(key) ?? [])
+      .filter((r) => r.context === "arrow")
+      .map((r) => r.range.start.line);
+  }
+
+  it("keys a relative path under its container's field, not the top-level namesake", () => {
+    const idx = buildIndex({ "file:///a.stm": SOURCE });
+    assert.deepEqual(arrowLines(idx, "src.orders.id"), [18]);
+    assert.deepEqual(arrowLines(idx, "tgt.rows.id"), [18]);
+    assert.ok(!arrowLines(idx, "src.id").includes(18), ".id must not be filed as src.id");
+  });
+
+  it("keys ^. and $. paths under the ancestor field they escape to", () => {
+    const idx = buildIndex({ "file:///a.stm": SOURCE });
+    assert.deepEqual(arrowLines(idx, "src.code"), [19]);
+    assert.deepEqual(arrowLines(idx, "src.id"), [20]);
+    assert.equal(idx.references.get("^"), undefined);
+    assert.equal(idx.references.get("$"), undefined);
+  });
+});
+
 describe("reference range precision (sl-xf3f)", () => {
   // Rename replaces a reference's stored range verbatim, so every range must
   // cover exactly the text keyed under the reference name — a wider range

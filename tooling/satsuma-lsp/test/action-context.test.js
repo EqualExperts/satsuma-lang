@@ -53,6 +53,18 @@ describe("computeActionContext", () => {
     assert.equal(ctx.fieldPath, "customers.email");
   });
 
+  it("resolves a relative arrow path against its each container", () => {
+    // bsw-89wr gave `.id` an arrow context; the lineage path it reports must be
+    // the container's field, `src.orders.id`, not a bare `src.id`.
+    const ctx = contextAt(
+      "schema src {\n  orders list_of record {\n    id VARCHAR\n  }\n}\nmapping `m` {\n  source { src }\n  target { tgt }\n  each orders -> rows {\n    .id -> .id\n  }\n}",
+      9,
+      5,
+    );
+    assert.equal(ctx.schemaName, "src");
+    assert.equal(ctx.fieldPath, "src.orders.id");
+  });
+
   it("returns enclosing field path for schema fields", () => {
     const ctx = contextAt("schema customers {\n  email VARCHAR\n}", 1, 3);
     assert.equal(ctx.schemaName, "customers");

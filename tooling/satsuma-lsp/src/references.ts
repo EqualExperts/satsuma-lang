@@ -1,9 +1,11 @@
 import { Location } from "vscode-languageserver";
-import type { Tree } from "./parser-utils";
-import { nodeAtPosition } from "./parser-utils";
-import { findNodeContext } from "./definition";
+import { fieldNameText } from "@satsuma/core";
+import type { SyntaxNode, Tree } from "./parser-utils";
+import { child, nodeAtPosition } from "./parser-utils";
+import { findNodeContext, resolveArrowContextField, type NodeContext } from "./definition";
 import {
   WorkspaceIndex,
+  arrowFieldReferenceKeys,
   resolveDefinition,
   findReferences as indexFindReferences,
   resolveReferenceKey,
@@ -45,28 +47,32 @@ export function computeReferences(
     results.push(Location.create(uri, range));
   }
 
+  if (isArrowField(ctx)) {
+    // An arrow path names one field, resolved against its containers; it is
+    // found under the keys the index files that same resolved field under.
+    // The bare-name key is not consulted: it matches every field of that
+    // name, so `.id` inside an each would also list the top-level `id`.
+    for (const qk of arrowFieldReferenceKeys(arrowSideSchemas(ctx), ctx.fieldPath ?? [])) {
+      for (const ref of indexFindReferences(index, qk)) addRef(ref.uri, ref.range);
+    }
+    if (includeDeclaration) {
+      const declared = resolveArrowContextField(ctx, index);
+      if (declared) addRef(declared.uri, declared.field.range);
+    }
+    return results;
+  }
+
   // Add references binding to the canonical key (always)
   for (const ref of indexFindReferences(index, refKey)) {
     addRef(ref.uri, ref.range);
   }
 
-  // Also look up schema-qualified references (schema.field) so we find all
-  // arrow occurrences of a field regardless of how they were indexed.
-  const qualKeys: string[] = [];
-
+  // Right-click on a field in a schema/fragment definition: also look up the
+  // schema-qualified key arrows are indexed under, with the field's full
+  // nested path so `orders.id` meets `.id` written inside `each orders`.
   if (ctx.kind === "field_name" && ctx.parentName) {
-    // Right-click on field in schema/fragment definition
-    qualKeys.push(`${ctx.parentName}.${name}`);
-  } else if (ctx.kind === "arrow_source" && ctx.mappingSources) {
-    // Right-click on field in arrow left-hand side
-    for (const schema of ctx.mappingSources) qualKeys.push(`${schema}.${name}`);
-  } else if (ctx.kind === "arrow_target" && ctx.mappingTargets) {
-    // Right-click on field in arrow right-hand side
-    for (const schema of ctx.mappingTargets) qualKeys.push(`${schema}.${name}`);
-  }
-
-  for (const qk of qualKeys) {
-    for (const ref of indexFindReferences(index, qk)) {
+    const qualKey = `${ctx.parentName}.${declaredFieldPath(ctx.node).join(".")}`;
+    for (const ref of indexFindReferences(index, qualKey)) {
       addRef(ref.uri, ref.range);
     }
   }
@@ -80,4 +86,29 @@ export function computeReferences(
   }
 
   return results;
+}
+
+/** True for a context on an arrow's source or target path. */
+function isArrowField(ctx: NodeContext): boolean {
+  return ctx.kind === "arrow_source" || ctx.kind === "arrow_target";
+}
+
+/** The schemas on the mapping side an arrow-path context sits on. */
+function arrowSideSchemas(ctx: NodeContext): string[] {
+  return (ctx.kind === "arrow_source" ? ctx.mappingSources : ctx.mappingTargets) ?? [];
+}
+
+/**
+ * The names of a declared field and of every record field enclosing it,
+ * outermost first: `["orders", "id"]` for `id` inside `orders record { }`.
+ */
+function declaredFieldPath(fieldNameNode: SyntaxNode): string[] {
+  const path: string[] = [];
+  for (let n: SyntaxNode | null = fieldNameNode; n; n = n.parent) {
+    if (n.type !== "field_decl") continue;
+    const nameNode = child(n, "field_name");
+    const name = nameNode ? fieldNameText(nameNode) : null;
+    if (name) path.unshift(name);
+  }
+  return path;
 }

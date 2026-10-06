@@ -299,7 +299,12 @@ connection.onRequest(
 connection.onHover((params) => {
   const tree = trees.get(params.textDocument.uri);
   if (!tree) return null;
-  return computeHover(tree, params.position.line, params.position.character);
+  return computeHover(
+    tree,
+    params.position.line,
+    params.position.character,
+    scopeIndex(params.textDocument.uri),
+  );
 });
 
 connection.onDefinition((params) => {
