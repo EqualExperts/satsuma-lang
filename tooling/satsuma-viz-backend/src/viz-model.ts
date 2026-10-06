@@ -941,8 +941,8 @@ function extractMapping(
 }
 
 /**
- * Extract a mapping's `source { ... }` block into schema refs and an optional
- * join description.
+ * Extract a mapping's `source { ... }` block into schema refs, an optional
+ * join description, and the row filters declared on its refs.
  *
  * The grammar overloads `source_ref`: it normally wraps a schema name
  * (identifier / backtick / qualified_name), but it can also wrap a bare NL
@@ -951,6 +951,10 @@ function extractMapping(
  * checking which child the source_ref actually contains: if it has only an
  * NL string and no name child, it is a join description; otherwise it is a
  * schema reference.
+ *
+ * A row filter is metadata on the ref it narrows —
+ * `source { customers (filter "@email IS NOT NULL") }` — so it is read from
+ * that ref's metadata block. Filters are collected in source order.
  */
 function extractSourceBlock(node: SyntaxNode): SourceBlockInfo {
   const schemas: string[] = [];
@@ -971,6 +975,7 @@ function extractSourceBlock(node: SyntaxNode): SourceBlockInfo {
       } else {
         const name = sourceRefText(ch);
         if (name) schemas.push(name);
+        filters.push(...sourceRefFilters(ch));
       }
     } else if (ch.type === "nl_string" || ch.type === "multiline_string") {
       joinDescription = stringText(ch);
@@ -978,6 +983,18 @@ function extractSourceBlock(node: SyntaxNode): SourceBlockInfo {
   }
 
   return { schemas, joinDescription, filters };
+}
+
+/** Metadata key that marks a row filter on a source ref (spec: `filter`). */
+const FILTER_METADATA_KEY = "filter";
+
+/** The unquoted `filter` expressions in a source_ref's metadata block, if any. */
+function sourceRefFilters(ref: SyntaxNode): string[] {
+  const meta = child(ref, "metadata_block");
+  if (!meta) return [];
+  return extractMetadata(meta).flatMap((entry) =>
+    entry.kind === "kv" && entry.key === FILTER_METADATA_KEY ? [entry.value] : [],
+  );
 }
 
 /**

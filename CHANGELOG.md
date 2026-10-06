@@ -117,6 +117,10 @@ Markdown too.
 - **Asterisks in notes survive Markdown** (`bsw-5b3m`). Inline code such as
   `SELECT * FROM t` lost its asterisks to emphasis, and so did a lone `*` in
   `a * b`. Both now render as written.
+- **Source filters appear in the mapping header** (`vsf-q7m2`). A filter
+  written on a source, such as `source { customers (filter "...") }`, was
+  dropped before it reached the visualiser. Each one now shows as a `filter`
+  chip under the sources.
 
 ### A fragment spread inside a record no longer switches off validation (`bsw-xivc`, `bsw-hbcb`)
 

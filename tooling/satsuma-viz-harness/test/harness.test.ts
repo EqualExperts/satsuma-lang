@@ -779,6 +779,33 @@ test.describe("Mapping detail — completed orders (multi-source join)", () => {
   });
 });
 
+test.describe("Mapping detail — source filters in the header", () => {
+  test("shows a filter chip for every filtered source ref", async ({ page }) => {
+    // A row filter is written on the source ref it narrows
+    // (`source { `crm_customers` (filter "...") }`). The backend used to drop
+    // these, so the header rendered the source chips with no filters at all.
+    // `customer 360` filters all three of its sources, so each expression
+    // must appear in its own `filter` chip in the mapping header.
+    await page.goto("/");
+    await page.waitForFunction(() => {
+      const harness = window.__satsumaHarness;
+      if (!harness?.setViewMode) return false; // app.js not evaluated yet
+      harness.setViewMode("single");
+      return true;
+    });
+    await loadFixture(page, multiSourceJoinUri);
+    const detail = await openMappingByName(page, "customer-360");
+
+    const filterRows = detail
+      .locator("[data-testid='mapping-detail-customer-360-header'] .mapping-meta-row")
+      .filter({ has: page.locator(".label", { hasText: /^filter$/ }) });
+    await expect(filterRows).toHaveCount(3);
+    await expect(filterRows.nth(0)).toContainText("email NOT LIKE");
+    await expect(filterRows.nth(1)).toContainText("status IN");
+    await expect(filterRows.nth(2)).toContainText("created_at >= date_sub");
+  });
+});
+
 // ---------------------------------------------------------------------------
 // Enum badge collapse/expand (sl-2ne7)
 //
