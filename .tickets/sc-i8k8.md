@@ -1,6 +1,6 @@
 ---
 id: sc-i8k8
-status: done
+status: closed
 deps: []
 links: []
 created: 2026-03-26T06:50:38Z

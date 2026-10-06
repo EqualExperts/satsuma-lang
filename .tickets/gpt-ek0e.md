@@ -19,7 +19,13 @@ Raised by Feature 46 R6's review (gpt-clpj).
 
 ## Acceptance Criteria
 
-One exported helper in @satsuma/core next to resolveFieldEndpoint, taking a CanonicalFieldEndpoint and returning its owning CanonicalEntityRef (and, if callers need it, the schema-local path). The two production call sites and the two CLI test copies use it. scenario-gen's copy is left alone and gains a comment saying why it must stay independent. A test covers the namespaced case that the naive first-dot split gets wrong.
+Adopt the existing `fieldEndpointSchema` / `fieldEndpointPath` helpers (tooling/satsuma-core/src/reference-stages.ts, exported from core's index) at the four remaining copies; no new helper is needed:
+
+- tooling/satsuma-core/src/validate.ts (~line 540): replace only the structural fallback branch. The longest-existing-prefix loop ahead of it stays, because swapping it would change `nl-ref-not-in-source`, which Feature 46 R2's generated properties watch.
+- tooling/satsuma-cli/src/lint-engine.ts (~line 126, `hidden-source-in-nl`).
+- tooling/satsuma-cli/test/generated-edge-invariants.test.ts (~line 109) and generated-inverse-relations.test.ts (~line 222).
+
+coverage-rollup.ts is not a copy and is left alone. Before adopting at either production site, establish that `resolution.resolvedTo.name` survives `createCanonicalFieldEndpoint`; a bare `s0.field_0` must not turn a silent wrong answer into a thrown TypeError. scenario-gen's copy stays independent and gains a comment saying why. A test covers the namespaced case the naive first-dot split gets wrong.
 
 
 ## Notes
@@ -39,3 +45,7 @@ One exported helper in @satsuma/core next to resolveFieldEndpoint, taking a Cano
 **One further hazard.** The helper takes a *branded* `CanonicalFieldEndpoint`, so a caller holding a plain string must go through `createCanonicalFieldEndpoint`, which validates. Both production sites pass `resolution.resolvedTo.name`, whose canonicality is not established at that point — a bare `s0.field_0` with no `::` may not survive `canonicalNameOf`. Check that before adopting, or the refactor turns a silent wrong answer into a thrown TypeError. The two CLI *test* copies are safe: graph endpoints are canonical (`::s0.field_0`).
 
 Left open deliberately at the end of Feature 46 rather than rushed: it is not a child of the epic and does not block it.
+
+**2026-10-06T09:01:33Z**
+
+Acceptance criteria rewritten in the 2026-10-06 ticket audit to match the 2026-08-06 findings note: adopt the existing helper at four sites rather than write a new one. The original description above is kept as history.

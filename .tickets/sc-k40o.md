@@ -1,6 +1,6 @@
 ---
 id: sc-k40o
-status: done
+status: closed
 deps: []
 links: []
 created: 2026-03-26T06:21:31Z

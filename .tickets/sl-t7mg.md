@@ -1,6 +1,6 @@
 ---
 id: sl-t7mg
-status: done
+status: closed
 deps: [sl-2e4z]
 links: []
 created: 2026-03-23T09:55:40Z
