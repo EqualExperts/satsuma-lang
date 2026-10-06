@@ -2,16 +2,50 @@
 
 ## Unreleased
 
-### Pan the visualiser by dragging empty space (`sl-u3x8`, gh-513)
+### Reach an enclosing level from inside `each` and `flatten` with `^.` and `$.` (`sl-8vqk`, ADR-053)
 
-The overview, mapping detail and chain views now pan the way Miro and Figma
-do: drag empty space, or hold Space and drag from anywhere, including over a
-card. The cursor shows `grab` where a drag will pan and `grabbing` during one.
-A drag that starts on a card still leaves the card alone, Space+drag never
-clicks the card underneath, and a pan keeps following the pointer outside
-the canvas until release. Scrolling, middle-drag and Alt+drag pan as before.
-This applies in the VS Code panel and the web playground, which share the
-component.
+Every path inside an `each`, `flatten` or nested-arrow block is relative to
+the block, so there was no way to name a field from an enclosing level. The
+"parent's field populates each child" case had to be written as a `note`,
+which coverage and lineage cannot follow. Two prefixes now escape the rule:
+
+- **`^.field`** goes up one level per `^.`. Inside `each lines` inside
+  `each orders`, `^.order_no` is `orders.order_no`, and `^.^.id` goes up two.
+- **`$.field`** starts from the schema root, whatever the depth.
+
+A bare `field` or `.field` resolves exactly as before. Whether an escaped path
+names a declared field is still checked by `field-not-in-schema`. The CLI,
+coverage, the visualisation and the LSP all resolve escaped paths the same
+way, and go-to-definition works on them. `examples/ancestor-escape/` shows
+both prefixes in a nested `each`.
+
+### A path that misses inside a block now says how to fix it, and the tutorials no longer teach the mistake (gh-525)
+
+When an arrow inside a block fails `field-not-in-schema` and the path does
+exist at an enclosing level, the message now names the block and suggests the
+`^.` or `$.` spelling. The CLI and the language server share the message.
+
+The BA tutorial and lessons 07 and 14 taught `Order.OrderId -> order_id`
+inside `flatten Order.LineItems`, which resolves to
+`Order.LineItems.Order.OrderId` and fails validation with a message that
+looked like a tooling bug. They now use `^.`, and the prose explains why
+paths in a block are relative. The spec, agent reference, language skill and
+Excel prompt are corrected too. A new check, `scripts/check-doc-snippets.mjs`,
+validates every `each`/`flatten` snippet in the tutorials, lessons and
+nested-data guide through the CLI, so the docs cannot drift from the language
+again.
+
+### A leading dot at mapping level now means the schema root (`tced-ewd4`)
+
+`satsuma coverage` crashed with `Schema-local path must not be empty` on any
+mapping containing a top-level `each <list> -> .<target>`. A leading dot at
+mapping level now resolves against the schema root, as spec §4.6 says, so
+`each parties -> .rows` and `each parties -> rows` are the same arrow.
+
+This is a deliberate reversal: the dot used to be treated as a typo that
+matched nothing. `arrows`, `graph` and `field-lineage` already resolved it to
+the root, so coverage was the odd one out. The visualisation's coverage,
+hover highlighting and overview edges follow the same rule.
 
 ### The VS Code extension now needs VS Code 1.134 or later
 
@@ -37,6 +71,69 @@ server, so each comment appears once.
 `"question"`. The default output has always mixed the two under a
 `"warning"` envelope, and this is the only way to tell them apart.
 
+### Pan the visualiser by dragging empty space (`sl-u3x8`, gh-513)
+
+The overview, mapping detail and chain views now pan the way Miro and Figma
+do: drag empty space, or hold Space and drag from anywhere, including over a
+card. The cursor shows `grab` where a drag will pan and `grabbing` during one.
+A drag that starts on a card still leaves the card alone, Space+drag never
+clicks the card underneath, and a pan keeps following the pointer outside
+the canvas until release. Scrolling, middle-drag and Alt+drag pan as before.
+This applies in the VS Code panel and the web playground, which share the
+component.
+
+### Notes render as Markdown everywhere in the visualisation, and mapping notes are shown (`vnm-kisd`, `vnm-bak4`)
+
+Notes promise Markdown, but field, fragment-card and metric-card notes showed
+raw asterisks, and file-level notes lost their lists because note bodies keep
+their source indentation. Every note is now dedented and rendered as
+Markdown, with `@ref` highlighting inside it.
+
+The mapping detail view never showed a mapping's `note { }` blocks at all.
+They now appear in a collapsible section above the arrow table, expanded by
+default, joined by any `( note "..." )` metadata. Arrow notes render as
+Markdown too.
+
+### Smaller visualisation fixes
+
+- **Enum badges collapse to a count** (`sl-2ne7`). A multi-value enum used to
+  print every value in one badge, the widest thing on the row. A click opens
+  an overlay listing the values; a second click, a click elsewhere or Escape
+  closes it.
+- **The chain view tells an unknown field from one with no lineage**
+  (`sv-embb`). Focusing a field that is not declared now shows
+  `Field not found: <schema>.<field>` instead of an empty chain.
+- **`@ref`s are highlighted in join and filter descriptions** (`sl-yhlj`), as
+  they already were in transforms and notes.
+- **Empty arrow tables say so** (`sl-jetk`, `sl-k7i4`). A report or model with
+  no field arrows shows a stated empty state rather than column headers over
+  nothing, and a target-only arrow's source cell reads `derived` rather than
+  being blank.
+- **Layout** (`sl-yedr`, `sl-6g23`, `sl-zsv6`). Expanded namespaced cards keep
+  their rounded corners, the field count joins the arrow as the expand
+  target, and the toolbar wraps instead of pushing the file filter out of view.
+
+### Language server: go-to-definition in three more places, and schema renames reach `@ref`s (`gpt-jwek`, `gpt-fjo7`)
+
+Go-to-definition now works on a metric's `source` value, on the schema part
+of a qualified arrow path, and on a namespace's own name. These were already
+reported by find-references, so the two now agree.
+
+Renaming a schema now updates `@ref`s in NL text that name a field of it,
+such as `@orders.total`. Previously the rename left them dangling. Renaming
+a field still does not reach `@ref`s.
+
+### CLI fixes for `arrows` and the `unenumerated-record-target` lint rule (`gpt-qhfo`, `gpt-i1uv`, `sl-3fou`)
+
+`satsuma arrows <schema>.<nested.path>` could return a shallower field's
+arrow instead of the queried field's own. A fully qualified path now matches
+exactly. An unqualified leaf name still shows every match.
+
+The `unenumerated-record-target` rule went silent for any schema with a
+fragment spread, even one that resolved. It now skips only unresolved
+spreads. Its advice for a multi-source arrow also changed: the old remedies
+do not parse there, so it now recommends one arrow per target leaf.
+
 ### Rolling builds now identify the exact commit (`sl-13p5`)
 
 CLI, standalone LSP, and VSIX artifacts built from `main` or a local untagged
@@ -47,6 +144,18 @@ tagged releases remain clean `X.Y.Z` versions.
 Clean-checkout lint now generates the ignored CLI/LSP build-version modules
 before type-aware ESLint, so CI does not depend on artifacts left by a prior
 local build (`s1cl-gphp`).
+
+### The site and docs lead with readability (`sl-j7vt`)
+
+The site and main docs presented Satsuma's size advantage over YAML and JSON
+as a token saving, and made unmeasured claims about better AI output. The old
+"40–60% smaller than YAML" was wrong: measured across the specs in
+`examples/`, Satsuma is a median 9% smaller than equivalent YAML. The copy
+now describes Satsuma as a readable language for data mappings that people
+and AI tools can both read and write, and the AI claims are gone.
+
+The site now redeploys after every release (`rv-tmb4`). It had been left on
+the previous version until someone deployed it by hand.
 
 ## v0.13.0 — 2026-08-05
 
