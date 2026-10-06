@@ -82,10 +82,12 @@ Choose based on your data quality requirements:
 
 ## Metrics: Defining Business KPIs
 
-Satsuma `metric` blocks define business metrics with source, grain, dimensions, and measure additivity:
+A Satsuma metric is a `schema` marked with the `metric` token. Its metadata declares the source, grain, dimensions and filter; its fields declare measure additivity:
 
 ```satsuma
-metric monthly_recurring_revenue "MRR" (
+schema monthly_recurring_revenue (
+  metric,
+  metric_name "MRR",
   source fact_subscriptions,
   grain monthly,
   slice {customer_segment, product_line, region},
@@ -137,7 +139,7 @@ filter "status = 'active' AND is_trial = false"
 | `measure non_additive` | Cannot be summed (ratios, averages) | Churn rate, CLV, avg order value |
 | `measure semi_additive` | Can be summed across some dimensions | Account balances (sum across accounts, not time) |
 
-**Critical rule:** Metrics are terminal nodes in the lineage graph. Data flows **into** them, nothing flows **out**. Do not use metrics as mapping sources or targets.
+**Critical rule:** Metrics are terminal nodes in the lineage graph. Data flows **into** them, nothing flows **out**. A mapping may target a metric to show how its values are produced, but never use one as a mapping source.
 
 ---
 
@@ -255,7 +257,7 @@ This gives you the complete node and edge structure of the workspace. The agent 
 
 1. Use precise types, constraints, and format metadata — your schemas should be implementation-ready.
 2. Prefer structural transforms that translate directly to SQL/Spark expressions.
-3. Metric blocks define KPIs with source, grain, slice, filter, and measure additivity. They are terminal nodes.
+3. Metric schemas (marked with the `metric` token) define KPIs with source, grain, slice, filter, and measure additivity. They are terminal nodes.
 4. Use lineage commands to trace data flow upstream and downstream, especially before making changes.
 5. Data Vault and dimensional modeling conventions are supported as vocabulary tokens.
 6. The agent can help with implementation planning — SQL generation, dbt structuring, and feasibility assessment.
