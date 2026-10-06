@@ -19,6 +19,7 @@ import {
   stripNLRefScopePrefix,
 } from "../dist/nl-ref.js";
 import { initParser, getParser } from "../dist/parser.js";
+import { extractArrowRecords } from "../dist/extract.js";
 
 // Real-parser cases below (sl-74m6) parse minimal Satsuma snippets against the
 // committed grammar WASM, mirroring the bootstrap in parse-errors.test.js.
@@ -872,12 +873,58 @@ describe("extractNLRefData — container target qualification (sl-hrql)", () => 
     assert.deepEqual(targetFields(src), ["parcels.packed_items.label"]);
   });
 
-  it("establishes no base for a top-level flatten, whose target names the schema", () => {
-    // Spec 4.6: `flatten contacts -> tgt` unnests into target schema roots, so
-    // `contact_line` is already absolute and must not become `tgt.contact_line`.
+  it("prefixes a schema-form flatten's children with the schema name, as extraction does", () => {
+    // Spec 4.6: `flatten contacts -> tgt` names the target schema. The walk does
+    // not guess that from the CST: it records `tgt.contact_line`, exactly the
+    // declared arrow's target, and resolveFieldEndpoint strips the schema prefix
+    // downstream (bsw-zlrc).
     const src =
       'mapping m {\n  flatten contacts -> tgt {\n    -> contact_line { "Format @email" }\n  }\n}';
-    assert.deepEqual(targetFields(src), ["contact_line"]);
+    assert.deepEqual(targetFields(src), ["tgt.contact_line"]);
+  });
+
+  // bsw-zlrc: a flatten header target that is not `.field` — an ADR-053 escape
+  // or a bare name — was taken for the schema form and dropped, so the NL arrow
+  // landed on the enclosing each's list (`rows.t`) while the declared arrows in
+  // the same block went to `flat.*`.
+  const FLATTEN_IN_EACH = (header) =>
+    `mapping m {\n  each orders -> rows {\n    flatten .lines -> ${header} {\n      -> .t { "from @src.sid" }\n    }\n  }\n}`;
+
+  it("resolves a $.-escaped flatten target from the schema root (bsw-zlrc)", () => {
+    // `$.flat` leaves `rows` for the root list `flat`.
+    assert.deepEqual(targetFields(FLATTEN_IN_EACH("$.flat")), ["flat.t"]);
+  });
+
+  it("resolves a ^.-escaped flatten target one level up (bsw-zlrc)", () => {
+    // `^.flat` pops `rows`, landing on the root list `flat`.
+    assert.deepEqual(targetFields(FLATTEN_IN_EACH("^.flat")), ["flat.t"]);
+  });
+
+  it("stacks a bare flatten target on the enclosing each (bsw-zlrc)", () => {
+    // A bare name inside a container is prefixed like `.flat`, per extraction's
+    // accumulating-prefix rule.
+    assert.deepEqual(targetFields(FLATTEN_IN_EACH("flat")), ["rows.flat.t"]);
+  });
+
+  it("uses a top-level flatten's list-field target as the base (bsw-zlrc)", () => {
+    // `flatten lines -> flat` onto a list field: children land under `flat`,
+    // not at the schema root.
+    const src = 'mapping m {\n  flatten lines -> flat {\n    -> .t { "from @src.sid" }\n  }\n}';
+    assert.deepEqual(targetFields(src), ["flat.t"]);
+  });
+
+  it("records the same target as a computed arrow extraction resolves at that position (bsw-zlrc)", () => {
+    // The NL walk and extraction each resolve container targets; this pins the
+    // two together across every header shape so they cannot drift apart again.
+    const headers = ["$.flat", "^.flat", "flat", ".flat", "`flat`"];
+    for (const header of headers) {
+      const root = getParser().parse(FLATTEN_IN_EACH(header)).rootNode;
+      const nl = extractNLRefData(root).map((i) => i.targetField);
+      const declared = extractArrowRecords(root)
+        .filter((a) => a.kind === "computed")
+        .map((a) => a.target);
+      assert.deepEqual(nl, declared, `header ${header}`);
+    }
   });
 
   it("unquotes a backtick target segment before qualifying it (bsw-f9fq)", () => {

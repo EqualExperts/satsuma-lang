@@ -947,11 +947,6 @@ function extractBlockNoteRefs(
 // and derive covered paths from extraction instead (sl-vu22) — so treat
 // extract.ts as the reference here, not coverage.ts.
 
-/** True when a tgt_path was authored relative to the current element (`.field`). */
-function isRelativeTargetPath(pathNode: SyntaxNode | undefined): boolean {
-  return pathNode?.namedChildren.some((x) => x.type === "relative_field_path") ?? false;
-}
-
 /**
  * Resolve a target path node against the base its enclosing container
  * established, applying the same ADR-053 path-prefix semantics an arrow's own
@@ -966,30 +961,6 @@ function qualifyTarget(
   tgtNode: SyntaxNode | undefined,
 ): ResolvedArrowPath | null {
   return resolveArrowPath(tgtNode, base)?.resolved ?? base;
-}
-
-/**
- * The target base a container establishes for the arrows inside it.
- *
- * `each` and `nested_arrow` always establish one: their target names a field,
- * and their children are written against it.
- *
- * `flatten` is the exception, and the grammar says which case applies. In spec
- * §4.6's top-level form the target names the target *schema*
- * (`flatten contacts -> tgt`) and the block unnests into schema-root fields, so
- * there is no base. Written relative — `flatten .contents -> .packed_items`
- * inside an `each` — it names a list field on the current element and its
- * arrows are relative to that. A `relative_field_path` node is the authored
- * signal separating the two.
- */
-function containerTargetBase(
-  node: SyntaxNode,
-  rawTgt: SyntaxNode | undefined,
-  outerTgt: ResolvedArrowPath | null,
-): ResolvedArrowPath | null {
-  if (!rawTgt) return outerTgt;
-  if (node.type === "flatten_block" && !isRelativeTargetPath(rawTgt)) return outerTgt;
-  return qualifyTarget(outerTgt, rawTgt);
 }
 
 function walkArrowsForNL(
@@ -1051,8 +1022,16 @@ function walkArrowsForNL(
       continue;
     }
     if (c.type === "each_block" || c.type === "flatten_block") {
+      // The header target is resolved like any arrow target, with no special
+      // case for flatten. Its header may name the target schema (spec §4.6,
+      // `flatten contacts -> tgt`) or a list field (`flatten .lines -> $.flat`),
+      // and the CST cannot tell a schema name from a field name. Guessing from
+      // the node type sent `$.`/`^.` and bare list-field headers to the outer
+      // base, so their NL arrows landed on undeclared fields (bsw-zlrc). The
+      // schema form therefore records `tgt.contact_line`, as extraction does for
+      // a declared arrow, and resolveFieldEndpoint strips the schema prefix.
       const tgtNode = c.namedChildren.find((x) => x.type === "tgt_path");
-      const tgt = containerTargetBase(c, tgtNode, targetBase);
+      const tgt = qualifyTarget(targetBase, tgtNode);
       walkArrowsForNL(c, mappingName, namespace, tgt, results);
       continue;
     }

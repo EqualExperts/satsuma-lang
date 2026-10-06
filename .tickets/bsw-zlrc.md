@@ -1,6 +1,6 @@
 ---
 id: bsw-zlrc
-status: open
+status: closed
 deps: []
 links: []
 created: 2026-10-06T09:45:31Z
@@ -35,3 +35,10 @@ mapping m {
 
 - NL-derived arrows inside a flatten/each whose header target is `^.`/`$.`-escaped resolve to the same container as the declared arrows in that block.
 - Core test covering `$.` and `^.` header targets, red before the fix.
+
+## Notes
+
+**2026-10-06T17:27:24Z**
+
+Cause: The NL-ref walk in nl-ref.ts (`containerTargetBase`) guessed from the CST node type whether a flatten header named the target schema, and took any header that was not `.field` for the schema form. `$.flat`, `^.flat` and bare list-field headers therefore fell back to the outer base, so NL arrows landed on undeclared fields (`rows.t`, `t`) while extraction put the declared arrows on `flat.*`.
+Fix: The special case and `isRelativeTargetPath` are gone, and each/flatten header targets are now resolved with `qualifyTarget`, exactly as extraction does. The schema form now records `tgt.contact_line`, like a declared arrow, and resolveFieldEndpoint strips the prefix downstream. New core tests cover `$.`, `^.`, bare and top-level list-field headers, plus a parity test against extractArrowRecords. The `::tgt.tgt` header edge for the schema form is the separate ticket r0-7w76. (commit immediately after 52d8582d)
