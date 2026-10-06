@@ -42,3 +42,8 @@ mapping m {
 
 Cause: The NL-ref walk in nl-ref.ts (`containerTargetBase`) guessed from the CST node type whether a flatten header named the target schema, and took any header that was not `.field` for the schema form. `$.flat`, `^.flat` and bare list-field headers therefore fell back to the outer base, so NL arrows landed on undeclared fields (`rows.t`, `t`) while extraction put the declared arrows on `flat.*`.
 Fix: The special case and `isRelativeTargetPath` are gone, and each/flatten header targets are now resolved with `qualifyTarget`, exactly as extraction does. The schema form now records `tgt.contact_line`, like a declared arrow, and resolveFieldEndpoint strips the prefix downstream. New core tests cover `$.`, `^.`, bare and top-level list-field headers, plus a parity test against extractArrowRecords. The `::tgt.tgt` header edge for the schema form is the separate ticket r0-7w76. (commit immediately after 52d8582d)
+
+**2026-10-06T19:14:20Z** (review follow-up)
+
+Cause: `lint --fix` for `hidden-source-in-nl` found the arrow to edit by cutting the NL ref's recorded target at its first dot. Once this ticket made a bare `flatten .lines -> flat` header record `rows.flat.t`, the cut gave `flat.t`, which no longer matched `.t`. The fix edited only the source block while claiming to have edited the arrow too. The `$.`/`^.` forms could also land on an earlier arrow with the same field name.
+Fix: makeAddArrowSourceFix now picks the nearest arrow at or above the NL string's row whose written target ends in the same field name, so it no longer depends on how the header is written. New CLI integration tests cover bare, `.`, `$.` and `^.` headers, each with a same-named outer arrow that must stay untouched. (commit immediately after 9e99856f)

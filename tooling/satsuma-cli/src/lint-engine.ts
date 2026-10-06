@@ -139,7 +139,7 @@ function checkHiddenSourceInNl(index: ExtractedWorkspace): LintDiagnostic[] {
         const sourceBlockFix = makeAddSourceFix(mappingKey, referencedSchema);
         const fixApply = item.targetField
           ? composeFixes(
-              makeAddArrowSourceFix(mappingKey, referencedSchema, item.targetField),
+              makeAddArrowSourceFix(mappingKey, referencedSchema, item.targetField, item.line),
               sourceBlockFix,
             )
           : sourceBlockFix;
@@ -267,20 +267,51 @@ function composeFixes(...fns: ((s: string) => string)[]): (s: string) => string 
 }
 
 /**
+ * The last segment of an arrow path as written or as recorded, without
+ * backticks: `rows.flat.t` → `t`, `.t` → `t`, `$.flat` → `flat`,
+ * `` rows.`a.b` `` → `a.b`. Dots inside backticks do not split.
+ */
+function lastPathSegment(path: string): string {
+  let inBackticks = false;
+  let start = 0;
+  for (let i = 0; i < path.length; i++) {
+    const ch = path[i];
+    if (ch === "`") inBackticks = !inBackticks;
+    else if (ch === "." && !inBackticks) start = i + 1;
+  }
+  return path.slice(start).replace(/`/g, "");
+}
+
+/**
  * Build a fix closure that prepends `schemaRef` to the source list of the arrow
- * targeting `targetField` inside the named (or anonymous) mapping. The fix is text-based.
+ * that owns an NL string, inside the named (or anonymous) mapping. The fix is
+ * text-based.
+ *
+ * Which arrow owns the NL string is decided by position, not by comparing
+ * paths. `targetField` is the resolved target (`rows.flat.t` for `.t` inside
+ * `each … -> rows { flatten … -> flat { … } }`), while the text says `.t`, and
+ * no text-level rewrite of one turns it into the other for every header form
+ * (bare, `.x`, `$.x`, `^.x`, schema name). So the owner is the nearest arrow at
+ * or above `nlRow` whose written target ends in the same field name as
+ * `targetField`. The name check guards against picking an unrelated arrow when
+ * the NL body spans several lines; the position check tells apart two arrows
+ * with the same field name in different nested blocks (bsw-zlrc).
  *
  * Algorithm (mirrors makeAddSourceFix for the mapping-location phase):
  *   1. Locate the mapping header by name or, for anonymous mappings, by row number.
  *   2. Track brace depth to stay inside the mapping body.
- *   3. Find the arrow whose target matches `targetField` (bare or schema-qualified).
- *   4. Prepend `insertRef` to the arrow's source list before the `->`.
+ *   3. Remember the last arrow at or above `nlRow` whose target name matches.
+ *   4. Prepend `insertRef` to that arrow's source list before the `->`.
  *   5. If the ref is already present, return source unchanged.
+ *
+ * `nlRow` is the 0-based row where the NL string starts. Earlier fixes in the
+ * same run rewrite lines in place and never add or remove one, so it stays valid.
  */
 function makeAddArrowSourceFix(
   mappingKey: string,
   schemaRef: string,
   targetField: string,
+  nlRow: number,
 ): (source: string) => string {
   const nsIdx = mappingKey.indexOf("::");
   const displayName = nsIdx !== -1 ? mappingKey.slice(nsIdx + 2) : mappingKey;
@@ -291,14 +322,7 @@ function makeAddArrowSourceFix(
     insertRef = schemaRef.slice(mappingNs.length + 2);
   }
 
-  // Strip namespace prefix from targetField for matching inside namespace block
-  let matchTarget = targetField;
-  if (mappingNs && matchTarget.startsWith(`${mappingNs}::`)) {
-    matchTarget = matchTarget.slice(mappingNs.length + 2);
-  }
-  // Also strip schema prefix — arrow targets in source use bare field names, not schema.field
-  const dotIdx = matchTarget.indexOf(".");
-  const bareTarget = dotIdx >= 0 ? matchTarget.slice(dotIdx + 1) : matchTarget;
+  const targetName = lastPathSegment(targetField);
 
   // Anonymous mappings: locate by row number encoded in the key.
   const anonMatch = displayName.match(/^<anon>@.+:(\d+)$/);
@@ -311,8 +335,9 @@ function makeAddArrowSourceFix(
     const lines = source.split("\n");
     let inMapping = false;
     let braceDepth = 0;
+    let owner: { row: number; match: RegExpMatchArray } | null = null;
 
-    for (let i = 0; i < lines.length; i++) {
+    for (let i = 0; i < lines.length && i <= nlRow; i++) {
       const trimmed = lines[i]!.trim();
 
       // Step 1: find the mapping header — named by label text or anonymous by row number.
@@ -346,29 +371,23 @@ function makeAddArrowSourceFix(
       // Step 3: match an arrow line — `src -> target` or `src1, src2 -> target { ... }`
       // Captures: [1] source list, [2] target field, [3] optional trailing transform block
       const arrowMatch = trimmed.match(/^(.+?)\s*->\s*(.+?)(\s*\{.*)?$/);
-      if (!arrowMatch) continue;
-
-      const arrowTargetPart = arrowMatch[2]!.trim();
-      // Match target by bare field name, ignoring any schema prefix or backticks
-      const targetBare = arrowTargetPart.replace(/^`|`$/g, "");
-      const targetDotIdx = targetBare.indexOf(".");
-      const targetFieldOnly = targetDotIdx >= 0 ? targetBare.slice(targetDotIdx + 1) : targetBare;
-
-      if (targetFieldOnly !== bareTarget && targetBare !== matchTarget) continue;
-
-      // Step 5: skip if the ref is already in the source list
-      const srcPart = arrowMatch[1]!.trim();
-      const existingSrcs = srcPart.split(/\s*,\s*/).map((s) => s.replace(/^`|`$/g, ""));
-      if (existingSrcs.some((s) => s === insertRef || s === schemaRef)) return source;
-
-      // Step 4: prepend the new schema ref before the `->`
-      const indent = lines[i]!.match(/^(\s*)/)![1];
-      const rest = arrowMatch[2]! + (arrowMatch[3] ?? "");
-      lines[i] = `${indent}${srcPart}, ${insertRef} -> ${rest}`;
-      return lines.join("\n");
+      if (arrowMatch && lastPathSegment(arrowMatch[2]!.trim()) === targetName) {
+        owner = { row: i, match: arrowMatch };
+      }
     }
+    if (!owner) return source;
+    const { row, match } = owner;
 
-    return source;
+    // Step 5: skip if the ref is already in the source list
+    const srcPart = match[1]!.trim();
+    const existingSrcs = srcPart.split(/\s*,\s*/).map((s) => s.replace(/^`|`$/g, ""));
+    if (existingSrcs.some((s) => s === insertRef || s === schemaRef)) return source;
+
+    // Step 4: prepend the new schema ref before the `->`
+    const indent = lines[row]!.match(/^(\s*)/)![1];
+    const rest = match[2]! + (match[3] ?? "");
+    lines[row] = `${indent}${srcPart}, ${insertRef} -> ${rest}`;
+    return lines.join("\n");
   };
   /* eslint-enable @typescript-eslint/no-non-null-assertion */
 }
