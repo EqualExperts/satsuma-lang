@@ -33,6 +33,7 @@ import {
   createScopedIndex,
 } from "./workspace-index";
 import { computeScopedSemanticDiagnostics } from "./semantic-diagnostics";
+import { DependentDiagnosticsRefresher } from "./diagnostic-refresh";
 import { computeDefinition } from "./definition";
 import { computeReferences } from "./references";
 import { computeCompletions } from "./completion";
@@ -63,6 +64,17 @@ const validateDiagCache = new CanonicalUriMap<import("vscode-languageserver").Di
 
 // Workspace index for cross-file navigation
 const wsIndex: WorkspaceIndex = createWorkspaceIndex();
+
+// Every open document's semantic diagnostics read the shared index, so any
+// index change must reach all of them, not just the edited one (bsw-r1wl).
+// Call `dependents.indexChanged` after every indexFile/removeFile.
+const dependents = new DependentDiagnosticsRefresher({
+  openUris: () => trees.keys(),
+  publish: (uri) => {
+    const tree = trees.get(uri);
+    if (tree) sendMergedDiagnostics(uri, tree);
+  },
+});
 
 // CLI path resolved at initialization
 let cliPath = "satsuma";
@@ -167,8 +179,11 @@ documents.onDidChangeContent((change) => {
   // Update workspace index for the open document
   indexFile(wsIndex, change.document.uri, tree);
 
-  // Recompute parse diagnostics and merge with cached validate diagnostics
+  // The edited document gets fresh diagnostics at once; every other open
+  // document follows once typing pauses, since its result may depend on this
+  // file through the index.
   sendMergedDiagnostics(change.document.uri, tree);
+  dependents.indexChanged(change.document.uri);
 });
 
 documents.onDidClose((event) => {
@@ -177,6 +192,7 @@ documents.onDidClose((event) => {
   // The index may hold modified-but-unsaved buffer content the user just
   // discarded by closing; re-index from what is actually on disk (sl-0tgo).
   reindexFromDisk(event.document.uri);
+  dependents.indexChanged(null);
   // LSP diagnostic publishes are fire-and-forget notifications; nothing
   // here needs to await or react to the result.
   void connection.sendDiagnostics({ uri: event.document.uri, diagnostics: [] });
@@ -213,7 +229,8 @@ function parseTreeFromDisk(uri: string): Tree | null {
 
 // Run satsuma validate on save
 documents.onDidSave(async (event) => {
-  // Re-index from the saved content
+  // Re-index from the saved content. This is the tree the last didChange
+  // already indexed, so the other open documents are already being refreshed.
   const tree = trees.get(event.document.uri);
   if (tree) {
     indexFile(wsIndex, event.document.uri, tree);
@@ -251,11 +268,13 @@ documents.onDidSave(async (event) => {
 // watches both registered extensions, so the gate must accept both — a
 // bare .endsWith(".stm") check silently dropped .satsuma events (sl-v215).
 connection.onDidChangeWatchedFiles((params) => {
+  let indexChanged = false;
   for (const change of params.changes) {
     if (!isSatsumaFilePath(change.uri)) continue;
 
     if (change.type === FileChangeType.Deleted) {
       removeFile(wsIndex, change.uri);
+      indexChanged = true;
     } else {
       // Created or changed — re-index from disk
       // Skip if the file is open in the editor (onDidChangeContent handles it)
@@ -266,11 +285,14 @@ connection.onDidChangeWatchedFiles((params) => {
         const content = fs.readFileSync(fsPath, "utf-8");
         const tree = parseSource(content);
         indexFile(wsIndex, change.uri, tree);
+        indexChanged = true;
       } catch {
         // File unreadable — skip
       }
     }
   }
+  // No open document was republished for these changes, so refresh them all.
+  if (indexChanged) dependents.indexChanged(null);
 });
 
 // ---------- Feature handlers ----------

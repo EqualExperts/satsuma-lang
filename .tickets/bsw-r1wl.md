@@ -1,6 +1,6 @@
 ---
 id: bsw-r1wl
-status: open
+status: closed
 deps: []
 links: []
 created: 2026-10-06T09:45:31Z
@@ -16,3 +16,10 @@ tags: [bug-sweep-2026-10, lsp, diagnostics]
 ## Acceptance Criteria
 
 - A change republishes workspace-level diagnostics for every open document whose result can change (at least importers / duplicates); test with two open documents.
+
+## Notes
+
+**2026-10-06T18:46:48Z**
+
+Cause: every open document's semantic diagnostics read the shared workspace index (the import closure for duplicates and undefined refs, the whole folder for missing-import), but server.ts republished only the edited document after a didChange, and nothing at all after a document closed or a watched file changed on disk.
+Fix: a new LSP module, src/diagnostic-refresh.ts (`DependentDiagnosticsRefresher`), republishes every other open document 150 ms after the index goes quiet, while the edited document is still published at once, as the user decided; server.ts calls it from didChange, didClose and the watched-files handler. Tested with a fake clock and end to end over stdio (new test/support/stdio-client.js), including a non-importer that gains missing-import (commit immediately after 4fa8495b)
