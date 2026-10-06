@@ -25,6 +25,17 @@
  *     type_expr / spread — resolved by GLR + prec
  */
 
+// ── Shared lexical patterns ─────────────────────────────────────────────
+// Defined once because the immediate path-segment tokens (`_imm_path_seg`)
+// must accept exactly what `identifier` and `backtick_name` accept.
+
+// Hyphens are allowed inside an identifier but not at its end (sl-csd2; see
+// the `identifier` rule below).
+const IDENTIFIER_PATTERN = /[a-zA-Z_]([a-zA-Z0-9_-]*[a-zA-Z0-9_])?/;
+
+// A backtick-quoted name; backslash escapes any character, including a backtick.
+const BACKTICK_NAME_PATTERN = /`(?:[^`\\]|\\.)+`/;
+
 module.exports = grammar({
   name: "satsuma",
 
@@ -354,41 +365,61 @@ module.exports = grammar({
         $.field_path,
       ),
 
+    // A path is one lexical unit: no whitespace or comment may follow a `.`,
+    // `^.` or `$.` marker or sit between segments (bsw-0twy, spec §4.4).
+    // Every segment after a marker or a continuation dot is therefore an
+    // immediate token (`_imm_path_seg`). Without this, `^. oid` and `a. b`
+    // parsed, extraction read the raw text with the space in it, and fmt
+    // silently rewrote the path to a different, canonical meaning. The
+    // continuation dot is itself immediate, so multi-line bare arrows are
+    // never merged into one path. The segment after `::` is deliberately
+    // left non-immediate — `ns:: x` is a separate question.
+
     // ns::identifier or ns::identifier.field...
-    // token.immediate(".") ensures continuation dots must be adjacent (no
-    // newlines) so multi-line bare arrows are not merged into one path.
     namespaced_path: ($) =>
-      prec.right(
-        seq($.identifier, "::", $._path_seg, repeat(seq(token.immediate("."), $._path_seg))),
-      ),
+      prec.right(seq($.identifier, "::", $._path_seg, repeat($._path_continuation))),
 
     // `BacktickRef` or `BacktickRef`.field...
-    backtick_path: ($) =>
-      prec.right(seq($.backtick_name, repeat(seq(token.immediate("."), $._path_seg)))),
+    backtick_path: ($) => prec.right(seq($.backtick_name, repeat($._path_continuation))),
 
     // .field or .field.nested...
-    relative_field_path: ($) =>
-      prec.right(seq(".", $._path_seg, repeat(seq(token.immediate("."), $._path_seg)))),
+    relative_field_path: ($) => prec.right(seq(".", $._imm_path_seg, repeat($._path_continuation))),
 
     // ^.^...field — each `^.` pops one enclosing container level (ADR-053).
-    // The marker is a single token so a stray `^` is never half-parsed, and
-    // the continuation dots stay immediate so `^.a.b` is one path. A bare `^.`
-    // with no following segment is a parse error — the field is not optional.
+    // The marker is a single token so a stray `^` is never half-parsed. Every
+    // marker after the first is immediate, so `^. ^.sid` is rejected rather
+    // than read as two levels with a gap. A bare `^.` with no following
+    // segment is a parse error — the field is not optional.
     parent_path: ($) =>
       prec.right(
-        seq(repeat1(token("^.")), $._path_seg, repeat(seq(token.immediate("."), $._path_seg))),
+        seq(
+          token("^."),
+          repeat(token.immediate("^.")),
+          $._imm_path_seg,
+          repeat($._path_continuation),
+        ),
       ),
 
     // $.field — absolute from the schema root, ignoring every enclosing
     // container (ADR-053). Like the parent escape, `$.` is one token.
-    root_path: ($) =>
-      prec.right(seq(token("$."), $._path_seg, repeat(seq(token.immediate("."), $._path_seg)))),
+    root_path: ($) => prec.right(seq(token("$."), $._imm_path_seg, repeat($._path_continuation))),
 
     // field or field.nested...
-    field_path: ($) =>
-      prec.right(seq($.identifier, repeat(seq(token.immediate("."), $._path_seg)))),
+    field_path: ($) => prec.right(seq($.identifier, repeat($._path_continuation))),
+
+    // `.segment` glued to the segment before it.
+    _path_continuation: ($) => seq(token.immediate("."), $._imm_path_seg),
 
     _path_seg: ($) => choice($.identifier, $.backtick_name),
+
+    // A path segment with nothing between it and the preceding marker. The
+    // aliases keep the CST node names (`identifier`, `backtick_name`) that
+    // every consumer reads, so the rule changes only what is accepted.
+    _imm_path_seg: ($) =>
+      choice(
+        alias(token.immediate(IDENTIFIER_PATTERN), $.identifier),
+        alias(token.immediate(BACKTICK_NAME_PATTERN), $.backtick_name),
+      ),
 
     // ── Pipe chain (transform, arrow bodies) ─────────────────────────────
 
@@ -555,9 +586,9 @@ module.exports = grammar({
     // hyphen would let maximal munch lex `Id->tgt` as identifier "Id-" + ">",
     // breaking no-space arrows (sl-csd2). With this shape, `a->b` lexes as
     // "a", "->", "b" — whitespace around arrows is never required.
-    identifier: (_) => /[a-zA-Z_]([a-zA-Z0-9_-]*[a-zA-Z0-9_])?/,
+    identifier: (_) => IDENTIFIER_PATTERN,
 
-    backtick_name: (_) => /`(?:[^`\\]|\\.)+`/,
+    backtick_name: (_) => BACKTICK_NAME_PATTERN,
 
     // Content is any run without three consecutive quotes; the optional
     // `"?"?` before the closing delimiter lets content END in one or two
