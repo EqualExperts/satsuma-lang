@@ -63,6 +63,24 @@ describe("satsuma warnings", () => {
     );
   });
 
+  it("labels each default JSON item with its own comment kind", async () => {
+    // The default envelope says "warning" but carries questions too, so a
+    // consumer can only tell them apart per item. VS Code's Show Warnings
+    // relies on this to list //? at Information rather than Warning (sl-0j8b).
+    const { stdout } = await run("warnings", "--json", COMMENTS);
+
+    const data = JSON.parse(stdout);
+    assert.deepEqual(
+      data.items.map((item: { kind: string; line: number }) => [item.line, item.kind]),
+      [
+        [4, "warning"],
+        [5, "question"],
+        [12, "warning"],
+        [13, "question"],
+      ],
+    );
+  });
+
   it("emits question-only JSON with the question kind and filtered count", async () => {
     // `--questions --json` is the structured counterpart to question text
     // mode; it must not include warning comments under a question payload.

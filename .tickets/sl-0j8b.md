@@ -1,6 +1,6 @@
 ---
 id: sl-0j8b
-status: open
+status: in_progress
 deps: []
 links: []
 created: 2026-09-29T07:27:22Z
@@ -41,3 +41,12 @@ A second gap: the LSP only publishes comment diagnostics for **open** documents 
 - diagnostics.ts doc-comment and vscode-satsuma README match the behaviour; CHANGELOG Unreleased entry.
 - Manual VS Code check (native Problems panel, so Playwright does not apply): questions listed with the info icon, including closed files after Show Warnings.
 - `turbo run test --filter=@satsuma/lsp` and `--filter=vscode-satsuma` pass.
+
+## Notes
+
+**2026-10-06T00:00:00Z**
+
+Cause: b14d1464 moved `//?` diagnostics from Information to Hint with the Unnecessary tag, which VS Code leaves out of the Problems panel. Show Warnings already received questions from the CLI (its default output mixes both kinds) but published them all as Warning, because the JSON items carried no per-item kind.
+Fix: LSP publishes `//?` at Information, untagged. `satsuma warnings --json` labels each item with `kind`; Show Warnings maps it to Warning/Information and withholds a file's results while it is open, since the LSP reports open files (overlap decision, documented in warnings.ts). Message wording moved to core `commentDiagnosticMessage` so both routes agree. (commit immediately after 20aec326)
+
+Still open: the manual VS Code check in the acceptance criteria. Close once it is done.

@@ -1,11 +1,51 @@
+/**
+ * warnings.ts — the "Satsuma: Show Warnings" command.
+ *
+ * The LSP reports `//!` and `//?` comments only for documents open in an
+ * editor. This command fills the gap for the rest of the workspace: it runs
+ * `satsuma warnings <entry> --json` and puts every warning and question it
+ * finds into the Problems panel, `//!` at Warning and `//?` at Information.
+ * Parsing and shaping the CLI output lives in warnings-logic.ts.
+ */
+
 import * as vscode from "vscode";
+import type { CommentDiagnosticKind } from "@satsuma/core";
 import { runCli } from "./cli-runner";
 import { resolveEntryFile } from "./entry-file";
-import { parseWarningsResponse, groupWarningsByFile } from "./warnings-logic";
+import { parseWarningsResponse, groupWarningsByFile, summariseMarkers } from "./warnings-logic";
+import type { WarningMarker } from "./warnings-logic";
+
+/** Same severities the LSP uses for the same comments (see its diagnostics.ts). */
+const SEVERITY_BY_KIND: Record<CommentDiagnosticKind, vscode.DiagnosticSeverity> = {
+  warning: vscode.DiagnosticSeverity.Warning,
+  question: vscode.DiagnosticSeverity.Information,
+};
 
 export function registerWarningsCommand(context: vscode.ExtensionContext, cliPath: string): void {
   const diagnostics = vscode.languages.createDiagnosticCollection("satsuma-warnings-cmd");
   context.subscriptions.push(diagnostics);
+
+  // ── Overlap with the LSP ────────────────────────────────────────────────
+  // Rule: while a file is open, its comments come from the LSP alone, which
+  // re-reads them on every edit. Publishing the command's snapshot as well
+  // would list each comment twice, and the snapshot goes stale as soon as the
+  // user types. So the command's results for a file are withheld while it is
+  // open and restored when it closes, which is also when the LSP clears its
+  // own diagnostics for it.
+  const lastResults = new Map<string, vscode.Diagnostic[]>();
+
+  const isOpen = (uri: vscode.Uri): boolean =>
+    vscode.workspace.textDocuments.some((doc) => doc.uri.toString() === uri.toString());
+
+  const publish = (uri: vscode.Uri): void => {
+    const diags = lastResults.get(uri.toString());
+    if (diags && !isOpen(uri)) diagnostics.set(uri, diags);
+  };
+
+  context.subscriptions.push(
+    vscode.workspace.onDidOpenTextDocument((doc) => diagnostics.delete(doc.uri)),
+    vscode.workspace.onDidCloseTextDocument((doc) => publish(doc.uri)),
+  );
 
   context.subscriptions.push(
     vscode.commands.registerCommand("satsuma.showWarnings", async () => {
@@ -15,6 +55,7 @@ export function registerWarningsCommand(context: vscode.ExtensionContext, cliPat
 
       const result = await runCli(cliPath, ["warnings", entryFilePath, "--json"]);
       diagnostics.clear();
+      lastResults.clear();
 
       const data = parseWarningsResponse(result.stdout);
       if (!data) {
@@ -24,25 +65,25 @@ export function registerWarningsCommand(context: vscode.ExtensionContext, cliPat
         return;
       }
 
-      if (data.items.length === 0) {
-        vscode.window.showInformationMessage("No warnings found.");
-        return;
+      const byFile = groupWarningsByFile(data);
+      for (const [file, markers] of byFile) {
+        const uri = vscode.Uri.file(file);
+        lastResults.set(uri.toString(), markers.map(toDiagnostic));
+        publish(uri);
       }
 
-      for (const [file, markers] of groupWarningsByFile(data.items)) {
-        const diags = markers.map((marker) => {
-          const diag = new vscode.Diagnostic(
-            new vscode.Range(marker.line, 0, marker.line, 0),
-            marker.text,
-            vscode.DiagnosticSeverity.Warning,
-          );
-          diag.source = "satsuma-warnings";
-          return diag;
-        });
-        diagnostics.set(vscode.Uri.file(file), diags);
-      }
-
-      vscode.window.showInformationMessage(`Satsuma: ${data.count} warning(s) found.`);
+      vscode.window.showInformationMessage(summariseMarkers(byFile));
     }),
   );
+}
+
+/** A zero-width diagnostic at the start of the comment's line. */
+function toDiagnostic(marker: WarningMarker): vscode.Diagnostic {
+  const diag = new vscode.Diagnostic(
+    new vscode.Range(marker.line, 0, marker.line, 0),
+    marker.message,
+    SEVERITY_BY_KIND[marker.kind],
+  );
+  diag.source = "satsuma-warnings";
+  return diag;
 }

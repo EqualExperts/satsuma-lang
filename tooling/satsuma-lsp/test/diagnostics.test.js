@@ -51,15 +51,33 @@ describe("computeDiagnostics", () => {
     );
   });
 
-  it("reports question comments as Hint severity with TODO prefix", () => {
+  // gh-542 / sl-0j8b: questions were published as Hint + Unnecessary, which
+  // VS Code leaves out of the Problems panel and greys out. The Feature 16 PRD
+  // puts them at Information so the panel lists them.
+  it("reports trailing and standalone question comments at Information with no tags", () => {
     const tree = parse(`schema foo {
   bar STRING //? should this be INT?
+}
+//? who owns this feed?`);
+    const questions = computeDiagnostics(tree).filter((d) => d.severity === 3); // Information
+    assert.deepEqual(
+      questions.map((d) => d.message),
+      ["Question: should this be INT?", "Question: who owns this feed?"],
+    );
+    for (const d of questions) assert.equal(d.tags, undefined);
+  });
+
+  // An empty message makes vscode's Diagnostic constructor throw (sl-sme1),
+  // and a bare prefix would read as a truncated question.
+  it("gives a bare //? comment the named fallback message", () => {
+    const tree = parse(`schema foo {
+  bar STRING //?
 }`);
-    const diags = computeDiagnostics(tree);
-    const hints = diags.filter((d) => d.severity === 4); // Hint
-    assert.equal(hints.length, 1);
-    assert.match(hints[0].message, /^TODO: /);
-    assert.match(hints[0].message, /should this be INT/);
+    const questions = computeDiagnostics(tree).filter((d) => d.severity === 3);
+    assert.deepEqual(
+      questions.map((d) => d.message),
+      ["Question comment (no text)"],
+    );
   });
 
   it("sets source to 'satsuma' on all diagnostics", () => {
