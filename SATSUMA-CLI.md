@@ -43,6 +43,26 @@ Block-level extraction — retrieve whole blocks or workspace-level summaries.
 | `warnings`                     | All `//!` and `//?` comments across the workspace            | `satsuma warnings`                       |
 | `context <query>`              | Keyword-ranked block extraction (heuristic)                  | `satsuma context "customer mapping"`     |
 
+#### mapping --json arrow shape
+
+`mapping --json` returns the mapping's `arrows` as a tree in document order. Paths are as authored — relative inside `each`/`flatten`/nested blocks, backticks kept — so use `arrows` or `field-lineage` when you need absolute field paths.
+
+```jsonc
+{
+  "kind": "map", // map | computed | nested | each | flatten
+  "src": "a", // first source; null for a computed arrow
+  "srcs": ["a", "b"], // every source, in order; [] for a computed arrow
+  "tgt": "c",
+  "hasTransform": true,
+  "classification": "nl",
+  "transform": "\"sum\"", // omitted with --compact or when there is no body
+  "metadata": [], // omitted when empty or with --compact
+  "children": [], // arrows inside a nested, each or flatten block; omitted when none
+}
+```
+
+**Read `srcs`, not `src`, for an arrow's inputs.** `a, b -> c` has two sources and `src` holds only the first. `srcs` was added after v0.14.0; `src` keeps its earlier meaning so existing readers do not break.
+
 ### Structural Primitives
 
 Fine-grained extraction — slice below block level to get specific arrows, NL content, metadata, or field lists.

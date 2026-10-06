@@ -77,87 +77,97 @@ Examples:
     );
 }
 
-// ── CST helpers ───────────────────────────────────────────────────────────────
+// ── Arrow tree ───────────────────────────────────────────────────────────────
+//
+// Every output mode renders the same tree, built by one recursive CST walk,
+// so the modes cannot disagree about which arrows a mapping holds. A separate
+// text-only walk once lost each/flatten blocks nested in each/flatten
+// (bsw-an3y). An arrow keeps every `src_path`, not just the first, so
+// `a, b -> c` shows both inputs (bsw-fbd8).
+//
+// Why not core's extractMappingArrowRecords? Its records are flat and carry
+// absolute, backtick-stripped paths — the right shape for lineage and coverage.
+// This command shows the mapping as the author wrote it: relative paths,
+// backticks kept (DISCOVERED-REQUIREMENTS: backticks must never be stripped)
+// and the nesting intact, so it reads the authored text straight from the CST.
 
-/** Extract text from a path node (_path_expr variants), preserving backticks. */
-function pathText(pathNode: SyntaxNode | undefined): string {
-  if (!pathNode) return "?";
-  return pathNode.text;
-}
+/** Arrow kinds that are list blocks; their kind doubles as the keyword printed before them. */
+type ListBlockKind = "each" | "flatten";
 
+/** Separator between the sources of a multi-source arrow, as written in Satsuma. */
+const SOURCE_SEPARATOR = ", ";
+
+/** Column width the --arrows-only table pads the source column to. */
+const ARROWS_ONLY_SOURCE_WIDTH = 30;
+
+/** One arrow declaration in a mapping body, with any arrows nested in it. */
 interface ArrowInfo {
-  kind: string;
-  src: string | null;
+  /** `map`, `computed`, `nested` (an arrow whose braces hold arrows), `each` or `flatten`. */
+  kind: "map" | "computed" | ListBlockKind | "nested";
+  /** Every source path as authored, in order; empty for a computed arrow. */
+  srcs: string[];
+  /** Target path as authored. */
   tgt: string;
-  hasBody: boolean;
+  /** The transform body, when the arrow has one. */
+  pipeChain: SyntaxNode | undefined;
+  /** The arrow's `( ... )` metadata, when present. */
   metaNode: SyntaxNode | undefined;
-  node: SyntaxNode;
+  /** Arrows declared inside this one's braces; absent when there are none. */
   children?: ArrowInfo[];
 }
 
-/** Collect arrows from mapping_body as {kind, src, tgt, hasBody} objects. */
-function collectArrows(bodyNode: SyntaxNode | undefined): ArrowInfo[] {
-  if (!bodyNode) return [];
-  const arrows: ArrowInfo[] = [];
-  for (const c of bodyNode.namedChildren) {
-    if (c.type === "map_arrow") {
-      const src = c.namedChildren.find((x) => x.type === "src_path");
-      const tgt = c.namedChildren.find((x) => x.type === "tgt_path");
-      const hasBody = c.namedChildren.some((x) => x.type === "pipe_chain");
-      const meta = c.namedChildren.find((x) => x.type === "metadata_block");
-      arrows.push({
-        kind: "map",
-        src: pathText(src),
-        tgt: pathText(tgt),
-        hasBody,
-        metaNode: meta,
-        node: c,
-      });
-    } else if (c.type === "computed_arrow") {
-      const tgt = c.namedChildren.find((x) => x.type === "tgt_path");
-      const hasBody = c.namedChildren.some((x) => x.type === "pipe_chain");
-      const meta = c.namedChildren.find((x) => x.type === "metadata_block");
-      arrows.push({
-        kind: "computed",
-        src: null,
-        tgt: pathText(tgt),
-        hasBody,
-        metaNode: meta,
-        node: c,
-      });
-    } else if (c.type === "nested_arrow") {
-      const src = c.namedChildren.find((x) => x.type === "src_path");
-      const tgt = c.namedChildren.find((x) => x.type === "tgt_path");
-      const meta = c.namedChildren.find((x) => x.type === "metadata_block");
-      const children = collectArrows(c);
-      const hasChildren = children.length > 0;
-      arrows.push({
-        kind: hasChildren ? "nested" : "map",
-        src: pathText(src),
-        tgt: pathText(tgt),
-        hasBody: hasChildren,
-        metaNode: meta,
-        node: c,
-        children: hasChildren ? children : undefined,
-      });
-    } else if (c.type === "flatten_block" || c.type === "each_block") {
-      const blockKind = c.type === "flatten_block" ? "flatten" : "each";
-      const src = c.namedChildren.find((x) => x.type === "src_path");
-      const tgt = c.namedChildren.find((x) => x.type === "tgt_path");
-      const meta = c.namedChildren.find((x) => x.type === "metadata_block");
-      const children = collectArrows(c);
-      arrows.push({
-        kind: blockKind,
-        src: pathText(src),
-        tgt: pathText(tgt),
-        hasBody: true,
-        metaNode: meta,
-        node: c,
-        children: children.length > 0 ? children : undefined,
-      });
-    }
+/** Authored text of a path node, backticks included; "?" when the node is missing. */
+function pathText(pathNode: SyntaxNode | undefined): string {
+  return pathNode ? pathNode.text : "?";
+}
+
+/**
+ * Build the arrow tree for the declarations directly inside `container` (a
+ * mapping body, nested arrow, or each/flatten block), recursing into every
+ * nested container at any depth. Non-arrow children are skipped.
+ */
+function collectArrows(container: SyntaxNode | undefined): ArrowInfo[] {
+  if (!container) return [];
+  return container.namedChildren.map(arrowInfo).filter((info): info is ArrowInfo => info !== null);
+}
+
+/** The arrow tree rooted at `node`, or null when `node` is not an arrow declaration. */
+function arrowInfo(node: SyntaxNode): ArrowInfo | null {
+  const kind = arrowKind(node);
+  if (!kind) return null;
+  const children = kind === "map" || kind === "computed" ? [] : collectArrows(node);
+  return {
+    // A nested arrow with nothing in its braces says no more than a plain map.
+    kind: kind === "nested" && children.length === 0 ? "map" : kind,
+    srcs: node.namedChildren.filter((x) => x.type === "src_path").map((x) => pathText(x)),
+    tgt: pathText(node.namedChildren.find((x) => x.type === "tgt_path")),
+    pipeChain: node.namedChildren.find((x) => x.type === "pipe_chain"),
+    metaNode: node.namedChildren.find((x) => x.type === "metadata_block"),
+    ...(children.length > 0 ? { children } : {}),
+  };
+}
+
+/** The arrow kind a CST node declares, or null when it is not an arrow. */
+function arrowKind(node: SyntaxNode): ArrowInfo["kind"] | null {
+  switch (node.type) {
+    case "map_arrow":
+      return "map";
+    case "computed_arrow":
+      return "computed";
+    case "nested_arrow":
+      return "nested";
+    case "each_block":
+      return "each";
+    case "flatten_block":
+      return "flatten";
+    default:
+      return null;
   }
-  return arrows;
+}
+
+/** The sources joined as Satsuma writes them: `a, b`. */
+function sourcesText(info: ArrowInfo): string {
+  return info.srcs.join(SOURCE_SEPARATOR);
 }
 
 // ── Formatters ────────────────────────────────────────────────────────────────
@@ -172,34 +182,41 @@ function extractNoteText(node: SyntaxNode | undefined): string | null {
   return parts.length > 0 ? parts.join("\n") : null;
 }
 
+/**
+ * One arrow as JSON. `srcs` lists every source; `src` is kept as the first
+ * source (null for a computed arrow) so readers written before multi-source
+ * support keep working (bsw-fbd8).
+ */
+function arrowToJson(info: ArrowInfo, compact: boolean | undefined): Record<string, unknown> {
+  const { kind, srcs, tgt, pipeChain, metaNode, children } = info;
+  const pipeSteps = pipeChain
+    ? [...pipeChain.namedChildren].filter((x) => x.type === "pipe_step")
+    : [];
+  const classification = classifyTransform(pipeSteps.length > 0 ? pipeSteps : null);
+  const arrowObj: Record<string, unknown> = {
+    kind,
+    src: srcs[0] ?? null,
+    srcs,
+    tgt,
+    hasTransform: pipeChain != null,
+    classification,
+  };
+  if (!compact) {
+    if (pipeChain) arrowObj.transform = pipeChain.text;
+    const arrowMetadata = extractMetadata(metaNode);
+    if (arrowMetadata.length > 0) arrowObj.metadata = arrowMetadata;
+  }
+  if (children) arrowObj.children = children.map((child) => arrowToJson(child, compact));
+  return arrowObj;
+}
+
 function printJson(entry: MappingRecord, mappingNode: SyntaxNode | null, compact?: boolean): void {
   const body = mappingNode?.namedChildren.find((c) => c.type === "mapping_body");
   const metaNode = mappingNode?.namedChildren.find((c) => c.type === "metadata_block");
   const metadata = compact ? [] : extractMetadata(metaNode);
   const noteBlock = body?.namedChildren.find((c) => c.type === "note_block");
   const note = compact ? null : extractNoteText(noteBlock);
-  function arrowToJson(info: ArrowInfo): Record<string, unknown> {
-    const { kind, src, tgt, hasBody, metaNode: arrowMeta, node: arrowNode, children } = info;
-    const pipeChain = arrowNode.namedChildren.find((x) => x.type === "pipe_chain");
-    const pipeSteps = pipeChain
-      ? [...pipeChain.namedChildren].filter((x) => x.type === "pipe_step")
-      : [];
-    const classification = classifyTransform(pipeSteps.length > 0 ? pipeSteps : null);
-    const hasTransform = hasBody && pipeChain != null;
-    const arrowObj: Record<string, unknown> = { kind, src, tgt, hasTransform, classification };
-    if (!compact && hasBody) {
-      if (pipeChain) arrowObj.transform = pipeChain.text;
-    }
-    if (!compact) {
-      const arrowMetadata = extractMetadata(arrowMeta);
-      if (arrowMetadata.length > 0) arrowObj.metadata = arrowMetadata;
-    }
-    if (children && children.length > 0) {
-      arrowObj.children = children.map(arrowToJson);
-    }
-    return arrowObj;
-  }
-  const arrows = collectArrows(body ?? undefined).map(arrowToJson);
+  const arrows = collectArrows(body).map((info) => arrowToJson(info, compact));
   console.log(
     JSON.stringify(
       {
@@ -223,70 +240,41 @@ function printJson(entry: MappingRecord, mappingNode: SyntaxNode | null, compact
 
 function printArrowsOnly(entry: MappingRecord, mappingNode: SyntaxNode | null): void {
   const body = mappingNode?.namedChildren.find((c) => c.type === "mapping_body");
-  if (body) {
-    function printArrowsFlat(arrows: ArrowInfo[], prefix: string): void {
-      for (const { src, tgt, children } of arrows) {
-        const srcStr = src ? prefix + src : "(computed)";
-        console.log(`${srcStr.padEnd(30)} -> ${prefix}${tgt}`);
-        if (children) printArrowsFlat(children, prefix);
-      }
-    }
-    printArrowsFlat(collectArrows(body), "");
-  } else {
-    // Fallback
+  if (!body) {
+    // Fallback when the block cannot be found in the CST: schema-level summary.
     console.log(`${entry.sources.join(", ")} -> ${entry.targets.join(", ")}`);
+    return;
   }
+  const printFlat = (arrows: ArrowInfo[]): void => {
+    for (const info of arrows) {
+      const srcStr = info.srcs.length > 0 ? sourcesText(info) : "(computed)";
+      console.log(`${srcStr.padEnd(ARROWS_ONLY_SOURCE_WIDTH)} -> ${info.tgt}`);
+      if (info.children) printFlat(info.children);
+    }
+  };
+  printFlat(collectArrows(body));
 }
 
-function printArrowNode(c: SyntaxNode, compact: boolean | undefined, indent: string): void {
-  const src = c.namedChildren.find((x) => x.type === "src_path");
-  const tgt = c.namedChildren.find((x) => x.type === "tgt_path");
-  const pipeChain = c.namedChildren.find((x) => x.type === "pipe_chain");
-  const arrowMeta = c.namedChildren.find((x) => x.type === "metadata_block");
-  const srcStr = src ? pathText(src) : null;
-  const tgtStr = pathText(tgt);
-  const metaSuffix = arrowMeta && !compact ? ` ${arrowMeta.text}` : "";
-  const srcPart = srcStr ? `${srcStr} -> ` : "-> ";
+/**
+ * Print one arrow, and everything nested in it, as Satsuma text at `indent`.
+ * each/flatten blocks always keep their braces; a nested arrow opens braces
+ * only when it holds arrows. --compact drops transform bodies and metadata.
+ */
+function printArrow(info: ArrowInfo, compact: boolean | undefined, indent: string): void {
+  const metaSuffix = info.metaNode && !compact ? ` ${info.metaNode.text}` : "";
+  const keyword = info.kind === "each" || info.kind === "flatten" ? `${info.kind} ` : "";
+  const srcPart = info.srcs.length > 0 ? `${sourcesText(info)} -> ` : "-> ";
+  const head = `${indent}${keyword}${srcPart}${info.tgt}${metaSuffix}`;
 
-  // Check if this is a nested arrow with children
-  const childArrows = c.namedChildren.filter(
-    (x) => x.type === "map_arrow" || x.type === "computed_arrow" || x.type === "nested_arrow",
-  );
-
-  if (childArrows.length > 0) {
-    console.log(`${indent}${srcPart}${tgtStr}${metaSuffix} {`);
-    for (const child of childArrows) {
-      printArrowNode(child, compact, indent + "  ");
-    }
+  if (keyword || info.children) {
+    console.log(`${head} {`);
+    for (const child of info.children ?? []) printArrow(child, compact, indent + "  ");
     console.log(`${indent}}`);
+  } else if (info.pipeChain && !compact) {
+    console.log(`${head} { ${info.pipeChain.text} }`);
   } else {
-    if (compact || !pipeChain) {
-      console.log(`${indent}${srcPart}${tgtStr}${metaSuffix}`);
-    } else {
-      console.log(`${indent}${srcPart}${tgtStr}${metaSuffix} { ${pipeChain.text} }`);
-    }
+    console.log(head);
   }
-}
-
-function printBlockNode(c: SyntaxNode, compact: boolean | undefined, indent: string): void {
-  const keyword = c.type === "flatten_block" ? "flatten" : "each";
-  const src = c.namedChildren.find((x) => x.type === "src_path");
-  const tgt = c.namedChildren.find((x) => x.type === "tgt_path");
-  const meta = c.namedChildren.find((x) => x.type === "metadata_block");
-  const srcStr = pathText(src);
-  const tgtStr = pathText(tgt);
-  const metaSuffix = meta && !compact ? ` ${meta.text}` : "";
-  console.log(`${indent}${keyword} ${srcStr} -> ${tgtStr}${metaSuffix} {`);
-  for (const child of c.namedChildren) {
-    if (
-      child.type === "map_arrow" ||
-      child.type === "computed_arrow" ||
-      child.type === "nested_arrow"
-    ) {
-      printArrowNode(child, compact, indent + "  ");
-    }
-  }
-  console.log(`${indent}}`);
 }
 
 function printDefault(
@@ -311,19 +299,14 @@ function printDefault(
     if (tgtBlock)
       console.log(`  target { ${tgtBlock.namedChildren.map((c) => c.text).join(", ")} }`);
 
-    // Arrows and notes
+    // Arrows and notes, in document order; a note's body is elided.
     for (const c of body.namedChildren) {
       if (c.type === "note_block") {
         if (!compact) console.log(`  note { ... }`);
         continue;
       }
-      if (c.type === "source_block" || c.type === "target_block") continue;
-
-      if (c.type === "map_arrow" || c.type === "nested_arrow" || c.type === "computed_arrow") {
-        printArrowNode(c, compact, "  ");
-      } else if (c.type === "flatten_block" || c.type === "each_block") {
-        printBlockNode(c, compact, "  ");
-      }
+      const info = arrowInfo(c);
+      if (info) printArrow(info, compact, "  ");
     }
   } else {
     // Fallback from index

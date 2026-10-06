@@ -185,8 +185,10 @@ For each mapping, use CLI to get the full arrow set:
 satsuma mapping "<mapping-name>" --json
 ```
 
-Then translate each arrow to SQL. See `references/satsuma-to-sql.md` for the
-full translation table. Key patterns:
+Then translate each arrow to SQL. Read an arrow's inputs from `srcs`, which
+lists every source of a multi-source arrow (`a, b -> c`); `src` holds only the
+first. See `references/satsuma-to-sql.md` for the full translation table. Key
+patterns:
 
 **Direct copy (`[none]` classification):**
 ```sql

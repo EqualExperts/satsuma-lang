@@ -1,6 +1,6 @@
 ---
 id: bsw-fbd8
-status: open
+status: closed
 deps: []
 links: []
 created: 2026-10-06T09:45:31Z
@@ -25,3 +25,10 @@ Text prints `a -> c { "sum" }`, `--arrows-only` prints `a -> c`, `--json` gives 
 
 - All three output modes show every source. JSON gains a field listing all sources (keep `src` for compatibility or document the change in SATSUMA-CLI.md and the skills).
 - Tests for text, `--arrows-only` and `--json`.
+
+## Notes
+
+**2026-10-06T10:33:06Z**
+
+Cause: `collectArrows` and `printArrowNode` in `mapping.ts` each took `namedChildren.find(src_path)`, so every output mode kept only an arrow's first source.
+Fix: Arrow records now carry `srcs` (every `src_path`, in order); text and `--arrows-only` print them comma-joined, and `--json` adds `srcs` beside `src`, which stays the first source. Documented in SATSUMA-CLI.md and the explainer, dbt and OpenLineage skills; tests in `tooling/satsuma-cli/test/mapping.test.ts`. (commit immediately after 914c97c2)
