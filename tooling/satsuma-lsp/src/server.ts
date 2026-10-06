@@ -67,7 +67,11 @@ const wsIndex: WorkspaceIndex = createWorkspaceIndex();
 
 // Every open document's semantic diagnostics read the shared index, so any
 // index change must reach all of them, not just the edited one (bsw-r1wl).
-// Call `dependents.indexChanged` after every indexFile/removeFile.
+// Call `dependents.indexChanged` after any index mutation that can change
+// another open document's diagnostics. Two indexFile calls are exempt:
+// onDidSave re-indexes the tree the last didChange already indexed (and
+// refreshed), and the initial workspace-folder scan runs before any document
+// is open.
 const dependents = new DependentDiagnosticsRefresher({
   openUris: () => trees.keys(),
   publish: (uri) => {
