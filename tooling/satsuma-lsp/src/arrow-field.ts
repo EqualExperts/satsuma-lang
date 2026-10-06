@@ -12,6 +12,12 @@
  *  - walking that path through the schema's declared field tree, following
  *    fragment spreads into the fragment that declares the field.
  *
+ * Find-references asks the reverse question — which arrow paths name this
+ * field? — and answers it by putting every recorded arrow segment of that
+ * name through the same lookup ({@link findArrowSegmentsNaming}). Definition
+ * and references therefore cannot disagree about what a path means: there is
+ * one rule, applied once all files are indexed (bsw-89wr).
+ *
  * It does not resolve the path against its containers (core's arrow-path.ts
  * does) and it does not decide which schemas a mapping side names (the caller
  * reads them from the mapping's source/target block).
@@ -22,8 +28,14 @@ import {
   createCanonicalEntityRef,
   schemaLocalSegments,
 } from "@satsuma/core";
+import type { Range } from "vscode-languageserver";
 import { resolveDefinition } from "./workspace-index";
-import type { DefinitionEntry, FieldInfo, WorkspaceIndex } from "./workspace-index";
+import type {
+  ArrowFieldEntry,
+  DefinitionEntry,
+  FieldInfo,
+  WorkspaceIndex,
+} from "./workspace-index";
 
 /** Separates a namespace from a name in a qualified reference (`ns::name`). */
 const NAMESPACE_SEPARATOR = "::";
@@ -36,6 +48,11 @@ export interface ArrowFieldTarget {
   field: FieldInfo;
   /** The mapping-side schema the path belongs to, as the mapping names it. */
   schema: string;
+  /**
+   * That schema's definition key, `ns::name` or a bare global name — the same
+   * for every spelling of the schema, so callers can key on it.
+   */
+  schemaKey: string;
   /** The field's path within that schema, one entry per nesting level. */
   localPath: string[];
 }
@@ -71,17 +88,63 @@ export function resolveArrowField(
       );
       if (!localPath) continue;
       const hit = findDeclaredField(index, def, localPath);
-      if (hit) return { ...hit, schema, localPath };
+      if (hit) return { ...hit, schema, schemaKey: definitionKey(schema, def), localPath };
     }
   }
   return null;
 }
 
+/**
+ * Every arrow-path segment, across the index, that names the field declared
+ * at `declaration` in the file `uri`.
+ *
+ * Each recorded segment ending in `fieldName` is resolved by
+ * {@link resolveArrowField} — the rule go-to-definition uses — and kept when
+ * it lands on that declaration. So a bare `customers` inside `namespace crm`
+ * and `crm::customers` outside it reach the same field, `src.id` follows the
+ * shadow rule when `src` declares a field `src`, and a nested `.id` is never
+ * the top-level `id`.
+ *
+ * @param uri         Canonical URI of the file declaring the field.
+ * @param declaration Range of the field's name in its declaration.
+ */
+export function findArrowSegmentsNaming(
+  index: WorkspaceIndex,
+  fieldName: string,
+  uri: string,
+  declaration: Range,
+): ArrowFieldEntry[] {
+  return (index.arrowFields.get(fieldName) ?? []).filter((segment) => {
+    const hit = resolveArrowField(
+      index,
+      segment.sideSchemas,
+      segment.resolvedSegments,
+      segment.namespace,
+    );
+    return hit !== null && hit.uri === uri && samePosition(hit.field.range, declaration);
+  });
+}
+
+/** True when two ranges start at the same place: one declared name each. */
+function samePosition(a: Range, b: Range): boolean {
+  return a.start.line === b.start.line && a.start.character === b.start.character;
+}
+
 /** The `[namespace]::name` identity of a definition the mapping named `schema`. */
 function canonicalDefinitionKey(schema: string, def: DefinitionEntry): string {
+  return `${def.namespace ?? ""}${NAMESPACE_SEPARATOR}${bareName(schema)}`;
+}
+
+/** The index's definition key for `def`: `ns::name`, or the bare name when global. */
+function definitionKey(schema: string, def: DefinitionEntry): string {
+  const bare = bareName(schema);
+  return def.namespace ? `${def.namespace}${NAMESPACE_SEPARATOR}${bare}` : bare;
+}
+
+/** `name` without any `ns::` qualifier. */
+function bareName(schema: string): string {
   const separator = schema.lastIndexOf(NAMESPACE_SEPARATOR);
-  const bare = separator < 0 ? schema : schema.slice(separator + NAMESPACE_SEPARATOR.length);
-  return `${def.namespace ?? ""}::${bare}`;
+  return separator < 0 ? schema : schema.slice(separator + NAMESPACE_SEPARATOR.length);
 }
 
 /** A field found by {@link findDeclaredField}, with the file declaring it. */

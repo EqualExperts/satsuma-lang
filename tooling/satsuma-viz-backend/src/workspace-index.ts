@@ -38,9 +38,7 @@ import {
   arrowPathParts,
   resolveArrowPathInPlace,
   pathSegmentText,
-  schemaLocalSegments,
-  createAuthoredEntityRef,
-  createCanonicalEntityRef,
+  resolvedSegmentsThrough,
 } from "@satsuma/core";
 import type { FieldDecl, SatsumaCstType, SatsumaGrammarSymbol } from "@satsuma/core";
 
@@ -119,6 +117,36 @@ export interface ReferenceEntry {
   namespace?: string | null;
 }
 
+/**
+ * One authored segment of an arrow path, recorded so a field-level query can
+ * decide later which declared field it names.
+ *
+ * Which field `x` means depends on the schemas the mapping names, on the
+ * namespace they resolve in and on whether the schema declares a field that
+ * shadows its own name (ADR-041). The schemas may live in a file not yet
+ * indexed when this arrow is, so the index records the path as resolved
+ * against its containers and leaves the schema lookup to the query. Keying it
+ * by a `schema.path` string at index time used the mapping's spelling of the
+ * schema and skipped the shadow rule, so a bare `customers` inside
+ * `namespace crm` and `crm::customers` outside it never met (bsw-89wr).
+ */
+export interface ArrowFieldEntry {
+  /** File URI where the arrow appears. */
+  uri: string;
+  /** Span of this one authored segment, without any `.`, `^.`, `$.` or `ns::`. */
+  range: Range;
+  /** Namespace block the mapping is authored inside, or null at the top level. */
+  namespace: string | null;
+  /** The schemas on the arrow's side of the mapping, as its source/target block names them. */
+  sideSchemas: string[];
+  /**
+   * The path up to and including this segment, made absolute against the
+   * enclosing each/flatten/nested containers (core's
+   * `resolvedSegmentsThrough`). It may lead with a schema name.
+   */
+  resolvedSegments: string[];
+}
+
 export interface ImportEntry {
   /** Imported names from the declaration. */
   names: string[];
@@ -137,6 +165,12 @@ export interface WorkspaceIndex {
   references: Map<string, ReferenceEntry[]>;
   /** file URI → import entries. */
   imports: Map<string, ImportEntry[]>;
+  /**
+   * Field name → every arrow-path segment that ends in that name. Keyed by
+   * the name because a segment can only mean a field that has it; the field
+   * it actually means is decided at query time (see {@link ArrowFieldEntry}).
+   */
+  arrowFields: Map<string, ArrowFieldEntry[]>;
   /** Set of indexed file URIs. */
   indexedFiles: Set<string>;
 }
@@ -191,6 +225,7 @@ export function createWorkspaceIndex(): WorkspaceIndex {
     definitions: new Map(),
     references: new Map(),
     imports: new Map(),
+    arrowFields: new Map(),
     indexedFiles: new Set(),
   };
 }
@@ -287,6 +322,11 @@ export function createScopedIndex(
   for (const [name, entries] of index.references) {
     const filtered = entries.filter((e) => reachableUris.has(e.uri));
     if (filtered.length > 0) scoped.references.set(name, filtered);
+  }
+
+  for (const [name, entries] of index.arrowFields) {
+    const filtered = entries.filter((e) => reachableUris.has(e.uri));
+    if (filtered.length > 0) scoped.arrowFields.set(name, filtered);
   }
 
   return scoped;
@@ -418,6 +458,16 @@ export function removeFile(index: WorkspaceIndex, uri: string): void {
       index.references.delete(key);
     } else {
       index.references.set(key, remaining);
+    }
+  }
+
+  // Remove arrow-path segments belonging to this URI
+  for (const [key, entries] of index.arrowFields) {
+    const remaining = entries.filter((e) => e.uri !== uri);
+    if (remaining.length === 0) {
+      index.arrowFields.delete(key);
+    } else {
+      index.arrowFields.set(key, remaining);
     }
   }
 }
@@ -857,15 +907,18 @@ function indexArrowFieldRefs(
       namespace,
     });
 
-    // schema.path — the container-resolved path under each schema it can
-    // belong to; arrowFieldReferenceKeys is the one rule queries use too.
-    for (const qualKey of arrowFieldReferenceKeys(schemas, path.resolved.segments)) {
-      addReference(index, qualKey, {
+    // Each authored segment, for field-level queries: which declared field it
+    // names is resolved when queried, once every file is indexed.
+    for (const segment of path.segmentNodes) {
+      const resolvedSegments = resolvedSegmentsThrough(path, segment);
+      const name = resolvedSegments[resolvedSegments.length - 1];
+      if (!name) continue;
+      addArrowField(index, name, {
         uri,
-        range: fullPathRange,
-        name: qualKey,
-        context: "arrow",
+        range: nodeRange(segment),
         namespace,
+        sideSchemas: schemas,
+        resolvedSegments,
       });
     }
     // Also index the resolved path without a schema prefix when it differs
@@ -880,39 +933,6 @@ function indexArrowFieldRefs(
       });
     }
   });
-}
-
-/**
- * The reference keys an arrow path's resolved field is indexed under: one
- * `schema.path` per schema on the arrow's side the path can belong to.
- *
- * The path is made schema-local by core's rule (`schemaLocalSegments`), so a
- * multi-source arrow written `crm.email` is keyed `crm.email` under `crm` only,
- * not also `crm.crm.email` and `ledger.crm.email`. Exported because a
- * find-references query from an arrow must build its keys the same way or the
- * two never meet.
- *
- * @param sideSchemas      The schemas named on the arrow's side of the mapping,
- *                         as authored in its source/target block.
- * @param resolvedSegments The container-resolved path (arrow-path.ts
- *                         `resolveArrowPathInPlace`), possibly led by a schema.
- */
-export function arrowFieldReferenceKeys(
-  sideSchemas: readonly string[],
-  resolvedSegments: readonly string[],
-): string[] {
-  const keys: string[] = [];
-  for (const schema of sideSchemas) {
-    const others = sideSchemas.filter((s) => s !== schema).map(createAuthoredEntityRef);
-    const local = schemaLocalSegments(
-      resolvedSegments,
-      createAuthoredEntityRef(schema),
-      createCanonicalEntityRef(schema.includes("::") ? schema : `::${schema}`),
-      others,
-    );
-    if (local) keys.push(`${schema}.${local.join(".")}`);
-  }
-  return keys;
 }
 
 /** The span from the first to the last authored segment of a path. */
@@ -1287,6 +1307,12 @@ function addDefinition(index: WorkspaceIndex, name: string, entry: DefinitionEnt
   const existing = index.definitions.get(name) ?? [];
   existing.push(entry);
   index.definitions.set(name, existing);
+}
+
+function addArrowField(index: WorkspaceIndex, name: string, entry: ArrowFieldEntry): void {
+  const existing = index.arrowFields.get(name) ?? [];
+  existing.push(entry);
+  index.arrowFields.set(name, existing);
 }
 
 function addReference(index: WorkspaceIndex, name: string, entry: ReferenceEntry): void {

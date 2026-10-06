@@ -19,6 +19,13 @@ function buildIndex(files) {
   return { index: idx, trees };
 }
 
+/** "line:start-end" for each location, sorted, for exact comparison. */
+function spans(result) {
+  return result
+    .map((r) => `${r.range.start.line}:${r.range.start.character}-${r.range.end.character}`)
+    .sort();
+}
+
 /** Get references at a position, with or without declaration. */
 function refs(files, uri, line, col, includeDecl = false) {
   const { index, trees } = buildIndex(files);
@@ -221,14 +228,103 @@ mapping m {
     assert.deepEqual(lines, [3, 17]);
   });
 
-  it("finds a relative arrow path from the nested schema field it resolves to", () => {
-    // From `id` inside `orders record`, the `.id` written inside the each
-    // block is a use of that field.
+  it("finds a relative arrow path from the nested schema field it resolves to, and nothing else", () => {
+    // From `id` inside `orders record`, the one use is the source-side `.id`
+    // inside the each block. Neither the top-level `id -> k` (line 15) nor the
+    // target-side `.id`, which names tgt.rows.id, is a use of it.
     const result = refs({ "file:///a.stm": EACH }, "file:///a.stm", 3, 5, false);
-    assert.ok(
-      result.some((r) => r.range.start.line === 17),
-      "expected the .id arrow inside the each block",
-    );
+    assert.deepEqual(spans(result), ["17:5-7"]);
+  });
+
+  it("does not list a nested field's relative arrow path among the top-level field's uses", () => {
+    // The reverse of the case above: the top-level `id` has one use, `id -> k`.
+    // Matching declarations to arrows by leaf name listed every `id` arrow.
+    const result = refs({ "file:///a.stm": EACH }, "file:///a.stm", 1, 3, false);
+    assert.deepEqual(spans(result), ["15:2-4"]);
+  });
+
+  // ── One schema, two spellings ──────────────────────────────────────────
+  // `customers` inside `namespace crm` and `crm::customers` outside it are
+  // the same schema, so arrows through either spelling are uses of one field.
+  const SPELLINGS = `namespace crm {
+  schema customers {
+    id VARCHAR
+  }
+  schema out1 {
+    a VARCHAR
+  }
+  mapping m1 {
+    source { customers }
+    target { out1 }
+    id -> a
+  }
+}
+schema out2 {
+  b VARCHAR
+}
+mapping m2 {
+  source { crm::customers }
+  target { out2 }
+  id -> b
+}`;
+
+  it("finds arrows through every spelling of a schema, from either arrow and from the declaration", () => {
+    // Each query reduces to the declared field crm::customers.id, so all
+    // three return the same two arrows (bsw-89wr review).
+    const expected = ["10:4-6", "19:2-4"];
+    assert.deepEqual(spans(refs({ "file:///a.stm": SPELLINGS }, "file:///a.stm", 10, 4)), expected);
+    assert.deepEqual(spans(refs({ "file:///a.stm": SPELLINGS }, "file:///a.stm", 19, 2)), expected);
+    assert.deepEqual(spans(refs({ "file:///a.stm": SPELLINGS }, "file:///a.stm", 2, 4)), expected);
+  });
+
+  it("finds a namespace-qualified arrow path written inside its own namespace", () => {
+    // `crm::customers.email` inside `namespace crm` names customers.email;
+    // the index once filed it under the malformed key `customers.crm::customers.email`.
+    const src = `namespace crm {
+  schema customers {
+    email VARCHAR
+  }
+  schema out {
+    e VARCHAR
+  }
+  mapping m {
+    source { customers }
+    target { out }
+    crm::customers.email -> e
+  }
+}`;
+    const result = refs({ "file:///a.stm": src }, "file:///a.stm", 2, 4, false);
+    assert.deepEqual(spans(result), ["10:19-24"]);
+  });
+
+  // ── A schema that declares a field with its own name (ADR-041) ─────────
+  // In `src.id`, `src` is the declared field, not the schema prefix, so the
+  // arrow names the nested src.src.id — for references as for definition.
+  const SHADOW = `schema src {
+  id VARCHAR
+  src record {
+    id VARCHAR
+  }
+}
+schema tgt {
+  a VARCHAR
+  b VARCHAR
+}
+mapping m {
+  source { src }
+  target { tgt }
+  src.id -> a
+  id -> b
+}`;
+
+  it("finds a shadowed path from the arrow as the nested field it names", () => {
+    const result = refs({ "file:///a.stm": SHADOW }, "file:///a.stm", 13, 6, true);
+    assert.deepEqual(spans(result), ["13:6-8", "3:4-6"]);
+  });
+
+  it("finds a shadowed path from the nested declaration but not from the top-level one", () => {
+    assert.deepEqual(spans(refs({ "file:///a.stm": SHADOW }, "file:///a.stm", 3, 5)), ["13:6-8"]);
+    assert.deepEqual(spans(refs({ "file:///a.stm": SHADOW }, "file:///a.stm", 1, 3)), ["14:2-4"]);
   });
 
   // ── ADR-053 escape paths (bsw-rkn4) ────────────────────────────────────
@@ -256,13 +352,6 @@ mapping m {
     $.survey_id -> sid
   }
 }`;
-
-  /** "line:start-end" for each location, sorted, for exact comparison. */
-  function spans(result) {
-    return result
-      .map((r) => `${r.range.start.line}:${r.range.start.character}-${r.range.end.character}`)
-      .sort();
-  }
 
   it("finds a ^.-escaped arrow source from the parent-level field it names", () => {
     // Cursor on `transect_ref` in `transects record`. The only use is the

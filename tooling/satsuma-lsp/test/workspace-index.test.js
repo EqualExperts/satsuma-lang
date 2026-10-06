@@ -586,11 +586,11 @@ describe("arrow field path indexing", () => {
   });
 });
 
-describe("arrow field paths keyed by their container-resolved field (bsw-89wr)", () => {
-  // find-references from a schema field and from an arrow meet only when the
-  // index keys each arrow path by the field it resolves to. Keying the text
-  // filed `.id` inside `each orders` under the top-level `src.id`, and `^.x` /
-  // `$.x` under `^` / `$`.
+describe("arrow path segments recorded by their container-resolved path (bsw-89wr)", () => {
+  // Which field an arrow segment names is decided at query time, so the index
+  // must record each segment's path made absolute against its containers.
+  // Reading the text filed `.id` inside `each orders` as the top-level `id`,
+  // and `^.x` / `$.x` under `^` / `$`.
   const SOURCE = `schema src {
   id VARCHAR
   code VARCHAR
@@ -615,26 +615,38 @@ mapping m {
   }
 }`;
 
-  /** Lines of the arrow references filed under `key`. */
-  function arrowLines(idx, key) {
-    return (idx.references.get(key) ?? [])
-      .filter((r) => r.context === "arrow")
-      .map((r) => r.range.start.line);
+  /** "line: side schemas / resolved path" for each recorded segment named `name`. */
+  function segments(idx, name) {
+    return (idx.arrowFields.get(name) ?? [])
+      .map(
+        (e) =>
+          `${e.range.start.line}: ${e.sideSchemas.join(",")} / ${e.resolvedSegments.join(".")}`,
+      )
+      .sort();
   }
 
-  it("keys a relative path under its container's field, not the top-level namesake", () => {
+  it("records a relative path under its container's field, not the top-level namesake", () => {
     const idx = buildIndex({ "file:///a.stm": SOURCE });
-    assert.deepEqual(arrowLines(idx, "src.orders.id"), [18]);
-    assert.deepEqual(arrowLines(idx, "tgt.rows.id"), [18]);
-    assert.ok(!arrowLines(idx, "src.id").includes(18), ".id must not be filed as src.id");
+    assert.deepEqual(segments(idx, "id"), [
+      "18: src / orders.id",
+      "18: tgt / rows.id",
+      "20: src / id",
+    ]);
   });
 
-  it("keys ^. and $. paths under the ancestor field they escape to", () => {
+  it("records ^. and $. paths as the ancestor field they escape to", () => {
     const idx = buildIndex({ "file:///a.stm": SOURCE });
-    assert.deepEqual(arrowLines(idx, "src.code"), [19]);
-    assert.deepEqual(arrowLines(idx, "src.id"), [20]);
+    assert.deepEqual(segments(idx, "code"), ["19: src / code", "19: tgt / rows.code"]);
     assert.equal(idx.references.get("^"), undefined);
     assert.equal(idx.references.get("$"), undefined);
+  });
+
+  it("drops a file's recorded segments when the file is removed", () => {
+    // A stale segment would resolve against the new definitions and surface
+    // as a reference in a file that no longer contains it.
+    const idx = buildIndex({ "file:///a.stm": SOURCE });
+    removeFile(idx, "file:///a.stm");
+    assert.equal(idx.arrowFields.size, 0);
   });
 });
 
