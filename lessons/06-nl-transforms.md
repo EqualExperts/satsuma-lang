@@ -96,7 +96,7 @@ Another example:
 
 ```satsuma
 Amount -> amount_usd {
-  "Multiply by rate from currency_rates using CurrencyIsoCode"
+  "Multiply by rate from @fx_spot_rates using @CurrencyIsoCode"
   | round(2)
 }
 ```

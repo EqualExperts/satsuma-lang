@@ -406,7 +406,7 @@ The `import` statement brings fragments, transforms, or schemas from other files
 
 ```satsuma
 import { `address fields`, `audit fields` } from "lib/common.stm"
-import { `currency rates` } from "lookups/finance.stm"
+import { fx_spot_rates } from "lookups/finance.stm"
 ```
 
 This supports splitting large specifications across multiple files — one per source system, perhaps, or one per domain — while keeping each individual file focused and readable.
@@ -451,7 +451,7 @@ Here's a realistic Salesforce-to-Snowflake integration, the kind of mapping you 
 // Satsuma — Salesforce to Snowflake Pipeline
 
 import { `sfdc standard types` } from "lib/sfdc_fragments.stm"
-import { `currency rates` } from "lookups/finance.stm"
+import { fx_spot_rates } from "lookups/finance.stm"
 
 note {
   """
@@ -508,7 +508,10 @@ schema snowflake_opps (note "FACT_OPPORTUNITIES — Snowflake Analytics") {
 // --- Mapping ---
 
 mapping `opportunity ingestion` {
-  source { `sfdc_opportunity` }
+  source {
+    `sfdc_opportunity`,
+    `fx_spot_rates`
+  }
   target { `snowflake_opps` }
 
   // --- Direct identifiers ---
@@ -520,7 +523,7 @@ mapping `opportunity ingestion` {
   Amount -> amount_raw { coalesce(0) }
 
   Amount -> amount_usd {
-    "Multiply by rate from `currency rates` lookup using CurrencyIsoCode"
+    "Multiply by rate from @fx_spot_rates lookup using @CurrencyIsoCode"
     | round(2)
   }
 
@@ -554,7 +557,7 @@ Even if you've never seen Satsuma before today, you can follow this specificatio
 
 - *"What happens if Amount is null?"* — The `arr_value` mapping shows `coalesce(0)`, so it becomes zero.
 - *"How is pipeline stage determined?"* — There's an explicit value map from Salesforce picklist values to Snowflake categories.
-- *"What about currency conversion?"* — The `amount_usd` mapping uses a natural-language description explaining it uses the `currency rates` lookup.
+- *"What about currency conversion?"* — The `amount_usd` mapping uses a natural-language description explaining it uses the `fx_spot_rates` lookup, which is listed as a source so lineage can trace it.
 - *"What if Finance has overridden the ARR?"* — `ARR_Override__c` takes priority, with `Amount` as a fallback.
 
 Compare that to hunting through a spreadsheet's comments column, a Confluence page, and a Slack thread to piece together the same answers.
@@ -573,12 +576,14 @@ That single row raises immediate questions. *"What about 'Value Prop' — is tha
 
 ## Metrics: Defining What You Measure
 
-Data pipelines don't just move data — they feed business metrics. Satsuma has a dedicated `metric` keyword for declaring KPIs and measures, so that the definition of *"what does MRR mean?"* lives alongside the schemas and mappings it depends on, not in a Confluence page that nobody updates.
+Data pipelines don't just move data — they feed business metrics. Satsuma declares KPIs and measures as schemas marked with the `metric` token, so that the definition of *"what does MRR mean?"* lives alongside the schemas and mappings it depends on, not in a Confluence page that nobody updates.
 
-A metric block says: **what** the metric measures, **where** the data comes from, and **how** it can be sliced. It doesn't describe the implementation step-by-step — that's what mappings are for. Instead, the `note { }` block captures the business definition in natural language.
+A metric schema says: **what** the metric measures, **where** the data comes from, and **how** it can be sliced. It doesn't describe the implementation step-by-step — that's what mappings are for. Instead, the `note { }` block captures the business definition in natural language.
 
 ```satsuma
-metric monthly_recurring_revenue "MRR" (
+schema monthly_recurring_revenue (
+  metric,
+  metric_name "MRR",
   source fact_subscriptions,
   grain monthly,
   slice {customer_segment, product_line, region},
@@ -600,6 +605,8 @@ The metadata tokens in `( )` work exactly like the ones you've already seen on s
 
 | Token | What It Means |
 | ----- | ------------- |
+| `metric` | Marks this schema as a metric |
+| `metric_name` | The short business label shown in dashboards |
 | `source` | Which schema(s) feed this metric |
 | `grain` | The time grain (daily, monthly, etc.) |
 | `slice` | Dimensions you can cut the metric by |
@@ -611,7 +618,9 @@ The metadata tokens in `( )` work exactly like the ones you've already seen on s
 A metric with multiple measures and multi-source lineage:
 
 ```satsuma
-metric customer_lifetime_value "CLV" (
+schema customer_lifetime_value (
+  metric,
+  metric_name "CLV",
   source {fact_orders, dim_customer},
   slice {acquisition_channel, segment, cohort_year}
 ) {
@@ -629,7 +638,7 @@ metric customer_lifetime_value "CLV" (
 }
 ```
 
-Metrics are *not* schemas — you can't use them as a source or target in a mapping. They sit at the end of the lineage graph: data flows *into* a metric, nothing flows *out*. Think of them as the answer to the question *"why are we building this pipeline?"*
+A metric is still a schema, so a mapping can target it to show how its values are produced. It cannot be a mapping's source: metrics sit at the end of the lineage graph, where data flows *into* a metric and nothing flows *out*. Think of them as the answer to the question *"why are we building this pipeline?"*
 
 ---
 

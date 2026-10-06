@@ -93,7 +93,7 @@ The `import` statement pulls named definitions from another file:
 
 ```satsuma
 import { `address fields`, `audit columns` } from "lib/common.stm"
-import { `currency rates` } from "lookups/finance.stm"
+import { fx_spot_rates } from "lookups/finance.stm"
 ```
 
 ### What can be imported

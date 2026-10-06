@@ -363,7 +363,7 @@ PHONE_NBR -> phone {
 
 ```
 Amount -> amount_usd {
-  "Multiply by rate from currency_rates lookup using CurrencyIsoCode"
+  "Multiply by rate from @fx_spot_rates lookup using @CurrencyIsoCode"
   | round(2)
 }
 ```
@@ -662,7 +662,7 @@ Import fragments, transforms, or schemas from other files:
 
 ```
 import { `address fields`, `audit fields` } from "lib/common.stm"
-import { `currency rates` } from "lookups/finance.stm"
+import { fx_spot_rates } from "lookups/finance.stm"
 ```
 
 Import syntax follows the pattern `import { <names> } from "<path>"`. Paths are resolved relative to the importing file. Importing `X` from another file brings `X` into scope together with the exact transitive dependencies `X` requires. It does **not** bring every other definition from that file into scope.
@@ -1458,7 +1458,7 @@ mapping `order lines` {
 // Satsuma v2 — Salesforce to Snowflake Pipeline
 
 import { `sfdc standard types` } from "lib/sfdc_fragments.stm"
-import { `currency rates` } from "lookups/finance.stm"
+import { fx_spot_rates } from "lookups/finance.stm"
 
 note {
   """
@@ -1518,7 +1518,10 @@ schema snowflake_opps (note "FACT_OPPORTUNITIES — Snowflake Analytics") {
 // --- Mapping ---
 
 mapping `opportunity ingestion` {
-  source { `sfdc_opportunity` }
+  source {
+    `sfdc_opportunity`,
+    `fx_spot_rates`
+  }
   target { `snowflake_opps` }
 
   // --- Direct identifiers ---
@@ -1530,7 +1533,7 @@ mapping `opportunity ingestion` {
   Amount -> amount_raw { coalesce(0) }
 
   Amount -> amount_usd {
-    "Multiply by rate from `currency rates` lookup using CurrencyIsoCode"
+    "Multiply by rate from @fx_spot_rates lookup using @CurrencyIsoCode"
     | round(2)
   }
 

@@ -82,27 +82,28 @@ Key points:
 
 ```satsuma
 schema mainframe_policy (
-  format cobol,
-  encoding EBCDIC,
+  format copybook,
+  encoding ebcdic,
   note "POLICY-MASTER copybook — IBM z/OS VSAM"
 ) {
-  POLICY-ID     PIC-9(10)        (pk, offset 0)
-  HOLDER-NAME   PIC-X(40)        (offset 10)
-  PREMIUM-AMT   PIC-S9(7)V99-COMP-3  (offset 50)    // packed decimal
-  COVERAGE-TYPE PIC-X(2)         (offset 54, enum {LF, HE, AU, HO})
+  POLICY_ID     INTEGER       (pic "9(10)", offset 1, pk)
+  HOLDER_NAME   STRING        (pic "X(40)", offset 11)
+  PREMIUM_AMT   DECIMAL(9,2)  (pic "S9(7)V99", encoding comp-3, offset 51)   // packed decimal
+  COVERAGE_TYPE STRING        (pic "X(2)", offset 56, enum {LF, HE, AU, HO})
+  BENE_COUNT    INTEGER       (pic "9(1)", offset 58)
 
-  BENEFICIARIES list_of record (offset 56, occurs 5, depends_on BENE-COUNT) {
-    BENE-NAME   PIC-X(30)
-    BENE-PCT    PIC-9(3)V9       // percentage, 1 decimal
+  BENEFICIARIES list_of record (offset 59, occurs 5, depends_on BENE_COUNT) {
+    BENE_NAME   STRING        (pic "X(30)")
+    BENE_PCT    DECIMAL(4,1)  (pic "9(3)V9")   // percentage, 1 decimal
   }
 }
 ```
 
 Key points:
-- **`PIC-*` types** follow COBOL conventions — `PIC-9` for numeric, `PIC-X` for alphanumeric, `COMP-3` for packed decimal.
-- **`offset`** metadata captures the byte position in the record.
-- **`occurs` / `depends_on`** captures COBOL repeating groups with variable length.
-- **`encoding EBCDIC`** documents the character encoding — critical for mainframe integrations.
+- **Fields use ordinary Satsuma types**; the original PIC clause is kept verbatim in `pic "..."`, and `encoding comp-3` marks packed decimals. See the [COBOL copybook conventions](../docs/conventions-for-schema-formats/cobol-copybook/conventions.md).
+- **`offset`** metadata captures the 1-based byte position in the record.
+- **`occurs` / `depends_on`** captures COBOL repeating groups with variable length; the count field must itself be declared.
+- **`encoding ebcdic`** on the schema documents the character encoding — critical for mainframe integrations.
 
 ### Protobuf with Schema Registry
 
