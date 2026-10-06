@@ -82,7 +82,7 @@
     "satsuma-cli": "*",
     "c8": "^12.0.0",
     "esbuild": "^0.28.2",
-    "fast-check": "^4.9.0",
+    "fast-check": "^4.10.2",
     "tree-sitter-satsuma": "*",
     "typescript": "^6.0.3"
   }

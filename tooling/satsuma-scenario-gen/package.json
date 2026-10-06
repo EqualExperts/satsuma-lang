@@ -16,6 +16,6 @@
     "test": "node --test test/**/*.test.js"
   },
   "dependencies": {
-    "fast-check": "^4.9.0"
+    "fast-check": "^4.10.2"
   }
 }
