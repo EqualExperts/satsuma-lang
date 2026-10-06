@@ -1,6 +1,6 @@
-# ADR-052 — The Behavioural Eval Consumes Released Artifacts, and Therefore Lives in Its Own Repository
+# ADR-054 — The Behavioural Eval Consumes Released Artifacts, and Therefore Lives in Its Own Repository
 
-**Status:** Accepted
+**Status:** Accepted (renumbered from a duplicate ADR-052 on 2026-10-06; ADR-052 is the non-release artifact identity record)
 **Date:** 2026-08-11 (sl-x9m1; Feature 44 Phase 0.5)
 
 ## Context
