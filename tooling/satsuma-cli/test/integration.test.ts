@@ -3689,6 +3689,48 @@ describe("satsuma lint --fix", () => {
     const content = readFileSync(file, "utf8");
     assert.match(content, /hidden_dep/, "hidden_dep should be added to the source block");
   });
+
+  // bsw-zlrc review: the NL ref's recorded target is the resolved path
+  // (`rows.flat.t`), but the source text says `.t`. The fix used to cut the
+  // recorded path at its first dot and compare (`flat.t` ≠ `t`), so for these
+  // header forms it edited only the source block while claiming to have edited
+  // the arrow. The outer `.oid -> .t` also targets a field named `t`, so each
+  // case also proves the fix picks the arrow that owns the NL text, not the
+  // first arrow with a matching name.
+  for (const header of ["flat", ".flat", "$.flat", "^.flat"]) {
+    it(`adds the hidden source to the owning arrow under a \`flatten .lines -> ${header}\` header`, async () => {
+      const source = [
+        "schema src { orders list_of record { oid STRING  lines list_of record { sku STRING } } }",
+        "schema other { x STRING }",
+        "schema tgt {",
+        "  rows list_of record { t STRING  flat list_of record { t STRING } }",
+        "  flat list_of record { t STRING }",
+        "}",
+        "mapping m {",
+        "  source { src }",
+        "  target { tgt }",
+        "  each orders -> rows {",
+        "    .oid -> .t",
+        `    flatten .lines -> ${header} {`,
+        '      .sku -> .t { "combine with @other.x" }',
+        "    }",
+        "  }",
+        "}",
+        "",
+      ].join("\n");
+      const dir = mkdtempSync(join(tmpdir(), "satsuma-lint-"));
+      const file = join(dir, "m.stm");
+      writeFileSync(file, source);
+
+      const { stdout, code } = await run("lint", "--fix", file);
+      assert.equal(code, 0, stdout);
+
+      const content = readFileSync(file, "utf8");
+      assert.match(content, /source \{ src, other \}/);
+      assert.match(content, /\.sku, other -> \.t \{ "combine with @other\.x" \}/);
+      assert.match(content, /^ {4}\.oid -> \.t$/m, "the outer arrow must be left alone");
+    });
+  }
 });
 
 // ---------------------------------------------------------------------------
