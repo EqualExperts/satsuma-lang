@@ -270,3 +270,47 @@ describe("ns::`name` references (bsw-iuzs)", () => {
     assert.match(stdout, /1 arrow/);
   });
 });
+
+// `flatten items -> fact { .sku -> sku }` inside `namespace n` records its child
+// target as `fact.sku`: the target schema's bare name, while the index keys the
+// schema as `n::fact`. Every arrows step that compared text against `n::fact.`
+// missed it (bsw-tzc6).
+const NS_FLATTEN_TARGET_FIXTURE = resolve(__dirname, "fixtures/namespace-flatten-target.stm");
+const SEABIRD_MART = resolve(__dirname, "../../../examples/seabird-colony-lineage/mart.stm");
+
+describe("arrows on a namespaced flatten-to-schema target (bsw-tzc6)", () => {
+  it("finds the flatten child arrow when queried by the namespaced target field", async () => {
+    // The ticket's repro: the arrow is stored as `fact.sku`, which no lookup
+    // under `n::fact` recognised, so the command reported no arrows.
+    const { stdout, code } = await run("arrows", "n::fact.sku", NS_FLATTEN_TARGET_FIXTURE);
+    assert.equal(code, 0, stdout);
+    assert.match(stdout, /1 arrow \(1 as target\)/);
+  });
+
+  it("finds the seabird mart's species_code flatten child (the ticket's acceptance query)", async () => {
+    // The canonical example of the shape: `flatten observations -> species_fact`
+    // inside `namespace mart`.
+    const { stdout, code } = await run("arrows", "mart::species_fact.species_code", SEABIRD_MART);
+    assert.equal(code, 0, stdout);
+    assert.match(stdout, /species -> species_fact\.species_code/);
+  });
+
+  it("--as-target keeps the namespaced flatten child arrow", async () => {
+    // The direction filter must apply the same schema-prefix rule as the lookup.
+    const { code } = await run("arrows", "n::fact.sku", NS_FLATTEN_TARGET_FIXTURE, "--as-target");
+    assert.equal(code, 0);
+  });
+
+  it("--json names the declared target field, not a doubled schema prefix", async () => {
+    // Queried from either side, the target is `n::fact.sku`. Re-prefixing the
+    // bare `fact.sku` with `n::fact` produced `n::fact.fact.sku`, which the
+    // workspace does not declare.
+    for (const query of ["n::fact.sku", "n::src.items.sku"]) {
+      const { stdout, code } = await run("arrows", query, NS_FLATTEN_TARGET_FIXTURE, "--json");
+      assert.equal(code, 0, `${query}: ${stdout}`);
+      const [arrow] = JSON.parse(stdout);
+      assert.equal(arrow.target, "n::fact.sku", query);
+      assert.equal(arrow.source, "n::src.items.sku", query);
+    }
+  });
+});

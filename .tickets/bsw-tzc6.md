@@ -1,6 +1,6 @@
 ---
 id: bsw-tzc6
-status: open
+status: closed
 deps: []
 links: []
 created: 2026-10-06T09:57:03Z
@@ -24,3 +24,10 @@ namespace n {
 ## Acceptance Criteria
 
 - `arrows` matches flatten-to-schema targets inside namespaces; test with the seabird example query.
+
+## Notes
+
+**2026-10-06T18:17:03Z**
+
+Cause: Inside a namespace, a flatten to the target schema records its children with the schema's bare name (`fact.sku`), while the index keys the schema as `n::fact`. The CLI's own text-prefix checks in `buildFieldArrows`, the `arrows` field matcher and the `--json` qualifiers knew only the index spelling, so the arrow was keyed as `n::fact.fact.sku`, rejected by every lookup, and printed with a doubled prefix.
+Fix: New `arrowPathInSchema` in tooling/satsuma-cli/src/index-builder.ts wraps core's `schemaLocalFieldPath` (the rule coverage and lint use) and now drives `buildFieldArrows` and the `arrows` matcher; `--json` endpoints and the NL dedup go through `arrowEndpoint` (core `resolveFieldEndpoint`). `arrows mart::species_fact.species_code` now finds the seabird flatten child. (commit immediately after 8b738c71)

@@ -1,0 +1,12 @@
+// A flatten whose target is the target schema itself, inside a namespace
+// (bsw-tzc6). Extraction records the child arrow's target as `fact.sku`: the
+// schema's bare name, not its index key `n::fact`.
+namespace n {
+  schema src { items list_of record { sku STRING } }
+  schema fact { sku STRING }
+  mapping `m` {
+    source { src }
+    target { fact }
+    flatten items -> fact { .sku -> sku }
+  }
+}
