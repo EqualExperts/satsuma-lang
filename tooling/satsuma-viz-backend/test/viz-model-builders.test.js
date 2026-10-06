@@ -525,6 +525,25 @@ describe("extractSourceBlock (direct)", () => {
       filters: [],
     });
   });
+
+  // A row filter is written as metadata on the source ref itself
+  // (`source { a (filter "...") }`). The renderers already draw `filters`, so
+  // dropping them here hid every source filter from the viz. Each filtered ref
+  // contributes its expression, unquoted, in source order; unfiltered refs and
+  // unrelated metadata contribute nothing.
+  it("collects the filter written on each source ref, in source order", () => {
+    const src =
+      "schema a { id INT }\nschema b { id INT }\nschema t { id INT }\n" +
+      "mapping m {\n" +
+      '  source { a (filter "@id IS NOT NULL"), `b` (note "n", filter "status = `done`") }\n' +
+      "  target { t }\n  a.id -> id\n}";
+    const node = findNode(root(src), "source_block");
+    assert.deepStrictEqual(extractSourceBlock(node), {
+      schemas: ["a", "b"],
+      joinDescription: null,
+      filters: ["@id IS NOT NULL", "status = `done`"],
+    });
+  });
 });
 
 // ==================================================================
