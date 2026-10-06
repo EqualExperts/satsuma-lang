@@ -6,7 +6,7 @@
  * they can be tested against mock CST objects.
  */
 
-import { canonicalRef } from "./canonical-ref.js";
+import { arrowPathText } from "./arrow-path.js";
 import { resolveAuthoredPathAgainstContainer } from "./reference-stages.js";
 import { classifyTransform, classifyArrow } from "./classify.js";
 import { createScalarTypeExpression } from "./field-decl.js";
@@ -819,29 +819,6 @@ export function extractImports(rootNode: SyntaxNode): ExtractedImport[] {
 // ── Arrow-level extraction ──────────────────────────────────────────────────
 
 /**
- * Extract the text of a src_path or tgt_path node.
- */
-function pathText(pathNode: SyntaxNode | null): string | null {
-  if (!pathNode) return null;
-  const inner = pathNode.namedChildren[0];
-  if (!inner) return pathNode.text;
-  if (inner.type === "backtick_path") return inner.text.slice(1, -1);
-  if (inner.type === "namespaced_path") {
-    const ids = inner.namedChildren.filter((c) => c.type === "identifier");
-    const [ns, schema] = ids;
-    if (ns && schema) {
-      const field =
-        ids
-          .slice(2)
-          .map((c) => c.text)
-          .join(".") || null;
-      return canonicalRef(ns.text, schema.text, field);
-    }
-  }
-  return inner.text;
-}
-
-/**
  * Decompose pipe_step nodes into structured step records.
  */
 function decomposePipeSteps(steps: SyntaxNode[]): PipeStep[] {
@@ -1144,9 +1121,9 @@ function extractSingleArrow(
   const pipeSteps = pipeChain ? children(pipeChain, "pipe_step") : [];
 
   const authoredSources: string[] = srcNodes
-    .map((n) => cleanPathText(pathText(n)))
+    .map((n) => cleanPathText(arrowPathText(n)))
     .filter((s): s is string => s !== null);
-  const authoredTarget = cleanPathText(pathText(tgtNode));
+  const authoredTarget = cleanPathText(arrowPathText(tgtNode));
   const classification = classifyTransform(pipeSteps);
   const derived = classifyArrow(arrow);
   const steps = decomposePipeSteps(pipeSteps);

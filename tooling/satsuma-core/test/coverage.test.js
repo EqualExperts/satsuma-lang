@@ -1046,6 +1046,36 @@ mapping load {
   });
 });
 
+describe("computeMappingCoverage — backtick path segments (bsw-f9fq)", () => {
+  // A quoted segment after the first used to keep its backticks, so the arrow
+  // matched no declared field and coverage reported a mapped field as a gap.
+  const SRC = `
+schema src {
+  \`long name\` STRING
+  orders list_of record { \`odd name\` STRING }
+}
+schema tgt { x STRING rows list_of record { y STRING c STRING } }
+mapping load {
+  source { src }
+  target { tgt }
+  orders.\`odd name\` -> x
+  each orders -> rows {
+    .\`odd name\` -> .y
+    $.\`long name\` -> .c
+  }
+}`;
+
+  it("covers fields named by plain, relative and root-escaped backtick segments", () => {
+    const result = coverage(SRC, "load");
+    const source = forRole(result, "source");
+    assertMapped(source, "orders.odd name", true);
+    assertMapped(source, "long name", true);
+    const target = forRole(result, "target");
+    assertMapped(target, "rows.y", true);
+    assertMapped(target, "rows.c", true);
+  });
+});
+
 // ── Declaration positions ───────────────────────────────────────────────────
 
 describe("computeMappingCoverage — declaration positions", () => {
