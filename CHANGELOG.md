@@ -2,6 +2,54 @@
 
 ## Unreleased
 
+### Breaking: a path can no longer contain whitespace (`bsw-0twy`, ADR-055)
+
+`^. order_no`, `^. ^.id`, `$. order_no`, `. sku` and `orders. order_no` used to
+parse. The validator read them with the space in, and `satsuma fmt` removed it,
+so formatting could change which field an arrow named: `^. ^.sid` became
+`^.^.sid`, one level higher. Spaced paths are now parse errors. Write the path
+without the gap. Every `.stm` file in this repository parses as before.
+
+### Quote only the name after `::` (`bsw-iuzs`, ADR-055)
+
+`` source { raw::`crm-contacts` } `` now parses, as the docs always showed.
+Wrapping the whole qualified name in backticks, `` `raw::crm-contacts` ``,
+still works but is deprecated; a lint rule to flag it is planned (`bsw-qdep`).
+
+### `fmt --check` fails on files that do not parse (`bsw-u11n`)
+
+`satsuma fmt --check` skipped unparseable files and exited 0, so a CI gate
+built on it passed broken files. `fmt` now exits 2 in every mode whenever any
+file has a parse error.
+
+### Backtick names, `^.` and `$.` resolve everywhere
+
+- A backtick segment anywhere in a path, not just the first, now resolves
+  (`` orders.`odd name` ``). A backtick container whose name contains a dot,
+  such as `` each `line.items` ``, counts as one level for `^.`
+  (`bsw-f9fq`, `bsw-2yzd`).
+- NL-derived arrows inside a `flatten` whose target uses `^.` or `$.` land on
+  the same container as the declared arrows (`bsw-zlrc`).
+
+### CLI field queries
+
+- `arrows src.id` returns only the arrows of the top-level `id` when one is
+  declared, not every nested field called `id` (`bsw-kvj9`).
+- `arrows` finds the children of a `flatten` into a namespaced target schema
+  (`bsw-tzc6`).
+- `arrows`, `field-lineage`, `nl` and `meta` find fields that a fragment
+  spread supplies inside a nested record (`bsw-ep0m`).
+
+### Language server
+
+- Go-to-definition, find-references and hover work on relative `.field`
+  paths and on `^.`/`$.` paths inside `each` and `flatten`. Hover now shows
+  the resolved field (`bsw-89wr`, `bsw-rkn4`).
+- "Trace field lineage" starts from the right field inside `each` and
+  `flatten` (`bsw-pv7a`).
+- Editing one open file refreshes the diagnostics of every other open file,
+  so a stale duplicate-definition warning no longer lingers (`bsw-r1wl`).
+
 ## v0.14.0 — 2026-10-06
 
 ### Reach an enclosing level from inside `each` and `flatten` with `^.` and `$.` (`sl-8vqk`, ADR-053)

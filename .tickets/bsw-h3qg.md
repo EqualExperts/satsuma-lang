@@ -19,6 +19,8 @@ schema src { `line.items` list_of record { v STRING }  line record { items recor
 
 Here "line.items.v" names two different fields.
 
+Another site of the same kind, added in this batch: `sourceOwner` in `tooling/satsuma-cli/src/commands/arrows.ts` takes `path.replace(/^\./, "").split(".")[0]`, so a source field named `` `a.b` `` gets the wrong head.
+
 ## Acceptance Criteria
 
 - Decide (ADR) whether path identity carries segments or an escaped join, and update the helpers above to use it.
