@@ -2,10 +2,12 @@ import { Location } from "vscode-languageserver";
 import {
   createAtRefRegex,
   fieldNameText,
-  qualifiedNameText,
+  importNameText,
+  metricSourceRefs,
   resolveArrowPathInPlace,
   resolvedSegmentsThrough,
   sourceRefText,
+  spreadLabelText,
 } from "@satsuma/core";
 import { resolveArrowField, type ArrowFieldTarget } from "./arrow-field";
 import type { SyntaxNode, Tree } from "./parser-utils";
@@ -175,19 +177,19 @@ function tryContext(node: SyntaxNode, cursorNode: SyntaxNode): NodeContext | nul
     }
 
     // A metric's declared provenance: the value of a `source` tag inside a
-    // metric's metadata block, e.g. `(metric, source fact_orders)`.
-    // `workspace-index` indexes this value_text node as a "metric_source"
-    // reference to the source schema, so find-references already reports
-    // it; go-to-definition had no case for a metadata value at all until
-    // now (gpt-jwek).
+    // metric's metadata block, e.g. `(metric, source fact_orders)` or
+    // `` (metric, source { raw::`crm-contacts`, other }) ``. `workspace-index`
+    // indexes each named source as a "metric_source" reference, read by
+    // core's metricSourceRefs; reading it the same way here makes the name
+    // unquoted and picks the list item under the cursor (gpt-jwek, bsw-iuzs).
     case "value_text": {
       const tag = node.parent;
       if (!tag || tag.type !== "tag_with_value") return null;
       const key = tag.namedChildren[0];
       if (key?.text !== "source") return null;
-      const name = node.text;
-      if (!name) return null;
-      return { kind: "metric_source", name, namespace: ns, node };
+      const ref = metricSourceUnderCursor(node, cursorNode);
+      if (!ref) return null;
+      return { kind: "metric_source", name: ref.name, namespace: ns, node: ref.node };
     }
 
     // Handle identifiers and backtick_names that are inside source_ref, spread, etc.
@@ -525,24 +527,25 @@ function findEnclosingBlock(node: SyntaxNode): SyntaxNode | null {
 
 // ---------- Text extraction ----------
 
-function spreadLabelText(node: SyntaxNode): string | null {
-  const qn = child(node, "qualified_name");
-  if (qn) return qualifiedNameText(qn) ?? qn.text;
-  const quoted = child(node, "backtick_name");
-  if (quoted) return quoted.text.slice(1, -1);
-  const ids = node.namedChildren.filter((c) => c.type === "identifier");
-  if (ids.length > 0) return ids.map((i) => i.text).join(" ");
-  return node.text;
-}
-
-function importNameText(node: SyntaxNode): string | null {
-  const qn = child(node, "qualified_name");
-  if (qn) return qualifiedNameText(qn) ?? qn.text;
-  const quoted = child(node, "backtick_name");
-  if (quoted) return quoted.text.slice(1, -1);
-  const id = child(node, "identifier");
-  if (id) return id.text;
-  return null;
+/**
+ * The metric source a cursor inside a `source` tag's value names: the list
+ * item containing the cursor node, or the sole item when the cursor sits on
+ * the value itself (a brace or the whitespace of a one-name list). Null when
+ * the cursor is between items of a longer list. The name comes from core's
+ * metricSourceRefs; the node returned is this package's view of the same
+ * list item, for range information.
+ */
+function metricSourceUnderCursor(
+  value: SyntaxNode,
+  cursorNode: SyntaxNode,
+): { name: string; node: SyntaxNode } | null {
+  const refs = metricSourceRefs(value);
+  const contains = (n: { startIndex: number; endIndex: number }) =>
+    cursorNode.startIndex >= n.startIndex && cursorNode.endIndex <= n.endIndex;
+  const ref = refs.find((r) => contains(r.node)) ?? (refs.length === 1 ? refs[0] : undefined);
+  if (!ref) return null;
+  const node = value.namedChildren.find((c) => c.startIndex === ref.node.startIndex) ?? value;
+  return { name: ref.name, node };
 }
 
 function importPathText(node: SyntaxNode): string | null {

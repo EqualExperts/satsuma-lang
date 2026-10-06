@@ -346,6 +346,26 @@ export function splitRefSchemaKey(raw: string): RefSchemaKeySplit | null {
   return null;
 }
 
+/** A backtick-quoted span, captured without its delimiters. */
+const BACKTICK_SPAN_RE = /`([^`]+)`/g;
+
+/**
+ * The schema a `(ref ...)` field-metadata value names, unquoted: `crm.id` →
+ * `crm`, `` raw::`crm-contacts`.id `` → `raw::crm-contacts`,
+ * `` `odd.name`.id `` → `odd.name`. A value with no field path (`crm`) is
+ * returned whole, unquoted.
+ *
+ * The value reaches consumers as text, so it is split with the same
+ * backtick-aware reader NL @refs use ({@link splitRefSchemaKey}): a "." inside
+ * backticks is part of a name, never the schema/field boundary (bsw-iuzs).
+ * Validation and `satsuma where-used` both read `(ref)` values through this
+ * one function, so they cannot disagree about which schema a ref names.
+ */
+export function refMetadataSchemaKey(value: string): string {
+  const raw = value.replace(/^@/, "");
+  return splitRefSchemaKey(raw)?.schemaKey ?? raw.replace(BACKTICK_SPAN_RE, "$1");
+}
+
 // ── Resolution ────────────────────────────────────────────────────────────────
 
 interface MappingContext {

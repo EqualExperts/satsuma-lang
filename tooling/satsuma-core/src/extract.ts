@@ -18,9 +18,9 @@ import {
   labelText,
   stringText,
   entryText,
-  qualifiedNameText,
   importNameText,
   spreadLabelText,
+  metricSourceRefs,
   sourceRefStructuralText,
 } from "./cst-utils.js";
 import type {
@@ -376,14 +376,7 @@ function extractMetricMeta(meta: SyntaxNode | null): {
           displayName =
             stringText(val.namedChildren.find((c) => c.type === "nl_string")) ?? entryText(val);
       } else if (key?.text === "source") {
-        if (!val) continue;
-        for (const item of val.namedChildren) {
-          if (item.type === "qualified_name") {
-            sources.push(qualifiedNameText(item) ?? item.text);
-          } else if (item.type === "identifier") {
-            sources.push(item.text);
-          }
-        }
+        for (const ref of metricSourceRefs(val)) sources.push(ref.name);
       } else if (key?.text === "grain") {
         if (val) grain = entryText(val);
       }

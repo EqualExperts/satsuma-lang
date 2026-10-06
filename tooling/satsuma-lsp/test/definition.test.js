@@ -198,6 +198,64 @@ mapping m {
     assert.equal(loc.range.start.line, 1);
   });
 
+  it("jumps from a metric's ns::`name` source to the quoted schema (bsw-iuzs)", () => {
+    // The metric source is read by core, unquoted, so it resolves like a
+    // mapping source does. Before, the raw text kept its backticks and no
+    // definition matched.
+    const result = definition(
+      {
+        "file:///a.stm": `namespace raw {
+  schema \`crm-contacts\` { id INT }
+}
+schema rev (metric, source raw::\`crm-contacts\`) { v INT }`,
+      },
+      "file:///a.stm",
+      3,
+      35, // cursor on "crm-contacts" inside raw::`crm-contacts`
+    );
+    assert.ok(result);
+    const loc = Array.isArray(result) ? result[0] : result;
+    assert.equal(loc.range.start.line, 1);
+  });
+
+  it("jumps from the item under the cursor in a braced metric source list", () => {
+    // A braced list names several schemas; the cursor picks one. Reading the
+    // whole value_text as one name resolved none of them.
+    const result = definition(
+      {
+        "file:///a.stm": `schema first { id INT }
+schema second { id INT }
+schema rev (metric, source {first, second}) { v INT }`,
+      },
+      "file:///a.stm",
+      2,
+      36, // cursor on "second"
+    );
+    assert.ok(result);
+    const loc = Array.isArray(result) ? result[0] : result;
+    assert.equal(loc.range.start.line, 1);
+  });
+
+  it("jumps from a multi-word spread to the fragment it names", () => {
+    // `...address fields` parses as identifier + continuation_word. The LSP
+    // once kept a private copy of spreadLabelText that dropped the second
+    // word and looked up "address"; it now uses core's (bsw-iuzs review).
+    const result = definition(
+      {
+        "file:///a.stm": `fragment \`address fields\` { street STRING }
+schema s {
+  ...address fields
+}`,
+      },
+      "file:///a.stm",
+      2,
+      14, // cursor on "fields"
+    );
+    assert.ok(result);
+    const loc = Array.isArray(result) ? result[0] : result;
+    assert.equal(loc.range.start.line, 0);
+  });
+
   it("jumps from block label to its own definition", () => {
     const result = definition(
       {

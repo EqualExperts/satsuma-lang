@@ -263,6 +263,25 @@ describe("ns::`name` references (bsw-iuzs)", () => {
     assert.deepEqual(kinds, ["fragment_spread", "import"]);
   });
 
+  it("where-used finds the (ref ns::`name`.field) metadata that names a schema", async () => {
+    // where-used reads (ref) values itself; it must unquote the schema key the
+    // same way validate does, or a ref validate accepts is invisible to it.
+    const { stdout, code } = await run(
+      "where-used",
+      "raw::crm-contacts",
+      BACKTICK_NAME_FIXTURE,
+      "--json",
+    );
+    assert.equal(code, 0);
+    const refMeta = JSON.parse(stdout).refs.filter(
+      (r: { kind: string }) => r.kind === "ref_metadata",
+    );
+    assert.deepEqual(
+      refMeta.map((r: { name: string }) => r.name),
+      ["t.id"],
+    );
+  });
+
   it("arrows attributes the mapping's arrow to the ns::`name` source schema", async () => {
     // The source ref must key to raw::crm-contacts for its fields to have arrows.
     const { stdout, code } = await run("arrows", "raw::crm-contacts.id", BACKTICK_NAME_FIXTURE);

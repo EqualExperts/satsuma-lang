@@ -17,7 +17,7 @@ import {
   resolveRef,
   sourceRefText as coreSourceRefText,
   fieldNameText as coreFieldNameText,
-  qualifiedNameText as coreQualifiedNameText,
+  metricSourceRefs,
   extractMetadata,
   expandDeclaredFields,
   makeEntityRefResolver,
@@ -1288,20 +1288,9 @@ function extractMetricMetadata(
       if (!key || !val) continue;
       switch (key.text) {
         case "source":
-          // value_text may contain multiple identifiers for braced source lists
-          if (val.type === "value_text") {
-            for (const item of val.namedChildren) {
-              // Same reading as core's metric extraction: a qualified name
-              // comes back unquoted (`` ns::`a b` `` → `ns::a b`, bsw-iuzs).
-              if (item.type === "qualified_name") {
-                source.push(coreQualifiedNameText(item) ?? item.text);
-              } else if (item.type === "identifier") {
-                source.push(item.text);
-              }
-            }
-          } else {
-            source.push(val.text);
-          }
+          // Core's reader, shared with metric extraction and the LSP index:
+          // one source per value_text item, names unquoted (bsw-iuzs).
+          for (const ref of metricSourceRefs(val)) source.push(ref.name);
           break;
         case "grain":
           if (val.type === "value_text") {

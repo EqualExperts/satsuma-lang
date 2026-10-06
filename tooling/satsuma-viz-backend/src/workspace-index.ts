@@ -28,6 +28,7 @@ import {
   sourceRefStructuralText as coreSourceRefStructuralText,
   importNameText,
   spreadLabelText,
+  metricSourceRefs,
   entryText,
   extractFieldTree,
   isMetricSchema,
@@ -1188,13 +1189,13 @@ function indexMetricRefs(
     if (n.type === "tag_with_value") {
       const keyNode = n.namedChildren[0];
       if (keyNode?.text === "source") {
-        // Value can be identifier, qualified_name, or braced list (inside value_text)
-        const valNode = n.namedChildren[1];
-        if (valNode) {
-          const name = valNode.text;
+        // One reference per named source, keyed by its unquoted name so
+        // `` source raw::`crm-contacts` `` and braced lists resolve like any
+        // other schema reference (bsw-iuzs). Core reads the value.
+        for (const { node: srcNode, name } of metricSourceRefs(n.namedChildren[1])) {
           addReference(index, name, {
             uri,
-            range: nodeRange(valNode),
+            range: nodeRange(srcNode),
             name,
             context: "metric_source",
             container,

@@ -52,6 +52,26 @@ mapping \`a\` {
     assert.equal(result[0].uri, "file:///a.stm");
   });
 
+  it("finds metric sources written as ns::`name`, one per braced list item (bsw-iuzs)", () => {
+    // Each metric source is indexed under its unquoted name, so the quoted
+    // form and each item of a braced list count as references to the schema.
+    const result = refs(
+      {
+        "file:///a.stm": `namespace raw {
+  schema \`crm-contacts\` { id INT }
+}
+schema rev (metric, source raw::\`crm-contacts\`) { v INT }
+schema rev2 (metric, source {raw::\`crm-contacts\`, other}) { v INT }
+schema other { id INT }`,
+      },
+      "file:///a.stm",
+      1,
+      12, // cursor on the crm-contacts declaration
+      false,
+    );
+    assert.deepEqual(result.map((r) => r.range.start.line).sort(), [3, 4]);
+  });
+
   it("includes declaration when requested", () => {
     const result = refs(
       {

@@ -156,6 +156,42 @@ export function importNameText(node: SyntaxNode | null | undefined): string | nu
   return isPresent(id) ? id.text : null;
 }
 
+/** One schema a metric's `source` tag names, with the CST node that names it. */
+export interface MetricSourceRef {
+  /** The qualified_name, backtick_name or identifier node naming the source;
+   *  consumers that need a position (the LSP's reference index) use its range. */
+  node: SyntaxNode;
+  /** The source's name, unquoted: `` raw::`crm-contacts` `` → `raw::crm-contacts`. */
+  name: string;
+}
+
+/**
+ * Read the schemas a metric's `source` tag names from the tag's value node.
+ *
+ * The grammar wraps every tag value in value_text, whether it is a single
+ * name (`source orders`) or a braced list (`source { raw::`crm-contacts`,
+ * other }`); each named child is one source. A qualified name or backtick
+ * name comes back unquoted (bsw-iuzs), so the name matches how the schema is
+ * keyed. Core's metric extraction, the VizModel builder and the LSP index all
+ * read sources through this one function, so the CLI, the viz and the editor
+ * agree on what a metric draws from. Children that name nothing (recovered
+ * qualified names, stray tokens) are skipped.
+ */
+export function metricSourceRefs(value: SyntaxNode | null | undefined): MetricSourceRef[] {
+  if (!value) return [];
+  const items = value.type === "value_text" ? value.namedChildren : [value];
+  const refs: MetricSourceRef[] = [];
+  for (const node of items) {
+    if (!isPresent(node)) continue;
+    let name: string | null = null;
+    if (node.type === "qualified_name") name = qualifiedNameText(node);
+    else if (node.type === "identifier" || node.type === "backtick_name")
+      name = pathSegmentText(node);
+    if (name) refs.push({ node, name });
+  }
+  return refs;
+}
+
 /**
  * Extract the fragment or schema name a spread (`...name`) refers to from its
  * spread_label CST node.
