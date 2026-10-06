@@ -333,3 +333,60 @@ describe("arrows on a namespaced flatten-to-schema target (bsw-tzc6)", () => {
     }
   });
 });
+
+// Schema `n::fact` declares both `sku` and a record field `fact { sku }`, so on
+// an arrow `fact.sku` is the nested field `fact.fact.sku`: a declared top-level
+// field wins over a prefix that only looks like the schema's bare name
+// (bsw-tzc6 review). The fix for the flatten case must not take that field for
+// the schema prefix.
+const NS_SCHEMA_NAMED_FIELD_FIXTURE = resolve(
+  __dirname,
+  "fixtures/namespace-schema-named-field.stm",
+);
+
+describe("arrows on a namespaced schema with a field of its own name (bsw-tzc6 review)", () => {
+  it("--json spells an arrow to the nested field with the field's own prefix", async () => {
+    // `a -> fact.sku` writes `n::fact.fact.sku`. Reading `fact.` as the schema
+    // prefix gave `n::fact.sku`, which mislabels the nested field as the
+    // top-level one — whichever side the arrow is queried from.
+    for (const query of ["n::fact.fact.sku", "n::src.a"]) {
+      const { stdout, code } = await run("arrows", query, NS_SCHEMA_NAMED_FIELD_FIXTURE, "--json");
+      assert.equal(code, 0, `${query}: ${stdout}`);
+      const arrows = JSON.parse(stdout);
+      assert.deepEqual(
+        arrows.map((a: { target: string }) => a.target),
+        ["n::fact.fact.sku"],
+        query,
+      );
+    }
+  });
+
+  it("--json keeps the top-level field's arrow on the top-level field", async () => {
+    // The query for the top-level `sku` must report only `b -> sku`.
+    const { stdout, code } = await run(
+      "arrows",
+      "n::fact.sku",
+      NS_SCHEMA_NAMED_FIELD_FIXTURE,
+      "--json",
+    );
+    assert.equal(code, 0, stdout);
+    const arrows = JSON.parse(stdout);
+    assert.deepEqual(
+      arrows.map((a: { source: string; target: string }) => [a.source, a.target]),
+      [["n::src.b", "n::fact.sku"]],
+    );
+  });
+
+  it("field-lineage traces the nested field upstream to its source", async () => {
+    // field-lineage resolves endpoints through the same rule; with `fact.`
+    // stripped, the nested field had no connections at all.
+    const { stdout, code } = await run(
+      "field-lineage",
+      "n::fact.fact.sku",
+      NS_SCHEMA_NAMED_FIELD_FIXTURE,
+      "--json",
+    );
+    assert.equal(code, 0, stdout);
+    assert.match(stdout, /n::src\.a/);
+  });
+});

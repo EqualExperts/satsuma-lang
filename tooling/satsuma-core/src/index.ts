@@ -201,7 +201,7 @@ export {
   resolveFieldEndpoint,
   resolveScopedEntityRef,
 } from "./canonical-ref.js";
-export type { FieldEndpointResolution } from "./canonical-ref.js";
+export type { FieldEndpointResolution, TopLevelFieldTest } from "./canonical-ref.js";
 export { buildFieldEdges, traceFieldLineage } from "./field-lineage.js";
 export type {
   FieldEdgeStepLike,

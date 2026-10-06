@@ -66,6 +66,13 @@ export function canonicalEntityName(entity: {
 // ── Arrow endpoint resolution ────────────────────────────────────────────────
 
 /**
+ * Does the schema held under `schemaKey` (a workspace index key: `fact`,
+ * `n::fact`) declare a top-level field called `fieldName`? Fragment spreads
+ * count, since they declare fields as surely as the schema body does.
+ */
+export type TopLevelFieldTest = (schemaKey: string, fieldName: string) => boolean;
+
+/**
  * What resolving an authored arrow field against a mapping's schemas concluded.
  *
  * Three variants rather than one string, because qualification is not always
@@ -119,10 +126,17 @@ export type FieldEndpointResolution =
  *   restored when the token names only its bare half;
  * - a bare token — a field of the primary schema, unless it also names a
  *   declared schema, which is the ambiguous case above.
+ *
+ * `declaresTopLevel`, when given, says whether the schema under an index key
+ * declares a top-level field of a name. A `schema.field` prefix that the named
+ * schema also declares as a field stays part of the path: a declared top-level
+ * field wins over a prefix that only looks like the schema's name, the rule
+ * `schemaLocalFieldPath` applies (ADR-041, bsw-tzc6 review).
  */
 export function resolveFieldEndpoint(
   authored: AuthoredFieldRef,
   schemas: readonly string[],
+  declaresTopLevel?: TopLevelFieldTest,
 ): FieldEndpointResolution {
   const [primarySchema] = schemas;
   if (primarySchema === undefined) return { kind: "unqualifiable", authored };
@@ -142,7 +156,11 @@ export function resolveFieldEndpoint(
 
   const pathStart = authored.indexOf(PATH_SEPARATOR);
   if (pathStart > 0) {
-    const owner = schemaNamed(authored.slice(0, pathStart), schemas);
+    const prefix = authored.slice(0, pathStart);
+    const owner = schemaNamed(prefix, schemas);
+    if (owner !== undefined && declaresTopLevel?.(owner, prefix)) {
+      return { kind: "field", endpoint: endpointIn(owner, authored) };
+    }
     if (owner !== undefined) {
       return {
         kind: "field",

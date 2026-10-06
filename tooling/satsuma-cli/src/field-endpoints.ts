@@ -18,7 +18,7 @@ import {
   createCanonicalFieldEndpoint,
   resolveFieldEndpoint,
 } from "@satsuma/core";
-import type { CanonicalFieldEndpoint } from "@satsuma/core";
+import type { CanonicalFieldEndpoint, TopLevelFieldTest } from "@satsuma/core";
 import { canonicalKey } from "./index-builder.js";
 
 /**
@@ -31,13 +31,20 @@ import { canonicalKey } from "./index-builder.js";
  * than emitting an edge whose endpoint names nothing.
  *
  * `schemas` are index keys in declaration order; see `resolveFieldEndpoint` for
- * why the order is significant.
+ * why the order is significant. `declaresTopLevel` (from `topLevelFieldTest`)
+ * keeps a schema's own same-named field from being read as the schema prefix;
+ * without it, `fact.x` on schema `fact` always means `fact`'s field `x`.
  */
 export function arrowEndpoint(
   authored: string,
   schemas: readonly string[],
+  declaresTopLevel?: TopLevelFieldTest,
 ): CanonicalFieldEndpoint {
-  const resolution = resolveFieldEndpoint(createAuthoredFieldRef(authored), schemas);
+  const resolution = resolveFieldEndpoint(
+    createAuthoredFieldRef(authored),
+    schemas,
+    declaresTopLevel,
+  );
 
   switch (resolution.kind) {
     case "field":

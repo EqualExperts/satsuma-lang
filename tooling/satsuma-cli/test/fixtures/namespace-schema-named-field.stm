@@ -1,0 +1,22 @@
+// A namespaced schema with a top-level record field that shares its name
+// (bsw-tzc6 review). `fact.sku` on an arrow is the nested field `fact.fact.sku`,
+// because a declared top-level field wins over a prefix that only looks like
+// the schema's bare name; `sku` alone is the top-level field.
+namespace n {
+  schema src {
+    a STRING
+    b STRING
+  }
+  schema fact {
+    sku STRING
+    fact record {
+      sku STRING
+    }
+  }
+  mapping `m` {
+    source { src }
+    target { fact }
+    a -> fact.sku
+    b -> sku
+  }
+}
