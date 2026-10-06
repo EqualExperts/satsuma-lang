@@ -336,11 +336,12 @@ function tryArrowSchemaPrefixContext(
     : [];
   const name = identifierNode.text;
   if (!schemas.includes(name)) return null;
+  if (!isSchemaPrefixAfterResolution(wrapper, identifierNode)) return null;
 
   // Carried alongside the schema name, not used to find it: `action-context.ts`
-  // reads the same `rawPath` + schema-list shape `src_path`/`tgt_path` contexts
-  // carry to keep inferring the full field path (e.g. "customers.email") at
-  // this position, exactly as it did before the prefix had its own case.
+  // infers the full field path (e.g. "customers.email") from the same
+  // schema-list shape `src_path`/`tgt_path` contexts carry, resolving the path
+  // through core and keeping `rawPath` only as its fallback.
   return {
     kind: "arrow_schema",
     name,
@@ -350,6 +351,22 @@ function tryArrowSchemaPrefixContext(
     mappingSources: mapping ? getMappingSchemaRefs(mapping, "source_block") : [],
     mappingTargets: mapping ? getMappingSchemaRefs(mapping, "target_block") : [],
   };
+}
+
+/**
+ * Whether `segment` is still the first segment of `pathNode` once core has
+ * resolved the path against its enclosing each/flatten containers.
+ *
+ * Only then can it be a schema prefix. Inside `each orders`, `src.x` resolves
+ * to `orders.src.x`: `src` is a field of the container that merely shares a
+ * schema's name, and reading it as the prefix traced and jumped to the
+ * top-level `src.x` instead (bsw-pv7a). At mapping-body level, or after a
+ * `$.` escape to the root, the authored first segment stays first.
+ */
+function isSchemaPrefixAfterResolution(pathNode: SyntaxNode, segment: SyntaxNode): boolean {
+  const inPlace = resolveArrowPathInPlace(pathNode);
+  if (!inPlace) return true;
+  return resolvedSegmentsThrough(inPlace, segment).length === 1;
 }
 
 // ---------- Resolution ----------

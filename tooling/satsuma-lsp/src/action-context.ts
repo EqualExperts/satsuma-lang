@@ -121,7 +121,7 @@ function inferSchemaName(ctx: NodeContext): string | null {
     // context — checking both lists together is safe because only the one
     // schema actually named by `rawPath` can ever match (gpt-jwek).
     case "arrow_schema":
-      return inferSchemaFromPath(arrowSchemaCandidates(ctx), ctx.rawPath ?? null);
+      return inferSchemaFromPath(arrowSchemaCandidates(ctx), resolvedArrowPath(ctx));
 
     case "nl_ref":
       return inferSchemaFromNlRef(ctx.name);
@@ -143,7 +143,7 @@ function inferFieldPath(ctx: NodeContext): string | null {
       return inferArrowFieldPath(ctx.mappingTargets ?? [], resolvedArrowPath(ctx));
 
     case "arrow_schema":
-      return inferArrowFieldPath(arrowSchemaCandidates(ctx), ctx.rawPath ?? null);
+      return inferArrowFieldPath(arrowSchemaCandidates(ctx), resolvedArrowPath(ctx));
 
     case "nl_ref":
       return ctx.name.includes(".") ? stripPathDecorators(ctx.name) : null;
@@ -154,13 +154,19 @@ function inferFieldPath(ctx: NodeContext): string | null {
 }
 
 /**
- * The whole path an arrow_source / arrow_target context sits on, resolved
- * against its enclosing each/flatten/nested containers by core — so `.x`
- * inside `each orders` is `orders.x`, not a bare `x`. Falls back to the raw
- * text only when core cannot resolve the node.
+ * The whole path an arrow_source / arrow_target / arrow_schema context sits
+ * on, resolved against its enclosing each/flatten/nested containers by core —
+ * so `.x` inside `each orders` is `orders.x`, not a bare `x`, and `$.` reaches
+ * the root. Falls back to the raw text only when core cannot resolve the node.
+ *
+ * An arrow_schema context's node is the prefix identifier, not the path: its
+ * `src_path`/`tgt_path` is two levels up (identifier → field_path → wrapper),
+ * and every context kind must be resolved the same way or one arrow traces
+ * different fields depending on the segment under the cursor (bsw-pv7a).
  */
 function resolvedArrowPath(ctx: NodeContext): string | null {
-  return resolveArrowPathInPlace(ctx.node)?.resolved.text ?? ctx.rawPath ?? null;
+  const pathNode = ctx.kind === "arrow_schema" ? ctx.node.parent?.parent : ctx.node;
+  return resolveArrowPathInPlace(pathNode)?.resolved.text ?? ctx.rawPath ?? null;
 }
 
 /**
