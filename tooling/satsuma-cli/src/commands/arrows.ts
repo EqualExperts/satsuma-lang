@@ -18,7 +18,8 @@ import { resolveIndexKey, canonicalKey } from "../index-builder.js";
 import { resolveAllNLRefs } from "../nl-ref-extract.js";
 import { expandDeclaredFields } from "../spread-expand.js";
 import { findDeclaredFields } from "../field-lookup.js";
-import { collectFieldNames, findFieldByPath } from "@satsuma/core";
+import type { DeclaredFieldMatch } from "../field-lookup.js";
+import { collectFieldNames } from "@satsuma/core";
 import type { ExtractedWorkspace, ArrowRecord } from "../types.js";
 
 export function register(program: Command): void {
@@ -85,13 +86,14 @@ Examples:
             throw new CommandError(lines.join("\n"), EXIT_NOT_FOUND);
           }
 
-          // Validate field exists in schema, seeing through fragment spreads at
-          // any depth (bsw-ep0m). `allFields` is the same expanded tree, so the
-          // arrow matching below agrees with this check.
+          // Resolve the queried field against the schema's declared tree, seeing
+          // through fragment spreads at any depth (bsw-ep0m). Every later step —
+          // candidate filtering, the direction filters and the text grouping —
+          // asks one question of an arrow path: is it one of these declared paths?
           const schema = resolvedSchema.entry;
           const allFields = expandDeclaredFields(schema, schema.namespace ?? null, index);
-          const fieldExists = findDeclaredFields(schema, fieldName.split("."), index).length > 0;
-          if (!fieldExists) {
+          const matches = findDeclaredFields(schema, fieldName.split("."), index);
+          if (matches.length === 0) {
             // Suggest close matches from top-level and nested fields
             const allNames = collectFieldNames(allFields);
             const close = allNames.find((n) => n.toLowerCase() === fieldName.toLowerCase());
@@ -99,24 +101,25 @@ Examples:
             if (close) lines.push(`Did you mean '${close}'?`);
             throw new CommandError(lines.join("\n"), EXIT_NOT_FOUND);
           }
+          const schemaKey = resolvedSchema.key;
+          const isQueriedField = queriedFieldMatcher(matches, schemaKey);
 
           // Find matching arrows using schema-qualified key
-          // Try full dotted path, bare field name, and leaf name for nested fields
-          const qualifiedField = `${resolvedSchema.key}.${fieldName}`;
+          const qualifiedField = `${schemaKey}.${fieldName}`;
           let arrows = findFieldArrows(qualifiedField, index);
 
-          // Also search by bare field name (handles nested child fields indexed by leaf name)
-          // Only include arrows from mappings involving the resolved schema, and only
-          // when the arrow's source/target field path actually exists in the queried schema.
-          // This prevents false positives from leaf-name collisions across schemas.
+          // Also search by bare path and leaf name: nested arrows are indexed under
+          // both, so this is how a leaf-name query reaches `orders.lines.id`.
+          // Those keys are shared by every schema, and by every path ending in the
+          // same segment, so a candidate is kept only when its mapping involves the
+          // queried schema and its own path is one the query resolved to.
           // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- Safe: split always produces at least one element
-          const leafName = fieldName.includes(".") ? fieldName.split(".").pop()! : fieldName;
+          const leafName = fieldName.split(".").pop()!;
           const seen = new Set(
             arrows.map(
               (a) => `${a.mapping}:${a.namespace}:${a.sources.join(",")}:${a.target}:${a.line}`,
             ),
           );
-          const schemaKey = resolvedSchema.key;
           for (const altKey of [fieldName, leafName]) {
             for (const a of findFieldArrows(altKey, index)) {
               const dedupKey = `${a.mapping}:${a.namespace}:${a.sources.join(",")}:${a.target}:${a.line}`;
@@ -125,55 +128,14 @@ Examples:
               const mapping = index.mappings.get(qMapping);
               if (!mapping) continue;
 
-              // Verify the arrow's source or target field path belongs to the queried
-              // field. Strip any schema prefix before the comparison.
-              //
-              // A bare (undotted) query is deliberately ambiguous — sl-xj4p's
-              // criterion 2 blesses "does this path exist anywhere in the schema's
-              // field tree" so a leaf name shared by several nested fields still
-              // surfaces every match. A fully qualified nested-path query is NOT
-              // ambiguous, though: the candidate must be the exact path asked for,
-              // not merely some other field that happens to exist in the same
-              // schema. Without this, querying `staged.lines.field_0` would accept
-              // any arrow touching the unrelated top-level `staged.field_0` purely
-              // because a field named `field_0` exists somewhere in `staged` — the
-              // other half of gpt-qhfo (the sibling defect is `arrowPathMatches`'s
-              // over-permissive suffix check below).
-              const pathExistsInSchema = (rawPath: string): boolean => {
-                const bare = rawPath.replace(/^\./, "");
-                const path = bare.startsWith(schemaKey + ".")
-                  ? bare.slice(schemaKey.length + 1)
-                  : bare;
-                if (fieldName.includes(".")) return path === fieldName;
-                return (
-                  findFieldByPath(allFields, path) !== null ||
-                  collectFieldNames(allFields).includes(path)
-                );
-              };
-
               const asSourceMatch =
-                mapping.sources.includes(schemaKey) && a.sources.some((s) => pathExistsInSchema(s));
-              const asTargetMatch =
-                mapping.targets.includes(schemaKey) &&
-                a.target != null &&
-                pathExistsInSchema(a.target);
+                mapping.sources.includes(schemaKey) && a.sources.some((s) => isQueriedField(s));
+              const asTargetMatch = mapping.targets.includes(schemaKey) && isQueriedField(a.target);
 
               if (!asSourceMatch && !asTargetMatch) continue;
               seen.add(dedupKey);
               arrows.push(a);
             }
-          }
-
-          // When the user specifies a deeply nested path (e.g. CdtTrfTxInf.DbtrAgt.BIC),
-          // filter out arrows whose source/target path doesn't match the requested path.
-          // This allows disambiguating fields that share a leaf name at different nesting levels.
-          if (fieldName.includes(".")) {
-            arrows = arrows.filter((a) => {
-              return (
-                a.sources.some((s) => arrowPathMatches(s, fieldName)) ||
-                arrowPathMatches(a.target, fieldName)
-              );
-            });
           }
 
           // Add NL-derived arrows when the queried field is the @ref source.
@@ -269,24 +231,14 @@ Examples:
               // For nl-derived arrows, sources may be fully-qualified canonical paths
               // (e.g. "::s1.a") rather than bare field names — match both forms.
               return (
-                m?.sources.includes(resolvedSchema.key) &&
-                a.sources.some(
-                  (s) =>
-                    s === fieldName ||
-                    s === leafName ||
-                    s === canonicalQualified ||
-                    s.endsWith(`.${fieldName}`),
-                )
+                m?.sources.includes(resolvedSchema.key) && a.sources.some((s) => isQueriedField(s))
               );
             });
           } else if (opts.asTarget) {
             arrows = arrows.filter((a) => {
               const qMapping = a.namespace ? `${a.namespace}::${a.mapping}` : (a.mapping ?? "");
               const m = index.mappings.get(qMapping);
-              return (
-                m?.targets.includes(resolvedSchema.key) &&
-                (a.target === fieldName || a.target === leafName)
-              );
+              return m?.targets.includes(resolvedSchema.key) && isQueriedField(a.target);
             });
           }
 
@@ -374,32 +326,40 @@ Examples:
 
           // Pass the resolved schema key so printDefault can match against index
           // entries even when the user queried with a bare (unqualified) name (sl-ltv6).
-          printDefault(fieldRef, arrows, index, resolvedSchema.key);
+          printDefault(fieldRef, arrows, index, resolvedSchema.key, isQueriedField);
         },
       ),
     );
 }
 
 /**
- * Check if an arrow's source/target path matches the user's requested nested path.
+ * Build the test for "does this arrow path name the queried field?".
  *
- * For example, if the arrow source is "CdtTrfTxInf.DbtrAgt.BIC" and the user
- * requested "CdtTrfTxInf.DbtrAgt.BIC", this returns true. It also returns true
- * when the arrow's own path carries a schema prefix the caller has already
- * resolved away (e.g. arrow path "staged.lines.field_0" against a request of
- * "lines.field_0") — that is a longer, more-qualified spelling of the same path.
+ * Rule (bsw-kvj9): the query names exactly the declared paths `findDeclaredFields`
+ * resolved it to. A query that is itself a declared path — top-level `id` or
+ * nested `orders.id` — resolves to that one path, so `orders.id` and
+ * `orders.lines.id` are other fields even though they end in `id`. Only a name
+ * that is not a declared path falls back to every field of that name at any
+ * depth (sl-xj4p's leaf-name shorthand), and then each of those paths matches.
  *
- * The reverse is deliberately NOT accepted: a *shorter* arrow path must never
- * match a *longer* requested path (e.g. arrow path "field_0" against a request
- * of "lines.field_0"). That direction used to be allowed and let a fully
- * qualified nested-path query return an unrelated, shallower field's arrow —
- * gpt-qhfo. A shorter arrow path names a different, less-specific field, not
- * a looser spelling of the one the user asked for.
+ * An arrow path is compared after removing a leading `.` and the queried
+ * schema's prefix, in either its index spelling (`src.`, `ns::src.`) or its
+ * canonical one (`::src.`, which nl-derived arrows carry as their source). Paths are
+ * compared whole, never by suffix: a suffix match is how a shallower or deeper
+ * field with the same leaf name used to slip in (gpt-qhfo, bsw-kvj9).
  */
-function arrowPathMatches(arrowPath: string | null, requestedPath: string): boolean {
-  if (!arrowPath) return false;
-  if (arrowPath === requestedPath) return true;
-  return arrowPath.endsWith(`.${requestedPath}`);
+function queriedFieldMatcher(
+  matches: DeclaredFieldMatch[],
+  schemaKey: string,
+): (arrowPath: string | null) => boolean {
+  const queried = new Set(matches.map((m) => m.path.join(".")));
+  const schemaPrefixes = [`${schemaKey}.`, `${canonicalKey(schemaKey)}.`];
+  return (arrowPath) => {
+    if (!arrowPath) return false;
+    const bare = arrowPath.replace(/^\./, "");
+    const prefix = schemaPrefixes.find((p) => bare.startsWith(p));
+    return queried.has(prefix ? bare.slice(prefix.length) : bare);
+  };
 }
 
 /**
@@ -429,21 +389,17 @@ function findFieldArrows(fieldKey: string, index: ExtractedWorkspace): ArrowReco
  *   (e.g. "crm::customers"). Must be the resolved key, not the user's raw
  *   query string, so that mapping source/target lookups hit correctly even
  *   when the user queried with a bare unqualified name (sl-ltv6).
+ * @param matchesField - The command's queried-field test, so the source/target
+ *   split here uses the same rule that chose the arrows.
  */
 function printDefault(
   fieldRef: string,
   arrows: ArrowRecord[],
   index: ExtractedWorkspace,
   resolvedSchemaKey: string,
+  matchesField: (arrowPath: string | null) => boolean,
 ): void {
-  const dot = fieldRef.indexOf(".");
   const schemaName = resolvedSchemaKey;
-  const fieldPath = dot >= 0 ? fieldRef.slice(dot + 1) : fieldRef;
-  const leafName = fieldPath.split(".").pop();
-  const matchesField = (val: string | null) =>
-    val === fieldPath ||
-    val === leafName ||
-    (val != null && (val.endsWith(`.${fieldPath}`) || val.endsWith(`.${leafName}`)));
 
   // Schema-aware source/target classification: verify the queried schema
   // is on the correct side of the mapping, not just that the field name matches

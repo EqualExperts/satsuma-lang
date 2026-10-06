@@ -4274,6 +4274,59 @@ describe("satsuma arrows — deeply nested paths (sl-xj4p)", () => {
   });
 });
 
+// ---------------------------------------------------------------------------
+// Bug fix: a declared top-level field does not pick up nested namesakes (bsw-kvj9)
+// ---------------------------------------------------------------------------
+describe("satsuma arrows — a declared path beats the leaf-name fallback (bsw-kvj9)", () => {
+  const SHADOW = resolve(__dirname, "fixtures", "arrows-top-level-shadow.stm");
+
+  /** The canonical sources of an `arrows --json` answer, sorted. */
+  const sourcesOf = (stdout: string): string[] =>
+    (JSON.parse(stdout) as Array<{ source: string }>).map((a) => a.source).sort();
+
+  it("returns only the top-level field's arrow when the query names a declared top-level field", async () => {
+    // `id` is a declared top-level path, so the query is unambiguous; the nested
+    // `orders.id` and `orders.lines.id` are different fields that share a leaf
+    // name. Before the fix all three arrows came back.
+    const { stdout, code } = await run("arrows", "src.id", "--json", SHADOW);
+    assert.equal(code, 0);
+    assert.deepEqual(sourcesOf(stdout), ["::src.id"]);
+  });
+
+  it("applies the same rule under --as-source, the impact-analysis workflow", async () => {
+    // SATSUMA-CLI.md's impact and PII workflows run `arrows X.id --as-source`;
+    // the direction filter must not re-admit nested namesakes by leaf name.
+    const { stdout, code } = await run("arrows", "src.id", "--as-source", "--json", SHADOW);
+    assert.equal(code, 0);
+    assert.deepEqual(sourcesOf(stdout), ["::src.id"]);
+  });
+
+  it("counts only the top-level field's arrow in the text summary", async () => {
+    // The text output splits arrows into source and target by the same rule;
+    // a looser test there would still print the nested arrows' totals.
+    const { stdout, code } = await run("arrows", "src.id", SHADOW);
+    assert.equal(code, 0);
+    assert.match(stdout, /src\.id — 1 arrow \(1 as source\)/);
+    assert.ok(!stdout.includes("oid"), "nested orders.id arrow leaked into the output");
+  });
+
+  it("returns only the nested path's arrow for a declared nested path", async () => {
+    // The same exact-path rule covers dotted queries (gpt-qhfo): neither the
+    // shallower `id` nor the deeper `orders.lines.id` may answer for `orders.id`.
+    const { stdout, code } = await run("arrows", "src.orders.id", "--json", SHADOW);
+    assert.equal(code, 0);
+    assert.deepEqual(sourcesOf(stdout), ["::src.orders.id"]);
+  });
+
+  it("still returns every nested match for a leaf name that is not a declared path", async () => {
+    // sl-xj4p criterion 2: `ref` is not a top-level field, so it is shorthand
+    // for every field named `ref` at any depth.
+    const { stdout, code } = await run("arrows", "src.ref", "--json", SHADOW);
+    assert.equal(code, 0);
+    assert.deepEqual(sourcesOf(stdout), ["::src.orders.lines.ref", "::src.orders.ref"]);
+  });
+});
+
 describe("satsuma nl/meta field syntax (sg-95gr)", () => {
   it("nl accepts schema.field without 'field' keyword", async () => {
     const { code } = await run("nl", "mart::dim_contact.email", NS_PLATFORM);

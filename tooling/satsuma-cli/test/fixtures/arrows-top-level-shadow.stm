@@ -1,0 +1,41 @@
+// bsw-kvj9: `src` declares a top-level `id` and two nested fields also named
+// `id`, each mapped separately. `ref` is a leaf name that only nested records
+// declare, so a query for it still reaches every match (sl-xj4p).
+schema src {
+  id INT
+  orders list_of record {
+    id INT
+    ref STRING
+    lines list_of record {
+      id INT
+      ref STRING
+    }
+  }
+}
+
+schema tgt {
+  rid INT
+  rows list_of record {
+    oid INT
+    oref STRING
+    items list_of record {
+      lid INT
+      lref STRING
+    }
+  }
+}
+
+mapping m {
+  source { src }
+  target { tgt }
+
+  id -> rid
+  orders -> rows {
+    .id -> .oid
+    .ref -> .oref
+    .lines -> .items {
+      .id -> .lid
+      .ref -> .lref
+    }
+  }
+}

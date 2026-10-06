@@ -1,6 +1,6 @@
 ---
 id: bsw-kvj9
-status: open
+status: closed
 deps: []
 links: []
 created: 2026-10-06T09:57:03Z
@@ -18,3 +18,10 @@ With `src` declaring top-level `id` plus `orders.id` and `orders.lines.id`, each
 ## Acceptance Criteria
 
 - When the queried name is a declared top-level field, only its arrows are returned; leaf-name matching (sl-xj4p) still applies when it is not. Tests for both.
+
+## Notes
+
+**2026-10-06T18:08:41Z**
+
+Cause: `arrows` demanded an exact path only when the query contained a dot; an undotted query accepted any candidate whose path existed anywhere in the schema, so a top-level `id` picked up `orders.id` and `orders.lines.id` through the leaf-name index, and the `--as-source`/`--as-target` filters and text grouping matched by leaf name and suffix too.
+Fix: arrows.ts now resolves the query once with `findDeclaredFields` (exact path wins, else every field of that leaf name) and accepts an arrow only when its schema-local path is one of those resolved paths; the suffix post-filter is gone, the generated-property suite asserts every declared path exactly, and SATSUMA-CLI.md states the rule (commit immediately after 872555bf).
