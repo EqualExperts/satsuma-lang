@@ -312,6 +312,42 @@ schema customers {
     );
   });
 
+  it("rewrites ^. and $. escape sites when renaming the field they name, keeping the marker (bsw-rkn4)", () => {
+    // The index once filed `^.x` and `$.x` under the keys "^" and "$", so a
+    // rename from the field declaration produced no edit at those sites and
+    // left them naming a field that no longer existed. The edit range must
+    // also start after the marker, or the rename would delete it.
+    const source = [
+      "schema src {",
+      "  survey_id UUID",
+      "  transects list_of record {",
+      "    transect_ref STRING",
+      "    sightings list_of record { species STRING }",
+      "  }",
+      "}",
+      "schema tgt { sid UUID  tref STRING }",
+      "mapping m {",
+      "  source { src }",
+      "  target { tgt }",
+      "  flatten transects.sightings -> tgt {",
+      "    ^.transect_ref -> tref",
+      "    $.survey_id -> sid",
+      "  }",
+      "}",
+    ].join("\n");
+    const { index, trees } = buildIndex({ "file:///a.stm": source });
+    const tree = trees["file:///a.stm"];
+    let renamed = source;
+    const parentEdit = computeRename(tree, 3, 6, "file:///a.stm", index, "tr2");
+    assert.ok(parentEdit, "expected edits for the ^. site");
+    renamed = applyEdits(renamed, parentEdit.changes["file:///a.stm"]);
+    const rootEdit = computeRename(tree, 1, 4, "file:///a.stm", index, "sid2");
+    assert.ok(rootEdit, "expected edits for the $. site");
+    renamed = applyEdits(renamed, rootEdit.changes["file:///a.stm"]);
+    assert.ok(renamed.includes("^.tr2 -> tref"), `got: ${renamed}`);
+    assert.ok(renamed.includes("$.sid2 -> sid"), `got: ${renamed}`);
+  });
+
   it("renames from a reference site", () => {
     const { index, trees } = buildIndex({
       "file:///a.stm": "schema customers {\n  id UUID\n}",
