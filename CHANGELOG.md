@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### The VS Code extension now needs VS Code 1.134 or later
+
+The minimum supported VS Code is raised from 1.125 to 1.134, to match the
+`@types/vscode` bump in #553. With the types ahead of the declared minimum,
+`vsce package` refused to build the extension, so every Release run had failed
+since 2026-09-29. A new unit test checks the two agree, so a future types bump
+fails in its own pull request rather than at release.
+
 ### `//?` questions are listed in VS Code's Problems panel again (`sl-0j8b`, gh-542)
 
 The language server had been publishing `//?` comments as hints with the
