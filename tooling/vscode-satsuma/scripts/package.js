@@ -17,6 +17,12 @@ const extensionRoot = path.join(__dirname, "..");
 const repoRoot = path.join(extensionRoot, "..", "..");
 const outputPath = path.join(extensionRoot, "vscode-satsuma.vsix");
 
+// vsce is a pinned devDependency, so packaging uses the version the lockfile,
+// `npm audit` and Dependabot all see. It is resolved from the extension root
+// because the staging copy below has no node_modules of its own (bsw-n4mm).
+const vsceManifestPath = require.resolve("@vscode/vsce/package.json", { paths: [extensionRoot] });
+const vsceBin = path.join(path.dirname(vsceManifestPath), require(vsceManifestPath).bin.vsce);
+
 execFileSync("npm", ["run", "build"], { cwd: extensionRoot, stdio: "inherit" });
 
 const buildVersion = execFileSync(
@@ -46,7 +52,7 @@ try {
   stagedManifest.version = buildVersion;
   writeFileSync(stagedManifestPath, `${JSON.stringify(stagedManifest, null, 2)}\n`);
 
-  execFileSync("npx", ["--yes", "@vscode/vsce", "package", "--no-dependencies", "-o", outputPath], {
+  execFileSync(process.execPath, [vsceBin, "package", "--no-dependencies", "-o", outputPath], {
     cwd: stagedExtension,
     stdio: "inherit",
   });
