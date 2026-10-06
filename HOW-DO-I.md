@@ -60,7 +60,19 @@ Use `each src -> tgt { }` and address element fields with a leading `.`. Nest `e
 Use `flatten src -> tgt { }`. Arrows outside the block repeat on every output row. Guide: [`flatten`](docs/nested-data/README.md#4-flatten--one-output-row-per-element)
 
 **How do I reference a parent field from inside an `each` or `flatten` block?**
-You can't — every path inside a block is prefixed with the block's path. Put the arrow outside the block. Guide: [The resolution rule](docs/nested-data/README.md#the-resolution-rule)
+Every path inside a block is prefixed with the block's path, so a bare `order_no` would not reach the parent. Escape the prefix instead: each `^.` goes up one level (`^.^.id` goes up two), and `$.` starts from the schema root, however deep the block.
+
+```satsuma
+each orders -> invoices {
+  each lines -> items {
+    ^.order_no -> order_ref   // orders.order_no
+    $.batch_id -> batch       // batch_id at the schema root
+    .sku -> sku               // orders.lines.sku
+  }
+}
+```
+
+Spec: [§4.4 Nested Mappings](docs/developer/SATSUMA-V2-SPEC.md#44-nested-mappings) · Guide: [The resolution rule](docs/nested-data/README.md#the-resolution-rule)
 
 **How do I map two parallel lists that are correlated by position (a "zip")?**
 There is no `zip` operator. Use sibling `each` blocks over one target list, or map each scalar list onto its target leaf — and state the correlation in a `note`. Guide: [Two parallel lists](docs/nested-data/README.md#5-two-parallel-lists--the-zip-question)
