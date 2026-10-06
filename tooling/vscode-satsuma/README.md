@@ -139,6 +139,7 @@ Nine commands available via `Ctrl+Shift+P`:
 - **Edges** show data flow between schemas and mappings
 - **Click** a node to jump to its definition
 - **Namespace filter** dropdown to focus on a single namespace
+- **Pan** by scrolling, by dragging empty space, or by holding Space and dragging from anywhere (middle-drag and Alt+drag also work); **Ctrl/Cmd+scroll** zooms
 - **Auto-refreshes** on file save
 
 ### Field-Level Lineage

@@ -1,6 +1,6 @@
 ---
 id: vnm-gucl
-status: open
+status: closed
 deps: []
 links: [sl-u3x8]
 created: 2026-08-06T17:24:08Z
@@ -39,3 +39,9 @@ The cursor feedback the issue asks for is already half-present: `satsuma-viz.ts:
 - If any harness assertion or screenshot baseline pins the old hint text, it is updated in the same change.
 - Before the ticket closes, the user is told whether #513's interaction request (left-drag / Spacebar panning, hover `grab` cursor) is being carried into a follow-up ticket or dropped, so the GitHub issue is resolved on an accurate basis.
 
+## Notes
+
+**2026-10-06T15:00:00Z**
+
+Cause: the harness hint said "drag to pan" when only middle-drag or Alt+drag panned.
+Fix: superseded by sl-u3x8, which makes plain drag on empty space pan and rewrites the hint to "Ctrl+scroll to zoom · scroll, drag empty space or Space+drag to pan · use Fit button inside". The approved "middle mouse drag" wording would have been wrong after that change, so it was never shipped. #513's interaction request is carried by sl-u3x8, not dropped. (commit immediately after 631e9605)

@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+### Pan the visualiser by dragging empty space (`sl-u3x8`, gh-513)
+
+The overview, mapping detail and chain views now pan the way Miro and Figma
+do: drag empty space, or hold Space and drag from anywhere, including over a
+card. The cursor shows `grab` where a drag will pan and `grabbing` during one.
+A drag that starts on a card still leaves the card alone, Space+drag never
+clicks the card underneath, and a pan keeps following the pointer outside
+the canvas until release. Scrolling, middle-drag and Alt+drag pan as before.
+This applies in the VS Code panel and the web playground, which share the
+component.
+
 ### The VS Code extension now needs VS Code 1.134 or later
 
 The minimum supported VS Code is raised from 1.125 to 1.134, to match the
