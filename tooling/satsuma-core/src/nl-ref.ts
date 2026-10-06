@@ -12,8 +12,7 @@
 import type { FieldDecl, SyntaxNode } from "./types.js";
 import { expandEntityFields } from "./spread-expand.js";
 import type { SpreadEntity, EntityRefResolver, SpreadEntityLookup } from "./spread-expand.js";
-import { resolveAuthoredPathAgainstContainer } from "./reference-stages.js";
-import { arrowPathText } from "./arrow-path.js";
+import { resolveArrowPath, type ResolvedArrowPath } from "./arrow-path.js";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -954,15 +953,19 @@ function isRelativeTargetPath(pathNode: SyntaxNode | undefined): boolean {
 }
 
 /**
- * Append a target leaf to the base its enclosing container established,
- * applying the same ADR-053 path-prefix semantics an arrow's own target uses
- * (`^.` pops a level, `$.` escapes to the root, `.field`/`field` are prefixed).
+ * Resolve a target path node against the base its enclosing container
+ * established, applying the same ADR-053 path-prefix semantics an arrow's own
+ * target uses (`^.` pops a level, `$.` escapes to the root, `.field`/`field`
+ * are prefixed). The base travels as segments, as extraction's containers do,
+ * so a backtick container such as `` `line.rows` `` is one level (bsw-2yzd).
  * Returns the base unchanged when the node carries no target (an arrow with no
  * tgt_path).
  */
-function qualifyTarget(base: string | null, leaf: string | null): string | null {
-  if (leaf === null) return base;
-  return resolveAuthoredPathAgainstContainer(leaf, base);
+function qualifyTarget(
+  base: ResolvedArrowPath | null,
+  tgtNode: SyntaxNode | undefined,
+): ResolvedArrowPath | null {
+  return resolveArrowPath(tgtNode, base)?.resolved ?? base;
 }
 
 /**
@@ -982,18 +985,18 @@ function qualifyTarget(base: string | null, leaf: string | null): string | null 
 function containerTargetBase(
   node: SyntaxNode,
   rawTgt: SyntaxNode | undefined,
-  outerTgt: string | null,
-): string | null {
+  outerTgt: ResolvedArrowPath | null,
+): ResolvedArrowPath | null {
   if (!rawTgt) return outerTgt;
   if (node.type === "flatten_block" && !isRelativeTargetPath(rawTgt)) return outerTgt;
-  return qualifyTarget(outerTgt, arrowPathText(rawTgt));
+  return qualifyTarget(outerTgt, rawTgt);
 }
 
 function walkArrowsForNL(
   node: SyntaxNode,
   mappingName: string,
   namespace: string | null,
-  targetField: string | null,
+  targetBase: ResolvedArrowPath | null,
   results: NLRefDataItemNoFile[],
 ): void {
   for (const c of node.namedChildren) {
@@ -1049,13 +1052,13 @@ function walkArrowsForNL(
     }
     if (c.type === "each_block" || c.type === "flatten_block") {
       const tgtNode = c.namedChildren.find((x) => x.type === "tgt_path");
-      const tgt = containerTargetBase(c, tgtNode, targetField);
+      const tgt = containerTargetBase(c, tgtNode, targetBase);
       walkArrowsForNL(c, mappingName, namespace, tgt, results);
       continue;
     }
     if (c.type === "map_arrow" || c.type === "computed_arrow" || c.type === "nested_arrow") {
       const tgtNode = c.namedChildren.find((x) => x.type === "tgt_path");
-      const tgt = qualifyTarget(targetField, arrowPathText(tgtNode));
+      const tgt = qualifyTarget(targetBase, tgtNode);
 
       const pipeChain = c.namedChildren.find((x) => x.type === "pipe_chain");
       if (pipeChain) {
@@ -1068,7 +1071,7 @@ function walkArrowsForNL(
                   text,
                   mapping: mappingName,
                   namespace,
-                  targetField: tgt,
+                  targetField: tgt?.text ?? null,
                   delimiterWidth: openingDelimiterWidth(nlNode),
                   line: nlNode.startPosition.row,
                   column: nlNode.startPosition.column,

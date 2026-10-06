@@ -578,6 +578,53 @@ describe("arrow field-not-in-schema diagnostics", () => {
     ]);
   });
 
+  it("counts a dotted backtick container as one level in the hint (bsw-2yzd)", () => {
+    // `` `line.items` `` is one field. Split on ".", the container looked three
+    // deep and the hint told the author to write '^.^.sid', which pops past the
+    // order. Extraction records the container's segments; the hint must use them.
+    const index = makeIndex({
+      schemas: [
+        {
+          name: "src",
+          fields: [
+            {
+              name: "order",
+              type: "record",
+              children: [
+                { name: "sid", type: "STRING" },
+                { name: "line.items", type: "list", children: [{ name: "v", type: "STRING" }] },
+              ],
+            },
+          ],
+        },
+        { name: "tgt", fields: [{ name: "y", type: "STRING" }] },
+      ],
+      mappings: [{ name: "m", sources: ["src"], targets: ["tgt"] }],
+      fieldArrows: [
+        {
+          mapping: "m",
+          namespace: null,
+          steps: [],
+          line: 5,
+          file: "test.stm",
+          sources: ["order.line.items.sid"],
+          target: null,
+          nesting: {
+            containerKind: "each",
+            sourceContainer: "order.line.items",
+            sourceContainerSegments: ["order", "line.items"],
+            targetContainer: null,
+            targetContainerSegments: null,
+            authoredSources: ["sid"],
+            authoredTarget: null,
+          },
+        },
+      ],
+    });
+    const [message] = fieldMessages(index);
+    assert.match(message, /write '\^\.sid' or '\$\.order\.sid'/);
+  });
+
   it("gives no hint when the container itself is undeclared", () => {
     // The container's own arrow carries the real finding; steering its children
     // to $. would hide a misnamed list (the docs' `-> order_lines` in #525).

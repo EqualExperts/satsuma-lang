@@ -12,6 +12,8 @@
  * belongs to, and the coverage modules consume the resulting stage types.
  */
 
+import type { ArrowPathAnchor } from "./arrow-path.js";
+
 // This symbol is deliberately module-private. Consumers can obtain branded
 // values only from the validating constructors and semantic transitions below.
 declare const referenceStage: unique symbol;
@@ -211,41 +213,104 @@ function stripRelativityMarker(path: string): string {
 }
 
 /**
- * Resolve an authored arrow path against the container it was written inside.
+ * An enclosing container's absolute path as its segments, one per nesting
+ * level, each unquoted.
  *
- * Applies the three path-prefix semantics from ADR-053, in order:
+ * A segment may itself contain a `.` — `` `line.items` `` is one field — so a
+ * container must travel as segments, not as joined text: re-splitting
+ * "line.items" would count it as two levels and make `^.` pop half a name
+ * (bsw-2yzd). A plain string container is still accepted where no CST is to
+ * hand, and is split on `.`, which is exact whenever no segment holds a dot.
+ */
+export type ContainerSegments = readonly string[];
+
+/** Normalise either container form to segments; see {@link ContainerSegments}. */
+function containerSegmentsOf(
+  container: string | ContainerSegments | null,
+): ContainerSegments | null {
+  // An empty string is "no container", as it always was for the text form.
+  if (!container) return null;
+  return typeof container === "string" ? container.split(PATH_SEPARATOR) : container;
+}
+
+/**
+ * Resolve a path's segments against the segments of its container — the
+ * segment form of the ADR-053 rule, and the one extraction uses because it
+ * reads both sides from the CST.
+ *
+ *  - `root` (`$.`): the container is ignored.
+ *  - `parent` (`^.` × levels): that many trailing container segments are
+ *    dropped; popping past the root leaves the schema root.
+ *  - `plain` / `relative` (`field`, `.field`): the container is prefixed.
+ *
+ * No segment is split or joined, so a dotted segment on either side stays one
+ * level and the result can serve as the next container down.
+ *
+ * @param anchor    The path's structural prefix (arrow-path.ts).
+ * @param segments  The path's own segments, unquoted, without any prefix.
+ * @param container The container's segments, or null at mapping-body level.
+ * @returns The schema-root-relative segments.
+ */
+export function resolvePathSegmentsAgainstContainer(
+  anchor: ArrowPathAnchor,
+  segments: readonly string[],
+  container: ContainerSegments | null,
+): string[] {
+  if (anchor.kind === "root" || !container) return [...segments];
+  if (anchor.kind === "parent") {
+    const kept = container.slice(0, Math.max(0, container.length - anchor.levels));
+    return [...kept, ...segments];
+  }
+  return [...container, ...segments];
+}
+
+/**
+ * Resolve an authored arrow path string against the container it was written
+ * inside: the text form of {@link resolvePathSegmentsAgainstContainer}.
+ *
+ * Applies the three path-prefix semantics from ADR-053:
  *
  *  - `$.field`  — root escape: enclosing containers are ignored; the path is
  *    taken absolute from the schema root.
- *  - `^.field`  — parent escape: each `^.` pops one segment off the container
- *    path before the field is appended. `^.^.field` pops two; popping past the
+ *  - `^.field`  — parent escape: each `^.` pops one level off the container
+ *    before the field is appended. `^.^.field` pops two; popping past the
  *    root resolves root-relative.
  *  - `.field` or `field` — the original prefixing rule: the container path is
  *    prefixed and the leading relativity dot is stripped.
  *
  * The escapes are additive: a path either carries one or it does not, and they
  * never interact with the relativity marker, so the existing dot semantics are
- * untouched.
+ * untouched. The authored text after the prefix is appended whole, never
+ * split, so only the container's level boundaries matter — pass the container
+ * as segments when one of them may contain a dot.
  *
  * @param path      Path as authored, with or without an escape / relativity
  *                  marker. An empty path stays empty.
- * @param container Absolute path of the enclosing container, or null at
- *                  mapping-body level, where the mapping root is the frame.
+ * @param container The enclosing container, as segments or as dotted text, or
+ *                  null at mapping-body level, where the mapping root is the
+ *                  frame.
  * @returns The path relative to the schema root, never carrying an escape or
  *          relativity marker.
  */
 export function resolveAuthoredPathAgainstContainer(
   path: string,
-  container: string | null,
+  container: string | ContainerSegments | null,
 ): string {
   if (!path) return path;
+  const { anchor, rest } = splitAuthoredPrefix(path);
+  return resolvePathSegmentsAgainstContainer(anchor, [rest], containerSegmentsOf(container)).join(
+    PATH_SEPARATOR,
+  );
+}
 
-  // Root escape — absolute from the schema root; the container is irrelevant.
+/** Separate an authored path's ADR-053 / §4.4 prefix from the text after it. */
+function splitAuthoredPrefix(path: string): { anchor: ArrowPathAnchor; rest: string } {
   if (path.startsWith(ROOT_ESCAPE)) {
-    return stripRelativityMarker(path.slice(ROOT_ESCAPE.length));
+    return {
+      anchor: { kind: "root" },
+      rest: stripRelativityMarker(path.slice(ROOT_ESCAPE.length)),
+    };
   }
-
-  // Parent escape — pop one container segment per `^.`.
   if (path.startsWith(PARENT_ESCAPE)) {
     let rest = path;
     let levels = 0;
@@ -253,16 +318,9 @@ export function resolveAuthoredPathAgainstContainer(
       levels += 1;
       rest = rest.slice(PARENT_ESCAPE.length);
     }
-    const relative = stripRelativityMarker(rest);
-    if (!container) return relative;
-    const segments = container.split(".");
-    const popped = segments.slice(0, Math.max(0, segments.length - levels));
-    return popped.length ? `${popped.join(".")}.${relative}` : relative;
+    return { anchor: { kind: "parent", levels }, rest: stripRelativityMarker(rest) };
   }
-
-  // Default — the original prefixing rule, relativity marker stripped.
-  const relativeToFrame = stripRelativityMarker(path);
-  return container ? `${container}.${relativeToFrame}` : relativeToFrame;
+  return { anchor: { kind: "plain" }, rest: stripRelativityMarker(path) };
 }
 
 /**
@@ -289,7 +347,8 @@ export interface AncestorEscape {
  *
  * @param path      Path as authored. One that already carries an escape prefix
  *                  gets no suggestion: its author has already chosen a level.
- * @param container Absolute path the authored path was resolved against.
+ * @param container The container the authored path was resolved against, as
+ *                  segments (exact) or dotted text (split on `.`).
  * @param exists    Whether a schema-root path names a declared field.
  * @returns null when there is no container, the container is itself
  *          undeclared (that is the real fault, reported on the container's own
@@ -298,22 +357,30 @@ export interface AncestorEscape {
  */
 export function findAncestorEscape(
   path: string,
-  container: string | null,
+  container: string | ContainerSegments | null,
   exists: (rootPath: string) => boolean,
 ): AncestorEscape | null {
-  if (!path || !container || path.startsWith(ROOT_ESCAPE) || path.startsWith(PARENT_ESCAPE)) {
+  const containerSegments = containerSegmentsOf(container);
+  if (
+    !path ||
+    !containerSegments ||
+    path.startsWith(ROOT_ESCAPE) ||
+    path.startsWith(PARENT_ESCAPE)
+  ) {
     return null;
   }
-  if (!exists(container)) return null;
+  if (!exists(containerSegments.join(PATH_SEPARATOR))) return null;
   const relative = stripRelativityMarker(path);
-  const containerSegments = container.split(".");
   for (let levels = 1; levels <= containerSegments.length; levels++) {
     const ancestor = containerSegments.slice(0, containerSegments.length - levels);
-    const resolved = [...ancestor, relative].join(".");
+    const resolved = [...ancestor, relative].join(PATH_SEPARATOR);
     if (exists(resolved)) {
       return {
         resolved,
-        parentEscape: shortestParentEscape(resolved, containerSegments),
+        parentEscape: shortestParentEscape(
+          [...ancestor, ...relative.split(PATH_SEPARATOR)],
+          containerSegments,
+        ),
         rootEscape: `${ROOT_ESCAPE}${resolved}`,
       };
     }
@@ -322,12 +389,18 @@ export function findAncestorEscape(
 }
 
 /**
- * The `^.` spelling of `resolved` from inside `containerSegments`: pop up to the
- * deepest container level that is a prefix of `resolved`, then name the rest.
+ * The `^.` spelling of a resolved path from inside `containerSegments`: pop up
+ * to the deepest container level that is a prefix of it, then name the rest.
  * Null when they share no prefix, since `$.` then says the same thing plainly.
+ *
+ * `target` holds the ancestor's segments followed by the authored tail split
+ * on `.`; the tail is text, so a dotted backtick name inside it simply fails to
+ * match a container segment and the spelling falls back to more `^.`s.
  */
-function shortestParentEscape(resolved: string, containerSegments: string[]): string | null {
-  const target = resolved.split(".");
+function shortestParentEscape(
+  target: readonly string[],
+  containerSegments: ContainerSegments,
+): string | null {
   let shared = 0;
   while (
     shared < containerSegments.length &&
@@ -337,7 +410,10 @@ function shortestParentEscape(resolved: string, containerSegments: string[]): st
     shared += 1;
   }
   if (shared === 0) return null;
-  return PARENT_ESCAPE.repeat(containerSegments.length - shared) + target.slice(shared).join(".");
+  return (
+    PARENT_ESCAPE.repeat(containerSegments.length - shared) +
+    target.slice(shared).join(PATH_SEPARATOR)
+  );
 }
 
 /**
