@@ -17,6 +17,12 @@ updates:
       interval: "weekly"
     open-pull-requests-limit: 10
     labels: ["dependencies"]
+    ignore:
+      # @types/vscode must not run ahead of engines.vscode in
+      # tooling/vscode-satsuma, or vsce refuses to package the extension
+      # (sl-110g). Raise both together, by hand, when we drop older VS Code.
+      - dependency-name: "@types/vscode"
+        update-types: ["version-update:semver-minor", "version-update:semver-major"]
 
   # Project website
   - package-ecosystem: "npm"
