@@ -45,6 +45,7 @@ import { createScopedIndex, getImportReachableUris, resolveDefinition } from "./
 import type { WorkspaceIndex } from "./workspace-index";
 import {
   createWorkspaceDefinitionLookup,
+  declaresSchemaFields,
   resolveSchemaFields,
 } from "./workspace-definition-lookup";
 
@@ -175,7 +176,7 @@ function focusFieldIsDeclared(field: CanonicalFieldEndpoint, workspace: Workspac
   const schemaKey = indexKeyOfSchema(fieldEndpointSchema(field));
   const path = fieldEndpointPath(field);
   if (path === null) {
-    return workspace.definitions.get(schemaKey)?.some((d) => d.kind === "schema") ?? false;
+    return workspace.definitions.get(schemaKey)?.some(declaresSchemaFields) ?? false;
   }
 
   const fields = resolveSchemaFields(workspace, schemaKey);
