@@ -2,17 +2,6 @@
 
 ## Unreleased
 
-### Overview cards show the whole mapping label and schema notes, and field comments get their badges (`sl-q7pm`)
-
-A long mapping name such as `CustomerRecordToMailingList` pushed its "4 →s"
-arrow count past the edge of its overview box. The box is now sized for the
-count as well, and a name too long for the widest box is shortened with an
-ellipsis instead. Overview schema cards now show the schema's `note`, as the
-mapping view already did. And `//!` and `//?` comments on fields and mapping
-arrows now reach the visualisation, so their warning and question badges
-appear in both the overview and the mapping view. They had been silently
-dropped, and a comment on a schema's last field was credited to the schema.
-
 ## v0.14.0 — 2026-10-06
 
 ### Reach an enclosing level from inside `each` and `flatten` with `^.` and `$.` (`sl-8vqk`, ADR-053)
@@ -107,6 +96,17 @@ They now appear in a collapsible section above the arrow table, expanded by
 default, joined by any `( note "..." )` metadata. Arrow notes render as
 Markdown too.
 
+### Overview cards show the whole mapping label and schema notes, and field comments get their badges (`sl-q7pm`)
+
+A long mapping name such as `CustomerRecordToMailingList` pushed its "4 →s"
+arrow count past the edge of its overview box. The box is now sized for the
+count as well, and a name too long for the widest box is shortened with an
+ellipsis instead. Overview schema cards now show the schema's `note`, as the
+mapping view already did. And `//!` and `//?` comments on fields and mapping
+arrows now reach the visualisation, so their warning and question badges
+appear in both the overview and the mapping view. They had been silently
+dropped, and a comment on a schema's last field was credited to the schema.
+
 ### Smaller visualisation fixes
 
 - **Enum badges collapse to a count** (`sl-2ne7`). A multi-value enum used to
@@ -196,6 +196,10 @@ local build (`s1cl-gphp`).
 
 Release tags now point at the commit the release was built from, not at
 whatever `main` had become by the time the release job ran (`bsw-nx1l`).
+
+The VS Code extension is now packaged by a pinned `@vscode/vsce` from the
+lockfile, not whichever version `npx` fetched on the day, so `npm audit` and
+Dependabot cover the packager too (`bsw-n4mm`).
 
 ### The site and docs lead with readability (`sl-j7vt`)
 
