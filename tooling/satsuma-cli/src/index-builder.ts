@@ -24,9 +24,10 @@ import {
   createAuthoredEntityRef,
   createCanonicalEntityRef,
   createContainerQualifiedFieldRef,
+  expandDeclaredFields,
 } from "@satsuma/core";
 export { resolveScopedEntityRef } from "@satsuma/core";
-import type { ResolvedFileImport } from "@satsuma/core";
+import type { ResolvedFileImport, TopLevelFieldTest } from "@satsuma/core";
 import { extractNLRefData } from "./nl-ref-extract.js";
 import type {
   ArrowRecord,
@@ -162,6 +163,38 @@ export function arrowPathInSchema(
     sideSchemaKeys.filter((key) => key !== schemaKey).map(createAuthoredEntityRef),
     declaresTopLevel,
   );
+}
+
+/**
+ * The workspace's answer to "does this schema declare a top-level field of this
+ * name?", which decides whether an arrow path's first segment is the schema's
+ * own field or a prefix spelling the schema's name (ADR-041). Fields a fragment
+ * spread supplies count. Each schema's names are computed once, on first ask.
+ *
+ * Takes the two maps rather than a whole `ExtractedWorkspace` so the index
+ * builder can use it before the workspace exists.
+ */
+export function topLevelFieldTest(
+  schemas: Map<string, SchemaRecord>,
+  fragments: Map<string, FragmentRecord>,
+): TopLevelFieldTest {
+  const namesBySchema = new Map<string, ReadonlySet<string>>();
+  const namesOf = (schemaKey: string): ReadonlySet<string> => {
+    const known = namesBySchema.get(schemaKey);
+    if (known) return known;
+    const schema = schemas.get(schemaKey);
+    const currentNs = schema?.namespace ?? null;
+    const fields = expandDeclaredFields(
+      schema,
+      currentNs,
+      (ref) => resolveScopedEntityRef(ref, currentNs, fragments),
+      (key) => fragments.get(key),
+    );
+    const names = new Set(fields.map((field) => field.name));
+    namesBySchema.set(schemaKey, names);
+    return names;
+  };
+  return (schemaKey, fieldName) => namesOf(schemaKey).has(fieldName);
 }
 
 /**
@@ -461,7 +494,11 @@ export function buildIndex(parsedFiles: (ParsedFile | FileData)[]): ExtractedWor
   }
 
   const referenceGraph = buildReferenceGraph({ schemas, metrics, mappings });
-  const fieldArrows = buildFieldArrows(allArrowRecords, mappings);
+  const fieldArrows = buildFieldArrows(
+    allArrowRecords,
+    mappings,
+    topLevelFieldTest(schemas, fragments),
+  );
 
   // Build per-file resolved import declarations for import-scope validation
   // (ADR-022). Resolves relative import paths to absolute paths using each
@@ -554,6 +591,7 @@ export function resolveIndexKey<T>(
 function buildFieldArrows(
   arrowRecords: ArrowRecord[],
   mappings: Map<string, MappingRecord>,
+  declaresTopLevel: TopLevelFieldTest,
 ): Map<string, ArrowRecord[]> {
   const index = new Map<string, ArrowRecord[]>();
 
@@ -570,6 +608,8 @@ function buildFieldArrows(
    * spelling of a schema's name (`n::fact.sku`, or `fact.sku` inside the
    * namespace) belongs to that schema alone, so its prefix is replaced rather
    * than doubled; an unprefixed path is offered to every schema on the side.
+   * A first segment the schema declares as a top-level field is that field,
+   * not a spelling of the schema's name (bsw-tzc6 review).
    */
   function addSchemaQualifiedKeys(
     path: string,
@@ -577,7 +617,9 @@ function buildFieldArrows(
     record: ArrowRecord,
   ): void {
     for (const schema of sideSchemas) {
-      const local = arrowPathInSchema(path, schema, sideSchemas);
+      const local = arrowPathInSchema(path, schema, sideSchemas, (name) =>
+        declaresTopLevel(schema, name),
+      );
       if (local === null) continue;
       const internalKey = `${schema}.${local}`;
       addToIndex(internalKey, record);

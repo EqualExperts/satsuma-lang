@@ -14,13 +14,19 @@
 import type { Command } from "commander";
 import { loadWorkspace } from "../load-workspace.js";
 import { runCommand, CommandError, EXIT_NOT_FOUND, EXIT_PARSE_ERROR } from "../command-runner.js";
-import { resolveIndexKey, canonicalKey, arrowPathInSchema } from "../index-builder.js";
+import {
+  resolveIndexKey,
+  canonicalKey,
+  arrowPathInSchema,
+  topLevelFieldTest,
+} from "../index-builder.js";
 import { arrowEndpoint } from "../field-endpoints.js";
 import { resolveAllNLRefs } from "../nl-ref-extract.js";
 import { expandDeclaredFields } from "../spread-expand.js";
 import { findDeclaredFields } from "../field-lookup.js";
 import type { DeclaredFieldMatch } from "../field-lookup.js";
 import { collectFieldNames } from "@satsuma/core";
+import type { TopLevelFieldTest } from "@satsuma/core";
 import type { ExtractedWorkspace, ArrowRecord, FieldDecl } from "../types.js";
 
 export function register(program: Command): void {
@@ -75,6 +81,7 @@ Examples:
           const fieldName = fieldRef.slice(dot + 1);
 
           const { index } = await loadWorkspace(pathArg);
+          const declaresTopLevel = topLevelFieldTest(index.schemas, index.fragments);
 
           // Validate schema exists
           const resolvedSchema = resolveIndexKey(schemaName, index.schemas);
@@ -181,7 +188,9 @@ Examples:
               const srcSchemas = nlMapping?.sources ?? [];
               const owners = srcSchemas.length > 0 ? srcSchemas : [undefined];
               return a.sources.some((s) =>
-                owners.some((owner) => endpointText(s, srcSchemas, owner) === resolvedTo),
+                owners.some(
+                  (owner) => endpointText(s, srcSchemas, owner, declaresTopLevel) === resolvedTo,
+                ),
               );
             });
             if (alreadyDeclared) continue;
@@ -279,10 +288,22 @@ Examples:
                   a.sources.length === 0
                     ? null
                     : a.sources
-                        .map((s) => endpointText(s, sideOrQueried(sourceSchemas), sourceOwner(s)))
+                        .map((s) =>
+                          endpointText(
+                            s,
+                            sideOrQueried(sourceSchemas),
+                            sourceOwner(s),
+                            declaresTopLevel,
+                          ),
+                        )
                         .join(", "),
                 target: a.target
-                  ? endpointText(a.target, sideOrQueried(targetSchemas), targetOwner)
+                  ? endpointText(
+                      a.target,
+                      sideOrQueried(targetSchemas),
+                      targetOwner,
+                      declaresTopLevel,
+                    )
                   : null,
                 classification: a.classification,
                 transform_raw: a.transform_raw,
@@ -348,19 +369,22 @@ function queriedFieldMatcher(
  * Core's `resolveFieldEndpoint` (through `arrowEndpoint`) decides ownership: a
  * path that names a side schema, in any spelling, belongs to it; an unprefixed
  * path belongs to the first schema. `owner`, when it is on this side, is put
- * first so it claims the unprefixed paths. The queried-field filters have
- * already chosen the arrow; this only spells its endpoints for `--json`.
+ * first so it claims the unprefixed paths. `declaresTopLevel` keeps a schema's
+ * own same-named field from being read as its name (bsw-tzc6 review). The
+ * queried-field filters have already chosen the arrow; this only spells its
+ * endpoints for `--json`.
  */
 function endpointText(
   path: string,
   sideSchemas: readonly string[],
   owner: string | undefined,
+  declaresTopLevel: TopLevelFieldTest,
 ): string {
   const ordered =
     owner !== undefined && sideSchemas.includes(owner)
       ? [owner, ...sideSchemas.filter((schema) => schema !== owner)]
       : sideSchemas;
-  return arrowEndpoint(path, ordered);
+  return arrowEndpoint(path, ordered, declaresTopLevel);
 }
 
 /**

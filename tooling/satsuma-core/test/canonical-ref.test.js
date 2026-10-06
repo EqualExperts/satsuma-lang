@@ -125,6 +125,28 @@ describe("resolveFieldEndpoint()", () => {
     });
   });
 
+  it("keeps a prefix that is the named schema's own top-level field as part of the path", () => {
+    // Schema `n::fact` declares a record field `fact`, so `fact.sku` is the
+    // nested field `fact.fact.sku`. A declared top-level field wins over a
+    // prefix that only looks like the schema's name — the rule
+    // schemaLocalFieldPath applies (bsw-tzc6 review).
+    const declaresTopLevel = (schemaKey, name) => schemaKey === "n::fact" && name === "fact";
+    assert.deepEqual(
+      resolveFieldEndpoint(createAuthoredFieldRef("fact.sku"), ["n::fact"], declaresTopLevel),
+      { kind: "field", endpoint: "n::fact.fact.sku" },
+    );
+  });
+
+  it("still strips the schema prefix when the schema has no field of that name", () => {
+    // The shadowing test is per schema and per name: a predicate that knows
+    // other fields must not stop `fact.sku` naming `n::fact`'s `sku`.
+    const declaresTopLevel = (_schemaKey, name) => name === "sku";
+    assert.deepEqual(
+      resolveFieldEndpoint(createAuthoredFieldRef("fact.sku"), ["n::fact"], declaresTopLevel),
+      { kind: "field", endpoint: "n::fact.sku" },
+    );
+  });
+
   it("reports an authored token as unqualifiable when the mapping side is empty", () => {
     // A mapping with no declared schema on this side offers no owner to attach
     // to, so no endpoint can be composed and the authored text is all there is.

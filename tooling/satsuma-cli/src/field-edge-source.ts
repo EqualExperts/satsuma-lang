@@ -8,7 +8,7 @@
 
 import type { FieldEdgeSource } from "@satsuma/core";
 import { arrowEndpoint } from "./field-endpoints.js";
-import { distinctArrowRecords } from "./index-builder.js";
+import { distinctArrowRecords, topLevelFieldTest } from "./index-builder.js";
 import { resolveAllNLRefs } from "./nl-ref-extract.js";
 import type { ArrowRecord, ExtractedWorkspace } from "./types.js";
 
@@ -37,6 +37,7 @@ export function createFieldEdgeSource(
     includeMapping(arrowMappingKey(arrow)),
   );
   const nlRefs = resolveAllNLRefs(index).filter((ref) => includeMapping(ref.mapping));
+  const declaresTopLevel = topLevelFieldTest(index.schemas, index.fragments);
 
   return {
     arrows,
@@ -45,6 +46,6 @@ export function createFieldEdgeSource(
       return mapping ? { sources: mapping.sources, targets: mapping.targets } : null;
     },
     nlRefs,
-    resolveEndpoint: arrowEndpoint,
+    resolveEndpoint: (field, schemas) => arrowEndpoint(field, schemas, declaresTopLevel),
   };
 }

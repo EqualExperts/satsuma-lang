@@ -835,3 +835,22 @@ describe("fieldArrows index: schema-prefixed paths in a namespace (bsw-tzc6)", (
     assert.ok(!index.fieldArrows.has("n::fact.fact.sku"), "must not index n::fact.fact.sku");
   });
 });
+
+describe("fieldArrows index: a namespaced schema with a field of its own name (bsw-tzc6 review)", () => {
+  it("keys an arrow to the schema's same-named record field under that field, not the schema prefix", async () => {
+    // Schema `n::fact` declares a record field `fact`, so the arrow target
+    // `fact.sku` is the nested `n::fact.fact.sku`. Treating `fact.` as the
+    // schema's bare-name prefix filed it under the top-level `n::fact.sku`.
+    const { parseFile } = await import("#src/parser.js");
+    const { extractFileData } = await import("#src/index-builder.js");
+    const fixture = resolve(__dirname, "fixtures/namespace-schema-named-field.stm");
+    const index = buildIndex([extractFileData(parseFile(fixture))]);
+    // A namespaced key is its own canonical form, so a record is filed twice
+    // under it; compare the distinct sources.
+    const sources = (key: string) => [
+      ...new Set((index.fieldArrows.get(key) ?? []).map((a) => a.sources.join(","))),
+    ];
+    assert.deepEqual(sources("n::fact.fact.sku"), ["a"]);
+    assert.deepEqual(sources("n::fact.sku"), ["b"]);
+  });
+});
