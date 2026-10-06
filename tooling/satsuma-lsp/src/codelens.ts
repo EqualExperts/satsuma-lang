@@ -1,7 +1,7 @@
 import { CodeLens, Command, Range } from "vscode-languageserver";
 import type { SyntaxNode, Tree } from "./parser-utils";
 import { nodeRange, child, children, labelText, walkDescendants } from "./parser-utils";
-import { isMetricSchema, sourceRefStructuralText } from "@satsuma/core";
+import { countMappingArrows, isMetricSchema, sourceRefStructuralText } from "@satsuma/core";
 import { WorkspaceIndex, findReferences, findMappingsUsing } from "./workspace-index";
 
 /**
@@ -114,7 +114,7 @@ function mappingLens(node: SyntaxNode, range: Range): CodeLens {
 
   const sources = extractRefNames(body, "source_block");
   const targets = extractRefNames(body, "target_block");
-  const arrowCount = countArrows(body);
+  const arrowCount = countMappingArrows(body);
 
   const srcText = sources.length > 0 ? sources.join(", ") : "?";
   const tgtText = targets.length > 0 ? targets.join(", ") : "?";
@@ -168,22 +168,6 @@ function extractRefNames(body: SyntaxNode, blockType: string): string[] {
     }
   }
   return names;
-}
-
-function countArrows(body: SyntaxNode): number {
-  let count = 0;
-  for (const ch of body.namedChildren) {
-    if (
-      ch.type === "map_arrow" ||
-      ch.type === "nested_arrow" ||
-      ch.type === "computed_arrow" ||
-      ch.type === "each_block" ||
-      ch.type === "flatten_block"
-    ) {
-      count++;
-    }
-  }
-  return count;
 }
 
 function lineRange(node: SyntaxNode): Range {

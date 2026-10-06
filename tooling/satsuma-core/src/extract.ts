@@ -463,6 +463,23 @@ export interface ExtractedMapping {
 }
 
 /**
+ * The number of arrows a mapping body declares, at any depth.
+ *
+ * Every map, computed and nested arrow counts, including those inside `each`
+ * and `flatten` blocks and inside a nested arrow's own body; the blocks
+ * themselves are containers, not arrows. This is the single definition of a
+ * mapping's arrow count: `satsuma summary` reports it through
+ * {@link extractMappings}, and the LSP's mapping code lens shows it (bsw-ks5q).
+ */
+export function countMappingArrows(mappingBody: SyntaxNode): number {
+  return (
+    allDescendants(mappingBody, "map_arrow").length +
+    allDescendants(mappingBody, "computed_arrow").length +
+    allDescendants(mappingBody, "nested_arrow").length
+  );
+}
+
+/**
  * Extract all mapping_block definitions.
  */
 export function extractMappings(rootNode: SyntaxNode): ExtractedMapping[] {
@@ -490,10 +507,7 @@ export function extractMappings(rootNode: SyntaxNode): ExtractedMapping[] {
         }
       }
 
-      arrowCount =
-        allDescendants(body, "map_arrow").length +
-        allDescendants(body, "computed_arrow").length +
-        allDescendants(body, "nested_arrow").length;
+      arrowCount = countMappingArrows(body);
     }
 
     return {
