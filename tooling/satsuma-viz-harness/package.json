@@ -48,7 +48,7 @@
   "devDependencies": {
     "@playwright/test": "^1.62.1",
     "@satsuma/viz": "*",
-    "@types/node": "^26.6.3",
+    "@types/node": "^26.6.4",
     "esbuild": "^0.28.2",
     "tree-sitter-satsuma": "*",
     "typescript": "^6.0.3"
