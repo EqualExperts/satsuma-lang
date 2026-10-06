@@ -5,6 +5,9 @@
 // src.orders.created_by spread inside a record, transitively (line -> audit)
 // src.orders.qty        spread inside a record (line)
 // src.ship.addr.city    a fragment's own record that spreads another (shipping -> geo)
+// src.inner.created_by  a fragment's record spreads a fragment the schema also
+//                       spreads beside it (audit, envelope -> audit): not a cycle
+// namesakes.city        a top-level field and a nested field share a name
 
 fragment audit {
   created_by  STRING  (note "who created it")
@@ -19,6 +22,12 @@ fragment geo {
   city  STRING  (note "delivery city")
 }
 
+fragment envelope {
+  inner record {
+    ...audit
+  }
+}
+
 fragment shipping {
   addr record {
     ...geo
@@ -27,6 +36,7 @@ fragment shipping {
 
 schema src {
   ...audit
+  ...envelope
   orders list_of record {
     ...line
     oid  STRING
@@ -39,6 +49,7 @@ schema src {
 schema tgt {
   who   STRING
   city  STRING
+  inner_who  STRING
   rows list_of record {
     a  STRING
     c  INT
@@ -52,9 +63,17 @@ mapping m {
 
   created_by -> who
   ship.addr.city -> city
+  inner.created_by -> inner_who
   each orders -> rows {
     .created_by -> .a
     .qty -> .c
     .oid -> .d
+  }
+}
+
+schema namesakes {
+  city  STRING  (note "top city")
+  addr record {
+    city  STRING  (note "addr city")
   }
 }

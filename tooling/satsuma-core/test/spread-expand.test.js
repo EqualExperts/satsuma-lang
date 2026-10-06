@@ -361,13 +361,76 @@ describe("expandDeclaredFields()", () => {
       assert.equal(fields[1].children[0].fromFragment, "geo");
     });
 
-    it("leaves the fragment index untouched", () => {
-      // The copies are expanded, not the fragment's own record: a later
-      // command reading `shipping` must still see the spread its author wrote.
-      const schema = { fields: [], hasSpreads: true, spreads: ["shipping"] };
-      expandDeclaredFields(schema, null, resolveGraph, lookupGraph);
-      assert.deepEqual(shipping.fields[0].children, []);
-      assert.deepEqual(shipping.fields[0].spreads, ["geo"]);
+    it("leaves the fragment index untouched when the spreading record sits a record deeper", () => {
+      // The copies are expanded, not the fragment's own records: a later
+      // command reading the fragment must still see the spread its author
+      // wrote. The spreading `addr` sits inside `outer` on purpose — a
+      // top-level fragment field is already copied shallowly on the way out,
+      // so only a record below it proves the copy is deep.
+      const deep = fragment("deep_shipping", [
+        field("outer", "record", [
+          { ...field("addr", "record", []), hasSpreads: true, spreads: ["geo"] },
+        ]),
+      ]);
+      const deepGraph = new Map([...graph, ["deep_shipping", deep]]);
+      const lookupDeep = (key) => deepGraph.get(key) ?? null;
+      const resolveDeep = makeEntityRefResolver(deepGraph);
+      for (const schema of [
+        { fields: [], hasSpreads: true, spreads: ["deep_shipping"] },
+        {
+          fields: [
+            { ...field("ship", "record", []), hasSpreads: true, spreads: ["deep_shipping"] },
+          ],
+          hasSpreads: false,
+          spreads: [],
+        },
+      ]) {
+        const fields = expandDeclaredFields(schema, null, resolveDeep, lookupDeep);
+        assert.ok(
+          leaves(fields).some((p) => p.endsWith("outer.addr.city")),
+          "expansion happened",
+        );
+        const addr = deep.fields[0].children[0];
+        assert.deepEqual(addr.children, [], "the fragment's record gained no fields");
+        assert.deepEqual(addr.spreads, ["geo"], "and still records its spread");
+      }
+    });
+  });
+
+  describe("a fragment spread beside one whose record spreads it", () => {
+    // Review of bsw-ep0m. `schema { ...audit ...line }` where `line`'s record
+    // spreads `audit` is not cyclic: `audit` sits beside `line`, not around it.
+    // Treating every sibling spread as an enclosing fragment dropped the inner
+    // `...audit`, so `inner.created_by` was declared yet not found.
+    const audit = fragment("audit", [field("created_by")]);
+    const line = fragment("line", [
+      { ...field("inner", "record", []), hasSpreads: true, spreads: ["audit"] },
+    ]);
+    const graph = new Map([
+      ["audit", audit],
+      ["line", line],
+    ]);
+    const resolveGraph = makeEntityRefResolver(graph);
+    const lookupGraph = (key) => graph.get(key) ?? null;
+
+    it("expands the record at schema level", () => {
+      const schema = { fields: [], hasSpreads: true, spreads: ["audit", "line"] };
+      assert.deepEqual(leaves(expandDeclaredFields(schema, null, resolveGraph, lookupGraph)), [
+        "created_by",
+        "inner.created_by",
+      ]);
+    });
+
+    it("expands the record when both spreads sit inside a record", () => {
+      const schema = {
+        fields: [{ ...field("r", "record", []), hasSpreads: true, spreads: ["audit", "line"] }],
+        hasSpreads: false,
+        spreads: [],
+      };
+      assert.deepEqual(leaves(expandDeclaredFields(schema, null, resolveGraph, lookupGraph)), [
+        "r.created_by",
+        "r.inner.created_by",
+      ]);
     });
   });
 
@@ -388,6 +451,26 @@ describe("expandDeclaredFields()", () => {
       (key) => graph.get(key) ?? null,
     );
     assert.deepEqual(leaves(fields), ["id", "child"]);
+  });
+
+  it("stops when a fragment's record spreads a fragment that spreads it", () => {
+    // `a` spreads `b`, and `b`'s record spreads `a` again: the cycle runs
+    // through a transitive spread, so the record's guard must count every
+    // fragment on the path that supplied it, not just the one that wrote it.
+    const a = fragment("a", [field("x")], ["b"]);
+    const b = fragment("b", [{ ...field("r", "record", []), hasSpreads: true, spreads: ["a"] }]);
+    const graph = new Map([
+      ["a", a],
+      ["b", b],
+    ]);
+    const schema = { fields: [], hasSpreads: true, spreads: ["a"] };
+    const fields = expandDeclaredFields(
+      schema,
+      null,
+      makeEntityRefResolver(graph),
+      (key) => graph.get(key) ?? null,
+    );
+    assert.deepEqual(leaves(fields), ["x", "r"]);
   });
 
   it("returns nothing for an absent entity rather than throwing", () => {

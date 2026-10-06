@@ -38,3 +38,8 @@ The spread must sit on its own line: the grammar reads every word after `...` on
 
 Cause: each field-scoped command built its own field tree. `arrows` and `field-lineage` expanded only schema-level spreads, `meta` matched only top-level spread names and fell back to any field sharing the last segment, and `nl` ignored spreads altogether. Core's `expandDeclaredFields` also skipped spreads inside records that a fragment supplies (`fragment shipping { addr record { ...geo } }`).
 Fix: core now expands those copied records too, with a guard against self-spreading fragments. The four commands share `findDeclaredFields` and `findFieldDeclaration` (new `satsuma-cli/src/field-lookup.ts`), which resolve against that tree and read notes and metadata from the fragment that writes the field. `fields` uses `expandDeclaredFields` as well; the remaining top-level-only callers are filed as bsw-s9pd. (commit immediately after fc51a785)
+
+**2026-10-06T19:25:47Z**
+
+Review follow-up. Cause: the cycle guard put every sibling spread into the enclosing set, so in `{ ...audit ...line }` a record from `line` lost its own `...audit`; `nl` had also narrowed a bare name to the top-level field, dropping nested namesakes' notes; and the index-untouched test only checked a top-level fragment record, which a shallow copy already protects.
+Fix: each spread contribution now carries its own fragment chain, and only that chain joins the guard. `findDeclaredFields` takes `everyNamesake`, which `nl` sets. The index test now puts the spreading record one level deeper and fails when the deep copy is removed. (commit immediately after a4d76317)

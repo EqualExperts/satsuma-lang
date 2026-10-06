@@ -38,6 +38,15 @@ describe("field-scoped commands see through fragment spreads (bsw-ep0m)", () => 
     assert.match(stdout, /ship\.addr\.city -> city/);
   });
 
+  it("arrows finds a field a fragment's record spreads from a fragment spread beside it", async () => {
+    // `src` spreads `audit` and `envelope`, and `envelope`'s `inner` record
+    // spreads `audit` again. That is not a cycle, but the guard once counted
+    // every sibling spread as enclosing and dropped `inner`'s `...audit`.
+    const { stdout, code } = await run("arrows", "src.inner.created_by");
+    assert.equal(code, 0);
+    assert.match(stdout, /inner\.created_by -> inner_who/);
+  });
+
   it("field-lineage traces a field a fragment supplies inside a record", async () => {
     const { stdout, code } = await run("field-lineage", "src.orders.qty");
     assert.equal(code, 0);
@@ -56,6 +65,15 @@ describe("field-scoped commands see through fragment spreads (bsw-ep0m)", () => 
     const { stdout, code } = await run("nl", "src.ship.addr.city");
     assert.equal(code, 0);
     assert.match(stdout, /delivery city/);
+  });
+
+  it("nl reports the notes of every field a bare name reaches, not just the top-level one", async () => {
+    // `nl schema.name` has always meant every field of that name at any depth.
+    // An exact top-level match must not hide a nested namesake's note.
+    const { stdout, code } = await run("nl", "namesakes.city");
+    assert.equal(code, 0);
+    assert.match(stdout, /top city/);
+    assert.match(stdout, /addr city/);
   });
 
   it("meta reads type and note from the fragment that writes a nested field", async () => {
