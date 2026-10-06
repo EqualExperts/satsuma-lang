@@ -120,7 +120,7 @@ The content is baked into the CLI at build time — no runtime file read — fro
 
 The formatter is opinionated and zero-configuration — one canonical style for all Satsuma files. It walks the tree-sitter CST to produce parser-backed, semantics-preserving output. Files with parse errors are skipped with a warning.
 
-Exit codes: `0` = success (or already formatted), `1` = files would change (`--check` mode), `2` = parse errors.
+Exit codes: `0` = success (or already formatted), `1` = files would change (`--check` mode), `2` = parse errors. A file with parse errors makes every mode exit `2`, even when other files were formatted or would change; those files are still formatted or listed, but `2` outranks `1` so a `--check` gate cannot pass a file it never checked.
 
 ### Structural Analysis
 

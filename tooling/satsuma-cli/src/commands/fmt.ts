@@ -11,7 +11,9 @@
  * Exit codes:
  *   0  success (or all files already formatted in --check mode)
  *   1  files would change (--check mode only)
- *   2  parse errors or other failures
+ *   2  any file skipped for parse errors (in every mode, taking precedence
+ *      over 1; well-formed files are still formatted or listed), or other
+ *      failures
  */
 
 import { readFileSync, writeFileSync } from "node:fs";
@@ -108,18 +110,20 @@ Examples:
             }
           }
 
-          // Surface a hard failure if every input was unparseable (no formatting
-          // happened and no --check assertion was made). This catches the case
-          // of running `satsuma fmt` on a directory of broken files.
-          if (parseErrors > 0 && wouldChange === 0 && !opts.check) {
-            return EXIT_PARSE_ERROR;
-          }
-
-          // --check is the CI assertion mode: exit 1 if anything would change.
+          // --check is the CI assertion mode: report how many files would change.
           if (opts.check && wouldChange > 0) {
             console.error(`\n${wouldChange} file(s) would be reformatted`);
-            return EXIT_NOT_FOUND;
           }
+
+          // Rule: a skipped file fails the run with exit 2 in every mode, even
+          // when other files were formatted or would change. Otherwise a CI gate
+          // using `fmt --check` would pass a file the formatter never checked
+          // (bsw-u11n). Parse errors outrank "would change": the broken file has
+          // to be fixed before its formatting can even be judged.
+          if (parseErrors > 0) return EXIT_PARSE_ERROR;
+
+          // --check: exit 1 if anything would change.
+          if (opts.check && wouldChange > 0) return EXIT_NOT_FOUND;
         },
       ),
     );
