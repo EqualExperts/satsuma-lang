@@ -34,7 +34,7 @@ import {
   computeNLRefPosition,
 } from "./nl-ref.js";
 import type { DefinitionLookup } from "./nl-ref.js";
-import { expandSpreads, collectFieldPaths } from "./spread-expand.js";
+import { expandSpreads, collectFieldPaths, collectNestedSpreads } from "./spread-expand.js";
 import type { SpreadEntity, EntityRefResolver, SpreadEntityLookup } from "./spread-expand.js";
 import { resolveScopedEntityRef } from "./canonical-ref.js";
 import { findAncestorEscape } from "./reference-stages.js";
@@ -329,21 +329,37 @@ function checkDuplicates(index: SemanticIndex, diagnostics: SemanticDiagnostic[]
 
 /**
  * A schema that spreads a fragment must reference a fragment that exists in
- * the index. Cross-namespace spreads require a qualified reference.
+ * the index. Cross-namespace spreads require a qualified reference. Spreads
+ * inside a record body are held to the same rule as top-level ones
+ * (bsw-xivc): the message names the record and points at its line.
  */
 function checkFragmentSpreads(index: SemanticIndex, diagnostics: SemanticDiagnostic[]): void {
   for (const [name, schema] of index.schemas) {
     const currentNs = schema.namespace ?? null;
+    const isDefined = (spread: string): boolean =>
+      !!resolveScopedEntityRef(spread, currentNs, index.fragments);
+    const report = (line: number, message: string): void => {
+      diagnostics.push({
+        file: schema.file,
+        line,
+        column: 1,
+        severity: "warning",
+        rule: "undefined-ref",
+        message,
+      });
+    };
+
     for (const spread of schema.spreads ?? []) {
-      if (!resolveScopedEntityRef(spread, currentNs, index.fragments)) {
-        diagnostics.push({
-          file: schema.file,
-          line: schema.row + 1,
-          column: 1,
-          severity: "warning",
-          rule: "undefined-ref",
-          message: `Schema '${name}' spreads undefined fragment '${spread}'`,
-        });
+      if (!isDefined(spread)) {
+        report(schema.row + 1, `Schema '${name}' spreads undefined fragment '${spread}'`);
+      }
+    }
+    for (const { recordPath, spread, row } of collectNestedSpreads(schema.fields)) {
+      if (!isDefined(spread)) {
+        report(
+          (row ?? schema.row) + 1,
+          `Schema '${name}' spreads undefined fragment '${spread}' in record '${recordPath}'`,
+        );
       }
     }
   }

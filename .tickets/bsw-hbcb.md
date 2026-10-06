@@ -1,6 +1,6 @@
 ---
 id: bsw-hbcb
-status: open
+status: closed
 deps: []
 links: []
 created: 2026-10-06T09:57:03Z
@@ -23,3 +23,10 @@ mapping m { source { s } target { t }  full_name -> addr }
 ## Acceptance Criteria
 
 - The rule fires for record targets whose fields come from a resolvable spread, local or imported; tests added. Likely fixed by the core nested-spread ticket plus a lint test.
+
+## Notes
+
+**2026-10-06T10:37:02Z**
+
+Cause: `endpointKind` asked core's `expandSpreads` whether the target schema had an unresolved spread, and core answered yes for every schema whose only spreads were nested (bsw-xivc), so the rule skipped it.
+Fix: fixed at the root by bsw-xivc's core change; added a lint-engine test for a nested local spread and a two-file lint-command test for an imported fragment, both red before the fix (commit immediately after 914c97c2).

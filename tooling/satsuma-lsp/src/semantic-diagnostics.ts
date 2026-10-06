@@ -333,6 +333,7 @@ function defEntryToSchema(name: string, entry: DefinitionEntry): SemanticSchema 
     file: entry.uri,
     row: entry.range.start.line,
     fields: entry.fields.map(fieldInfoToDecl),
+    ...spreadsOf(entry),
   };
 }
 
@@ -345,14 +346,29 @@ function defEntryToFragment(name: string, entry: DefinitionEntry): SemanticFragm
     file: entry.uri,
     row: entry.range.start.line,
     fields: entry.fields.map(fieldInfoToDecl),
+    ...spreadsOf(entry),
   };
 }
 
-/** Normalize the workspace index's rendered type spelling for core validation. */
+/**
+ * The entity's top-level spreads, which core checks resolve (bsw-xivc). Nested
+ * spreads travel on each field instead (`fieldInfoToDecl`), so `hasSpreads`
+ * here reflects only the top-level list; core walks the field tree regardless.
+ */
+function spreadsOf(entry: DefinitionEntry): { spreads: string[]; hasSpreads: boolean } {
+  const spreads = entry.spreads ?? [];
+  return { spreads, hasSpreads: spreads.length > 0 };
+}
+
+/**
+ * Normalize the workspace index's rendered type spelling for core validation.
+ * `startRow` lets core point a nested-spread diagnostic at its record's line.
+ */
 function fieldInfoToDecl(field: DefinitionEntry["fields"][number]): FieldDecl {
   return fieldDeclFromRenderedType({
     name: field.name,
     type: field.type,
+    startRow: field.range.start.line,
     children: field.children.map(fieldInfoToDecl),
     ...(field.spreads ? { spreads: field.spreads } : {}),
   });

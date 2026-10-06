@@ -339,6 +339,26 @@ mapping m {
     );
   });
 
+  it("reports an undefined fragment spread at the top level and inside a record, each on its own line (bsw-xivc)", () => {
+    // The rule lives in core; this pins the adapter. It used to drop the
+    // schema's top-level spreads and each field's row, so the editor flagged
+    // neither form until a save ran the CLI. Both must reach core, and the
+    // nested one must point at its record rather than the schema header.
+    const src = `schema t2 { id INT  ...nope2 }
+schema t {
+  id INT
+  a record { ...nope }
+}`;
+    const idx = buildIndex({ "file:///a.stm": src });
+    const spreadDiags = computeCoreSemanticDiagnostics("file:///a.stm", idx)
+      .filter((d) => d.code === "undefined-ref")
+      .map((d) => [d.range.start.line, d.message]);
+    assert.deepEqual(spreadDiags, [
+      [0, "Schema 't2' spreads undefined fragment 'nope2'"],
+      [3, "Schema 't' spreads undefined fragment 'nope' in record 'a'"],
+    ]);
+  });
+
   it("returns no diagnostics for a valid single-file workspace", () => {
     const src = `schema customers { id UUID }
 mapping m {

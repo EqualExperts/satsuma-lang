@@ -10,7 +10,13 @@ import type { ExtractedWorkspace } from "#src/types.js";
 /** Shape of a mock schema passed to makeIndex. */
 interface MockSchema {
   name: string;
-  fields: Array<{ name: string; children?: Array<{ name: string }> }>;
+  /** A record field's `spreads` lists the fragments its body spreads (`r record { ...f }`). */
+  fields: Array<{
+    name: string;
+    children?: Array<{ name: string }>;
+    hasSpreads?: boolean;
+    spreads?: string[];
+  }>;
   /** Set when the schema spreads a fragment that has not been expanded — its field list is then incomplete. */
   hasSpreads?: boolean;
   /** Fragment names this schema spreads (`...name`), resolved against `fragments` passed to makeIndex. */
@@ -890,6 +896,29 @@ describe("lint: unenumerated-record-target", () => {
     // not suppress the diagnostic. Before the fix this reported nothing at
     // all, because `endpointKind` skipped every `hasSpreads` schema outright.
     const diags = run(differentialPair(true));
+    assert.equal(diags.length, 1);
+    assert.match(diags[0].message, /targets a record/);
+  });
+
+  it("flags an unenumerated record target whose fields all come from a nested spread (bsw-hbcb)", () => {
+    // `addr record { ...addr_f }`: extraction marks the schema `hasSpreads` but
+    // keeps the spread on the field, and core read that as "unresolved", so
+    // the rule skipped the schema while coverage reported `addr` at 0/1.
+    const index = makeIndex({
+      schemas: [
+        { name: "src", fields: [{ name: "full_name" }] },
+        {
+          name: "tgt",
+          fields: [{ name: "addr", children: [], hasSpreads: true, spreads: ["addr_f"] }],
+          hasSpreads: true,
+          spreads: [],
+        },
+      ],
+      fragments: [{ name: "addr_f", fields: [{ name: "line1" }] }],
+      mappings: [{ name: "load", sources: ["src"], targets: ["tgt"] }],
+      arrows: [{ mapping: "load", sources: ["full_name"], target: "addr" }],
+    });
+    const diags = run(index);
     assert.equal(diags.length, 1);
     assert.match(diags[0].message, /targets a record/);
   });
