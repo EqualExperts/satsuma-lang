@@ -98,8 +98,9 @@ namespace analytics (note "Business metrics layer") {
     total_value  DECIMAL(12,2)  (measure)
   }
 
+  // Cross-namespace mapping: e-commerce orders roll up into the metric
   mapping `daily sales pipeline` {
-    source { warehouse::conformed_store }
+    source { ecom::orders }
     target { analytics::daily_sales }
 
     order_date -> sale_date

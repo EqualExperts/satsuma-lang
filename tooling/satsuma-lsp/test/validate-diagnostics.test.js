@@ -141,44 +141,69 @@ describe("runValidate", () => {
 
   // Contract test against the real built CLI (sl-rngq acceptance criterion 3):
   // if the CLI's --json shape and the LSP parser ever drift again, this fails
-  // loudly instead of degrading to zero diagnostics. The namespaces example
-  // ships four known field-not-in-schema warnings (bogus source fields on
-  // warehouse::conformed_store in the 'daily sales pipeline' mapping), so a
-  // non-empty result is a hard requirement, not an if-guarded hope.
-  it("surfaces the namespaces example's four field-not-in-schema warnings from the real CLI", async () => {
-    const fixturePath = path.resolve(__dirname, "../../../examples/namespaces/namespaces.stm");
-    const fixtureUri = pathToFileURL(fixturePath).toString();
-
-    const result = await runValidate(fixtureUri, CLI_PATH);
-
-    assert.ok(
-      result.size > 0,
-      "real CLI output must produce diagnostics — empty means the JSON shapes have drifted (sl-rngq)",
+  // loudly instead of degrading to zero diagnostics. The input carries four
+  // known field-not-in-schema warnings (arrow sources the namespaced source
+  // schema never declares), so a non-empty result is a hard requirement, not
+  // an if-guarded hope. It is written here rather than borrowed from the
+  // example corpus, which must validate clean (bsw-8flg).
+  it("surfaces four field-not-in-schema warnings from the real CLI", async () => {
+    const fs = require("node:fs");
+    const os = require("node:os");
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "satsuma-lsp-rngq-"));
+    const file = path.join(dir, "bogus-sources.stm");
+    fs.writeFileSync(
+      file,
+      [
+        "namespace warehouse {",
+        "  schema store { store_id STRING }",
+        "  schema sales { a STRING  b STRING  c STRING  d STRING }",
+        "  mapping load {",
+        "    source { store }",
+        "    target { sales }",
+        "    w -> a",
+        "    x -> b",
+        "    y -> c",
+        "    z -> d",
+        "  }",
+        "}",
+        "",
+      ].join("\n"),
     );
 
-    const all = [...result.values()].flat();
-    const fieldWarnings = all.filter((d) => d.code === "field-not-in-schema");
-    assert.equal(
-      fieldWarnings.length,
-      4,
-      "the four bogus source fields must each surface as a diagnostic",
-    );
-    for (const d of fieldWarnings) {
-      assert.equal(d.source, "satsuma-validate");
-      // DiagnosticSeverity.Warning === 2
-      assert.equal(d.severity, 2, "field-not-in-schema is warning severity");
-      assert.match(d.message, /not declared in schema 'warehouse::conformed_store'/);
-      // CLI reports lines 105-108 (1-based); LSP must convert to 0-based.
+    try {
+      const result = await runValidate(pathToFileURL(file).toString(), CLI_PATH);
+
       assert.ok(
-        d.range.start.line >= 104 && d.range.start.line <= 107,
-        `expected 0-based line in [104,107], got ${d.range.start.line}`,
+        result.size > 0,
+        "real CLI output must produce diagnostics — empty means the JSON shapes have drifted (sl-rngq)",
       );
-    }
 
-    // Diagnostics must be keyed by canonical file:// URIs so they attach to
-    // the open editor document.
-    for (const [uri] of result) {
-      assert.ok(uri.startsWith("file://"), `URI should start with file://, got: ${uri}`);
+      const all = [...result.values()].flat();
+      const fieldWarnings = all.filter((d) => d.code === "field-not-in-schema");
+      assert.equal(
+        fieldWarnings.length,
+        4,
+        "the four bogus source fields must each surface as a diagnostic",
+      );
+      for (const d of fieldWarnings) {
+        assert.equal(d.source, "satsuma-validate");
+        // DiagnosticSeverity.Warning === 2
+        assert.equal(d.severity, 2, "field-not-in-schema is warning severity");
+        assert.match(d.message, /not declared in schema 'warehouse::store'/);
+        // CLI reports lines 7-10 (1-based); LSP must convert to 0-based.
+        assert.ok(
+          d.range.start.line >= 6 && d.range.start.line <= 9,
+          `expected 0-based line in [6,9], got ${d.range.start.line}`,
+        );
+      }
+
+      // Diagnostics must be keyed by canonical file:// URIs so they attach to
+      // the open editor document.
+      for (const [uri] of result) {
+        assert.ok(uri.startsWith("file://"), `URI should start with file://, got: ${uri}`);
+      }
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
     }
   });
 });
