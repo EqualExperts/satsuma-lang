@@ -211,6 +211,60 @@ mapping m {
     );
   });
 
+  // ── ADR-053 escape paths (bsw-rkn4) ────────────────────────────────────
+  // `^.x` names a field of the enclosing level's parent and `$.x` a field of
+  // the schema root. The index once filed them under the keys "^" and "$", so
+  // references from the declarations they name never reached them.
+  const ESCAPE = `schema src {
+  survey_id UUID
+  transects list_of record {
+    transect_ref STRING
+    sightings list_of record {
+      species STRING
+    }
+  }
+}
+schema tgt {
+  sid UUID
+  tref STRING
+}
+mapping m {
+  source { src }
+  target { tgt }
+  flatten transects.sightings -> tgt {
+    ^.transect_ref -> tref
+    $.survey_id -> sid
+  }
+}`;
+
+  /** "line:start-end" for each location, sorted, for exact comparison. */
+  function spans(result) {
+    return result
+      .map((r) => `${r.range.start.line}:${r.range.start.character}-${r.range.end.character}`)
+      .sort();
+  }
+
+  it("finds a ^.-escaped arrow source from the parent-level field it names", () => {
+    // Cursor on `transect_ref` in `transects record`. The only use is the
+    // `^.transect_ref` arrow, and its range covers the name alone, so the
+    // `^.` marker is never part of the reference.
+    const result = refs({ "file:///a.stm": ESCAPE }, "file:///a.stm", 3, 6, false);
+    assert.deepEqual(spans(result), ["17:6-18"]);
+  });
+
+  it("finds a $.-escaped arrow source from the root field it names", () => {
+    // Cursor on the top-level `survey_id`; `$.survey_id` is its one use.
+    const result = refs({ "file:///a.stm": ESCAPE }, "file:///a.stm", 1, 4, false);
+    assert.deepEqual(spans(result), ["18:6-15"]);
+  });
+
+  it("finds the declaration from a ^.-escaped arrow source", () => {
+    // The reverse query: from `transect_ref` after `^.`, the result holds the
+    // declaration inside `transects record` and the arrow site itself.
+    const result = refs({ "file:///a.stm": ESCAPE }, "file:///a.stm", 17, 8, true);
+    assert.deepEqual(spans(result), ["17:6-18", "3:4-16"]);
+  });
+
   it("finds @ref references in NL strings for a schema", () => {
     const src = `schema customers {
   id UUID

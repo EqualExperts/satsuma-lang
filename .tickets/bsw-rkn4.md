@@ -1,6 +1,6 @@
 ---
 id: bsw-rkn4
-status: open
+status: closed
 deps: []
 links: []
 created: 2026-10-06T09:45:31Z
@@ -19,3 +19,10 @@ Repro: inside `flatten transects.sightings -> tgt { ^.transect_ref -> tref  $.su
 
 - The index keys escape-path usages by their container-resolved field (reuse core's resolution, e.g. `qualifyChildArrowPath` / `resolveAuthoredPathAgainstContainer`, rather than re-stripping text).
 - LSP tests: references and rename include `^.` and `$.` sites, red before the fix.
+
+## Notes
+
+**2026-10-06T18:39:40Z**
+
+Cause: the workspace index built its reference keys from arrow-path text, so `^.x` and `$.x` were filed under "^" and "$" and never met the field they name. Already fixed by 435054e5 (bsw-89wr), which keys every arrow path by its container-resolved field through core's `resolveArrowPathInPlace`.
+Fix: added the LSP tests the acceptance criteria ask for: references from the declarations to `^.`/`$.` sites and back, and a computeRename that rewrites both sites and keeps the marker. All four fail with 435054e5^'s workspace-index.ts and pass now. Field rename stays gated off by prepareRename, so the rename test pins computeRename's edits only. (commit immediately after 435054e5)
