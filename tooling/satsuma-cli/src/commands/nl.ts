@@ -198,9 +198,10 @@ function extractFromField(
 
   // Spread-supplied fields count at any depth, and their notes are read from
   // the fragment that writes them (bsw-ep0m). A bare name reaches every field
-  // of that name in the schema, so each one's notes are reported.
+  // of that name in the schema, top-level or nested, so each one's notes are
+  // reported.
   const schema = resolvedSchema.entry;
-  const matches = findDeclaredFields(schema, pathSegments, index);
+  const matches = findDeclaredFields(schema, pathSegments, index, { everyNamesake: true });
   if (matches.length === 0) {
     throw new CommandError(
       `Field '${fieldPath}' not found in schema '${schemaName}'.`,

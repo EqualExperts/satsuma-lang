@@ -45,6 +45,17 @@ export interface DeclaredFieldMatch {
 
 // ── Lookup ────────────────────────────────────────────────────────────────────
 
+/** How a bare (single-segment) name is matched. */
+export interface FieldLookupOptions {
+  /**
+   * When true, a bare name matches every field of that name at any depth even
+   * if one is declared at the top level. `nl` reports notes, and has always
+   * reported each namesake's; `arrows` and `meta` want the one field the path
+   * names (bsw-kvj9), so they leave this off.
+   */
+  everyNamesake?: boolean;
+}
+
 /**
  * Every declared field the segments name in `entity`, spreads included.
  *
@@ -54,13 +65,20 @@ export interface DeclaredFieldMatch {
  * `schema.street` reach `schema.address.street` (sl-xj4p). A dotted path that
  * does not resolve exactly matches nothing: `customer.zzz.street` must not fall
  * back to some other `street`.
+ *
+ * With `everyNamesake`, a bare name skips the exact-path rule and matches
+ * every field of that name, the top-level one included.
  */
 export function findDeclaredFields(
   entity: FieldOwner,
   segments: readonly string[],
   index: ExtractedWorkspace,
+  options: FieldLookupOptions = {},
 ): DeclaredFieldMatch[] {
   const tree = expandDeclaredFields(entity, entity.namespace ?? null, index);
+  if (options.everyNamesake && segments.length === 1) {
+    return collectByName(tree, segments.join("."), [], null);
+  }
   const exact = matchPath(tree, segments);
   if (exact) return [exact];
   const name = segments.join(".");
