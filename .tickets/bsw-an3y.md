@@ -1,6 +1,6 @@
 ---
 id: bsw-an3y
-status: open
+status: closed
 deps: []
 links: []
 created: 2026-10-06T09:45:31Z
@@ -16,3 +16,10 @@ tags: [bug-sweep-2026-10, cli, mapping]
 ## Acceptance Criteria
 
 - Text output prints nested each/flatten blocks at any depth with their arrows; test against `examples/nested-iteration/`.
+
+## Notes
+
+**2026-10-06T10:33:06Z**
+
+Cause: The text view walked the CST separately from `--json`/`--arrows-only`, and its `printBlockNode` recursed only into map, computed and nested arrows, so an each/flatten inside an each/flatten vanished.
+Fix: All three output modes now render one arrow tree built by a single recursive walk, so the text view prints nested list blocks at any depth. Tests in `tooling/satsuma-cli/test/mapping.test.ts`, including `examples/nested-iteration/`. (commit immediately after 914c97c2)

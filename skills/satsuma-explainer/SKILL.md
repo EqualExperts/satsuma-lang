@@ -66,7 +66,8 @@ dictionaries and how to explain each pattern to different audiences.
 For every mapping found in the summary:
 
 ```bash
-# Full mapping with arrows and transforms
+# Full mapping with arrows and transforms (an arrow's `srcs` lists every
+# input of a multi-source arrow; `src` is only the first)
 satsuma mapping "<mapping-name>" --json
 
 # Target fields not covered by this mapping

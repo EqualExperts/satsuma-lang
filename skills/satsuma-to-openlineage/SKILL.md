@@ -146,7 +146,8 @@ JSON structure.
 ### Multi-source arrows
 
 When an arrow has multiple source fields (`a, b -> target`), list all source
-fields in the `inputFields` array:
+fields in the `inputFields` array. Take them from the arrow's `srcs` array in
+`mapping --json`; `src` holds only the first source:
 
 ```json
 "full_name": {
