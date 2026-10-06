@@ -245,9 +245,15 @@ function collectExpandedFields(
 }
 
 /**
- * Recursively expand fragment spreads within nested record fields.
- * Modifies field children in place, inserting fragment fields into the
- * correct nesting level rather than hoisting to the schema level.
+ * Recursively expand fragment spreads within nested record fields, in place,
+ * inserting fragment fields at the record's own level rather than hoisting
+ * them to the schema.
+ *
+ * A spread contributes copies of the fragment's fields, and a copied record
+ * may carry a spread of its own (`fragment shipping { addr record { ...geo } }`).
+ * Those copies are expanded too, so a field is reachable however many
+ * fragments stand between it and the schema (bsw-ep0m). The copies are deep,
+ * because expansion mutates and the fragment index is shared.
  */
 export function expandNestedSpreads(
   fields: FieldDecl[],
@@ -255,24 +261,81 @@ export function expandNestedSpreads(
   resolveRef: EntityRefResolver,
   lookupFragment: SpreadEntityLookup,
 ): void {
+  expandNestedSpreadsWithin(fields, currentNs, resolveRef, lookupFragment, new Set());
+}
+
+/**
+ * The recursion behind `expandNestedSpreads`.
+ *
+ * `enclosing` holds every fragment whose body the walk is currently inside.
+ * A record that spreads one of them describes an infinite tree
+ * (`fragment node { child record { ...node } }`), so that spread is dropped
+ * rather than followed. Each level that expands anything adds at least one
+ * fragment to the set, and there are finitely many, so the walk terminates.
+ */
+function expandNestedSpreadsWithin(
+  fields: FieldDecl[],
+  currentNs: string | null,
+  resolveRef: EntityRefResolver,
+  lookupFragment: SpreadEntityLookup,
+  enclosing: ReadonlySet<string>,
+): void {
   for (const field of fields) {
-    if (field.children) {
-      // First recurse into deeper levels
-      expandNestedSpreads(field.children, currentNs, resolveRef, lookupFragment);
-      // Then expand spreads at this level
-      if (field.hasSpreads && field.spreads) {
-        const expanded = expandEntityFields(
-          { fields: field.children, hasSpreads: true, spreads: field.spreads },
+    if (!field.children) continue;
+    if (field.hasSpreads && field.spreads) {
+      const spreadKeys = field.spreads
+        .map((ref) => resolveRef(ref, currentNs))
+        .filter((key): key is string => key !== null);
+      const live = field.spreads.filter((ref) => {
+        const key = resolveRef(ref, currentNs);
+        return key === null || !enclosing.has(key);
+      });
+      const expanded = deepCopyFields(
+        expandEntityFields(
+          { fields: field.children, hasSpreads: live.length > 0, spreads: live },
           currentNs,
           resolveRef,
           lookupFragment,
-        );
-        field.children = [...field.children, ...expanded];
-        delete field.hasSpreads;
-        delete field.spreads;
-      }
+        ),
+      );
+      expandSpreadContributions(
+        expanded,
+        currentNs,
+        resolveRef,
+        lookupFragment,
+        withKeys(enclosing, spreadKeys),
+      );
+      expandNestedSpreadsWithin(field.children, currentNs, resolveRef, lookupFragment, enclosing);
+      field.children = [...field.children, ...expanded];
+      delete field.hasSpreads;
+      delete field.spreads;
+    } else {
+      expandNestedSpreadsWithin(field.children, currentNs, resolveRef, lookupFragment, enclosing);
     }
   }
+}
+
+/**
+ * Expand the records inside fields a spread contributed. Each one is written
+ * in its `fromFragment`'s body, so that fragment joins the enclosing set for
+ * everything beneath it.
+ */
+function expandSpreadContributions(
+  contributed: ExpandedField[],
+  currentNs: string | null,
+  resolveRef: EntityRefResolver,
+  lookupFragment: SpreadEntityLookup,
+  enclosing: ReadonlySet<string>,
+): void {
+  for (const field of contributed) {
+    const within = field.fromFragment ? withKeys(enclosing, [field.fromFragment]) : enclosing;
+    expandNestedSpreadsWithin([field], currentNs, resolveRef, lookupFragment, within);
+  }
+}
+
+/** A copy of `set` with `keys` added; the caller's set is left alone. */
+function withKeys(set: ReadonlySet<string>, keys: readonly string[]): ReadonlySet<string> {
+  return new Set([...set, ...keys]);
 }
 
 /**
@@ -313,7 +376,20 @@ export function expandDeclaredFields(
   if (!entity) return [];
   const fields = deepCopyFields(entity.fields);
   expandNestedSpreads(fields, currentNs, resolveRef, lookupFragment);
-  return [...fields, ...expandEntityFields(entity, currentNs, resolveRef, lookupFragment)];
+  const contributed = deepCopyFields(
+    expandEntityFields(entity, currentNs, resolveRef, lookupFragment),
+  );
+  const spreadKeys = (entity.spreads ?? [])
+    .map((ref) => resolveRef(ref, currentNs))
+    .filter((key): key is string => key !== null);
+  expandSpreadContributions(
+    contributed,
+    currentNs,
+    resolveRef,
+    lookupFragment,
+    new Set(spreadKeys),
+  );
+  return [...fields, ...contributed];
 }
 
 /** Recursive copy, so in-place nested expansion cannot touch a shared index. */

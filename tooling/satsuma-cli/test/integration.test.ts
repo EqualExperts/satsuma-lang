@@ -2033,9 +2033,22 @@ describe("satsuma meta", () => {
   });
 
   it("disambiguates same-named fields via nested path (sl-bfue)", async () => {
+    // Both records sit inside `Order`. These paths once omitted it and passed
+    // only because meta fell back to any field named like the last segment;
+    // a dotted path is now resolved exactly (bsw-ep0m).
     const XML = resolve(EXAMPLES, "xml-to-parquet/pipeline.stm");
-    const { stdout: s1 } = await run("meta", "commerce_order.Totals.TaxAmount", "--json", XML);
-    const { stdout: s2 } = await run("meta", "commerce_order.LineItems.TaxAmount", "--json", XML);
+    const { stdout: s1 } = await run(
+      "meta",
+      "commerce_order.Order.Totals.TaxAmount",
+      "--json",
+      XML,
+    );
+    const { stdout: s2 } = await run(
+      "meta",
+      "commerce_order.Order.LineItems.TaxAmount",
+      "--json",
+      XML,
+    );
     const d1 = JSON.parse(s1);
     const d2 = JSON.parse(s2);
     assert.equal(d1.type, d2.type, "both TaxAmount fields should have same type");
