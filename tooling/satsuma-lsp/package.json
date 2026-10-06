@@ -60,7 +60,7 @@
     "now asserts no unpublishable dependency reaches the tarball."
   ],
   "dependencies": {
-    "vscode-languageserver": "^10.1.0",
+    "vscode-languageserver": "^10.1.2",
     "vscode-languageserver-textdocument": "^1.0.12",
     "web-tree-sitter": "^0.27.0"
   },
