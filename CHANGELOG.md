@@ -114,6 +114,9 @@ Markdown too.
 - **Layout** (`sl-yedr`, `sl-6g23`, `sl-zsv6`). Expanded namespaced cards keep
   their rounded corners, the field count joins the arrow as the expand
   target, and the toolbar wraps instead of pushing the file filter out of view.
+- **Asterisks in notes survive Markdown** (`bsw-5b3m`). Inline code such as
+  `SELECT * FROM t` lost its asterisks to emphasis, and so did a lone `*` in
+  `a * b`. Both now render as written.
 
 ### Language server: go-to-definition in three more places, and schema renames reach `@ref`s (`gpt-jwek`, `gpt-fjo7`)
 
@@ -124,6 +127,12 @@ reported by find-references, so the two now agree.
 Renaming a schema now updates `@ref`s in NL text that name a field of it,
 such as `@orders.total`. Previously the rename left them dangling. Renaming
 a field still does not reach `@ref`s.
+
+Three smaller editor fixes: the outline names each namespace instead of
+showing `(anonymous)` (`bsw-c7z2`); the mapping code lens counts arrows inside
+`each` and `flatten` blocks, so it agrees with `satsuma summary` (`bsw-ks5q`);
+and **Overview Visualization** from the Explorer's right-click menu shows the
+file you clicked rather than the one last open (`bsw-a2zk`).
 
 ### CLI fixes for `arrows` and the `unenumerated-record-target` lint rule (`gpt-qhfo`, `gpt-i1uv`, `sl-3fou`)
 
@@ -146,6 +155,9 @@ tagged releases remain clean `X.Y.Z` versions.
 Clean-checkout lint now generates the ignored CLI/LSP build-version modules
 before type-aware ESLint, so CI does not depend on artifacts left by a prior
 local build (`s1cl-gphp`).
+
+Release tags now point at the commit the release was built from, not at
+whatever `main` had become by the time the release job ran (`bsw-nx1l`).
 
 ### The site and docs lead with readability (`sl-j7vt`)
 
