@@ -9,6 +9,7 @@ import {
   vizThemeForKind,
 } from "./integration";
 import { RefreshGate } from "./refresh-gate";
+import { chooseVizTargetUri } from "./viz-target";
 
 export class VizPanel {
   static currentPanel: VizPanel | undefined;
@@ -25,10 +26,20 @@ export class VizPanel {
    */
   private readonly refreshGate = new RefreshGate();
 
-  static createOrShow(extensionUri: vscode.Uri, client: LanguageClient): void {
+  /**
+   * Open the panel, or reveal the open one, and load a file into it.
+   * `requestedUri` names the file to show (the Explorer's right-clicked file);
+   * without it the panel shows the active Satsuma editor or its last file —
+   * see {@link chooseVizTargetUri}.
+   */
+  static createOrShow(
+    extensionUri: vscode.Uri,
+    client: LanguageClient,
+    requestedUri?: string,
+  ): void {
     if (VizPanel.currentPanel) {
       VizPanel.currentPanel.panel.reveal(vscode.ViewColumn.Beside);
-      VizPanel.currentPanel.refresh();
+      VizPanel.currentPanel.refresh(requestedUri);
       return;
     }
 
@@ -43,13 +54,14 @@ export class VizPanel {
       },
     );
 
-    VizPanel.currentPanel = new VizPanel(panel, extensionUri, client);
+    VizPanel.currentPanel = new VizPanel(panel, extensionUri, client, requestedUri);
   }
 
   private constructor(
     panel: vscode.WebviewPanel,
     extensionUri: vscode.Uri,
     client: LanguageClient,
+    requestedUri: string | undefined,
   ) {
     this.panel = panel;
     this.extensionUri = extensionUri;
@@ -95,16 +107,15 @@ export class VizPanel {
     this.panel.onDidDispose(() => this.dispose(), null, this.disposables);
 
     // Initial data load
-    this.refresh();
+    this.refresh(requestedUri);
   }
 
-  async refresh(): Promise<void> {
-    // Prefer last loaded URI so Refresh works even when the webview has focus
-    // and the .stm editor is no longer the active editor.
+  /** Load `requestedUri`, or else the active Satsuma editor or the last file shown. */
+  async refresh(requestedUri?: string): Promise<void> {
     const editor = vscode.window.activeTextEditor;
-    const activeUri =
+    const activeSatsumaUri =
       editor?.document.languageId === "satsuma" ? editor.document.uri.toString() : undefined;
-    const uri = activeUri ?? this._lastUri;
+    const uri = chooseVizTargetUri({ requestedUri, activeSatsumaUri, lastUri: this._lastUri });
 
     if (!uri) {
       this.panel.webview.postMessage({
