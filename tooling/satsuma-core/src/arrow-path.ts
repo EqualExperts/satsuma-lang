@@ -12,10 +12,11 @@
  *   root_path            $.a           `$.`  — absolute from the schema root (ADR-053)
  *   namespaced_path      ns::s.a       `ns::` then schema and field segments
  *
- * This module owns turning that CST into structured parts, and rendering the
- * parts back to the authored path string the container resolver
- * (reference-stages.ts `resolveAuthoredPathAgainstContainer`) consumes. It
- * does not resolve paths against containers, and it does not look anything up.
+ * This module owns turning that CST into structured parts, rendering the parts
+ * back to the authored path string, and handing them to the container rule in
+ * reference-stages.ts so a path is resolved from its segments rather than from
+ * re-split text. The rule itself (what `^.`, `$.` and `.` mean) lives in
+ * reference-stages.ts, and nothing here looks a field up.
  *
  * Why the CST and not `node.text`: a path's raw text keeps the backticks of
  * every quoted segment, so `` orders.`odd name` `` would reach validation and
@@ -25,6 +26,12 @@
 
 import { canonicalRef } from "./canonical-ref.js";
 import { isPresent } from "./cst-utils.js";
+import {
+  PATH_SEPARATOR,
+  resolveAuthoredPathAgainstContainer,
+  resolvePathSegmentsAgainstContainer,
+  type ContainerSegments,
+} from "./reference-stages.js";
 import type { SyntaxNode } from "./types.js";
 
 // ── Types ───────────────────────────────────────────────────────────────────
@@ -189,4 +196,68 @@ export function arrowPathText(pathNode: SyntaxNode | null | undefined): string |
   const parts = arrowPathParts(pathNode);
   if (parts) return renderArrowPath(parts);
   return pathNode.namedChildren[0]?.text ?? pathNode.text;
+}
+
+// ── Resolution against a container ──────────────────────────────────────────
+
+/**
+ * An arrow path made absolute against its containers, in both of the forms
+ * consumers need.
+ */
+export interface ResolvedArrowPath {
+  /** The joined schema-root path: the arrow record's identity (ADR-035). */
+  text: string;
+  /**
+   * The segments `text` was joined from, one per nesting level. When this path
+   * is itself a container, its children resolve against these, so a backtick
+   * segment containing a dot stays one level for `^.` (bsw-2yzd).
+   */
+  segments: ContainerSegments;
+}
+
+/**
+ * Resolve a `src_path` / `tgt_path` node against its enclosing container.
+ *
+ * A well-formed, un-namespaced path is resolved segment by segment
+ * (`resolvePathSegmentsAgainstContainer`), never re-split from text.
+ *
+ * Two shapes have no clean segments and keep the text resolver: an
+ * error-recovered path, whose raw text must stay visibly malformed (rule
+ * sl-8o1n above), and a namespaced path, whose canonical `ns::schema.field`
+ * identity is text. Their segments are the resolved text split on `.` — exact
+ * unless a segment holds a dot, which is how every path was handled before
+ * bsw-2yzd, so these rare shapes lose nothing they had.
+ *
+ * @param pathNode  The path node, or null/undefined for an arrow without one.
+ * @param container The resolved enclosing container, or null at mapping-body
+ *                  level.
+ * @returns The authored text (first line only, so an error-recovered node
+ *          spanning lines stays one line) and the resolved path; null when
+ *          the node is absent or empty.
+ */
+export function resolveArrowPath(
+  pathNode: SyntaxNode | null | undefined,
+  container: ResolvedArrowPath | null,
+): { authored: string; resolved: ResolvedArrowPath } | null {
+  const authored = firstLine(arrowPathText(pathNode));
+  if (!authored) return null;
+
+  const parts = arrowPathParts(pathNode);
+  if (parts && parts.namespace === null) {
+    const segments = resolvePathSegmentsAgainstContainer(
+      parts.anchor,
+      parts.segments,
+      container?.segments ?? null,
+    );
+    return { authored, resolved: { text: segments.join(PATH_SEPARATOR), segments } };
+  }
+  const text = resolveAuthoredPathAgainstContainer(authored, container?.segments ?? null);
+  return { authored, resolved: { text, segments: text.split(PATH_SEPARATOR) } };
+}
+
+/** The text up to its first line break, trimmed when one was cut off. */
+function firstLine(text: string | null): string | null {
+  if (!text) return null;
+  const nlIdx = text.indexOf("\n");
+  return nlIdx === -1 ? text : text.slice(0, nlIdx).trim();
 }

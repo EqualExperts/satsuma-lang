@@ -293,6 +293,8 @@ describe("extractArrowRecords — authored paths and container on nested arrows 
       containerKind: "flatten",
       sourceContainer: "Order.LineItems",
       targetContainer: "t",
+      sourceContainerSegments: ["Order", "LineItems"],
+      targetContainerSegments: ["t"],
       authoredSources: ["Order.OrderId"],
       authoredTarget: ".order_id",
     });
@@ -376,5 +378,33 @@ describe("extractArrowRecords — backtick segments anywhere in a path (bsw-f9fq
     // quoted field vanished and the arrow pointed at the schema itself.
     const root = rootOf(`${MAPPING_HEADER}  crm::orders.\`odd name\` -> x\n}`);
     assert.deepEqual(pairs(extractArrowRecords(root)), ["crm::orders.odd name -> x"]);
+  });
+});
+
+describe("extractArrowRecords — a container named by a dotted backtick segment (bsw-2yzd)", () => {
+  // `` `line.items` `` is one field whose name contains a dot. Its children
+  // resolve against it as one container level, so ^. must pop the whole name.
+  const SRC = `${MAPPING_HEADER}
+  each \`line.items\` -> rows {
+    .v -> .x
+    ^.sid -> .y
+  }
+}`;
+
+  it("pops the whole dotted segment for ^., reaching the schema root", () => {
+    const records = extractArrowRecords(rootOf(SRC));
+    const escaped = records.find((r) => r.target === "rows.y");
+    assert.deepEqual(escaped?.sources, ["sid"]);
+  });
+
+  it("still prefixes a relative child with the whole container name", () => {
+    const records = extractArrowRecords(rootOf(SRC));
+    assert.deepEqual(records.find((r) => r.target === "rows.x")?.sources, ["line.items.v"]);
+  });
+
+  it("records the container as segments so validation can count its levels", () => {
+    const leaf = extractArrowRecords(rootOf(SRC)).find((r) => r.target === "rows.y");
+    assert.deepEqual(leaf?.nesting?.sourceContainerSegments, ["line.items"]);
+    assert.deepEqual(leaf?.nesting?.targetContainerSegments, ["rows"]);
   });
 });

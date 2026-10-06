@@ -6,8 +6,8 @@
  * they can be tested against mock CST objects.
  */
 
-import { arrowPathText } from "./arrow-path.js";
-import { resolveAuthoredPathAgainstContainer } from "./reference-stages.js";
+import { resolveArrowPath, type ResolvedArrowPath } from "./arrow-path.js";
+import { resolveAuthoredPathAgainstContainer, type ContainerSegments } from "./reference-stages.js";
 import { classifyTransform, classifyArrow } from "./classify.js";
 import { createScalarTypeExpression } from "./field-decl.js";
 import { extractMetadata } from "./meta-extract.js";
@@ -939,7 +939,10 @@ export interface ExtractedArrow {
  *
  * `sourceContainer`/`targetContainer` are the absolute paths the authored paths
  * were resolved against (spec §4.4); `authoredSources` is index-aligned with
- * `ExtractedArrow.sources`.
+ * `ExtractedArrow.sources`. The `…Segments` fields hold the same containers one
+ * element per nesting level: the joined text cannot tell a backtick field
+ * `` `line.items` `` from two levels, and counting levels is what `^.` and its
+ * diagnostic hint do (bsw-2yzd).
  */
 export interface ArrowNesting {
   /** Declaration kind of the innermost enclosing container. */
@@ -948,6 +951,10 @@ export interface ArrowNesting {
   sourceContainer: string | null;
   /** Absolute target path of the container, or null when it has none. */
   targetContainer: string | null;
+  /** `sourceContainer` as unquoted segments, one per level, or null with it. */
+  sourceContainerSegments: ContainerSegments | null;
+  /** `targetContainer` as unquoted segments, one per level, or null with it. */
+  targetContainerSegments: ContainerSegments | null;
   /** Each source path exactly as written, before container resolution. */
   authoredSources: string[];
   /** The target path exactly as written, or null for a target-less arrow. */
@@ -957,8 +964,8 @@ export interface ArrowNesting {
 /** The container an arrow body is resolved against; null at mapping-body level. */
 interface EnclosingContainer {
   kind: ArrowNesting["containerKind"];
-  source: string | null;
-  target: string | null;
+  source: ResolvedArrowPath | null;
+  target: ResolvedArrowPath | null;
 }
 
 /**
@@ -1042,13 +1049,20 @@ export function extractMappingArrowRecords(
  *
  * @param path        Path as authored, with or without a leading dot or an
  *                    ADR-053 escape prefix.
- * @param containerPath Absolute path of the enclosing container, or null at
- *                    mapping-body level, where the mapping root is the frame.
+ * @param containerPath The enclosing container, or null at mapping-body level,
+ *                    where the mapping root is the frame. Pass its segments
+ *                    when one may contain a dot (`` `line.items` ``): as text
+ *                    it is split on `.`, and `^.` would pop half a name
+ *                    (bsw-2yzd). Extraction itself resolves from the CST via
+ *                    arrow-path.ts `resolveArrowPath`.
  * @returns The path relative to the schema root, never dot-leading or carrying
  *          an escape marker. An empty path stays empty rather than becoming a
  *          dangling `container.`.
  */
-export function qualifyChildArrowPath(path: string, containerPath: string | null): string {
+export function qualifyChildArrowPath(
+  path: string,
+  containerPath: string | ContainerSegments | null,
+): string {
   return resolveAuthoredPathAgainstContainer(path, containerPath);
 }
 
@@ -1072,13 +1086,17 @@ function collectArrowRecords(
     switch (node.type) {
       case "map_arrow":
       case "computed_arrow":
-        records.push(extractSingleArrow(node, mappingName, namespace, enclosing));
+        records.push(extractSingleArrow(node, mappingName, namespace, enclosing).record);
         break;
 
       case "nested_arrow":
       case "each_block":
       case "flatten_block": {
-        const container = extractSingleArrow(node, mappingName, namespace, enclosing);
+        const {
+          record: container,
+          source,
+          target,
+        } = extractSingleArrow(node, mappingName, namespace, enclosing);
         records.push(container);
         // nested_arrow / each / flatten declare exactly one src_path, so the
         // container's single (already absolute) source is the child prefix.
@@ -1088,11 +1106,7 @@ function collectArrowRecords(
           node.namedChildren,
           mappingName,
           namespace,
-          {
-            kind: container.kind as EnclosingContainer["kind"],
-            source: container.sources[0] ?? null,
-            target: container.target,
-          },
+          { kind: container.kind as EnclosingContainer["kind"], source, target },
           records,
         );
         break;
@@ -1105,6 +1119,15 @@ function collectArrowRecords(
   }
 }
 
+/** One extracted arrow, plus its resolved paths as segments for its children. */
+interface ExtractedArrowWithFrames {
+  record: ExtractedArrow;
+  /** The first source, resolved — a container's only source is its prefix. */
+  source: ResolvedArrowPath | null;
+  /** The target, resolved. */
+  target: ResolvedArrowPath | null;
+}
+
 /**
  * Extract a single arrow record, resolving its paths against `enclosing` when
  * it sits inside a container.
@@ -1114,25 +1137,24 @@ function extractSingleArrow(
   mappingName: string | null,
   namespace: string | null,
   enclosing: EnclosingContainer | null,
-): ExtractedArrow {
+): ExtractedArrowWithFrames {
   const srcNodes = children(arrow, "src_path");
   const tgtNode = child(arrow, "tgt_path");
   const pipeChain = child(arrow, "pipe_chain");
   const pipeSteps = pipeChain ? children(pipeChain, "pipe_step") : [];
 
-  const authoredSources: string[] = srcNodes
-    .map((n) => cleanPathText(arrowPathText(n)))
-    .filter((s): s is string => s !== null);
-  const authoredTarget = cleanPathText(arrowPathText(tgtNode));
+  const resolvedSources = srcNodes
+    .map((n) => resolveArrowPath(n, enclosing?.source ?? null))
+    .filter((p) => p !== null);
+  const resolvedTarget = resolveArrowPath(tgtNode, enclosing?.target ?? null);
+  const authoredSources = resolvedSources.map((p) => p.authored);
+  const authoredTarget = resolvedTarget?.authored ?? null;
+  const sources = resolvedSources.map((p) => p.resolved.text);
+  const target = resolvedTarget?.resolved.text ?? null;
+
   const classification = classifyTransform(pipeSteps);
   const derived = classifyArrow(arrow);
   const steps = decomposePipeSteps(pipeSteps);
-
-  const sources = authoredSources.map((s) => qualifyChildArrowPath(s, enclosing?.source ?? null));
-  const target =
-    authoredTarget === null
-      ? null
-      : qualifyChildArrowPath(authoredTarget, enclosing?.target ?? null);
 
   // Canonical (layout-independent) so two arrows that differ only in how
   // the formatter laid out the chain or a map literal compare equal — diff
@@ -1163,14 +1185,20 @@ function extractSingleArrow(
   if (enclosing) {
     record.nesting = {
       containerKind: enclosing.kind,
-      sourceContainer: enclosing.source,
-      targetContainer: enclosing.target,
+      sourceContainer: enclosing.source?.text ?? null,
+      targetContainer: enclosing.target?.text ?? null,
+      sourceContainerSegments: enclosing.source?.segments ?? null,
+      targetContainerSegments: enclosing.target?.segments ?? null,
       authoredSources,
       authoredTarget,
     };
   }
 
-  return record;
+  return {
+    record,
+    source: resolvedSources[0]?.resolved ?? null,
+    target: resolvedTarget?.resolved ?? null,
+  };
 }
 
 /**
@@ -1207,16 +1235,4 @@ function arrowDeclarationKind(nodeType: SatsumaCstType): ArrowDeclarationKind {
     default:
       return "computed";
   }
-}
-
-/**
- * Clean path text: defensive newline stripping.
- */
-function cleanPathText(text: string | null): string | null {
-  if (!text) return null;
-  const nlIdx = text.indexOf("\n");
-  if (nlIdx !== -1) {
-    text = text.slice(0, nlIdx).trim();
-  }
-  return text;
 }

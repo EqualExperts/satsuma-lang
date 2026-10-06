@@ -1076,6 +1076,26 @@ mapping load {
   });
 });
 
+describe("computeMappingCoverage — ^. under a dotted backtick container (bsw-2yzd)", () => {
+  // ^. inside `each `line.items`` popped only "items", resolving `sid` to the
+  // undeclared "line.sid" and leaving the real `sid` uncovered.
+  const SRC = `
+schema src { sid STRING  \`line.items\` list_of record { v STRING } }
+schema tgt { rows list_of record { x STRING  y STRING } }
+mapping m {
+  source { src }
+  target { tgt }
+  each \`line.items\` -> rows {
+    .v -> .x
+    ^.sid -> .y
+  }
+}`;
+
+  it("covers the root field a parent escape names", () => {
+    assertMapped(forRole(coverage(SRC, "m"), "source"), "sid", true);
+  });
+});
+
 // ── Declaration positions ───────────────────────────────────────────────────
 
 describe("computeMappingCoverage — declaration positions", () => {

@@ -22,6 +22,7 @@ import {
   findAncestorEscape,
   qualifyContainerFieldRef,
   resolveAuthoredPathAgainstContainer,
+  resolvePathSegmentsAgainstContainer,
 } from "@satsuma/core";
 
 describe("reference-stage constructors", () => {
@@ -230,6 +231,32 @@ describe("resolveAuthoredPathAgainstContainer — ADR-053 escape prefixes", () =
     assert.equal(resolveAuthoredPathAgainstContainer("", "transects.sightings"), "");
   });
 
+  it("pops a whole backtick segment that contains a dot, not half of it (bsw-2yzd)", () => {
+    // `` `line.items` `` is one container level. Joined into "line.items" and
+    // re-split on ".", it became two, so ^. popped to "line" and named a field
+    // that does not exist. Passing the container as segments keeps it whole.
+    assert.equal(resolveAuthoredPathAgainstContainer("^.sid", ["line.items"]), "sid");
+    assert.equal(resolveAuthoredPathAgainstContainer("^.^.x", ["a.b", "c"]), "x");
+    assert.equal(resolveAuthoredPathAgainstContainer("^.x", ["a.b", "c"]), "a.b.x");
+  });
+
+  it("resolves CST segments against container segments without re-splitting either", () => {
+    // The segment form extraction uses: a dotted segment stays one element on
+    // the way in and on the way out, so the result can be a container in turn.
+    assert.deepEqual(
+      resolvePathSegmentsAgainstContainer({ kind: "parent", levels: 1 }, ["sid"], ["line.items"]),
+      ["sid"],
+    );
+    assert.deepEqual(
+      resolvePathSegmentsAgainstContainer({ kind: "relative" }, ["v.w"], ["line.items"]),
+      ["line.items", "v.w"],
+    );
+    assert.deepEqual(resolvePathSegmentsAgainstContainer({ kind: "root" }, ["a"], ["line.items"]), [
+      "a",
+    ]);
+    assert.deepEqual(resolvePathSegmentsAgainstContainer({ kind: "plain" }, ["a"], null), ["a"]);
+  });
+
   it("qualifies an escaped authored ref through the branded transition too", () => {
     // qualifyContainerFieldRef delegates to the same resolver, so the branded
     // path an arrow consumer carries already has the escape resolved away.
@@ -301,6 +328,17 @@ describe("findAncestorEscape — explaining a path that names an enclosing level
     assert.equal(findAncestorEscape(".Nope", "Order.LineItems", order), null);
     assert.equal(findAncestorEscape("^.Nope", "Order.LineItems", order), null);
     assert.equal(findAncestorEscape("$.Nope", "Order.LineItems", order), null);
+  });
+
+  it("counts a dotted backtick container segment as one level (bsw-2yzd)", () => {
+    // Inside `each order.`line.items``, the order's `sid` is one level up. Split
+    // on ".", the container looked three deep and the hint named "order.line.sid".
+    const lines = declared("order", "order.sid", "order.line.items");
+    assert.deepEqual(findAncestorEscape("sid", ["order", "line.items"], lines), {
+      resolved: "order.sid",
+      parentEscape: "^.sid",
+      rootEscape: "$.order.sid",
+    });
   });
 
   it("returns null when the container itself is undeclared", () => {

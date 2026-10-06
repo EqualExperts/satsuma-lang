@@ -888,6 +888,13 @@ describe("extractNLRefData — container target qualification (sl-hrql)", () => 
     assert.deepEqual(targetFields(src), ["rows.odd y"]);
   });
 
+  it("pops a whole dotted backtick container for a ^. target (bsw-2yzd)", () => {
+    // `` `line.rows` `` is one level; ^. leaves the mapping root, not "line".
+    const src =
+      'mapping m {\n  each items -> `line.rows` {\n    -> ^.total { "sum @src.items.a" }\n  }\n}';
+    assert.deepEqual(targetFields(src), ["total"]);
+  });
+
   it("leaves a mapping-body-level arrow target unqualified", () => {
     // The no-container control: top-level targets were always correct and must
     // stay byte-identical, since lint's fix targeting matches on this value.

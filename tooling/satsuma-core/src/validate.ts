@@ -698,6 +698,7 @@ function checkArrowFieldRefs(index: SemanticIndex, diagnostics: SemanticDiagnost
           const hint = ancestorEscapeHint(
             arrow.nesting?.authoredSources[i],
             arrow.nesting?.sourceContainer,
+            arrow.nesting?.sourceContainerSegments,
             arrow.nesting?.containerKind,
             sourceExists,
           );
@@ -723,6 +724,7 @@ function checkArrowFieldRefs(index: SemanticIndex, diagnostics: SemanticDiagnost
         const hint = ancestorEscapeHint(
           arrow.nesting?.authoredTarget,
           arrow.nesting?.targetContainer,
+          arrow.nesting?.targetContainerSegments,
           arrow.nesting?.containerKind,
           targetExists,
         );
@@ -745,15 +747,20 @@ function checkArrowFieldRefs(index: SemanticIndex, diagnostics: SemanticDiagnost
  * or "" when it does not. Paths inside a block are relative to it (§4.4), so
  * the bare finding reads like a tooling bug; this names the container and the
  * escape prefix (ADR-053) that reaches what the author meant.
+ *
+ * The levels are counted on `containerSegments` when extraction recorded them,
+ * so a backtick container such as `` `line.items` `` counts as one (bsw-2yzd);
+ * `container` is the text the message names.
  */
 function ancestorEscapeHint(
   authored: string | null | undefined,
   container: string | null | undefined,
+  containerSegments: readonly string[] | null | undefined,
   containerKind: ArrowNesting["containerKind"] | undefined,
   exists: (rootPath: string) => boolean,
 ): string {
   if (!authored || !container || !containerKind) return "";
-  const escape = findAncestorEscape(authored, container, exists);
+  const escape = findAncestorEscape(authored, containerSegments ?? container, exists);
   if (!escape) return "";
   const block =
     containerKind === "nested" ? `the block on '${container}'` : `'${containerKind} ${container}'`;
