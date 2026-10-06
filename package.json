@@ -105,7 +105,7 @@
     "js-tiktoken": "^1.0.21",
     "markdownlint-cli2": "^0.23.3",
     "prettier": "^3.9.9",
-    "turbo": "2.10.12",
+    "turbo": "2.11.7",
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.71.0",
     "yaml": "^2.9.1"
