@@ -37,11 +37,12 @@ function escapeHtml(s: string): string {
  *
  * The shared `@ref` pattern only matches after a line start or one of a fixed
  * set of opening characters, so a ref is deliberately NOT marked when it is
- * wrapped in Markdown punctuation (`` `@foo` ``, `**@foo**`). That is why this
- * runs FIRST in the inline pipeline: once emphasis has been converted to tags
+ * wrapped in Markdown punctuation (`**@foo**`). That is why this runs before
+ * emphasis in the inline pipeline: once emphasis has been converted to tags
  * the preceding character is `>`, which the pattern also rejects, so no
- * ordering recovers those cases. Leaving refs inside inline code unmarked is
- * the desirable half of that trade.
+ * ordering recovers those cases. A ref inside inline code (`` `@foo` ``) is
+ * never marked at all, because {@link renderInline} lifts code spans out
+ * before this runs.
  */
 function markAtRefs(escaped: string): string {
   return escaped.replace(AT_REF_RE, `<span class="at-ref">$&</span>`);
@@ -99,6 +100,56 @@ function dedentNoteBody(text: string): string {
   ].join("\n");
 }
 
+// ---------- Inline formatting ----------
+
+/** An inline code span: a backtick-delimited run with no backtick inside. */
+const CODE_SPAN_RE = /`([^`]+)`/g;
+
+/**
+ * Stands in for one code span while emphasis runs, so emphasis can neither see
+ * nor pair across the span's contents. A Unicode private-use character: it
+ * carries no meaning in authored note text (any stray one is dropped before
+ * substitution, so restoration cannot misalign), and it is not one of the
+ * `@ref` pattern's opening characters, so a ref straight after a code span
+ * stays unmarked exactly as it did when the backtick preceded it.
+ */
+const CODE_SPAN_PLACEHOLDER = "\uE000";
+const CODE_SPAN_PLACEHOLDER_RE = /\uE000/g;
+
+/**
+ * Emphasis delimiters follow CommonMark's flanking rule in its simplest form:
+ * the text just inside each delimiter must not be whitespace. So `*note*` is
+ * emphasis but `amount * 100 * rate` is arithmetic (bsw-5b3m).
+ */
+const STRONG_RE = /\*\*(?=\S)(.+?)(?<=\S)\*\*/g;
+const EMPHASIS_RE = /\*(?=\S)(.+?)(?<=\S)\*/g;
+
+/**
+ * Apply inline formatting to an already-escaped line: code spans, `@ref`
+ * marking, bold and italic.
+ *
+ * Code spans are lifted out first and restored last, so nothing inside them is
+ * read as emphasis or as a ref — `SELECT * FROM t` keeps its asterisk.
+ * Ref marking then runs before emphasis; see markAtRefs for why that order is
+ * forced.
+ */
+function renderInline(escaped: string): string {
+  const codeSpans: string[] = [];
+  const withoutCode = escaped
+    .replace(CODE_SPAN_PLACEHOLDER_RE, "")
+    .replace(CODE_SPAN_RE, (_span, content: string) => {
+      codeSpans.push(content);
+      return CODE_SPAN_PLACEHOLDER;
+    });
+
+  const formatted = markAtRefs(withoutCode)
+    .replace(STRONG_RE, "<strong>$1</strong>")
+    .replace(EMPHASIS_RE, "<em>$1</em>");
+
+  let next = 0;
+  return formatted.replace(CODE_SPAN_PLACEHOLDER_RE, () => `<code>${codeSpans[next++]}</code>`);
+}
+
 /**
  * Minimal Markdown → HTML converter for Satsuma notes.
  * Handles headings, lists, bold, italic, inline code, and paragraphs, and
@@ -112,14 +163,6 @@ function dedentNoteBody(text: string): string {
 export function renderMarkdown(text: string): string {
   // Escape HTML special chars
   const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-
-  // Apply inline formatting to an already-escaped string. Ref marking comes
-  // first — see markAtRefs for why the order is forced.
-  const inline = (s: string) =>
-    markAtRefs(s)
-      .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
-      .replace(/\*(.+?)\*/g, "<em>$1</em>")
-      .replace(/`([^`]+)`/g, "<code>$1</code>");
 
   const lines = dedentNoteBody(text).split("\n");
   const output: string[] = [];
@@ -135,7 +178,7 @@ export function renderMarkdown(text: string): string {
       const [, hashes, headingText] = hm;
       if (hashes && headingText) {
         const level = hashes.length;
-        output.push(`<h${level}>${inline(esc(headingText))}</h${level}>`);
+        output.push(`<h${level}>${renderInline(esc(headingText))}</h${level}>`);
       }
       i++;
       continue;
@@ -146,7 +189,7 @@ export function renderMarkdown(text: string): string {
       const items: string[] = [];
       let cur = lines[i];
       while (i < lines.length && cur !== undefined && /^[-*]\s/.test(cur)) {
-        items.push(`<li>${inline(esc(cur.replace(/^[-*]\s+/, "")))}</li>`);
+        items.push(`<li>${renderInline(esc(cur.replace(/^[-*]\s+/, "")))}</li>`);
         i++;
         cur = lines[i];
       }
@@ -159,7 +202,7 @@ export function renderMarkdown(text: string): string {
       const items: string[] = [];
       let cur = lines[i];
       while (i < lines.length && cur !== undefined && /^\d+\.\s/.test(cur)) {
-        items.push(`<li>${inline(esc(cur.replace(/^\d+\.\s+/, "")))}</li>`);
+        items.push(`<li>${renderInline(esc(cur.replace(/^\d+\.\s+/, "")))}</li>`);
         i++;
         cur = lines[i];
       }
@@ -184,7 +227,7 @@ export function renderMarkdown(text: string): string {
       !/^[-*]\s/.test(cur) &&
       !/^\d+\.\s/.test(cur)
     ) {
-      para.push(inline(esc(cur)));
+      para.push(renderInline(esc(cur)));
       i++;
       cur = lines[i];
     }
