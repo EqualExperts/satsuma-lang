@@ -1,6 +1,6 @@
 ---
 id: bsw-5b3m
-status: open
+status: closed
 deps: []
 links: []
 created: 2026-10-06T09:45:31Z
@@ -16,3 +16,10 @@ tags: [bug-sweep-2026-10, viz, markdown]
 ## Acceptance Criteria
 
 - Inline code spans are protected from emphasis; a lone `*` surrounded by spaces is not emphasis. Unit tests for both strings; escaping unchanged.
+
+## Notes
+
+**2026-10-06T10:16:44Z**
+
+Cause: renderMarkdown's inline pass applied emphasis before inline code, and its emphasis pattern accepted any `*...*` pair, so asterisks inside code spans paired up across spans and `a * b * c` became emphasis.
+Fix: A new `renderInline` lifts code spans out behind a placeholder before ref marking and emphasis and restores them last; bold and italic now require non-space text just inside each delimiter. Covered by three markdown.test.js cases; escaping is unchanged (commit immediately after f18318e0)

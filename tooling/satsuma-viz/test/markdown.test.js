@@ -107,6 +107,29 @@ describe("renderMarkdown", () => {
     assert.ok(!html.includes('class="at-ref"'), "a quoted ref should not be highlighted");
   });
 
+  it("keeps asterisks inside inline code literal instead of reading them as emphasis (bsw-5b3m)", () => {
+    // SQL in a note is common. Emphasis used to run before code spans, so
+    // the two `*`s below paired up across both spans: the asterisks vanished
+    // and the <em> and <code> tags crossed.
+    const html = renderMarkdown("Use `SELECT * FROM t` then `count(*)`");
+    assert.equal(html, "<p>Use <code>SELECT * FROM t</code> then <code>count(*)</code></p>");
+  });
+
+  it("does not treat a lone asterisk between spaces as emphasis (bsw-5b3m)", () => {
+    // Arithmetic in prose: an asterisk with whitespace on both sides cannot
+    // open or close emphasis, as in CommonMark.
+    assert.equal(renderMarkdown("amount * 100 * rate"), "<p>amount * 100 * rate</p>");
+  });
+
+  it("still applies emphasis and bold around inline code (bsw-5b3m)", () => {
+    // Protecting code spans must not switch emphasis off for the prose
+    // around them.
+    assert.equal(
+      renderMarkdown("*note* uses `a*b` and **must** hold"),
+      "<p><em>note</em> uses <code>a*b</code> and <strong>must</strong> hold</p>",
+    );
+  });
+
   it("escapes HTML in note text so a note body cannot inject markup", () => {
     // Note text is author-supplied and rendered through unsafeHTML; escaping
     // here is the only thing standing between a note and script injection.
