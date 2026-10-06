@@ -1,7 +1,7 @@
 import { join } from "path";
 import * as vscode from "vscode";
 import { ExtensionContext, window, workspace } from "vscode";
-import { SATSUMA_FILE_GLOB } from "@satsuma/core/source-files";
+import { SATSUMA_FILE_GLOB, isSatsumaFilePath } from "@satsuma/core/source-files";
 import {
   LanguageClient,
   LanguageClientOptions,
@@ -67,12 +67,17 @@ export function activate(context: ExtensionContext): void {
 
   registerCoverageCommand(context, cliPath, client);
 
-  // Mapping visualization webview
+  // Mapping visualization webview. The Explorer's context menu and the
+  // editor title bar pass the file's URI; the command palette passes nothing.
+  // A passed Satsuma file is the one the reader asked to see (bsw-a2zk).
   context.subscriptions.push(
-    vscode.commands.registerCommand("satsuma.showViz", () => {
-      if (client) {
-        VizPanel.createOrShow(context.extensionUri, client);
-      }
+    vscode.commands.registerCommand("satsuma.showViz", (resource?: unknown) => {
+      if (!client) return;
+      const requestedUri =
+        resource instanceof vscode.Uri && isSatsumaFilePath(resource.fsPath)
+          ? resource.toString()
+          : undefined;
+      VizPanel.createOrShow(context.extensionUri, client, requestedUri);
     }),
   );
 
