@@ -404,6 +404,171 @@ describe("arrow field-not-in-schema diagnostics", () => {
     assert.equal(fieldDiags.length, 0);
   });
 
+  /**
+   * An index for one mapping from `shop` to `rows`, with the given arrows.
+   * `shop` nests a list of line items inside an order record, the #525 shape.
+   */
+  function shopIndex(fieldArrows) {
+    return makeIndex({
+      schemas: [
+        {
+          name: "shop",
+          fields: [
+            {
+              name: "Order",
+              type: "record",
+              children: [
+                { name: "OrderId", type: "STRING" },
+                {
+                  name: "LineItems",
+                  type: "list",
+                  children: [
+                    { name: "SKU", type: "STRING" },
+                    { name: "Notes", type: "list", children: [{ name: "Text", type: "STRING" }] },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+        {
+          name: "rows",
+          fields: [
+            { name: "order_id", type: "STRING" },
+            { name: "lines", type: "list", children: [{ name: "sku", type: "STRING" }] },
+          ],
+        },
+      ],
+      mappings: [{ name: "lines", sources: ["shop"], targets: ["rows"] }],
+      fieldArrows: fieldArrows.map((a) => ({
+        mapping: "lines",
+        namespace: null,
+        steps: [],
+        line: 5,
+        file: "test.stm",
+        ...a,
+      })),
+    });
+  }
+
+  /** The field-not-in-schema messages for an index. */
+  function fieldMessages(index) {
+    return collectSemanticDiagnostics(index)
+      .filter((d) => d.rule === "field-not-in-schema")
+      .map((d) => d.message);
+  }
+
+  it("explains the #525 failure: names the flatten block and the ^. / $. spelling", () => {
+    // GitHub #525: `Order.OrderId` inside `flatten Order.LineItems` is resolved
+    // under the line item, as spec §4.4 requires. The bare finding read like a
+    // tooling bug, so the message must say why and how to reach the order.
+    const index = shopIndex([
+      {
+        sources: ["Order.LineItems.Order.OrderId"],
+        target: "rows.order_id",
+        nesting: {
+          containerKind: "flatten",
+          sourceContainer: "Order.LineItems",
+          targetContainer: "rows",
+          authoredSources: ["Order.OrderId"],
+          authoredTarget: "order_id",
+        },
+      },
+    ]);
+    assert.deepEqual(fieldMessages(index), [
+      "Arrow source 'Order.LineItems.Order.OrderId' not declared in schema 'shop'" +
+        " — paths inside 'flatten Order.LineItems' are relative to it;" +
+        " 'Order.OrderId' exists at an enclosing level, so write '^.OrderId' or '$.Order.OrderId' (spec §4.4)",
+    ]);
+  });
+
+  it("gives no hint for a path that exists at no level", () => {
+    // A plain typo must keep the plain finding; a hint here would send the
+    // author looking for a field that is not there.
+    const index = shopIndex([
+      {
+        sources: ["Order.LineItems.Nope"],
+        target: null,
+        nesting: {
+          containerKind: "flatten",
+          sourceContainer: "Order.LineItems",
+          targetContainer: "rows",
+          authoredSources: [".Nope"],
+          authoredTarget: null,
+        },
+      },
+    ]);
+    assert.deepEqual(fieldMessages(index), [
+      "Arrow source 'Order.LineItems.Nope' not declared in schema 'shop'",
+    ]);
+  });
+
+  it("hints for each-inside-each naming a field of the outer element", () => {
+    // Inside `each Notes` within `each LineItems`, `SKU` belongs to the line
+    // item one level up; the nested-each case had no workaround before ADR-053.
+    const index = shopIndex([
+      {
+        sources: ["Order.LineItems.Notes.SKU"],
+        target: null,
+        nesting: {
+          containerKind: "each",
+          sourceContainer: "Order.LineItems.Notes",
+          targetContainer: null,
+          authoredSources: ["SKU"],
+          authoredTarget: null,
+        },
+      },
+    ]);
+    const [message] = fieldMessages(index);
+    assert.match(message, /paths inside 'each Order\.LineItems\.Notes' are relative to it/);
+    assert.match(message, /write '\^\.SKU' or '\$\.Order\.LineItems\.SKU'/);
+  });
+
+  it("hints for a target path too", () => {
+    // Target paths are prefixed by the target container the same way (§4.4):
+    // `order_id` inside `-> lines` means `lines.order_id`, but the target
+    // declares it at the root.
+    const index = shopIndex([
+      {
+        sources: [],
+        target: "lines.order_id",
+        nesting: {
+          containerKind: "each",
+          sourceContainer: "Order.LineItems",
+          targetContainer: "lines",
+          authoredSources: [],
+          authoredTarget: "order_id",
+        },
+      },
+    ]);
+    assert.deepEqual(fieldMessages(index), [
+      "Arrow target 'lines.order_id' not declared in schema 'rows'" +
+        " — paths inside 'each lines' are relative to it;" +
+        " 'order_id' exists at an enclosing level, so write '$.order_id' (spec §4.4)",
+    ]);
+  });
+
+  it("gives no hint when the container itself is undeclared", () => {
+    // The container's own arrow carries the real finding; steering its children
+    // to $. would hide a misnamed list (the docs' `-> order_lines` in #525).
+    const index = shopIndex([
+      {
+        sources: [],
+        target: "order_lines.order_id",
+        nesting: {
+          containerKind: "flatten",
+          sourceContainer: "Order.LineItems",
+          targetContainer: "order_lines",
+          authoredSources: [],
+          authoredTarget: "order_id",
+        },
+      },
+    ]);
+    assert.deepEqual(fieldMessages(index), [
+      "Arrow target 'order_lines.order_id' not declared in schema 'rows'",
+    ]);
+  });
+
   it("suppresses field-not-in-schema for schemas with unresolved spreads", () => {
     // When a schema spreads a fragment that cannot be resolved, the full field set
     // is unknown. Emitting a field-not-in-schema warning in that case would be a

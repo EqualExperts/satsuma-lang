@@ -1,6 +1,6 @@
 ---
 id: sl-ui5d
-status: open
+status: closed
 deps: []
 links: [sl-i9ve, sl-8vqk, sl-pn00, tced-ewd4]
 created: 2026-09-29T07:27:22Z
@@ -41,3 +41,10 @@ Move parent-level arrows outside the flatten block, as spec §4.6's example does
 - Each corrected snippet, with its schema, validates cleanly through the CLI (no field-not-in-schema) and coverage shows the parent fields covered.
 - A guard stops the drift recurring: extend an existing doc-snippet check if there is one, otherwise add a test/script that extracts the Satsuma snippets from docs/tutorials and lessons and validates them.
 - Check whether the site renders these files and needs rebuilding.
+
+## Notes
+
+**2026-10-06T06:30:58Z**
+
+Cause: When sl-pn00 made "every path inside a block is relative" explicit (spec §4.4), nobody swept the teaching material, so the BA tutorial and lessons 07/14 kept teaching `Order.OrderId` inside `flatten Order.LineItems` — and also flattened into `-> order_lines`, a target that does not exist. No check validated doc snippets.
+Fix: Rewrote the three snippets to flatten into `order_lines_parquet` and reach order-level fields with `^.` (ADR-053), with prose explaining relativity; corrected spec §4.6 and the agent reference/skill/excel prompt wording. Added scripts/check-doc-snippets.mjs (+ tests, run by `npm run test:scripts`): snippets in docs/tutorials, docs/nested-data and lessons opt in via a `satsuma-check` HTML comment and are validated through the CLI against real example schemas; any complete each/flatten mapping snippet without an annotation fails. The site only links to these docs on GitHub, so no rebuild is needed. (commit immediately after 20aec326)

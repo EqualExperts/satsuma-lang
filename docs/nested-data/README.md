@@ -215,6 +215,7 @@ follow; now it is an ordinary arrow.
 `each` maps one list onto another: one target element per source element,
 structure preserved. The science portal wants exactly that.
 
+<!-- satsuma-check: schemas from earlier snippets -->
 ```satsuma
 // --- Target: science portal document ---
 schema colony_report_json (format json) {
@@ -297,6 +298,7 @@ asymmetry is normal and is the reason coverage reports the two roles separately.
 The analytics lake wants a table, not a document: one row per sighting, with the
 survey and transect identifiers repeated on every row.
 
+<!-- satsuma-check: schemas from earlier snippets -->
 ```satsuma
 // --- Target: analytics lake, one row per sighting ---
 schema sighting_rows_parquet (format parquet) {
@@ -368,6 +370,7 @@ correlation is expressed by arrows plus a stated rule.
 
 ### Lists of records — two `each` blocks over one target list
 
+<!-- satsuma-check: standalone -->
 ```satsuma
 // Ringing station tablet: two parallel lists, correlated by position
 schema ringing_tablet (format json) {
@@ -511,6 +514,7 @@ in their own lanes is what makes the spec readable:
 
 ### XML with namespaces and XPath
 
+<!-- satsuma-check: standalone -->
 ```satsuma
 // Partner NGO submits the same survey as XML
 schema colony_submission_xml (

@@ -37,6 +37,8 @@ import type { DefinitionLookup } from "./nl-ref.js";
 import { expandSpreads, collectFieldPaths } from "./spread-expand.js";
 import type { SpreadEntity, EntityRefResolver, SpreadEntityLookup } from "./spread-expand.js";
 import { resolveScopedEntityRef } from "./canonical-ref.js";
+import { findAncestorEscape } from "./reference-stages.js";
+import type { ArrowNesting } from "./extract.js";
 import type { FieldDecl, MetaEntry, PipeStep } from "./types.js";
 import { computeImportReachability } from "./import-reachability.js";
 import type { ImportReachability, ResolvedFileImport } from "./import-reachability.js";
@@ -113,6 +115,12 @@ export interface SemanticArrow {
   steps?: PipeStep[];
   line: number;
   file: string;
+  /**
+   * The enclosing container and authored paths, for an arrow inside an
+   * each/flatten/nested body. Lets field-not-in-schema say why a path naming an
+   * enclosing-level field failed (sl-i9ve); absent at mapping-body level.
+   */
+  nesting?: ArrowNesting;
 }
 
 export interface SemanticNLRef {
@@ -662,41 +670,81 @@ function checkArrowFieldRefs(index: SemanticIndex, diagnostics: SemanticDiagnost
       if (!mappingMatch || (arrow.namespace ?? null) !== currentNs) continue;
       if (arrow.file !== mapping.file) continue; // guard against cross-file duplicate mapping names
 
-      for (const source of arrow.sources) {
+      const sourceExists = (path: string): boolean =>
+        resolveFieldPath(path, resolvedSrcKeys, index, srcFieldPaths);
+      arrow.sources.forEach((source, i) => {
         if (
           srcSchema &&
           index.schemas.has(srcSchema) &&
           !srcHasUnresolved &&
-          !resolveFieldPath(source, resolvedSrcKeys, index, srcFieldPaths)
+          !sourceExists(source)
         ) {
+          const hint = ancestorEscapeHint(
+            arrow.nesting?.authoredSources[i],
+            arrow.nesting?.sourceContainer,
+            arrow.nesting?.containerKind,
+            sourceExists,
+          );
           diagnostics.push({
             file: arrow.file,
             line: arrow.line + 1,
             column: 1,
             severity: "warning",
             rule: "field-not-in-schema",
-            message: `Arrow source '${source}' not declared in schema '${blamedSourceSchema(source, resolvedSrcKeys, srcSchema)}'`,
+            message: `Arrow source '${source}' not declared in schema '${blamedSourceSchema(source, resolvedSrcKeys, srcSchema)}'${hint}`,
           });
         }
-      }
+      });
+      const targetExists = (path: string): boolean =>
+        !!resolvedTgtKey && resolveFieldPath(path, [resolvedTgtKey], index, tgtFieldPaths);
       if (
         arrow.target &&
         resolvedTgtKey &&
         index.schemas.has(resolvedTgtKey) &&
         !tgtHasUnresolved &&
-        !resolveFieldPath(arrow.target, [resolvedTgtKey], index, tgtFieldPaths)
+        !targetExists(arrow.target)
       ) {
+        const hint = ancestorEscapeHint(
+          arrow.nesting?.authoredTarget,
+          arrow.nesting?.targetContainer,
+          arrow.nesting?.containerKind,
+          targetExists,
+        );
         diagnostics.push({
           file: arrow.file,
           line: arrow.line + 1,
           column: 1,
           severity: "warning",
           rule: "field-not-in-schema",
-          message: `Arrow target '${arrow.target}' not declared in schema '${resolvedTgtKey}'`,
+          message: `Arrow target '${arrow.target}' not declared in schema '${resolvedTgtKey}'${hint}`,
         });
       }
     }
   }
+}
+
+/**
+ * The explanation appended to a field-not-in-schema message when the authored
+ * path names a field one or more levels above its container (sl-i9ve, #525),
+ * or "" when it does not. Paths inside a block are relative to it (§4.4), so
+ * the bare finding reads like a tooling bug; this names the container and the
+ * escape prefix (ADR-053) that reaches what the author meant.
+ */
+function ancestorEscapeHint(
+  authored: string | null | undefined,
+  container: string | null | undefined,
+  containerKind: ArrowNesting["containerKind"] | undefined,
+  exists: (rootPath: string) => boolean,
+): string {
+  if (!authored || !container || !containerKind) return "";
+  const escape = findAncestorEscape(authored, container, exists);
+  if (!escape) return "";
+  const block =
+    containerKind === "nested" ? `the block on '${container}'` : `'${containerKind} ${container}'`;
+  const spellings = escape.parentEscape
+    ? `'${escape.parentEscape}' or '${escape.rootEscape}'`
+    : `'${escape.rootEscape}'`;
+  return ` — paths inside ${block} are relative to it; '${escape.resolved}' exists at an enclosing level, so write ${spellings} (spec §4.4)`;
 }
 
 // ---------- Section 7: Transform spread references ----------

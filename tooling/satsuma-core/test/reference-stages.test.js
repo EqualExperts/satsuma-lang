@@ -19,6 +19,7 @@ import {
   fieldEndpointOf,
   fieldEndpointPath,
   fieldEndpointSchema,
+  findAncestorEscape,
   qualifyContainerFieldRef,
   resolveAuthoredPathAgainstContainer,
 } from "@satsuma/core";
@@ -246,5 +247,66 @@ describe("resolveAuthoredPathAgainstContainer — ADR-053 escape prefixes", () =
       ),
       "survey_id",
     );
+  });
+});
+
+describe("findAncestorEscape — explaining a path that names an enclosing level (sl-i9ve)", () => {
+  /** An `exists` predicate over a fixed set of schema-root paths. */
+  const declared =
+    (...paths) =>
+    (path) =>
+      paths.includes(path);
+  const order = declared("Order", "Order.OrderId", "Order.LineItems", "Order.LineItems.SKU");
+
+  it("offers ^. and $. for an absolute path written inside flatten (GitHub #525)", () => {
+    // The reporter wrote Order.OrderId inside flatten Order.LineItems. One level
+    // up from the line item is the order, so ^.OrderId is the shortest fix.
+    assert.deepEqual(findAncestorEscape("Order.OrderId", "Order.LineItems", order), {
+      resolved: "Order.OrderId",
+      parentEscape: "^.OrderId",
+      rootEscape: "$.Order.OrderId",
+    });
+  });
+
+  it("finds a field written relative to the parent element", () => {
+    // `OrderId` and `.OrderId` mean the same under §4.4; both should be
+    // explained the same way.
+    for (const authored of ["OrderId", ".OrderId"]) {
+      assert.equal(
+        findAncestorEscape(authored, "Order.LineItems", order)?.parentEscape,
+        "^.OrderId",
+      );
+    }
+  });
+
+  it("offers only $. when the field sits at the schema root, outside every container", () => {
+    // ^.^.id would work but says nothing $.id does not say more plainly.
+    assert.deepEqual(findAncestorEscape("id", "items", declared("id", "items")), {
+      resolved: "id",
+      parentEscape: null,
+      rootEscape: "$.id",
+    });
+  });
+
+  it("prefers the nearest enclosing level when several declare the name", () => {
+    // `ref` exists on both the transect and the root; the author inside the
+    // sightings list most plausibly meant the transect, one level up.
+    const survey = declared("ref", "transects", "transects.ref", "transects.sightings");
+    assert.equal(findAncestorEscape("ref", "transects.sightings", survey)?.parentEscape, "^.ref");
+  });
+
+  it("returns null when no level declares the path, or the author already chose a level", () => {
+    // A typo gets the plain finding; so does an escaped path, whose author has
+    // already stated which level they meant.
+    assert.equal(findAncestorEscape(".Nope", "Order.LineItems", order), null);
+    assert.equal(findAncestorEscape("^.Nope", "Order.LineItems", order), null);
+    assert.equal(findAncestorEscape("$.Nope", "Order.LineItems", order), null);
+  });
+
+  it("returns null when the container itself is undeclared", () => {
+    // The container's own arrow already carries the real finding. Steering its
+    // children to $. would paper over a misnamed list.
+    assert.equal(findAncestorEscape("OrderId", "Order.Lines", order), null);
+    assert.equal(findAncestorEscape("OrderId", null, order), null);
   });
 });

@@ -26,10 +26,12 @@ export {
   fieldEndpointOf,
   fieldEndpointPath,
   fieldEndpointSchema,
+  findAncestorEscape,
   qualifyContainerFieldRef,
   resolveAuthoredPathAgainstContainer,
 } from "./reference-stages.js";
 export type {
+  AncestorEscape,
   AuthoredEntityRef,
   AuthoredFieldRef,
   CanonicalEntityRef,
@@ -261,4 +263,5 @@ export type {
   ExtractedImport,
   ExtractedArrow,
   ArrowDeclarationKind,
+  ArrowNesting,
 } from "./extract.js";
