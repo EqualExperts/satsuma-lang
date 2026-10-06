@@ -56,39 +56,24 @@
  * header. Nothing here needs a special case for them because nothing here can
  * generate them.
  *
- * ## One exclusion this file owns: leaf-name ambiguity inside a schema
+ * ## Leaf names inside a schema
  *
  * `arrows` falls back to a bare **leaf-name** lookup so a nested field can be
- * queried by its last segment (`arrows.ts`'s `altKey` loop). When one schema
- * declares two paths ending in the same segment — the kitchen-sink workspace's
- * `raw.field_0` and `raw.lines.field_0` — the fallback returns the other path's
- * arrows as well, in both directions and under `--as-source`/`--as-target` too.
+ * queried by its last segment (`arrows.ts`'s `altKey` loop). The kitchen-sink
+ * workspace's `raw` declares both `field_0` and `lines.field_0`, which is how two
+ * defects in that fallback were found:
  *
- * That behaviour is **half intended and half not**, and the split is `sl-xj4p`
- * (closed): its acceptance criterion 2 asks that an ambiguous leaf-name query
- * "still work as before (show all matches)", while criterion 1 asks that a deeply
- * nested path "resolve correctly". So:
+ * - `gpt-qhfo`: `arrows warehouse::staged.lines.field_0 --as-source` returned
+ *   `staged.field_0`'s arrow — a dotted path accepted a shallower namesake.
+ * - `bsw-kvj9`: `arrows ::raw.field_0` returned `raw.lines.field_0`'s arrow too —
+ *   an undotted query that names a declared top-level field accepted a deeper
+ *   namesake.
  *
- * - `arrows ::raw.field_0` returning `raw.lines.field_0`'s arrow is criterion 2
- *   applied to a query that *also* names a declared top-level path exactly.
- *   Whether an exact path should beat the leaf fallback is undecided, and nothing
- *   here decides it. Pinned below by {@link describe} "known behaviour" so it
- *   cannot change unnoticed.
- * - `arrows warehouse::staged.lines.field_0 --as-source` used to return
- *   `staged.field_0 → revenue_metric.field_0` — a different field's arrow, and the
- *   *only* answer, since the queried field has no outgoing arrow. That contradicted
- *   criterion 1 outright and was filed as `gpt-qhfo`. `warehouse::staged.lines.field_0`
- *   is a fully qualified nested path, not a bare leaf name, so it was never covered
- *   by criterion 2's "show all matches" — the fix tightens the `altKey` loop's
- *   `pathExistsInSchema` guard and `arrowPathMatches`'s suffix check (both in
- *   `arrows.ts`) to require the exact path when one was given, and the case below
- *   now asserts the corrected empty answer instead of pinning the old wrong one.
- *
- * The exact-set property still skips both affected paths via
- * {@link leafAmbiguousPaths} rather than skipping the workspace that contains them —
- * the leaf-name conflation the property sidesteps is itself unchanged by the
- * `gpt-qhfo` fix, since `field_0` and `lines.field_0` still share a leaf name.
- * Every unambiguous path of that same workspace is still asserted.
+ * Both now follow one rule: a query that names a declared path answers for that
+ * path alone, and only a name that is not a declared path is shorthand for every
+ * field of that name (sl-xj4p criterion 2). Every path this suite queries is a
+ * declared path, so the exact-set property below asserts every one of them, and
+ * the two cases after it pin the regressions by name.
  */
 
 import assert from "node:assert/strict";
@@ -221,11 +206,6 @@ function owningSchema(endpoint: string): string {
   const separator = endpoint.indexOf("::");
   const dot = endpoint.indexOf(".", separator + 2);
   return dot === -1 ? endpoint : endpoint.slice(0, dot);
-}
-
-/** The last dotted segment of a canonical field endpoint — its leaf name. */
-function leafSegment(endpoint: string): string {
-  return endpoint.slice(endpoint.lastIndexOf(".") + 1);
 }
 
 // ── Edge identity ─────────────────────────────────────────────────────────
@@ -418,23 +398,6 @@ function expectedEdgeKeys(
   return sortedEdgeKeys([...declared, ...derived].map(edgeKey));
 }
 
-/**
- * The declared paths `arrows` cannot answer about exactly, because another path
- * in the same schema ends in the same segment.
- *
- * See this module's header: the command's leaf-name fallback conflates them. The
- * exclusion is per *path*, not per workspace, so a workspace containing one
- * ambiguous pair still has every other path asserted.
- */
-function leafAmbiguousPaths(declaredPaths: string[]): Set<string> {
-  const byLeaf = new Map<string, string[]>();
-  for (const path of declaredPaths) {
-    const leaf = `${owningSchema(path)}|${leafSegment(path)}`;
-    byLeaf.set(leaf, [...(byLeaf.get(leaf) ?? []), path]);
-  }
-  return new Set([...byLeaf.values()].filter((paths) => paths.length > 1).flat());
-}
-
 // ── Generated samples, and the workspace lifecycle ────────────────────────
 
 /**
@@ -497,12 +460,10 @@ describe("arrows: every declared arrow is reachable from both of its endpoints (
             "target, kind and classification; declaredArrows() cannot group that " +
             "and the expectation would be silently wrong",
         );
-        const declaredPaths = scenarioDeclaredFieldPaths(workspace);
-        const ambiguous = leafAmbiguousPaths(declaredPaths);
-        const queryable = declaredPaths.filter((path) => !ambiguous.has(path));
+        const queryable = scenarioDeclaredFieldPaths(workspace);
         // Precondition, not decoration: an empty query list would make every
         // assertion below unreachable and the property vacuously true.
-        assert.ok(queryable.length > 0, "no unambiguous declared field path to query");
+        assert.ok(queryable.length > 0, "no declared field path to query");
 
         await withGenerated(workspace, async (loaded) => {
           let checkedNonEmpty = 0;
@@ -584,39 +545,18 @@ describe("arrows: every declared arrow is reachable from both of its endpoints (
   });
 });
 
-describe("arrows: known behaviour — a shared leaf name merges two paths' arrows", () => {
-  // ⚠️ THIS CASE PINS WHAT `arrows` DOES TODAY, not what it should do, so it goes
-  // red the moment the leaf-name fallback changes — at which point read this
-  // module's header, re-decide it against `sl-xj4p`, and remove
-  // `leafAmbiguousPaths` from the exact-set property above.
-  //
-  // The mechanism: `raw` declares `field_0` *and* `lines.field_0`, so after
-  // resolving the qualified key `arrows` also looks the bare leaf name up
-  // (`arrows.ts`'s `altKey` loop), and — for a query with no dotted path of its
-  // own, as `field_0` here — that loop's guard accepts any path that exists
-  // *somewhere* in the queried schema, which is the sl-xj4p criterion-2 fallback
-  // rather than a bug.
-  //
-  // Pinned rather than skipped: a skipped test proves nothing, and node's JUnit
-  // reporter puts a `failure=` attribute on a failing `todo` case, which fails
-  // CI's test-report check.
-
-  it("returns raw.lines.field_0's arrow when asked about raw.field_0", async () => {
-    // The defensible half. `field_0` is a leaf name two paths of `raw` end in, so
-    // `sl-xj4p`'s criterion 2 ("ambiguous leaf-name queries show all matches")
-    // covers this answer — even though the query also names a declared top-level
-    // path exactly. Pinned because it is what makes `leafAmbiguousPaths` necessary,
-    // not because it is agreed to be wrong.
+describe("arrows: a query naming a declared top-level field is exact (bsw-kvj9)", () => {
+  it("returns only raw.field_0's arrow, not the nested raw.lines.field_0's", async () => {
+    // Regression test for bsw-kvj9. `raw` declares `field_0` and `lines.field_0`.
+    // `field_0` is a declared top-level path, so the query names one field and
+    // sl-xj4p's "show all matches" shorthand does not apply; before the fix the
+    // leaf-name fallback also returned `raw.lines.field_0 -> staged.lines.field_0`.
     await withGenerated(kitchenSinkWorkspace, async (loaded) => {
       const { edgeKeys } = await arrowEdgesFor(loaded, "::raw.field_0", []);
       assert.deepEqual(
         sortedEdgeKeys(edgeKeys),
-        sortedEdgeKeys([
-          "::raw.field_0 -> warehouse::staged.field_0 | warehouse::stage_raw | nl",
-          "::raw.lines.field_0 -> warehouse::staged.lines.field_0 | warehouse::stage_raw | none",
-        ]),
-        `the leaf-name conflation changed shape — read this describe block's comments ` +
-          `before updating the expectation:\n${loaded.sources}`,
+        ["::raw.field_0 -> warehouse::staged.field_0 | warehouse::stage_raw | nl"],
+        `expected only the top-level field's arrow:\n${loaded.sources}`,
       );
     });
   });
