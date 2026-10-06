@@ -15,6 +15,8 @@ import {
   stringText,
   entryText,
   qualifiedNameText,
+  importNameText,
+  spreadLabelText,
   sourceRefText,
   sourceRefStructuralText,
   fieldNameText,
@@ -243,6 +245,20 @@ describe("qualifiedNameText()", () => {
     assert.equal(qualifiedNameText(qn), null);
   });
 
+  it("unquotes a backtick name after :: (bsw-iuzs)", () => {
+    // `raw::\`crm-contacts\`` must key to the declared schema `raw::crm-contacts`;
+    // with the backticks kept, every reference to it was undefined.
+    const qn = n("qualified_name", [ident("raw"), backtick("crm-contacts")], "raw::`crm-contacts`");
+    assert.equal(qualifiedNameText(qn), "raw::crm-contacts");
+  });
+
+  it("returns null when the namespace side is not a bare identifier", () => {
+    // Namespace names are declared only as identifiers, so a recovered node
+    // with a quoted first child is not a qualified name the helper can trust.
+    const qn = n("qualified_name", [backtick("raw"), ident("x")], "`raw`::x");
+    assert.equal(qualifiedNameText(qn), null);
+  });
+
   it("returns null for non-qualified_name node type", () => {
     assert.equal(qualifiedNameText(ident("plain")), null);
   });
@@ -253,6 +269,38 @@ describe("qualifiedNameText()", () => {
 
   it("returns null for undefined input", () => {
     assert.equal(qualifiedNameText(undefined), null);
+  });
+});
+
+// ── importNameText() / spreadLabelText() ───────────────────────────────────
+
+describe("importNameText()", () => {
+  it("returns every import name form unquoted", () => {
+    // Import reachability compares these against declared keys, which never
+    // carry backticks (bsw-iuzs).
+    const qn = n("qualified_name", [ident("raw"), backtick("crm-contacts")], "raw::`crm-contacts`");
+    assert.equal(importNameText(n("import_name", [qn])), "raw::crm-contacts");
+    assert.equal(importNameText(n("import_name", [backtick("odd name")])), "odd name");
+    assert.equal(importNameText(n("import_name", [ident("plain")])), "plain");
+  });
+
+  it("returns null for an empty recovered import_name", () => {
+    // `import { } from "x"` must contribute no names, not "" (sl-0nvt).
+    assert.equal(importNameText(n("import_name", [])), null);
+  });
+});
+
+describe("spreadLabelText()", () => {
+  it("unquotes a qualified spread whose name side is backticked", () => {
+    // Spread expansion looks the fragment up by this text (bsw-iuzs).
+    const qn = n("qualified_name", [ident("raw"), backtick("audit fields")], "raw::`audit fields`");
+    assert.equal(spreadLabelText(n("spread_label", [qn])), "raw::audit fields");
+  });
+
+  it("joins an unquoted multi-word spread with single spaces", () => {
+    // `...address fields` names one fragment, not two (sl-3ccy).
+    const words = [ident("address"), n("continuation_word", [], "fields")];
+    assert.equal(spreadLabelText(n("spread_label", words)), "address fields");
   });
 });
 

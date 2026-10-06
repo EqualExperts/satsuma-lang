@@ -49,9 +49,12 @@ All comma-separated list constructs follow one rule: **a trailing comma after th
 - Backticks for names: bare names work when matching `[a-zA-Z_][a-zA-Z0-9_-]*`, except that a bare name may not _end_ with a hyphen (so `a->b` always reads as an arrow, never as the name `a-` followed by `>`). Everything else gets backticks.
 - Double quotes for prose: NL content uses `"..."` or `"""..."""`.
 
+**Namespace-qualified names** (`ns::name`) quote only the name after `::`, as in `` raw::`crm contacts` ``. A namespace name is always a bare identifier and is never quoted. Wrapping the whole qualified name in backticks (`` `raw::crm_contacts` ``) still parses but is **deprecated**: write `raw::crm_contacts`, or quote just the name. The rule is the same wherever a qualified name appears: imports, `source`/`target` entries, spreads, metadata values such as `(ref ...)`, arrow paths and `@` refs.
+
 ```
 schema `My Schema` { ... }           // backtick for name with spaces
 `Lead_Source_Detail__c` STRING       // backtick for special-char field identifier
+source { raw::`crm contacts` }       // quote only the name after ::
 "Look up @customer_id in the dim"    // @ref inside NL string
 "Short note — single line"           // single-line string
 """                                  // multiline string with Markdown
@@ -310,7 +313,7 @@ mapping <name> {
 }
 ```
 
-The `source` and `target` sub-blocks reference previously declared schemas by name (optionally backtick-quoted when the name contains special characters). The mapping name is optional.
+The `source` and `target` sub-blocks reference previously declared schemas by name (optionally backtick-quoted when the name contains special characters). A schema in a namespace is written `ns::name`, quoting only the name when it needs backticks: `` source { raw::`crm contacts` } `` (see §2.2). The mapping name is optional.
 
 An empty mapping body (`mapping m { }`) is valid — like an empty schema or transform, it is a legal skeleton while a spec is being authored.
 

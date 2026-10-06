@@ -823,6 +823,10 @@
       "required": true,
       "types": [
         {
+          "type": "backtick_name",
+          "named": true
+        },
+        {
           "type": "identifier",
           "named": true
         },
@@ -841,6 +845,10 @@
       "multiple": true,
       "required": true,
       "types": [
+        {
+          "type": "backtick_name",
+          "named": true
+        },
         {
           "type": "identifier",
           "named": true

@@ -32,6 +32,7 @@ import {
   isSchemaInMappingSources,
   stripNLRefScopePrefix,
   computeNLRefPosition,
+  splitRefSchemaKey,
 } from "./nl-ref.js";
 import type { DefinitionLookup } from "./nl-ref.js";
 import { expandSpreads, collectFieldPaths, collectNestedSpreads } from "./spread-expand.js";
@@ -833,6 +834,23 @@ function checkRefMetadata(index: SemanticIndex, diagnostics: SemanticDiagnostic[
   }
 }
 
+/** A backtick-quoted span, captured without its delimiters. */
+const BACKTICK_SPAN_RE = /`([^`]+)`/g;
+
+/**
+ * The schema a `(ref ...)` metadata value names, unquoted: `crm.id` → `crm`,
+ * `` raw::`crm-contacts`.id `` → `raw::crm-contacts`, `` `odd.name`.id `` →
+ * `odd.name`.
+ *
+ * The value reaches validation as text, so it is split with the same
+ * backtick-aware reader NL @refs use (splitRefSchemaKey): a "." inside
+ * backticks is part of a name, never the schema/field boundary (bsw-iuzs).
+ */
+function refMetadataSchemaKey(value: string): string {
+  const raw = value.replace(/^@/, "");
+  return splitRefSchemaKey(raw)?.schemaKey ?? raw.replace(BACKTICK_SPAN_RE, "$1");
+}
+
 function checkFieldRefMetadata(
   fields: FieldDecl[],
   entityName: string,
@@ -846,10 +864,7 @@ function checkFieldRefMetadata(
     if (field.metadata) {
       for (const m of field.metadata) {
         if (m.kind === "kv" && m.key === "ref") {
-          // split() on a non-empty pattern always yields at least one element,
-          // so the default here is unreachable in practice — it exists only
-          // to satisfy noUncheckedIndexedAccess.
-          const [refTarget = ""] = m.value.replace(/^@/, "").split(".");
+          const refTarget = refMetadataSchemaKey(m.value);
           if (!resolveScopedEntityRef(refTarget, currentNs, index.schemas)) {
             diagnostics.push({
               file,

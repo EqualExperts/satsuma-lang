@@ -129,8 +129,12 @@ module.exports = grammar({
 
     import_name: ($) => choice($.qualified_name, $.backtick_name, $.identifier),
 
-    // ns::identifier — used in imports
-    qualified_name: ($) => seq($.identifier, "::", $.identifier),
+    // ns::name — a namespace-qualified name, used in imports, source/target
+    // refs, spreads and metadata values. The namespace side is always a bare
+    // identifier, because `namespace` declares only identifier names. The
+    // name side may be backtick-quoted (`raw::\`crm-contacts\``), matching
+    // namespaced arrow paths and NL @refs (bsw-iuzs).
+    qualified_name: ($) => seq($.identifier, "::", $._path_seg),
 
     import_path: ($) => $.nl_string,
 
@@ -555,8 +559,9 @@ module.exports = grammar({
         ),
       ),
 
-    // ns::identifier.field... — namespace-qualified dotted ref path
-    qualified_dotted_name: ($) => seq($.qualified_name, repeat1(seq(".", $.identifier))),
+    // ns::name.field... — namespace-qualified dotted ref path; any segment
+    // may be backtick-quoted, as in qualified_name (bsw-iuzs).
+    qualified_dotted_name: ($) => seq($.qualified_name, repeat1(seq(".", $._path_seg))),
 
     dotted_name: ($) =>
       prec.left(seq($.identifier, repeat1(seq(".", choice($.identifier, $.number_literal))))),
@@ -574,7 +579,7 @@ module.exports = grammar({
       seq(
         "@",
         choice(
-          seq($.identifier, "::", $.identifier, repeat(seq(".", $._path_seg))),
+          seq($.identifier, "::", $._path_seg, repeat(seq(".", $._path_seg))),
           seq($.backtick_name, repeat(seq(".", $._path_seg))),
           seq($.identifier, repeat(seq(".", $._path_seg))),
         ),

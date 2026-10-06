@@ -134,7 +134,7 @@ export function canonicalKey(key: string): string {
  * Why this differs from {@link canonicalKey}: the leading `::` marks "the
  * global namespace" unambiguously, which matters for a machine consumer
  * matching keys across commands. It buys a human nothing — `::` is not even
- * valid Satsuma syntax (`qualified_name` is `identifier "::" identifier`), so
+ * valid Satsuma syntax (`qualified_name` needs an identifier before `::`), so
  * it cannot be pasted back into a file, and in a workspace with no namespaces
  * at all it prefixes every line of output with noise.
  *

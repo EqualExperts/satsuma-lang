@@ -25,7 +25,7 @@
  */
 
 import { canonicalRef } from "./canonical-ref.js";
-import { isPresent } from "./cst-utils.js";
+import { isPresent, pathSegmentText } from "./cst-utils.js";
 import {
   PATH_SEPARATOR,
   resolveAuthoredPathAgainstContainer,
@@ -76,17 +76,6 @@ const PARENT_ESCAPE_TOKEN = "^.";
 const ROOT_ESCAPE_TOKEN = "$.";
 /** The relativity marker on a relative_field_path (spec §4.4). */
 const RELATIVE_MARKER = ".";
-
-/**
- * Text of one path segment, with a `backtick_name`'s delimiters removed.
- *
- * Uses the same `slice(1, -1)` unquoting as field declarations
- * (cst-utils `fieldNameText`), so a segment and the field it names agree on
- * what the name is.
- */
-export function pathSegmentText(seg: SyntaxNode): string {
-  return seg.type === "backtick_name" ? seg.text.slice(1, -1) : seg.text;
-}
 
 /** True for a node the grammar's `_path_seg` produces, with real text. */
 function isPresentSegment(node: SyntaxNode): boolean {

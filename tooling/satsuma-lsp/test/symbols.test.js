@@ -124,6 +124,15 @@ describe("computeDocumentSymbols", () => {
     assert.equal(field.children.length, 2);
   });
 
+  it("names a ns::`name` fragment spread by its unquoted name (bsw-iuzs)", () => {
+    // The outline shows the spread as the fragment it names, the same text
+    // spread expansion resolves, not the authored backticks.
+    const tree = parse("schema s {\n  ...raw::`audit fields`\n  id INT\n}");
+    const [schema] = computeDocumentSymbols(tree);
+    const names = schema.children.map((c) => c.name);
+    assert.ok(names.includes("...raw::audit fields"), `got ${JSON.stringify(names)}`);
+  });
+
   it("handles note blocks", () => {
     const tree = parse(`note {
   "Some documentation here"

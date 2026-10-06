@@ -1,0 +1,10 @@
+// A namespaced schema and fragment whose names need backtick quoting (bsw-iuzs).
+namespace raw {
+  schema `crm-contacts` {
+    id INT
+  }
+
+  fragment `audit fields` {
+    loaded_at TIMESTAMP
+  }
+}

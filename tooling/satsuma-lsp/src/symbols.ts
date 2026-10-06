@@ -1,7 +1,7 @@
 import { DocumentSymbol, SymbolKind } from "vscode-languageserver";
 import type { SyntaxNode, Tree } from "./parser-utils";
 import { nodeRange, child, children, labelText, stringText } from "./parser-utils";
-import { fieldNameText, isMetricSchema } from "@satsuma/core";
+import { fieldNameText, isMetricSchema, spreadLabelText } from "@satsuma/core";
 
 /** Map of CST block type → LSP SymbolKind. */
 const BLOCK_SYMBOL_KIND: Record<string, SymbolKind> = {
@@ -244,12 +244,4 @@ function symbolDetail(node: SyntaxNode): string | undefined {
     }
   }
   return undefined;
-}
-
-function spreadLabelText(node: SyntaxNode): string | null {
-  // spread_label can contain identifier, quoted_name, or qualified_name
-  const inner = node.namedChildren[0];
-  if (!inner) return node.text;
-  if (inner.type === "backtick_name") return inner.text.slice(1, -1);
-  return inner.text;
 }

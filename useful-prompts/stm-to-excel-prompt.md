@@ -13,7 +13,9 @@ file             = { import_stmt | note_block | namespace | schema | fragment | 
 
 import_stmt      = "import" "{" name_list "}" "from" STRING ;
 name_list        = name_ref {"," name_ref} ;
-name_ref         = label | label "::" label ;
+name_ref         = label | IDENT "::" label ;
+(* Quote only the name after ::, as in raw::`crm contacts`. A namespace name is never quoted.
+   Backticks around the whole qualified name still parse but are deprecated *)
 note_block       = "note" "{" (STRING | TRIPLESTRING) "}" ;
 
 namespace        = "namespace" label ["(" metadata ")"] "{" namespace_body "}" ;
@@ -27,7 +29,7 @@ meta_entry       = IDENT [value] | IDENT "{" enum_items "}" | "note" (STRING | T
 schema_body      = { field_decl | spread | COMMENT } ;
 field_decl       = (IDENT | BACKTICK_IDENT) [type_expr] ["(" metadata ")"] ["{" schema_body "}"] ;
 type_expr        = TYPE ["(" params ")"] | "record" | "list_of" TYPE ["(" params ")"] | "list_of" "record" ;
-spread           = "..." label ;
+spread           = "..." (label | IDENT "::" label) ;
 
 transform        = "transform" label "{" transform_body "}" ;
 transform_body   = spread | pipe_step {"|" pipe_step} ;

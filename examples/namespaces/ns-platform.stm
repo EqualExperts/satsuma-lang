@@ -107,7 +107,7 @@ namespace vault (note "Data Vault 2.0 — hubs, links, and satellites") {
 
   // Load hub_contact from CRM contacts (cross-namespace)
   mapping `load hub_contact` {
-    source { `raw::crm_contacts` }
+    source { raw::crm_contacts }
     target { `hub_contact` }
 
     contact_id -> contact_hk { dv_hash_key }
@@ -116,7 +116,7 @@ namespace vault (note "Data Vault 2.0 — hubs, links, and satellites") {
 
   // Load satellite from CRM contacts
   mapping `load sat_contact` {
-    source { `raw::crm_contacts` }
+    source { raw::crm_contacts }
     target { `sat_contact_details` }
 
     contact_id -> contact_hk { dv_hash_key }
@@ -133,7 +133,7 @@ namespace vault (note "Data Vault 2.0 — hubs, links, and satellites") {
 
   // Load hub_deal from CRM deals
   mapping `load hub_deal` {
-    source { `raw::crm_deals` }
+    source { raw::crm_deals }
     target { `hub_deal` }
 
     deal_id -> deal_hk { dv_hash_key }
@@ -142,7 +142,7 @@ namespace vault (note "Data Vault 2.0 — hubs, links, and satellites") {
 
   // Load link between contact and deal
   mapping `load link_contact_deal` {
-    source { `raw::crm_deals` }
+    source { raw::crm_deals }
     target { `link_contact_deal` }
 
     -> link_hk { "MD5 hash of @contact_id + @deal_id" }
@@ -187,8 +187,8 @@ namespace mart (note "Business-facing dimensional models") {
   // Build contact dimension from vault
   mapping `build dim_contact` {
     source {
-      `vault::hub_contact`,
-      `vault::sat_contact_details`
+      vault::hub_contact,
+      vault::sat_contact_details
     }
     target { `dim_contact` }
 
@@ -210,10 +210,10 @@ namespace mart (note "Business-facing dimensional models") {
   // Build deal fact from vault
   mapping `build fact_deals` {
     source {
-      `vault::hub_deal`,
-      `vault::link_contact_deal`,
-      `vault::hub_contact`,
-      `mart::dim_contact`
+      vault::hub_deal,
+      vault::link_contact_deal,
+      vault::hub_contact,
+      mart::dim_contact
     }
     target { `fact_deals` }
 
@@ -238,7 +238,7 @@ namespace mart (note "Business-facing dimensional models") {
 
   // Revenue fact from ERP invoices
   mapping `build fact_revenue` {
-    source { `raw::erp_invoices` }
+    source { raw::erp_invoices }
     target { `fact_revenue` }
 
     -> revenue_sk { "Surrogate key via sequence generator" }

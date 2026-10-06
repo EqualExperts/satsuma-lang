@@ -108,18 +108,73 @@ export function entryText(node: SyntaxNode | null | undefined): string | null {
 }
 
 /**
- * Extract the namespace::name text from a qualified_name CST node.
- * Returns null if the node is missing or has fewer than two identifier children.
+ * Text of one name segment (`identifier` or `backtick_name`), with a
+ * `backtick_name`'s delimiters removed.
  *
- * A qualified_name node in the Satsuma grammar has the form:
- *   identifier "::" identifier
- * e.g. `crm::customers` → "crm::customers".
+ * Shared by arrow paths (arrow-path.ts) and namespace-qualified names below,
+ * and uses the same `slice(1, -1)` unquoting as field declarations
+ * (`fieldNameText`), so a reference and the declaration it names agree on
+ * what the name is.
+ */
+export function pathSegmentText(seg: SyntaxNode): string {
+  return seg.type === "backtick_name" ? seg.text.slice(1, -1) : seg.text;
+}
+
+/**
+ * Extract the canonical `ns::name` text from a qualified_name CST node, or
+ * null when the node is missing or error recovery left either side absent.
+ *
+ * The grammar's qualified_name is `identifier "::" (identifier | backtick_name)`:
+ * a namespace name is always a bare identifier, while the name after `::` may
+ * be backtick-quoted (bsw-iuzs). The quoted form is unquoted here, so
+ * `` raw::`crm-contacts` `` and `raw::crm_contacts` both come back as plain
+ * `ns::name` text that matches the declared schema's key.
  */
 export function qualifiedNameText(node: SyntaxNode | null | undefined): string | null {
   if (!node || node.type !== "qualified_name") return null;
-  const ids = node.namedChildren.filter((c) => c.type === "identifier" && isPresent(c));
-  if (ids.length < 2 || !ids[0] || !ids[1]) return null;
-  return `${ids[0].text}::${ids[1].text}`;
+  const parts = node.namedChildren.filter(
+    (c) => (c.type === "identifier" || c.type === "backtick_name") && isPresent(c),
+  );
+  const [ns, name] = parts;
+  if (parts.length < 2 || !ns || !name || ns.type !== "identifier") return null;
+  return `${ns.text}::${pathSegmentText(name)}`;
+}
+
+/**
+ * Extract the imported name from an import_name CST node: `ns::name`,
+ * a backtick name or a bare identifier, unquoted. Returns null when error
+ * recovery left the entry empty, so `import { } from "x"` yields no names
+ * rather than [""] (sl-0nvt).
+ */
+export function importNameText(node: SyntaxNode | null | undefined): string | null {
+  if (!node) return null;
+  const qn = child(node, "qualified_name");
+  if (isPresent(qn)) return qualifiedNameText(qn);
+  const q = child(node, "backtick_name");
+  if (isPresent(q)) return q.text.slice(1, -1);
+  const id = child(node, "identifier");
+  return isPresent(id) ? id.text : null;
+}
+
+/**
+ * Extract the fragment or schema name a spread (`...name`) refers to from its
+ * spread_label CST node.
+ *
+ * A spread_label is one of: a qualified_name (`...ns::name`, whose name side
+ * may be backtick-quoted), a backtick_name, or an unquoted run of words
+ * (`...address fields`: identifier + continuation_word children, sl-3ccy),
+ * which is joined with single spaces. Quoted names come back unquoted. A
+ * recovered qualified_name with a side missing falls back to its raw text.
+ */
+export function spreadLabelText(node: SyntaxNode): string {
+  const qn = child(node, "qualified_name");
+  if (qn) return qualifiedNameText(qn) ?? qn.text;
+  const q = child(node, "backtick_name");
+  if (q) return q.text.slice(1, -1);
+  return node.namedChildren
+    .filter((c) => c.type === "identifier" || c.type === "continuation_word")
+    .map((c) => c.text)
+    .join(" ");
 }
 
 /**

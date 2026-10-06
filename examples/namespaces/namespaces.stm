@@ -68,7 +68,7 @@ namespace warehouse (note "Conformed data layer for unified analytics") {
 
   // Cross-namespace mapping: POS stores into hub
   mapping `load hub_store` {
-    source { `pos::stores` }
+    source { pos::stores }
     target { conformed_store }
 
     STORE_ID -> store_key { md5(STORE_ID) }
@@ -79,7 +79,7 @@ namespace warehouse (note "Conformed data layer for unified analytics") {
 
   // Cross-namespace mapping: e-commerce customers into hub
   mapping `load hub_customer` {
-    source { `ecom::customers` }
+    source { ecom::customers }
     target { conformed_customer }
 
     email -> customer_key { md5(email) }
