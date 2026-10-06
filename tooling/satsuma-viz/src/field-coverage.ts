@@ -23,9 +23,11 @@
 
 import { schemaLocalFieldPath } from "@satsuma/core/coverage-paths";
 import {
+  PATH_SEPARATOR,
   createAuthoredEntityRef,
   createCanonicalEntityRef,
   createContainerQualifiedFieldRef,
+  type ContainerSegments,
 } from "@satsuma/core/reference-stages";
 import { unionFieldCoverage } from "@satsuma/core/coverage-rollup";
 import { uncoveredFieldCoverage } from "@satsuma/core/coverage";
@@ -221,12 +223,16 @@ export function forEachMappingArrow(
  * The absolute source and target paths that child arrows inside a container
  * resolve against. Null on a side means "no container" — at mapping-body level,
  * or when a malformed block declares no path on that side.
+ *
+ * Held as segments, one per nesting level, not as joined text: a backtick
+ * segment may hold a dot (`` `line.items` ``), and re-splitting the text would
+ * make `^.` pop half a name (bsw-2yzd).
  */
 export interface ContainerScope {
-  /** Absolute source path of the enclosing container chain. */
-  source: string | null;
-  /** Absolute target path of the enclosing container chain. */
-  target: string | null;
+  /** Absolute source segments of the enclosing container chain. */
+  source: ContainerSegments | null;
+  /** Absolute target segments of the enclosing container chain. */
+  target: ContainerSegments | null;
 }
 
 /** Mapping-body level: arrows there are already absolute. */
@@ -235,21 +241,37 @@ export const MAPPING_BODY_SCOPE: ContainerScope = { source: null, target: null }
 /**
  * The scope inside `block`, given the scope the block itself sits in.
  *
- * A block's header is authored relative to its own container (`each .parcels ->
- * .packed` inside another `each`), so the header is qualified first and the
- * result becomes the prefix for everything the block contains — which is how
- * one rule covers nesting of any depth. An empty path on either side (a
- * malformed block) leaves that side unprefixed rather than producing a path
- * with a dangling dot.
+ * The backend sends each block's header already resolved to schema-root
+ * segments (`sourceContainerSegments`), read from the CST so a dotted backtick
+ * segment stays one level; those are the scope as they stand.
+ *
+ * A payload from an older host lacks them. Then the header, authored relative
+ * to its own container (`each .parcels -> .packed` inside another `each`), is
+ * qualified against the outer scope and split into levels — exact whenever no
+ * segment holds a dot. Either way the result is the prefix for everything the
+ * block contains, which is how one rule covers nesting of any depth. An empty
+ * path on either side (a malformed block) leaves that side unprefixed rather
+ * than producing a path with a dangling dot.
  */
 export function scopeWithin(
   outer: ContainerScope,
   block: EachBlock | FlattenBlock | NestedArrowBlock,
 ): ContainerScope {
   return {
-    source: qualifyChildArrowPath(block.sourceField, outer.source) || null,
-    target: qualifyChildArrowPath(block.targetField, outer.target) || null,
+    source: sideScope(block.sourceContainerSegments, block.sourceField, outer.source),
+    target: sideScope(block.targetContainerSegments, block.targetField, outer.target),
   };
+}
+
+/** One side of {@link scopeWithin}: carried segments, else the qualified header text. */
+function sideScope(
+  carried: readonly string[] | undefined,
+  header: string,
+  outer: ContainerSegments | null,
+): ContainerSegments | null {
+  if (carried) return carried.length > 0 ? carried : null;
+  const qualified = qualifyChildArrowPath(header, outer);
+  return qualified ? qualified.split(PATH_SEPARATOR) : null;
 }
 
 /**

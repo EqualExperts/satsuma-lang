@@ -408,3 +408,29 @@ describe("extractArrowRecords — a container named by a dotted backtick segment
     assert.deepEqual(leaf?.nesting?.targetContainerSegments, ["rows"]);
   });
 });
+
+describe("extractArrowRecords — a namespaced container with a dotted backtick segment (bsw-2yzd)", () => {
+  // The namespaced form must keep `line.items` one level too: the namespace
+  // qualifier rides on the schema segment, never splitting the field name.
+  const SRC = `namespace a { schema src { sid STRING  \`line.items\` list_of record { v STRING } } }
+schema src2 { k STRING }
+schema tgt { rows list_of record { x STRING  y STRING } }
+mapping m {
+  source { a::src, src2 }
+  target { tgt }
+  each a::src.\`line.items\` -> rows {
+    .v -> .x
+    ^.sid -> .y
+  }
+}`;
+
+  it("pops the whole dotted segment for ^., reaching the namespaced schema root", () => {
+    const records = extractArrowRecords(rootOf(SRC));
+    assert.deepEqual(records.find((r) => r.target === "rows.y")?.sources, ["a::src.sid"]);
+  });
+
+  it("records the container as namespaced-schema plus whole-field segments", () => {
+    const leaf = extractArrowRecords(rootOf(SRC)).find((r) => r.target === "rows.y");
+    assert.deepEqual(leaf?.nesting?.sourceContainerSegments, ["a::src", "line.items"]);
+  });
+});

@@ -462,6 +462,45 @@ describe("relative arrow paths resolve against their container (3cdd-yavi)", () 
     assert.equal(mod.resolveSchemaLocalFieldPath(".orders", src, ["s"]), null);
     assert.equal(mod.resolveSchemaLocalFieldPath("orders", src, ["s"]), "orders");
   });
+
+  it("pops a dotted backtick container whole for ^. when the model carries its segments (bsw-2yzd)", () => {
+    // `` each `line.items` -> rows `` is one container level whose name holds a
+    // dot. Its joined text "line.items" cannot say so, which made `^.sid`
+    // resolve to the undeclared `line.sid` and drop the arrow's edge and hover
+    // highlight. The backend now sends the resolved segments, and the walk must
+    // resolve against those rather than re-split the text.
+    const mapping = mappingWith({
+      eachBlocks: [
+        block("line.items", "rows", {
+          sourceContainerSegments: ["line.items"],
+          targetContainerSegments: ["rows"],
+          arrows: [arrow(".v", ".x"), arrow("^.sid", ".y")],
+        }),
+      ],
+    });
+    assert.deepEqual(resolvedPaths(mapping), ["line.items.v -> rows.x", "sid -> rows.y"]);
+  });
+
+  it("nests a block's carried segments without consulting the outer scope's text", () => {
+    // The carried segments are already absolute, so a block inside a dotted
+    // container keeps that container as one level for its own `^.` too.
+    const mapping = mappingWith({
+      eachBlocks: [
+        block("line.items", "rows", {
+          sourceContainerSegments: ["line.items"],
+          targetContainerSegments: ["rows"],
+          nestedEach: [
+            block(".parts", ".parts", {
+              sourceContainerSegments: ["line.items", "parts"],
+              targetContainerSegments: ["rows", "parts"],
+              arrows: [arrow("^.^.sid", ".y")],
+            }),
+          ],
+        }),
+      ],
+    });
+    assert.deepEqual(resolvedPaths(mapping), ["sid -> rows.parts.y"]);
+  });
 });
 
 // ── "Not computed" is not "nothing is covered" (sl-46wr review) ──────────────
