@@ -265,6 +265,15 @@ export function countMappingArrows(mapping: MappingBlock): number {
   return count;
 }
 
+/**
+ * The arrow-count suffix on an overview mapping pill ("4 →s"). Shared by the
+ * renderer and the layout's width estimate so the node is always sized for
+ * exactly the text it will paint.
+ */
+export function overviewMappingCountText(arrowCount: number): string {
+  return `${arrowCount} \u2192s`;
+}
+
 // ── Reading core's coverage out of the model ────────────────────────────────
 
 /**

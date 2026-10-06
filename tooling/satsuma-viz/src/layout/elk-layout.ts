@@ -13,6 +13,7 @@ import type {
   FragmentCard,
   MappingBlock,
   FieldEntry,
+  NoteBlock,
   ArrowEntry,
   EachBlock,
   FlattenBlock,
@@ -20,6 +21,8 @@ import type {
 } from "../model.js";
 import {
   MAPPING_BODY_SCOPE,
+  countMappingArrows,
+  overviewMappingCountText,
   resolveSchemaLocalFieldPath,
   scopeWithin,
   type ContainerScope,
@@ -27,6 +30,7 @@ import {
 } from "../field-coverage.js";
 import { qualifyChildArrowPath } from "@satsuma/core/extract";
 import { metricFieldEntries } from "../metric-adapter.js";
+import { schemaLabelShown } from "../notes.js";
 import { fieldBadgeLabels } from "../field-badges.js";
 import {
   FIELD_BADGE_GAP,
@@ -128,8 +132,11 @@ const OVERVIEW_HEADER_BASE_WIDTH = 72; // icon + gaps + padding
 const OVERVIEW_TITLE_CHAR_WIDTH = 8.2;
 const OVERVIEW_COUNT_CHAR_WIDTH = 6.3;
 const OVERVIEW_PILL_CHAR_WIDTH = 6.1;
-const OVERVIEW_LABEL_CHAR_WIDTH = 6.8;
+// The mapping pill's name is 13px/600 — the same weight as compact card
+// titles — so it shares OVERVIEW_TITLE_CHAR_WIDTH; its arrow-count suffix is
+// the 11px/400 count text, so it shares OVERVIEW_COUNT_CHAR_WIDTH.
 const OVERVIEW_LABEL_PADDING = 76; // left 12 + right 40 + icon 16 + gap 8
+const OVERVIEW_LABEL_COUNT_GAP = 8; // flex gap between the name and the count
 const OVERVIEW_LABEL_MAX_WIDTH = 420;
 const OVERVIEW_NAMESPACE_PILL_PADDING = 30; // left 12 + right padding + pill internal padding
 const FULL_TITLE_CHAR_WIDTH = 8.1;
@@ -165,13 +172,20 @@ const FULL_SPREAD_HEIGHT = 24;
 const FULL_META_ROW_HEIGHT = 20;
 const FULL_META_BASE_HEIGHT = 12;
 
-/** Height of the area above the fields list (header + optional label + optional metadata pills). */
+/**
+ * Height of the area above the fields list: header, the label line when the
+ * card shows one, and the metadata pills. `labelShown` is the card's own
+ * decision — the compact overview card never shows a label, and a full card
+ * shows one only per {@link schemaLabelShown} — so the reserved space, and
+ * the field ports anchored below it, match what is painted.
+ */
 function preambleHeight(
-  schema: { label: string | null; metadata: Array<{ key: string; value: string }> },
-  hasNamespace = false,
+  schema: { metadata: Array<{ key: string; value: string }> },
+  hasNamespace: boolean,
+  labelShown: boolean,
 ): number {
   let h = HEADER_HEIGHT + (hasNamespace ? NAMESPACE_PILL_HEIGHT : 0);
-  if (schema.label) h += LABEL_HEIGHT;
+  if (labelShown) h += LABEL_HEIGHT;
   // Metadata pills stack one per row (sl-dw9x); each row's height is pinned
   // in the card CSS to the shared geometry constants used here.
   const pillCount = schema.metadata.filter((m) => m.key !== "note").length;
@@ -184,12 +198,22 @@ function preambleHeight(
   return h;
 }
 
-/** Compact card height: header + optional label + optional pills + small padding. */
-function compactHeight(
-  schema: { label: string | null; metadata: Array<{ key: string; value: string }> },
-  hasNamespace = false,
-): number {
-  return preambleHeight(schema, hasNamespace) + FIELDS_PADDING_BOTTOM;
+/**
+ * Height of a card's notes section with every note expanded — the schema
+ * card's default, compact or full, so the overview shows a note's text
+ * without a click.
+ */
+function expandedNotesHeight(notes: NoteBlock[]): number {
+  return notes.reduce((sum, note) => sum + estimateNoteBlockHeight(note.text, true), 0);
+}
+
+/** Compact card height: header + optional pills + small padding + notes (no label line). */
+function compactHeight(schema: SchemaCard, hasNamespace = false): number {
+  return (
+    preambleHeight(schema, hasNamespace, false) +
+    FIELDS_PADDING_BOTTOM +
+    expandedNotesHeight(schema.notes)
+  );
 }
 
 /**
@@ -202,10 +226,11 @@ function compactHeight(
 function compactExpandedHeight(schema: SchemaCard, hasNamespace = false): number {
   const cardWidth = compactExpandedWidth(schema);
   return (
-    preambleHeight(schema, hasNamespace) +
+    preambleHeight(schema, hasNamespace, false) +
     FIELDS_PADDING_TOP +
     sumFieldRowHeights(schema.fields, cardWidth) +
-    FIELDS_PADDING_BOTTOM
+    FIELDS_PADDING_BOTTOM +
+    expandedNotesHeight(schema.notes)
   );
 }
 
@@ -290,9 +315,23 @@ function estimateTextWidth(text: string, charWidth: number): number {
   return text.length * charWidth;
 }
 
-function estimateOverviewLabelWidth(mappingId: string, namespaceName?: string | null): number {
+/**
+ * Width of an overview mapping pill: the wider of its label row (icon, name
+ * and arrow-count suffix) and its namespace pill, clamped to the card bounds.
+ * The count suffix must be included — leaving it out sized the node to the
+ * name alone, so the renderer pinned the card to a width the "N →s" text then
+ * spilled past.
+ */
+function estimateOverviewLabelWidth(
+  mappingId: string,
+  arrowCount: number,
+  namespaceName?: string | null,
+): number {
   const labelWidth = Math.ceil(
-    estimateTextWidth(mappingId, OVERVIEW_LABEL_CHAR_WIDTH) + OVERVIEW_LABEL_PADDING,
+    OVERVIEW_LABEL_PADDING +
+      estimateTextWidth(mappingId, OVERVIEW_TITLE_CHAR_WIDTH) +
+      OVERVIEW_LABEL_COUNT_GAP +
+      estimateTextWidth(overviewMappingCountText(arrowCount), OVERVIEW_COUNT_CHAR_WIDTH),
   );
   // Namespace pill sits in its own row; take the wider of the two
   const pillWidth = namespaceName
@@ -505,13 +544,10 @@ function estimateFragmentHeight(fragment: FragmentCard, hasNamespace = false): n
 function estimateSchemaHeight(schema: SchemaCard, hasNamespace = false): number {
   const notes = schema.notes ?? [];
   const spreads = schema.spreads ?? [];
-  const notesHeight = notes.reduce(
-    (sum, note) => sum + estimateNoteBlockHeight(note.text, true),
-    0,
-  );
+  const notesHeight = expandedNotesHeight(notes);
   const spreadsHeight = spreads.length * FULL_SPREAD_HEIGHT;
   return (
-    preambleHeight(schema, hasNamespace) +
+    preambleHeight(schema, hasNamespace, schemaLabelShown(schema)) +
     FIELDS_PADDING_TOP +
     countFields(schema.fields) * FIELD_HEIGHT +
     FIELDS_PADDING_BOTTOM +
@@ -613,7 +649,7 @@ function addSchemaNodes(
 ) {
   for (const s of schemas) {
     const width = estimateSchemaWidth(s);
-    const topOffset = preambleHeight(s, hasNamespace) + FIELDS_PADDING_TOP;
+    const topOffset = preambleHeight(s, hasNamespace, schemaLabelShown(s)) + FIELDS_PADDING_TOP;
     // Expand spread fields so ports exist for arrow endpoints that reference them
     const spreadFields = (s.spreads ?? []).flatMap((name) => fragmentsById.get(name) ?? []);
     const allFields = [...s.fields, ...spreadFields];
@@ -1143,7 +1179,7 @@ export async function computeOverviewLayout(
       if (ns.name) overviewNodeHasNamespace.add(mappingNodeId);
       nsNodes.push({
         id: mappingNodeId,
-        width: estimateOverviewLabelWidth(m.id, ns.name),
+        width: estimateOverviewLabelWidth(m.id, countMappingArrows(m), ns.name),
         height: (ns.name ? NAMESPACE_PILL_HEIGHT : 0) + HEADER_HEIGHT + FIELDS_PADDING_BOTTOM,
         layoutOptions: {
           "elk.layered.layerConstraint": "NONE",

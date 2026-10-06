@@ -120,6 +120,21 @@ export const noteSectionStyles = css`
   }
 `;
 
+/**
+ * Whether a full schema card shows its italic label line.
+ *
+ * Rule: the backend fills a schema's `label` from its `note` tag, and the same
+ * note also arrives in `notes` and renders in the Notes section. A label that
+ * merely repeats a note is therefore not shown, or the note would print twice;
+ * a label with its own text (a metric's display name) still shows. The card
+ * and the overview layout both ask this one question, so the space the layout
+ * reserves above the field rows — where edge ports are anchored — is exactly
+ * the space the card paints.
+ */
+export function schemaLabelShown(card: { label: string | null; notes: NoteBlock[] }): boolean {
+  return card.label !== null && !card.notes.some((n) => n.text === card.label);
+}
+
 /** Inputs to {@link renderNotesSection}. */
 export interface NotesSectionOptions {
   /** Note blocks to render. Callers must not call with an empty array — a

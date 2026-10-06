@@ -843,29 +843,40 @@ describe("extractNotes (direct)", () => {
 // ==================================================================
 
 describe("extractComments (direct)", () => {
-  // The //! warning comment that follows a field declaration is parsed as a
-  // direct child of the enclosing schema_block (not the field_decl, and not
-  // schema_body — verified by dumping the CST). extractComments scans the
-  // node's children for warning/question_comment, so calling it on the
-  // schema_block surfaces the warning.
-  it("captures a warning_comment child as kind: 'warning'", () => {
+  // A //! trailing a schema's last field is hoisted by the grammar out of
+  // schema_body into schema_block. It still describes the field, so it must
+  // surface on the field_decl and NOT on the schema_block that happens to
+  // hold it in the CST.
+  it("credits a hoisted trailing //! to its field, not the enclosing schema_block", () => {
     const src = "schema s {\n  email STRING //! PII risk\n}";
-    const node = findNode(root(src), "schema_block");
-    const comments = extractComments(URI, node);
-    assert.equal(comments.length, 1);
-    assert.equal(comments[0].kind, "warning");
-    assert.equal(comments[0].text, "PII risk");
+    const r = root(src);
+    const comments = extractComments(URI, findNode(r, "field_decl"));
+    assert.deepEqual(
+      comments.map((c) => [c.kind, c.text]),
+      [["warning", "PII risk"]],
+    );
+    assert.deepEqual(extractComments(URI, findNode(r, "schema_block")), []);
   });
 
-  // //? maps to kind "question" via the same child-scan path. Distinct from
-  // the warning case so worth pinning separately.
-  it("captures a question_comment child as kind: 'question'", () => {
+  // //? maps to kind "question" via the same path. Distinct from the warning
+  // case so worth pinning separately.
+  it("maps a trailing //? to kind: 'question'", () => {
     const src = "schema s {\n  status STRING //? should be enum\n}";
-    const node = findNode(root(src), "schema_block");
-    const comments = extractComments(URI, node);
-    assert.equal(comments.length, 1);
-    assert.equal(comments[0].kind, "question");
-    assert.equal(comments[0].text, "should be enum");
+    const comments = extractComments(URI, findNode(root(src), "field_decl"));
+    assert.deepEqual(
+      comments.map((c) => [c.kind, c.text]),
+      [["question", "should be enum"]],
+    );
+  });
+
+  // A comment on a line of its own inside the block annotates the block.
+  it("keeps a standalone comment inside the block on the schema_block", () => {
+    const src = "schema s {\n  //! whole schema\n  id INT\n}";
+    const comments = extractComments(URI, findNode(root(src), "schema_block"));
+    assert.deepEqual(
+      comments.map((c) => c.text),
+      ["whole schema"],
+    );
   });
 
   // No annotation children → empty array, not undefined.

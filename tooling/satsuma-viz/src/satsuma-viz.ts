@@ -54,7 +54,7 @@ export {
   METADATA_PILLS_CHROME,
   NAMESPACE_PILL_HEIGHT,
 } from "./layout/geometry.js";
-import { countMappingArrows } from "./field-coverage.js";
+import { countMappingArrows, overviewMappingCountText } from "./field-coverage.js";
 export {
   buildCoverageIndex,
   mappingSchemaCoverage,
@@ -407,9 +407,19 @@ export class SatsumaViz extends LitElement {
       opacity: 0.92;
     }
 
+    /* When a name outgrows the clamped node width, the name truncates and
+       the arrow count stays whole: the count never shrinks, the name may. */
     .overview-mapping-name {
+      min-width: 0;
       overflow: hidden;
       text-overflow: ellipsis;
+    }
+
+    .overview-mapping-count {
+      flex-shrink: 0;
+      opacity: 0.6;
+      font-size: 11px;
+      font-weight: 400;
     }
 
     /* View transition fade */
@@ -2246,8 +2256,10 @@ export class SatsumaViz extends LitElement {
                           <path d="M4.5 9h7v1.5h-7z" opacity="0.78"></path>
                         </svg>
                         <span class="overview-mapping-name">${m.id}</span>
-                        <span style="opacity:0.6;font-size:11px;font-weight:400;"
-                          >${countMappingArrows(m)} &#8594;s</span
+                        <span
+                          class="overview-mapping-count"
+                          data-testid=${`overview-mapping-count-${sanitizeTestIdSegment(m.id)}`}
+                          >${overviewMappingCountText(countMappingArrows(m))}</span
                         >
                       </div>
                     </div>
