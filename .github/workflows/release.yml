@@ -94,17 +94,17 @@ jobs:
           npm install -g ./tooling/satsuma-lsp/satsuma-lsp.tgz
           node tooling/satsuma-lsp/scripts/smoke-initialize.js "$(command -v satsuma-lsp)" --stdio
 
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: satsuma-cli
           path: tooling/satsuma-cli/satsuma-cli.tgz
 
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: vscode-satsuma-vsix
           path: tooling/vscode-satsuma/vscode-satsuma.vsix
 
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: satsuma-lsp
           path: tooling/satsuma-lsp/satsuma-lsp.tgz
