@@ -104,7 +104,7 @@
     "globals": "^17.13.0",
     "js-tiktoken": "^1.0.21",
     "markdownlint-cli2": "^0.23.3",
-    "prettier": "^3.9.9",
+    "prettier": "^3.9.10",
     "turbo": "2.11.7",
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.71.0",
